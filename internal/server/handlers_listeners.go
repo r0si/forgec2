@@ -58,9 +58,8 @@ func (s *Server) handleListListeners(c *gin.Context) {
 		respondError(c, http.StatusInternalServerError, "Failed to list listeners")
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"success":   true,
-		"data":      listeners,
+	respond(c, gin.H{
+		"listeners": listeners,
 		"total":     total,
 		"page":      p.Page,
 		"page_size": p.PageSize,
@@ -126,8 +125,7 @@ func (s *Server) handleAPIGetListener(c *gin.Context) {
 		slog.Error("Failed to count active agents", "err", err)
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success":  true,
+	respond(c, gin.H{
 		"listener": listener,
 		"agents":   agents,
 		"total":    len(agents),
@@ -396,7 +394,7 @@ func (s *Server) handleCreateListener(c *gin.Context) {
 	s.broadcastListenerUpdate("created", &l)
 	s.LogAuditRecord(c, "listener_create", "listener", fmt.Sprintf("%d", l.ID), l.Name+" "+l.Scheme, true, nil)
 
-	c.JSON(http.StatusOK, gin.H{"success": true, "listener": l})
+	respond(c, gin.H{"listener": l})
 }
 
 // loadListenerScoped reads one listener honoring tenant visibility:
@@ -568,7 +566,7 @@ func (s *Server) handleUpdateListener(c *gin.Context) {
 	s.broadcastListenerUpdate("updated", &l)
 	s.LogAuditRecord(c, "listener_update", "listener", id, l.Name+" "+l.Scheme, true, nil)
 
-	c.JSON(http.StatusOK, gin.H{"success": true, "listener": l})
+	respond(c, gin.H{"listener": l})
 }
 
 func (s *Server) handleDeleteListener(c *gin.Context) {
@@ -638,7 +636,7 @@ func (s *Server) handleEnableListener(c *gin.Context) {
 	s.syncListenerProbe(&l)
 	s.broadcastListenerUpdate("enabled", &l)
 	s.LogAuditRecord(c, "listener_enable", "listener", id, l.Name+" "+l.Scheme, true, nil)
-	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Listener enabled"})
+	respond(c, gin.H{"message": "Listener enabled"})
 }
 
 func (s *Server) handleDisableListener(c *gin.Context) {
@@ -658,7 +656,7 @@ func (s *Server) handleDisableListener(c *gin.Context) {
 	s.syncListenerProbe(&l)
 	s.broadcastListenerUpdate("disabled", &l)
 	s.LogAuditRecord(c, "listener_disable", "listener", id, l.Name+" "+l.Scheme, true, nil)
-	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Listener disabled"})
+	respond(c, gin.H{"message": "Listener disabled"})
 }
 
 func (s *Server) handleListenersPage(c *gin.Context) {

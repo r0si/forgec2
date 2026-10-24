@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -30,23 +29,17 @@ func TestHandleListListeners_Empty(t *testing.T) {
 		t.Fatalf("expected 200, got %d; body=%s", w.Code, w.Body.String())
 	}
 	var resp struct {
-		Success  bool          `json:"success"`
-		Data     []db.Listener `json:"data"`
-		Total    int64         `json:"total"`
-		Page     int           `json:"page"`
-		PageSize int           `json:"page_size"`
+		Listeners []db.Listener `json:"listeners"`
+		Total     int64         `json:"total"`
+		Page      int           `json:"page"`
+		PageSize  int           `json:"page_size"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("invalid json: %v; body=%s", err, w.Body.String())
-	}
-	if !resp.Success {
-		t.Fatal("expected success=true")
-	}
+	unmarshalData(t, w.Body.Bytes(), &resp)
 	if resp.Total != 0 {
 		t.Fatalf("expected total=0, got %d", resp.Total)
 	}
-	if len(resp.Data) != 0 {
-		t.Fatalf("expected empty data, got %d entries", len(resp.Data))
+	if len(resp.Listeners) != 0 {
+		t.Fatalf("expected empty data, got %d entries", len(resp.Listeners))
 	}
 }
 
@@ -73,23 +66,17 @@ func TestHandleListListeners_WithData(t *testing.T) {
 		t.Fatalf("expected 200, got %d; body=%s", w.Code, w.Body.String())
 	}
 	var resp struct {
-		Success bool          `json:"success"`
-		Data    []db.Listener `json:"data"`
-		Total   int64         `json:"total"`
+		Listeners []db.Listener `json:"listeners"`
+		Total     int64         `json:"total"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("invalid json: %v; body=%s", err, w.Body.String())
-	}
-	if !resp.Success {
-		t.Fatal("expected success=true")
-	}
+	unmarshalData(t, w.Body.Bytes(), &resp)
 	if resp.Total != 1 {
 		t.Fatalf("expected total=1, got %d", resp.Total)
 	}
-	if len(resp.Data) != 1 {
-		t.Fatalf("expected 1 entry, got %d", len(resp.Data))
+	if len(resp.Listeners) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(resp.Listeners))
 	}
-	if resp.Data[0].Name != "primary-http" {
-		t.Fatalf("expected name 'primary-http', got %q", resp.Data[0].Name)
+	if resp.Listeners[0].Name != "primary-http" {
+		t.Fatalf("expected name 'primary-http', got %q", resp.Listeners[0].Name)
 	}
 }

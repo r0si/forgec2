@@ -46,7 +46,6 @@ handlers_certs.go 6
 handlers_container.go 1
 handlers_cookie_proxy.go 3
 handlers_credentials.go 4
-handlers_dashboard.go 8
 handlers_emergency.go 5
 handlers_generate_binaries.go 6
 handlers_generate_delivery.go 1
@@ -56,7 +55,6 @@ handlers_i18n.go 4
 handlers_infra.go 5
 handlers_ioc.go 1
 handlers_lateral.go 2
-handlers_listeners.go 6
 handlers_macros.go 4
 handlers_notification_routes.go 2
 handlers_ntlm.go 2
@@ -80,7 +78,6 @@ handlers_toolkit.go 4
 handlers_topology_net.go 1
 handlers_traffic_profile.go 4
 handlers_tun.go 2
-handlers_users.go 7
 remote_desktop.go 1
 render_api.go 1
 server_http.go 1

@@ -1,7 +1,6 @@
 package server
 
 import (
-	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -127,7 +126,7 @@ func (s *Server) handleDashboardActivityHeatmap(c *gin.Context) {
 		}
 	}
 
-	c.JSON(http.StatusOK, heatmap)
+	respond(c, heatmap)
 }
 
 func (s *Server) handleDashboardOSDistribution(c *gin.Context) {
@@ -158,7 +157,7 @@ func (s *Server) handleDashboardOSDistribution(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, distribution)
+	respond(c, distribution)
 }
 
 func (s *Server) handleDashboardTaskStatus(c *gin.Context) {
@@ -186,7 +185,7 @@ func (s *Server) handleDashboardTaskStatus(c *gin.Context) {
 		{Name: "Failed", Count: countMap["failed"], Color: "#ef4444"},
 	}
 
-	c.JSON(http.StatusOK, statusData)
+	respond(c, statusData)
 }
 
 func (s *Server) handleDashboardListenerTraffic(c *gin.Context) {
@@ -261,7 +260,7 @@ func (s *Server) handleDashboardListenerTraffic(c *gin.Context) {
 		BytesOut: bytesOut,
 	}
 
-	c.JSON(http.StatusOK, trafficData)
+	respond(c, trafficData)
 }
 
 func (s *Server) handleDashboardCredentialTypes(c *gin.Context) {
@@ -322,7 +321,7 @@ func (s *Server) handleDashboardCredentialTypes(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, credTypes)
+	respond(c, credTypes)
 }
 
 func (s *Server) handleDashboardAgentGeo(c *gin.Context) {
@@ -372,7 +371,7 @@ func (s *Server) handleDashboardAgentGeo(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, geoData)
+	respond(c, geoData)
 }
 
 func (s *Server) handleDashboardTaskGantt(c *gin.Context) {
@@ -444,7 +443,7 @@ func (s *Server) handleDashboardTaskGantt(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, ganttData)
+	respond(c, ganttData)
 }
 
 func (s *Server) handleDashboardAttackPath(c *gin.Context) {
@@ -529,5 +528,5 @@ func (s *Server) handleDashboardAttackPath(c *gin.Context) {
 		Edges: edges,
 	}
 
-	c.JSON(http.StatusOK, attackPath)
+	respond(c, attackPath)
 }

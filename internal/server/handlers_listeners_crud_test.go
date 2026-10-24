@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -54,9 +53,7 @@ func TestHandleCreateListener_Validation(t *testing.T) {
 			Success  bool        `json:"success"`
 			Listener db.Listener `json:"listener"`
 		}
-		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.Fatalf("invalid json: %v; body=%s", err, w.Body.String())
-		}
+		unmarshalData(t, w.Body.Bytes(), &resp)
 		if resp.Listener.Name != "Listener 8080" && resp.Listener.Name != "" {
 			t.Errorf("expected auto-generated name, got %q", resp.Listener.Name)
 		}
@@ -89,15 +86,9 @@ func TestHandleCreateListener_Validation(t *testing.T) {
 			t.Errorf("expected 200, got %d; body=%s", w.Code, w.Body.String())
 		}
 		var resp struct {
-			Success  bool        `json:"success"`
 			Listener db.Listener `json:"listener"`
 		}
-		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.Fatalf("invalid json: %v; body=%s", err, w.Body.String())
-		}
-		if !resp.Success {
-			t.Fatal("expected success=true")
-		}
+		unmarshalData(t, w.Body.Bytes(), &resp)
 		if resp.Listener.Name != "test-http" {
 			t.Errorf("expected name=test-http, got %q", resp.Listener.Name)
 		}
@@ -120,9 +111,7 @@ func TestHandleCreateListener_SSHandH2C(t *testing.T) {
 		var resp struct {
 			Listener db.Listener `json:"listener"`
 		}
-		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.Fatalf("invalid json: %v; body=%s", err, w.Body.String())
-		}
+		unmarshalData(t, w.Body.Bytes(), &resp)
 		if resp.Listener.Scheme != "ssh" {
 			t.Errorf("expected scheme=ssh, got %q", resp.Listener.Scheme)
 		}
@@ -148,9 +137,7 @@ func TestHandleCreateListener_SSHandH2C(t *testing.T) {
 		var resp struct {
 			Listener db.Listener `json:"listener"`
 		}
-		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.Fatalf("invalid json: %v; body=%s", err, w.Body.String())
-		}
+		unmarshalData(t, w.Body.Bytes(), &resp)
 		if resp.Listener.Scheme != "h2c" {
 			t.Errorf("expected scheme=h2c, got %q", resp.Listener.Scheme)
 		}
@@ -269,17 +256,11 @@ func TestHandleAPIGetListener(t *testing.T) {
 			t.Fatalf("expected 200, got %d; body=%s", w.Code, w.Body.String())
 		}
 		var resp struct {
-			Success  bool         `json:"success"`
 			Listener db.Listener  `json:"listener"`
 			Agents   []db.Implant `json:"agents"`
 			Total    int          `json:"total"`
 		}
-		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.Fatalf("invalid json: %v; body=%s", err, w.Body.String())
-		}
-		if !resp.Success {
-			t.Error("expected success=true")
-		}
+		unmarshalData(t, w.Body.Bytes(), &resp)
 		if resp.Listener.ID != listener.ID {
 			t.Errorf("expected listener id %d, got %d", listener.ID, resp.Listener.ID)
 		}

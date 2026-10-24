@@ -88,7 +88,7 @@ func (s *Server) handleAddUser(c *gin.Context) {
 		fmt.Sprintf("Created user %s with role %s", username, role), true, nil)
 	slog.Info("User created", "username", username, "role", role, "user", currentUser)
 
-	c.JSON(http.StatusOK, gin.H{"success": true, "message": fmt.Sprintf("User %s created", username)})
+	respond(c, gin.H{"message": fmt.Sprintf("User %s created", username)})
 }
 
 // handleToggleUser enables/disables a user
@@ -149,7 +149,7 @@ func (s *Server) handleToggleUser(c *gin.Context) {
 		fmt.Sprintf("%s account %s", status, user.Username), true, nil)
 	slog.Info("User toggled", "username", user.Username, "active", !user.IsActive)
 
-	c.JSON(http.StatusOK, gin.H{"success": true, "message": fmt.Sprintf("User %s", status)})
+	respond(c, gin.H{"message": fmt.Sprintf("User %s", status)})
 }
 
 // handleEditUser updates username/role (admin only)
@@ -190,7 +190,7 @@ func (s *Server) handleEditUser(c *gin.Context) {
 	}
 
 	if len(updates) == 0 {
-		c.JSON(http.StatusOK, gin.H{"success": true, "message": "No changes"})
+		respond(c, gin.H{"message": "No changes"})
 		return
 	}
 
@@ -206,7 +206,7 @@ func (s *Server) handleEditUser(c *gin.Context) {
 		fmt.Sprintf("Edited user %s: %v", user.Username, updates), true, nil)
 	slog.Info("User edited", "user_id", idStr, "updates", updates, "user", currentUser)
 
-	c.JSON(http.StatusOK, gin.H{"success": true, "message": "User updated"})
+	respond(c, gin.H{"message": "User updated"})
 }
 
 // handleForceLogoutUser invalidates all sessions for a user (admin only)
@@ -255,7 +255,7 @@ func (s *Server) handleForceLogoutUser(c *gin.Context) {
 		fmt.Sprintf("Force logged out user %s", target.Username), true, nil)
 	slog.Info("User force logged out", "username", target.Username, "user", currentUser)
 
-	c.JSON(http.StatusOK, gin.H{"success": true, "message": fmt.Sprintf("Force logged out %s", target.Username)})
+	respond(c, gin.H{"message": fmt.Sprintf("Force logged out %s", target.Username)})
 }
 
 // handleDeleteUser removes a user (admin only)
@@ -306,7 +306,7 @@ func (s *Server) handleDeleteUser(c *gin.Context) {
 		fmt.Sprintf("Deleted user %s", user.Username), true, nil)
 	slog.Info("User deleted", "username", user.Username, "user", currentUser)
 
-	c.JSON(http.StatusOK, gin.H{"success": true, "message": fmt.Sprintf("User %s deleted", user.Username)})
+	respond(c, gin.H{"message": fmt.Sprintf("User %s deleted", user.Username)})
 }
 
 // handleSetUserPassword (admin sets password for user)
@@ -352,5 +352,5 @@ func (s *Server) handleSetUserPassword(c *gin.Context) {
 	s.LogAuditRecord(c, "user_password_set", "auth", usernameSU,
 		fmt.Sprintf("Set password for user ID %d", id), true, nil)
 
-	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Password updated"})
+	respond(c, gin.H{"message": "Password updated"})
 }

@@ -86,8 +86,11 @@ export default function UsersPage() {
       const data = await api.get(paths.users.list);
       let customRoles: string[] = [];
       try {
-        const d = await api.get<{ success?: boolean; data?: unknown }>(paths.roles.list);
-        if (d.success) customRoles = ((d.data as unknown[]) || []).map((r: unknown) => (r as { name: string }).name as string);
+        const roles = await api.get<unknown[]>(paths.roles.list);
+        // api.get already unwraps the {success, data} envelope, so this is the
+        // role array itself; reading d.success/d.data here always yielded
+        // undefined and left the custom-role list empty.
+        customRoles = (Array.isArray(roles) ? roles : []).map((r: unknown) => (r as { name: string }).name as string);
       } catch (e) {
         toastError(e, "users.toast.load_roles_failed");
       }

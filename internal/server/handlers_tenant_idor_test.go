@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -333,9 +332,7 @@ func TestTenantIDOR_ListenerDetailFiltersAgents(t *testing.T) {
 		Agents []db.Implant `json:"agents"`
 		Total  int          `json:"total"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("invalid json: %v", err)
-	}
+	unmarshalData(t, w.Body.Bytes(), &resp)
 	if resp.Total != 1 || len(resp.Agents) != 1 || resp.Agents[0].ID != "agent-a" {
 		t.Fatalf("listener leaked foreign agents: total=%d %+v", resp.Total, resp.Agents)
 	}
