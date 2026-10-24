@@ -90,7 +90,7 @@ func (s *Server) handleBOFUpload(c *gin.Context) {
 
 	slog.Info("BOF uploaded", "name", file.Filename, "size", file.Size, "user", bof.CreatedBy)
 	s.LogAuditRecord(c, "bof_upload", "bof", "", fmt.Sprintf("BOF: %s (%d bytes)", file.Filename, file.Size), true, nil)
-	c.JSON(http.StatusOK, gin.H{"success": true, "bof": bof})
+	respond(c, gin.H{"bof": bof})
 }
 
 func (s *Server) handleBOFList(c *gin.Context) {
@@ -111,7 +111,7 @@ func (s *Server) handleBOFList(c *gin.Context) {
 			"created_at":  b.CreatedAt,
 		})
 	}
-	c.JSON(http.StatusOK, gin.H{"bofs": results})
+	respond(c, gin.H{"bofs": results})
 }
 
 func (s *Server) handleBOFDelete(c *gin.Context) {
@@ -219,7 +219,7 @@ func (s *Server) handleBOFQuickRun(c *gin.Context) {
 	}
 	slog.Info("BOF quick execute", "agent_id", id, "file", file.Filename, "size", len(data), "args", truncateString(args, 100))
 	s.LogAuditRecord(c, "bof_quick", "agent", id, fmt.Sprintf("BOF quick: %s (%d bytes) args=%s", file.Filename, len(data), args), true, nil)
-	c.JSON(http.StatusOK, gin.H{"success": true, "task_id": task.ID, "message": fmt.Sprintf("BOF %s dispatched", file.Filename)})
+	respond(c, gin.H{"task_id": task.ID, "message": fmt.Sprintf("BOF %s dispatched", file.Filename)})
 }
 
 func (s *Server) handleBOFRecentResults(c *gin.Context) {
@@ -258,7 +258,7 @@ func (s *Server) handleBOFRecentResults(c *gin.Context) {
 			"elapsed":    elapsed,
 		})
 	}
-	c.JSON(http.StatusOK, gin.H{"results": results})
+	respond(c, gin.H{"results": results})
 }
 
 func (s *Server) handleBOFEdit(c *gin.Context) {
@@ -286,5 +286,5 @@ func (s *Server) handleBOFEdit(c *gin.Context) {
 	}
 
 	s.LogAuditRecord(c, "bof_edit", "bof", "", fmt.Sprintf("Edited BOF: %s", bof.Name), true, nil)
-	c.JSON(http.StatusOK, gin.H{"success": true, "bof": bof})
+	respond(c, gin.H{"bof": bof})
 }

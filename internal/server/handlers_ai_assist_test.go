@@ -197,7 +197,7 @@ func TestHandleAISavePlaybook_ValidationAndCreate(t *testing.T) {
 	var resp struct {
 		ID int `json:"id"`
 	}
-	_ = json.Unmarshal(w.Body.Bytes(), &resp)
+	unmarshalData(t, w.Body.Bytes(), &resp)
 	if resp.ID == 0 {
 		t.Fatal("macro id missing in response")
 	}

@@ -360,7 +360,7 @@ func (s *Server) handleAgentModules(c *gin.Context) {
 	for _, m := range catalog {
 		out = append(out, moduleJSON{Name: m.Name, Title: m.Title, Description: m.Description, Tasks: m.Tasks, Special: m.Special})
 	}
-	c.JSON(http.StatusOK, gin.H{"modules": out})
+	respond(c, gin.H{"modules": out})
 }
 
 // buildImplantConfig constructs an ImplantConfig from the parsed binary form.
@@ -512,7 +512,7 @@ func (s *Server) serverBeaconKey() string {
 // handleGetBeaconKey returns the server's configured beacon_key so the Generate
 // page can pre-fill the PSK field (operator-only, session-authenticated).
 func (s *Server) handleGetBeaconKey(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"beacon_key": s.serverBeaconKey()})
+	respond(c, gin.H{"beacon_key": s.serverBeaconKey()})
 }
 
 // loadSSHHostPublicKeyB64 returns base64 of the SSH transport host public key for implant pinning.
@@ -593,7 +593,7 @@ func (s *Server) handleGenerateEXE(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"success": true, "build_id": job.ID, "status": "building"})
+	respond(c, gin.H{"build_id": job.ID, "status": "building"})
 }
 
 func (s *Server) handleGenerateDLL(c *gin.Context) {
@@ -632,7 +632,7 @@ func (s *Server) handleGenerateDLL(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"success": true, "build_id": job.ID, "status": "building"})
+	respond(c, gin.H{"build_id": job.ID, "status": "building"})
 }
 
 func (s *Server) handleGenerateLinux(c *gin.Context) {
@@ -663,7 +663,7 @@ func (s *Server) handleGenerateLinux(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"success": true, "build_id": job.ID, "status": "building"})
+	respond(c, gin.H{"build_id": job.ID, "status": "building"})
 }
 
 func (s *Server) handleGenerateMacOS(c *gin.Context) {
@@ -694,5 +694,5 @@ func (s *Server) handleGenerateMacOS(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"success": true, "build_id": job.ID, "status": "building"})
+	respond(c, gin.H{"build_id": job.ID, "status": "building"})
 }

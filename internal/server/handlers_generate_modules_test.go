@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/url"
 	"strings"
@@ -85,9 +84,7 @@ func TestHandleAgentModulesListsCatalogue(t *testing.T) {
 			Tasks       []string `json:"tasks"`
 		} `json:"modules"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode: %v (body=%s)", err, w.Body.String())
-	}
+	unmarshalData(t, w.Body.Bytes(), &body)
 	if len(body.Modules) != len(payload.AgentModuleNames()) {
 		t.Fatalf("module count = %d, want %d", len(body.Modules), len(payload.AgentModuleNames()))
 	}

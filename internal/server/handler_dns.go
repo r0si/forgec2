@@ -48,7 +48,7 @@ func (s *Server) handleDNSStatus(c *gin.Context) {
 		resp.AgentIP = dl.AgentIP
 	}
 
-	c.JSON(http.StatusOK, resp)
+	respond(c, resp)
 }
 
 func (s *Server) handleDNSStart(c *gin.Context) {
@@ -61,7 +61,7 @@ func (s *Server) handleDNSStart(c *gin.Context) {
 	s.dnsListenerMu.Lock()
 	defer s.dnsListenerMu.Unlock()
 	if s.dnsListener != nil && s.dnsListener.IsRunning() {
-		c.JSON(http.StatusOK, gin.H{"status": "already_running"})
+		respond(c, gin.H{"status": "already_running"})
 		return
 	}
 
@@ -102,7 +102,7 @@ func (s *Server) handleDNSStart(c *gin.Context) {
 		return
 	}
 	s.dnsListener = dl
-	c.JSON(http.StatusOK, gin.H{"status": "started"})
+	respond(c, gin.H{"status": "started"})
 }
 
 func (s *Server) handleDNSStop(c *gin.Context) {
@@ -110,7 +110,7 @@ func (s *Server) handleDNSStop(c *gin.Context) {
 	defer s.dnsListenerMu.Unlock()
 	dl := s.dnsListener
 	if dl == nil || !dl.IsRunning() {
-		c.JSON(http.StatusOK, gin.H{"status": "not_running"})
+		respond(c, gin.H{"status": "not_running"})
 		return
 	}
 
@@ -118,5 +118,5 @@ func (s *Server) handleDNSStop(c *gin.Context) {
 		respondError(c, http.StatusInternalServerError, sanitizeError(err, "DNS"))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"status": "stopped"})
+	respond(c, gin.H{"status": "stopped"})
 }

@@ -204,7 +204,7 @@ func (s *Server) handleAIStatus(c *gin.Context) {
 		st.AllowExecute = s.cfg.AI.AllowExecute
 		s.configMu.RUnlock()
 	}
-	c.JSON(http.StatusOK, st)
+	respond(c, st)
 }
 
 // handleAIAnalyzeResult summarizes one task's raw output into structured,
@@ -294,7 +294,7 @@ Highlight rules: privileged processes/SYSTEM/admin groups -> kind=priv; antiviru
 		ns = append(ns, truncateStr(n, 300))
 	}
 	out["next_steps"] = ns
-	c.JSON(http.StatusOK, gin.H{"analysis": out})
+	respond(c, gin.H{"analysis": out})
 }
 
 // buildAttackSurfaceData gathers everything suggest-next-steps needs about one
@@ -420,7 +420,7 @@ Order by operational value. Prefer OPSEC-quiet actions. If host is elevated with
 			"command_hint": truncateStr(sg.CommandHint, 300),
 		})
 	}
-	c.JSON(http.StatusOK, gin.H{"agent_id": aid, "hostname": agent.Hostname, "suggestions": out})
+	respond(c, gin.H{"agent_id": aid, "hostname": agent.Hostname, "suggestions": out})
 }
 
 var nlQueryStatuses = map[string]bool{
@@ -517,7 +517,7 @@ Rules: keywords = distinctive words likely inside command/result text ([] for no
 			"created_at": t.CreatedAt.Format(time.RFC3339),
 		})
 	}
-	c.JSON(http.StatusOK, gin.H{"filter": gin.H{
+	respond(c, gin.H{"filter": gin.H{
 		"keywords": filter.Keywords, "agent_hostname": filter.AgentHostname,
 		"task_type": filter.TaskType, "status": filter.Status,
 		"since_days": filter.SinceDays,
@@ -603,7 +603,7 @@ Rules: 2-8 steps, each step self-contained and quiet (prefer built-in tools over
 		respondError(c, http.StatusBadGateway, "playbook had no usable steps")
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
+	respond(c, gin.H{
 		"name":        truncateStr(pb.Name, 80),
 		"description": truncateStr(pb.Description, 300),
 		"steps":       steps,
@@ -684,7 +684,7 @@ func (s *Server) handleAISavePlaybook(c *gin.Context) {
 		respondError(c, http.StatusInternalServerError, sanitizeError(err, "Playbook save"))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "id": macro.ID, "name": macro.Name, "steps": len(steps)})
+	respond(c, gin.H{"id": macro.ID, "name": macro.Name, "steps": len(steps)})
 }
 
 // handleAIRunReview produces a post-run debrief for a completed AI run:
@@ -791,7 +791,7 @@ Max 5 items per list. Reply in the language of the transcript.`
 		}
 		return out
 	}
-	c.JSON(http.StatusOK, gin.H{"review": gin.H{
+	respond(c, gin.H{"review": gin.H{
 		"run_id":      run.ID,
 		"run_status":  run.Status,
 		"summary":     truncateStr(parsed.Summary, 4000),
