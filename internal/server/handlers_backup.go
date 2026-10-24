@@ -214,7 +214,7 @@ func (s *Server) handleDBBackupList(c *gin.Context) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			c.JSON(http.StatusOK, gin.H{"success": true, "data": []backupEntry{}})
+			respond(c, []backupEntry{})
 			return
 		}
 		respondError(c, http.StatusInternalServerError, "failed to read backup directory")
@@ -310,13 +310,10 @@ func (s *Server) handleDBBackup(c *gin.Context) {
 	}
 	slog.Info("Database backup created", "file", name, "size", size)
 	s.LogAuditRecord(c, "db_backup", "system", "", "encrypted database backup "+name, true, nil)
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data": backupEntry{
-			Name:    name,
-			Size:    size,
-			ModTime: time.Now().UTC().Format(time.RFC3339),
-		},
+	respond(c, backupEntry{
+		Name:    name,
+		Size:    size,
+		ModTime: time.Now().UTC().Format(time.RFC3339),
 	})
 }
 
@@ -350,13 +347,10 @@ func (s *Server) handleDBBackupPlaintext(c *gin.Context) {
 
 	slog.Info("Database backup created", "path", backupPath, "size", fi.Size(), "encrypted", false)
 	s.LogAuditRecord(c, "db_backup", "system", "", "plaintext database backup "+backupName+" (explicit ?encrypt=false opt-out)", true, nil)
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data": backupEntry{
-			Name:    backupName,
-			Size:    fi.Size(),
-			ModTime: time.Now().UTC().Format(time.RFC3339),
-		},
+	respond(c, backupEntry{
+		Name:    backupName,
+		Size:    fi.Size(),
+		ModTime: time.Now().UTC().Format(time.RFC3339),
 	})
 }
 
@@ -423,8 +417,7 @@ func (s *Server) handleRestoreFromUpload(c *gin.Context) {
 
 	slog.Info("Database restored from uploaded file", "filename", header.Filename, "size", header.Size)
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
+	respond(c, gin.H{
 		"message": "Database restored. Server will restart to apply changes.",
 		"restart": true,
 	})
@@ -518,8 +511,7 @@ func (s *Server) handleRestoreFromFile(c *gin.Context) {
 
 	slog.Info("Database restored from backup", "backup", name, "size", fi.Size())
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
+	respond(c, gin.H{
 		"message": "Database restored. Server will restart to apply changes.",
 		"restart": true,
 	})

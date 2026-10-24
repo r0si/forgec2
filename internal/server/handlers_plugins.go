@@ -59,8 +59,7 @@ func (s *Server) handlePluginExecuteInfo(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
+	respond(c, gin.H{
 		"plugin": gin.H{
 			"id":          p.ID,
 			"name":        manifest.Name,
@@ -96,7 +95,7 @@ func (s *Server) handlePluginExecute(c *gin.Context) {
 		respondErrorSafe(c, http.StatusBadRequest, err, "")
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "result": result})
+	respond(c, gin.H{"result": result})
 }
 
 func (s *Server) handlePluginReport(c *gin.Context) {
@@ -118,8 +117,7 @@ func (s *Server) handlePluginReport(c *gin.Context) {
 		respondErrorSafe(c, http.StatusBadRequest, err, "")
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
+	respond(c, gin.H{
 		"report": gin.H{
 			"title":   report.Title,
 			"format":  report.Format,
@@ -215,7 +213,7 @@ func (s *Server) handlePluginInstall(c *gin.Context) {
 			slog.Error("Failed to enable plugin record", "plugin", p.Name, "err", err)
 		}
 		s.LogAuditRecord(c, "plugin_install", "plugin", p.Name, fmt.Sprintf("enabled plugin %s", p.Name), true, nil)
-		c.JSON(http.StatusOK, gin.H{"success": true, "plugin": p.Name})
+		respond(c, gin.H{"plugin": p.Name})
 		return
 	}
 	if manifestFile.Size > MaxUploadSize {
@@ -329,7 +327,7 @@ func (s *Server) handlePluginInstall(c *gin.Context) {
 	}
 
 	s.LogAuditRecord(c, "plugin_install", "plugin", manifest.Name, fmt.Sprintf("installed plugin %s %s", manifest.Name, manifest.Version), true, nil)
-	c.JSON(http.StatusOK, gin.H{"success": true, "plugin": manifest.Name})
+	respond(c, gin.H{"plugin": manifest.Name})
 }
 
 func (s *Server) handlePluginEnable(c *gin.Context) {

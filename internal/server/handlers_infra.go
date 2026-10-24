@@ -54,7 +54,7 @@ func (s *Server) handleGenerateNginx(c *gin.Context) {
 	}
 	rc := toRedirectorConfig(req, "nginx")
 	config := infrastructure.GenerateNginxConfig(rc)
-	c.JSON(http.StatusOK, gin.H{"config": config})
+	respond(c, gin.H{"config": config})
 }
 
 func (s *Server) handleGenerateApache(c *gin.Context) {
@@ -65,7 +65,7 @@ func (s *Server) handleGenerateApache(c *gin.Context) {
 	}
 	rc := toRedirectorConfig(req, "apache")
 	config := infrastructure.GenerateApacheConfig(rc)
-	c.JSON(http.StatusOK, gin.H{"config": config})
+	respond(c, gin.H{"config": config})
 }
 
 func (s *Server) handleGenerateHAProxy(c *gin.Context) {
@@ -76,7 +76,7 @@ func (s *Server) handleGenerateHAProxy(c *gin.Context) {
 	}
 	rc := toRedirectorConfig(req, "haproxy")
 	config := infrastructure.GenerateHAProxyConfig(rc)
-	c.JSON(http.StatusOK, gin.H{"config": config})
+	respond(c, gin.H{"config": config})
 }
 
 func (s *Server) handleACMECertProvision(c *gin.Context) {
@@ -148,8 +148,7 @@ func (s *Server) handleACMECertProvision(c *gin.Context) {
 		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success":   true,
+	respond(c, gin.H{
 		"cert_file": certFile,
 		"key_file":  keyFile,
 		"expires":   expires,
@@ -196,7 +195,7 @@ FORGEC2_CONTENT_TYPE=%s
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"content": content})
+	respond(c, gin.H{"content": content})
 }
 
 func toRedirectorConfig(req infraGenerateRequest, rtype string) infrastructure.RedirectorConfig {

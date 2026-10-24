@@ -1082,8 +1082,7 @@ func (s *Server) handleStartSocksRelay(c *gin.Context) {
 	}
 
 	s.LogAuditRecord(c, "socks_relay_start", "agent", id, fmt.Sprintf("port %d", actualPort), true, nil)
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
+	respond(c, gin.H{
 		"port":    actualPort,
 		"message": fmt.Sprintf("SOCKS5 relay listening on %s:%d → Agent %s", listenHostMsg(s), actualPort, id),
 	})
@@ -1103,7 +1102,7 @@ func (s *Server) handleStopSocksRelay(c *gin.Context) {
 	}
 
 	s.LogAuditRecord(c, "socks_relay_stop", "agent", id, "", true, nil)
-	c.JSON(http.StatusOK, gin.H{"success": true, "message": "SOCKS relay stopped"})
+	respond(c, gin.H{"message": "SOCKS relay stopped"})
 }
 
 func (s *Server) handleSocksRelayStatus(c *gin.Context) {
@@ -1113,7 +1112,7 @@ func (s *Server) handleSocksRelayStatus(c *gin.Context) {
 	}
 	sess := s.socksEngine.getSession(id)
 	if sess == nil {
-		c.JSON(http.StatusOK, gin.H{"active": false})
+		respond(c, gin.H{"active": false})
 		return
 	}
 
@@ -1133,7 +1132,7 @@ func (s *Server) handleSocksRelayStatus(c *gin.Context) {
 	var dbSession db.SocksSession
 	s.db.Where("id = ?", sess.dbID).First(&dbSession)
 
-	c.JSON(http.StatusOK, gin.H{
+	respond(c, gin.H{
 		"active":       true,
 		"port":         sess.port,
 		"conn_count":   cc,
@@ -1181,7 +1180,7 @@ func (s *Server) handleGetSocksSessions(c *gin.Context) {
 		result = append(result, es)
 	}
 
-	c.JSON(http.StatusOK, gin.H{"sessions": result})
+	respond(c, gin.H{"sessions": result})
 }
 
 // processAgentSocksData is called from processBeacon to handle relay data from agent.
