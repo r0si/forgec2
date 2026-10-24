@@ -43,7 +43,7 @@ func (s *Server) handleAgentStatusHistory(c *gin.Context) {
 		events[i], events[j] = events[j], events[i]
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	respond(c, gin.H{
 		"agent_id": agentID,
 		"range":    rangeParam,
 		"events":   events,

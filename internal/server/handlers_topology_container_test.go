@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -43,9 +42,7 @@ func TestHandleTopologyData_IncludesAgents(t *testing.T) {
 	var resp struct {
 		Nodes []map[string]interface{} `json:"nodes"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("invalid json: %v; body=%s", err, w.Body.String())
-	}
+	unmarshalData(t, w.Body.Bytes(), &resp)
 	agentNodes := 0
 	for _, n := range resp.Nodes {
 		if id, _ := n["id"].(string); len(id) > 6 && id[:6] == "agent-" {
@@ -79,17 +76,15 @@ func TestHandleContainerAgents_MatchesHints(t *testing.T) {
 		t.Fatalf("expected 200, got %d; body=%s", w.Code, w.Body.String())
 	}
 	var resp struct {
-		Count int          `json:"count"`
-		Data  []db.Implant `json:"data"`
+		Count  int          `json:"count"`
+		Agents []db.Implant `json:"agents"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("invalid json: %v; body=%s", err, w.Body.String())
-	}
+	unmarshalData(t, w.Body.Bytes(), &resp)
 	if resp.Count != 2 {
 		t.Fatalf("expected 2 container agents, got %d; body=%s", resp.Count, w.Body.String())
 	}
 	ids := map[string]bool{}
-	for _, a := range resp.Data {
+	for _, a := range resp.Agents {
 		ids[a.ID] = true
 	}
 	if !ids["agent-ctr-1"] || !ids["agent-ctr-2"] || ids["agent-ctr-3"] {

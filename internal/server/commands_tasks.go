@@ -142,7 +142,7 @@ func (s *Server) handleCancelTask(c *gin.Context) {
 	slog.Info("Task cancelled", "agent_id", agentID, "task", taskID, "type", task.Type, "outcome", outcome)
 	s.LogAuditRecord(c, "cancel_task", "agent_id", agentID, fmt.Sprintf("Cancelled task #%d (%s): %s", taskID, task.Type, outcome), true, nil)
 	s.broadcastTaskUpdate(agentID, task)
-	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Task cancelled", "outcome": outcome})
+	respond(c, gin.H{"message": "Task cancelled", "outcome": outcome})
 }
 
 // handleRerunTask clones an existing task's parameters and creates a new pending task.

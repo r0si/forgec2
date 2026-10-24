@@ -97,7 +97,7 @@ func (s *Server) handleGenerateDelivery(c *gin.Context) {
 		return
 	}
 	s.LogAuditRecord(c, "generate_delivery", "generate", "", format+" "+outName, true, nil)
-	c.JSON(http.StatusOK, gin.H{
+	respond(c, gin.H{
 		"filename": outName,
 		"mime":     mime,
 		"data":     base64.StdEncoding.EncodeToString(out),

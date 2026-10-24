@@ -1,7 +1,6 @@
 package server
 
 import (
-	"net/http"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -153,7 +152,7 @@ func (s *Server) handleAgentTimeline(c *gin.Context) {
 		events = events[:limit]
 	}
 
-	c.JSON(http.StatusOK, gin.H{"success": true, "events": events})
+	respond(c, gin.H{"events": events})
 }
 
 type screenshotMod struct {

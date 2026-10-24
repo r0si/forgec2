@@ -124,7 +124,7 @@ func (s *Server) handleTopologyData(c *gin.Context) {
 		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{"nodes": nodes, "edges": edges})
+	respond(c, gin.H{"nodes": nodes, "edges": edges})
 }
 
 // handleLinkAgent links a child agent to a parent agent for P2P relay

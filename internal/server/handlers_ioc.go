@@ -165,8 +165,7 @@ func (s *Server) handleListIOCs(c *gin.Context) {
 		filtered = append(filtered, e)
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success":       true,
+	respond(c, gin.H{
 		"iocs":          filtered,
 		"total":         len(filtered),
 		"tasks_scanned": totalScanned,

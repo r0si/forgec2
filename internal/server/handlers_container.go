@@ -105,7 +105,7 @@ func (s *Server) handleContainerAgents(c *gin.Context) {
 			agents = append(agents, extra[i])
 		}
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": agents, "count": len(agents)})
+	respond(c, gin.H{"agents": agents, "count": len(agents)})
 }
 
 // handleContainerDetect dispatches a container detection task to an agent.

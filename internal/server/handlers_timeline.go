@@ -3,7 +3,6 @@ package server
 import (
 	"fmt"
 	"log/slog"
-	"net/http"
 	"time"
 
 	"github.com/forgec2/forgec2/internal/db"
@@ -48,7 +47,7 @@ func (s *Server) handleTimelinePage(c *gin.Context) {
 func (s *Server) handleTimelineData(c *gin.Context) {
 	events := s.buildTimelineEvents(c, c.Query("type"), c.Query("user"), c.Query("agent"), c.Query("from"), c.Query("to"))
 
-	c.JSON(http.StatusOK, gin.H{
+	respond(c, gin.H{
 		"events": events,
 		"total":  len(events),
 	})

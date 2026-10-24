@@ -257,7 +257,7 @@ func (s *Server) handleAIProfileUpdate(c *gin.Context) {
 	}
 	var stored db.AIProviderProfile
 	s.db.Where("id = ?", profile.ID).First(&stored)
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": makeAIProfileView(stored, true)})
+	respond(c, makeAIProfileView(stored, true))
 }
 
 func (s *Server) handleAIProfileDelete(c *gin.Context) {

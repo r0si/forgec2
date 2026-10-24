@@ -86,7 +86,7 @@ func (s *Server) handleBOF(c *gin.Context) {
 	}
 	slog.Info("BOF execution requested", "agent_id", id, "file", filename, "size", size, "args", truncateString(args, 100))
 	s.LogAuditRecord(c, "bof", "agent", id, fmt.Sprintf("BOF: %s (%d bytes) args=%s", filename, size, args), true, nil)
-	c.JSON(http.StatusOK, gin.H{"success": true, "task_id": task.ID, "message": fmt.Sprintf("BOF %s dispatched", filename)})
+	respond(c, gin.H{"task_id": task.ID, "message": fmt.Sprintf("BOF %s dispatched", filename)})
 }
 
 // ── AMSI/ETW Bypass ────────────────────────────────────────────────────────
