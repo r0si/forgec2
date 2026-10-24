@@ -42,7 +42,6 @@ handlers_auth.go 2
 handlers_backup.go 5
 handlers_bof.go 5
 handlers_browser_creds.go 3
-handlers_certs.go 6
 handlers_container.go 1
 handlers_cookie_proxy.go 3
 handlers_credentials.go 4
@@ -50,7 +49,6 @@ handlers_emergency.go 5
 handlers_generate_binaries.go 6
 handlers_generate_delivery.go 1
 handlers_generate_one_liners.go 2
-handlers_generate_profiles.go 8
 handlers_i18n.go 4
 handlers_infra.go 5
 handlers_ioc.go 1
@@ -63,7 +61,6 @@ handlers_p0.go 5
 handlers_plugins.go 5
 handlers_privesc.go 3
 handlers_process.go 2
-handlers_report.go 8
 handlers_saved_views.go 3
 handlers_scan.go 2
 handlers_scheduler.go 2

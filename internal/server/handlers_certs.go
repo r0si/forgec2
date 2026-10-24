@@ -40,7 +40,7 @@ func (s *Server) handleGetCertInfo(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	respond(c, gin.H{
 		"subject":        cert.Subject.CommonName,
 		"issuer":         cert.Issuer.CommonName,
 		"expires_at":     cert.NotAfter,
@@ -83,23 +83,23 @@ func (s *Server) handleRegenerateCert(c *gin.Context) {
 	// Return new cert info
 	certPEM, err := os.ReadFile(certPath)
 	if err != nil {
-		c.JSON(http.StatusOK, gin.H{"status": "certificate regenerated"})
+		respond(c, gin.H{"status": "certificate regenerated"})
 		return
 	}
 
 	block, _ := pem.Decode(certPEM)
 	if block == nil {
-		c.JSON(http.StatusOK, gin.H{"status": "certificate regenerated"})
+		respond(c, gin.H{"status": "certificate regenerated"})
 		return
 	}
 
 	cert, err := x509.ParseCertificate(block.Bytes)
 	if err != nil {
-		c.JSON(http.StatusOK, gin.H{"status": "certificate regenerated"})
+		respond(c, gin.H{"status": "certificate regenerated"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	respond(c, gin.H{
 		"status":         "certificate regenerated (takes effect for new connections immediately, no restart needed)",
 		"subject":        cert.Subject.CommonName,
 		"issuer":         cert.Issuer.CommonName,
@@ -202,5 +202,5 @@ func (s *Server) handleUploadCert(c *gin.Context) {
 
 	s.LogAuditRecord(c, "upload_cert", "settings", "", "Uploaded custom TLS certificate", true, nil)
 
-	c.JSON(http.StatusOK, gin.H{"status": "certificate uploaded (takes effect for new connections immediately, no restart needed)"})
+	respond(c, gin.H{"status": "certificate uploaded (takes effect for new connections immediately, no restart needed)"})
 }

@@ -284,7 +284,7 @@ func (s *Server) handleGenerateReport(c *gin.Context) {
 
 	// Generate output
 	if req.Format == "json" {
-		c.JSON(http.StatusOK, report)
+		respond(c, report)
 		return
 	}
 
@@ -581,7 +581,7 @@ func (s *Server) handleAPIGetReportAgents(c *gin.Context) {
 			"version": a.Version, "integrity": a.Integrity,
 		})
 	}
-	c.JSON(http.StatusOK, gin.H{"agents": agentList})
+	respond(c, gin.H{"agents": agentList})
 }
 
 func (s *Server) handleAPIGetReportTasks(c *gin.Context) {
@@ -612,7 +612,7 @@ func (s *Server) handleAPIGetReportTasks(c *gin.Context) {
 			pending++
 		}
 	}
-	c.JSON(http.StatusOK, gin.H{"stats": gin.H{
+	respond(c, gin.H{"stats": gin.H{
 		"total":     len(tasks),
 		"completed": completed,
 		"failed":    failed,
@@ -639,7 +639,7 @@ func (s *Server) handleAPIGetReportCredentials(c *gin.Context) {
 			"created": c.CreatedAt.Format("2006-01-02 15:04:05"),
 		})
 	}
-	c.JSON(http.StatusOK, gin.H{"credentials": credList})
+	respond(c, gin.H{"credentials": credList})
 }
 
 func (s *Server) handleAPIGetReportNetwork(c *gin.Context) {
@@ -656,7 +656,7 @@ func (s *Server) handleAPIGetReportNetwork(c *gin.Context) {
 			"last_seen": h.LastSeen.Format("2006-01-02 15:04:05"),
 		})
 	}
-	c.JSON(http.StatusOK, gin.H{"listeners": hostList})
+	respond(c, gin.H{"listeners": hostList})
 }
 
 func (s *Server) handleAPIGetReportFindings(c *gin.Context) {
@@ -694,7 +694,7 @@ func (s *Server) handleAPIGetReportFindings(c *gin.Context) {
 			"created":  t.CreatedAt.Format("2006-01-02 15:04:05"),
 		})
 	}
-	c.JSON(http.StatusOK, gin.H{"findings": findings})
+	respond(c, gin.H{"findings": findings})
 }
 
 func (s *Server) handleAPIGetReportHistory(c *gin.Context) {
@@ -717,7 +717,7 @@ func (s *Server) handleAPIGetReportHistory(c *gin.Context) {
 			"created": r.CreatedAt.Format("2006-01-02 15:04:05"),
 		})
 	}
-	c.JSON(http.StatusOK, gin.H{"reports": reportList})
+	respond(c, gin.H{"reports": reportList})
 }
 
 // handleAPIExportReportHTML renders the operation report as a self-contained
@@ -777,7 +777,7 @@ func (s *Server) handleAPIGetGeneratedReport(c *gin.Context) {
 		respondError(c, http.StatusNotFound, "report not found")
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"report": gin.H{
+	respond(c, gin.H{"report": gin.H{
 		"id":       r.ID,
 		"name":     r.Name,
 		"template": r.Template,

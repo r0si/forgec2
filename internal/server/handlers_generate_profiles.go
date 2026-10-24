@@ -45,7 +45,7 @@ func (s *Server) handleImportProfile(c *gin.Context) {
 		respondError(c, http.StatusBadRequest, sanitizeError(err, "Profile import"))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "profile": profile})
+	respond(c, gin.H{"profile": profile})
 }
 
 // profileListEntry is the list response used by the online editor. The
@@ -71,7 +71,7 @@ func (s *Server) handleListProfiles(c *gin.Context) {
 			Builtin:          payload.IsBuiltinProfile(p.Name),
 		})
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "profiles": out})
+	respond(c, gin.H{"profiles": out})
 }
 
 // handleSaveProfile persists a profile body (create or overwrite a custom
@@ -106,7 +106,7 @@ func (s *Server) handleSaveProfile(c *gin.Context) {
 			respondError(c, http.StatusBadRequest, sanitizeError(err, "Profile save"))
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"success": true, "profile": profile, "diagnostics": res.Diagnostics, "warnings": res.WarningMessages()})
+		respond(c, gin.H{"profile": profile, "diagnostics": res.Diagnostics, "warnings": res.WarningMessages()})
 		return
 	}
 	profile, err := payload.SaveImportedProfileNamed(s.implantDataDir(), name, raw)
@@ -114,7 +114,7 @@ func (s *Server) handleSaveProfile(c *gin.Context) {
 		respondError(c, http.StatusBadRequest, sanitizeError(err, "Profile save"))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "profile": profile})
+	respond(c, gin.H{"profile": profile})
 }
 
 // handleImportProfileText accepts pasted profile content (JSON or CS text).
@@ -157,8 +157,8 @@ func (s *Server) handleImportProfileText(c *gin.Context) {
 			respondError(c, http.StatusBadRequest, sanitizeError(err, "Profile import"))
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{
-			"success": true, "profile": profile, "diagnostics": res.Diagnostics,
+		respond(c, gin.H{
+			"profile": profile, "diagnostics": res.Diagnostics,
 			"warnings": res.WarningMessages(), "ignored": res.Ignored,
 		})
 		return
@@ -168,7 +168,7 @@ func (s *Server) handleImportProfileText(c *gin.Context) {
 		respondError(c, http.StatusBadRequest, sanitizeError(err, "Profile import"))
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "profile": profile})
+	respond(c, gin.H{"profile": profile})
 }
 
 func looksLikeCS(s string) bool {
@@ -257,10 +257,10 @@ func (s *Server) handleValidateProfile(c *gin.Context) {
 		}
 	}
 	if v2 == nil {
-		c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{
+		respond(c, gin.H{
 			"valid": false, "profile": nil, "wire": nil, "sample": nil,
 			"diagnostics": diagnostics, "warnings": warnings, "compiled": nil,
-		}})
+		})
 		return
 	}
 	// Round-trip samples through the ServerOutput chain. Two samples: a
@@ -317,7 +317,7 @@ func (s *Server) handleValidateProfile(c *gin.Context) {
 			}
 		}
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{
+	respond(c, gin.H{
 		"valid":    valid,
 		"profile":  v2,
 		"compiled": compiledProfileSummary(v2, ignored),
@@ -329,7 +329,7 @@ func (s *Server) handleValidateProfile(c *gin.Context) {
 		"sample":      gin.H{"input": samples[0], "encoded": encoded},
 		"diagnostics": diagnostics,
 		"warnings":    warnings,
-	}})
+	})
 }
 
 func compiledProfileSummary(v2 *malleable.ProfileV2, ignored []string) gin.H {
