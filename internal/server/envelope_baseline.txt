@@ -26,16 +26,13 @@ handlers_agent_screenshots.go 2
 handlers_agents.go 3
 handlers_ai_sessions.go 2
 handlers_ai_tools_policy.go 2
-handlers_apikeys.go 3
 handlers_approvals.go 2
 handlers_auth.go 2
-handlers_browser_creds.go 3
 handlers_cookie_proxy.go 3
 handlers_generate_one_liners.go 2
 handlers_lateral.go 2
 handlers_notification_routes.go 2
 handlers_ntlm.go 2
-handlers_opsec.go 3
 handlers_privesc.go 3
 handlers_process.go 2
 handlers_saved_views.go 3
@@ -50,5 +47,3 @@ helpers.go 1
 remote_desktop.go 1
 render_api.go 1
 server_http.go 1
-update_check.go 4
-webrtc.go 4

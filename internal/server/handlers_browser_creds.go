@@ -91,8 +91,7 @@ func (s *Server) handleWifiCreds(c *gin.Context) {
 		agentID, "Extracting all saved WiFi profiles and passwords",
 		true, nil)
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
+	respond(c, gin.H{
 		"task_id": task.ID,
 		"message": "WiFi credential extraction started",
 	})
@@ -163,8 +162,7 @@ func (s *Server) handleProcessBrowserResult(c *gin.Context) {
 		slog.Error("Failed to update browser creds task", "task_id", req.TaskID, "err", err)
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
+	respond(c, gin.H{
 		"created": created,
 		"message": fmt.Sprintf("Stored %d browser credentials", created),
 	})
@@ -233,8 +231,7 @@ func (s *Server) handleProcessWifiResult(c *gin.Context) {
 		slog.Error("Failed to update wifi creds task", "task_id", req.TaskID, "err", err)
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
+	respond(c, gin.H{
 		"created": created,
 		"message": fmt.Sprintf("Stored %d WiFi credentials", created),
 	})

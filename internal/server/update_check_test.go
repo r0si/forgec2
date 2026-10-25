@@ -510,9 +510,7 @@ func TestHandleUpdateCheckShapes(t *testing.T) {
 		t.Fatalf("status = %d", w.Code)
 	}
 	var idle map[string]interface{}
-	if err := json.Unmarshal(w.Body.Bytes(), &idle); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	unmarshalData(t, w.Body.Bytes(), &idle)
 	if idle["update_available"] != false {
 		t.Fatalf("update_available = %v, want false", idle["update_available"])
 	}
@@ -532,9 +530,7 @@ func TestHandleUpdateCheckShapes(t *testing.T) {
 	c2, w2 := updateCtx()
 	s.handleUpdateCheck(c2)
 	var avail map[string]interface{}
-	if err := json.Unmarshal(w2.Body.Bytes(), &avail); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	unmarshalData(t, w2.Body.Bytes(), &avail)
 	if avail["update_available"] != true || avail["latest_version"] != "v3.0.0" {
 		t.Fatalf("available state = %v", avail)
 	}
@@ -566,9 +562,7 @@ func TestHandleCheckVersionReportsUpToDate(t *testing.T) {
 	c, w := updateCtx()
 	s.handleCheckVersion(c)
 	var body map[string]interface{}
-	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	unmarshalData(t, w.Body.Bytes(), &body)
 	if body["is_latest"] != true {
 		t.Fatalf("is_latest = %v for an older latest_version", body["is_latest"])
 	}
@@ -586,9 +580,7 @@ func TestHandleCheckVersionReportsUpToDate(t *testing.T) {
 	c2, w2 := updateCtx()
 	s.handleCheckVersion(c2)
 	var newer map[string]interface{}
-	if err := json.Unmarshal(w2.Body.Bytes(), &newer); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	unmarshalData(t, w2.Body.Bytes(), &newer)
 	if newer["is_latest"] != false {
 		t.Fatalf("is_latest = %v for a newer latest_version", newer["is_latest"])
 	}
@@ -615,9 +607,7 @@ func TestHandleCheckVersionNeverClaimsUpToDateAfterAFailedCheck(t *testing.T) {
 	c, w := updateCtx()
 	s.handleCheckVersion(c)
 	var body map[string]interface{}
-	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	unmarshalData(t, w.Body.Bytes(), &body)
 	if body["is_latest"] != false {
 		t.Fatalf("is_latest = %v after a failed check, want false", body["is_latest"])
 	}
@@ -721,11 +711,9 @@ func TestHandleHotUpdateAcceptsNewerVersionAndAudits(t *testing.T) {
 		t.Fatalf("status = %d body = %s, want 202", w.Code, w.Body.String())
 	}
 	var body map[string]interface{}
-	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	unmarshalData(t, w.Body.Bytes(), &body)
 	if body["latest_version"] != "v99.0.0" || body["progress_url"] != "/api/update-progress" {
-		t.Fatalf("accepted response = %v", body)
+		t.Fatalf("accepted response = %v (body=%s)", body, w.Body.String())
 	}
 	s.updateState.mu.RLock()
 	target := s.updateState.TargetVersion

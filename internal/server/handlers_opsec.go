@@ -71,7 +71,7 @@ func (s *Server) handleOpsecCheck(c *gin.Context) {
 		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	respond(c, gin.H{
 		"allowed":  !blocked,
 		"blocked":  blocked,
 		"results":  results,
@@ -84,7 +84,7 @@ func (s *Server) handleOpsecCheck(c *gin.Context) {
 func (s *Server) handleCircuitBreakerStatus(c *gin.Context) {
 	cb := GetCircuitBreaker()
 	if cb == nil {
-		c.JSON(http.StatusOK, gin.H{"status": "disabled"})
+		respond(c, gin.H{"status": "disabled"})
 		return
 	}
 	statuses := cb.GetAllStatus()
@@ -108,7 +108,7 @@ func (s *Server) handleCircuitBreakerStatus(c *gin.Context) {
 		result = append(result, listenerStatus{ID: id, Health: label})
 	}
 
-	c.JSON(http.StatusOK, gin.H{"listeners": result})
+	respond(c, gin.H{"listeners": result})
 }
 
 // handleProfileRotate sends a profile rotation command to an agent.

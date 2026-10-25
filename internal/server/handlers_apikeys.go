@@ -136,19 +136,16 @@ func (s *Server) handleCreateAPIKey(c *gin.Context) {
 
 	s.LogAuditRecord(c, "api_key_create", "user", fmt.Sprintf("%d", userID), fmt.Sprintf("API key created: %s", req.Name), true, nil)
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data": gin.H{
-			"id":            apiKey.ID,
-			"name":          apiKey.Name,
-			"key":           plaintext,
-			"prefix":        prefix,
-			"scopes":        apiKey.Scopes,
-			"allowed_cidrs": apiKey.AllowedCIDRs,
-			"created_at":    apiKey.CreatedAt.Format(time.RFC3339),
-			"expires_at":    apiKey.ExpiresAt.Format(time.RFC3339),
-		},
-		"message": "Store this key securely - it will not be shown again",
+	respond(c, gin.H{
+		"id":            apiKey.ID,
+		"name":          apiKey.Name,
+		"key":           plaintext,
+		"prefix":        prefix,
+		"scopes":        apiKey.Scopes,
+		"allowed_cidrs": apiKey.AllowedCIDRs,
+		"created_at":    apiKey.CreatedAt.Format(time.RFC3339),
+		"expires_at":    apiKey.ExpiresAt.Format(time.RFC3339),
+		"message":       "Store this key securely - it will not be shown again",
 	})
 }
 
@@ -210,7 +207,7 @@ func (s *Server) handleRevokeAPIKey(c *gin.Context) {
 
 	s.LogAuditRecord(c, "api_key_revoke", "user", fmt.Sprintf("%d", userID), fmt.Sprintf("API key revoked: %s (id=%s)", key.Name, id), true, nil)
 
-	c.JSON(http.StatusOK, gin.H{"success": true, "message": "API key revoked"})
+	respond(c, gin.H{"message": "API key revoked"})
 }
 
 func (s *Server) handleRotateAPIKey(c *gin.Context) {
@@ -259,16 +256,13 @@ func (s *Server) handleRotateAPIKey(c *gin.Context) {
 
 	s.LogAuditRecord(c, "api_key_rotate", "user", fmt.Sprintf("%d", userID), fmt.Sprintf("API key rotated: %s (old_id=%s, new_id=%d)", oldKey.Name, id, newKey.ID), true, nil)
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data": gin.H{
-			"id":         newKey.ID,
-			"name":       newKey.Name,
-			"key":        plaintext,
-			"prefix":     prefix,
-			"created_at": newKey.CreatedAt.Format(time.RFC3339),
-			"expires_at": newKey.ExpiresAt.Format(time.RFC3339),
-		},
-		"message": "Store this key securely - it will not be shown again. Old key has been revoked.",
+	respond(c, gin.H{
+		"id":         newKey.ID,
+		"name":       newKey.Name,
+		"key":        plaintext,
+		"prefix":     prefix,
+		"created_at": newKey.CreatedAt.Format(time.RFC3339),
+		"expires_at": newKey.ExpiresAt.Format(time.RFC3339),
+		"message":    "Store this key securely - it will not be shown again. Old key has been revoked.",
 	})
 }

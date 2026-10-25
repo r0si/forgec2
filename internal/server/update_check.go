@@ -362,7 +362,7 @@ func (s *Server) handleCheckVersion(c *gin.Context) {
 	if errStr != "" {
 		resp["check_error"] = errStr
 	}
-	c.JSON(http.StatusOK, resp)
+	respond(c, resp)
 }
 
 // updateCheckStateName describes the state of the last version check.
@@ -464,7 +464,7 @@ func (s *Server) handleUpdateProgress(c *gin.Context) {
 	if last := s.lastUpdateResult(); last != nil {
 		resp["last_result"] = last
 	}
-	c.JSON(http.StatusOK, resp)
+	respond(c, resp)
 }
 
 // lastUpdateResult returns the outcome of the last update attempt, if the
@@ -975,12 +975,12 @@ func (s *Server) broadcastUpdateNotification(latest string) {
 // handleRefreshUpdateCheck forces a fresh update check and returns the result
 func (s *Server) handleRefreshUpdateCheck(c *gin.Context) {
 	s.checkForUpdate()
-	c.JSON(http.StatusOK, s.updateCheckResponse())
+	respond(c, s.updateCheckResponse())
 }
 
 // handleUpdateCheck returns the current update check status as JSON
 func (s *Server) handleUpdateCheck(c *gin.Context) {
-	c.JSON(http.StatusOK, s.updateCheckResponse())
+	respond(c, s.updateCheckResponse())
 }
 
 // updateCheckResponse builds the status payload the update-check endpoints

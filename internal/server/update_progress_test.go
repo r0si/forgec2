@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -54,9 +53,7 @@ func TestHandleUpdateProgress(t *testing.T) {
 		Percent int    `json:"percent"`
 		Version string `json:"version"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	unmarshalData(t, w.Body.Bytes(), &body)
 	if body.Stage != updateStageVerifying || body.Percent != 100 || body.Version != "v9.9.9" {
 		t.Fatalf("bad body: %+v", body)
 	}

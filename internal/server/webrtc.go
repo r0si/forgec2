@@ -774,7 +774,7 @@ func (s *Server) handleWebRTCStart(c *gin.Context) {
 	details := fmt.Sprintf("WebRTC session %s started (%dx%d@%d, %dkbps, encoder=%s)", sess.ID, opts.Width, opts.Height, opts.FPS, opts.BitrateKbps, opts.Encoder)
 	s.LogAuditRecord(c, "webrtc_start", "agent", id, details, true, nil)
 	s.broadcastTaskUpdate(id, *task)
-	c.JSON(http.StatusOK, webrtcStartResponse{
+	respond(c, webrtcStartResponse{
 		SessionID:  sess.ID,
 		AgentID:    id,
 		IceServers: data.IceServers,
@@ -807,11 +807,11 @@ func (s *Server) handleWebRTCStop(c *gin.Context) {
 	hub := s.webRTCHub()
 	sess := hub.byAgentSession(id)
 	if sess == nil {
-		c.JSON(http.StatusOK, gin.H{"success": true, "message": "no active WebRTC session"})
+		respond(c, gin.H{"message": "no active WebRTC session"})
 		return
 	}
 	if req.SessionID != "" && req.SessionID != sess.ID {
-		c.JSON(http.StatusOK, gin.H{"success": true, "message": "the requested WebRTC session is no longer active"})
+		respond(c, gin.H{"message": "the requested WebRTC session is no longer active"})
 		return
 	}
 	if sess.OperatorID != uid {
@@ -827,7 +827,7 @@ func (s *Server) handleWebRTCStop(c *gin.Context) {
 	}
 	s.LogAuditRecord(c, "webrtc_stop", "agent", id, "WebRTC session "+sess.ID+" stopped", true, nil)
 	s.broadcastTaskUpdate(id, *task)
-	c.JSON(http.StatusOK, gin.H{"success": true, "session_id": sess.ID})
+	respond(c, gin.H{"session_id": sess.ID})
 }
 
 type webrtcSignal struct {
