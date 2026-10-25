@@ -66,14 +66,16 @@ jobs:
       - name: Unit tests + coverage
         run: go test ./internal/config/... ./internal/crypto/... ./internal/db/... ./internal/malleable/... ./internal/obfuscation/... ./internal/payload/... ./internal/plugin/... ./internal/scripting/... ./internal/server/... ./pkg/... ./cmd/... -count=1 -timeout 8m -coverprofile=coverage.out
       - name: Coverage floor
-        # Ratcheting floor: current total is ~45.8% (raised from 33 when the
-        # security-critical handlers — privesc/evasion/roles/certs/workflow-
-        # groups/browser-creds — went from 0% to ~75%). Lower this only after
-        # adding tests, never to make a regression pass.
+        # Ratcheting floor. Measured 2026-10-25: 46.3% across this package list
+        # (it was ~45.8% when the floor was 40, and 33 before the
+        # security-critical handlers — privesc/evasion/roles/certs/
+        # workflow-groups/browser-creds — went from 0% to ~75%). Raise this as
+        # coverage grows and lower it only after adding tests, never to make a
+        # regression pass.
         run: |
           total=$(go tool cover -func=coverage.out | awk '/^total:/ {gsub("%", "", $3); print $3}')
           echo "total statement coverage: ${total}%"
-          floor=40
+          floor=44
           awk -v t="$total" -v f="$floor" 'BEGIN { exit (t+0 >= f+0) ? 0 : 1 }' || {
             echo "coverage ${total}% is below the ${floor}% floor"
             exit 1

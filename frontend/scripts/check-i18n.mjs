@@ -2,6 +2,14 @@
 // Verifies every t("x.y") call used in the frontend has a matching key
 // defined in BOTH en.ts and zh.ts under src/lib/i18n/.
 // Exits non-zero (fails the build / git hook) when a key is missing.
+//
+// Dead-key warnings are deliberately conservative: a key counts as used when a
+// t() pattern matches it, when it belongs to a dynamic family
+// (scripts/i18n-dynamic.mjs), or when it is mentioned literally anywhere
+// outside the dictionaries — schema-driven code stores a key in a record
+// (`desc: "generate.format_desc_exe"`) and resolves it later with t(record.x),
+// which no t() pattern can see. That ordering means a genuine dead key is
+// still reported; the literal-mention rule can only suppress false positives.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -64,7 +72,15 @@ function main() {
   const zhKeys = keysFromFile(fs.readFileSync(ZH_FILE, "utf8"));
 
   const used = new Set();
+  // Keys that appear literally somewhere outside the dictionaries. The t()
+  // patterns above cover direct calls; schema-driven code holds a key in a
+  // record field (`desc: "generate.format_desc_exe"`, `label: …`) and resolves
+  // it later with t(record.field), which no t() pattern can see. Counting a
+  // literal mention keeps those keys out of the dead list — a mention in a
+  // comment only costs a false negative, never a wrong "unused" verdict.
+  const mentioned = new Set();
   for (const file of walk(SRC)) {
+    if (file === EN_FILE || file === ZH_FILE) continue;
     let src;
     try {
       src = fs.readFileSync(file, "utf8");
@@ -76,6 +92,9 @@ function main() {
       let m;
       while ((m = re.exec(src)) !== null) used.add(m[1]);
     }
+    for (const m of src.matchAll(/"([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+)"/g)) {
+      mentioned.add(m[1]);
+    }
   }
 
   const missingEn = [];
@@ -85,13 +104,17 @@ function main() {
     if (!zhKeys.has(k)) missingZh.push(k);
   }
 
-  // Dead keys: defined in BOTH locale blocks but never referenced via t("x.y").
-  // Reported as warnings only. Keys built dynamically (e.g. the sidebar's
-  // `t(navKey)`) are false positives, so they're excluded from the dead
-  // list. The dynamic families live in scripts/i18n-dynamic.mjs (single source).
+  // Dead keys: defined in BOTH locale blocks but never referenced via t("x.y")
+  // and never mentioned literally outside the dictionaries (a schema-driven
+  // record such as `desc: "generate.format_desc_exe"` is resolved later with
+  // t(record.desc) and must not be called dead). Reported as warnings only.
+  // Keys built dynamically (e.g. the sidebar's `t(navKey)`) are false
+  // positives, so they're excluded from the dead list. The dynamic families
+  // live in scripts/i18n-dynamic.mjs (single source).
   const isDynamic = (k) => DYNAMIC_PREFIXES.some((p) => k.startsWith(p));
-  const deadEn = [...enKeys].filter((k) => !used.has(k) && !isDynamic(k));
-  const deadZh = [...zhKeys].filter((k) => !used.has(k) && !isDynamic(k));
+  const isUsed = (k) => used.has(k) || mentioned.has(k);
+  const deadEn = [...enKeys].filter((k) => !isUsed(k) && !isDynamic(k));
+  const deadZh = [...zhKeys].filter((k) => !isUsed(k) && !isDynamic(k));
   const dead = [...new Set([...deadEn, ...deadZh])].sort();
 
   const problems = new Set([...missingEn, ...missingZh]);
