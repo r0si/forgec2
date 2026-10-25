@@ -1059,6 +1059,11 @@ func (s *Server) trackPendingTask(agentID string) error {
 func (s *Server) trackPendingTaskReserved(agentID string, extra int) error {
 	s.agentPendingTasksMu.Lock()
 	defer s.agentPendingTasksMu.Unlock()
+	// A Server built without the map (tests, future constructors) must not
+	// turn a task insert into a nil-map panic.
+	if s.agentPendingTasks == nil {
+		s.agentPendingTasks = make(map[string]int)
+	}
 	if n := s.agentPendingTasks[agentID]; n >= MaxPendingTasksPerAgent+extra {
 		return fmt.Errorf("agent %s has %d pending tasks (limit %d)", agentID, n, MaxPendingTasksPerAgent+extra)
 	}
