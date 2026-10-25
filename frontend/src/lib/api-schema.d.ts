@@ -10669,9 +10669,18 @@ export interface components {
             content: string;
             tool_name?: string;
         };
+        /**
+         * @description Every JSON 200 response uses this envelope: respond() wraps the handler
+         *     payload exactly once as {"success": true, "data": <payload>}. Errors are
+         *     {"success": false, "error": "..."} on a non-2xx status. A JSON 200
+         *     schema is expressed as an allOf of this component plus a data property
+         *     holding the per-operation payload schema.
+         */
         SuccessResponse: {
             /** @example true */
             success: boolean;
+            /** @description The handler payload (shape documented per operation). */
+            data?: unknown;
             message?: string;
         };
         TaskResponse: {
@@ -11482,7 +11491,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HealthResponse"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["HealthResponse"];
+                    };
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -11520,10 +11531,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        success?: boolean;
-                        data?: components["schemas"]["Agent"][];
-                        total?: number;
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: {
+                            success?: boolean;
+                            data?: components["schemas"]["Agent"][];
+                            total?: number;
+                        };
                     };
                 };
             };
@@ -11546,7 +11559,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Agent"][];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["Agent"][];
+                    };
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -11621,7 +11636,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TaskResponse"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["TaskResponse"];
+                    };
                 };
             };
         };
@@ -11674,7 +11691,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Task"][];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["Task"][];
+                    };
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -11698,7 +11717,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Task"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["Task"];
+                    };
                 };
             };
             404: components["responses"]["NotFound"];
@@ -11745,7 +11766,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TaskResponse"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["TaskResponse"];
+                    };
                 };
             };
         };
@@ -11774,12 +11797,14 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        success?: boolean;
-                        tasks?: {
-                            agent_id?: string;
-                            task_id?: number;
-                        }[];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: {
+                            success?: boolean;
+                            tasks?: {
+                                agent_id?: string;
+                                task_id?: number;
+                            }[];
+                        };
                     };
                 };
             };
@@ -11817,7 +11842,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TaskResponse"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["TaskResponse"];
+                    };
                 };
             };
         };
@@ -11859,7 +11886,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TaskResponse"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["TaskResponse"];
+                    };
                 };
             };
         };
@@ -11881,7 +11910,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TaskResponse"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["TaskResponse"];
+                    };
                 };
             };
         };
@@ -11914,7 +11945,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TaskResponse"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["TaskResponse"];
+                    };
                 };
             };
         };
@@ -11945,7 +11978,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TaskResponse"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["TaskResponse"];
+                    };
                 };
             };
         };
@@ -11974,7 +12009,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TaskResponse"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["TaskResponse"];
+                    };
                 };
             };
         };
@@ -12003,7 +12040,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TaskResponse"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["TaskResponse"];
+                    };
                 };
             };
         };
@@ -12032,7 +12071,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TaskResponse"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["TaskResponse"];
+                    };
                 };
             };
         };
@@ -12054,9 +12095,11 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        active?: boolean;
-                        port?: number;
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: {
+                            active?: boolean;
+                            port?: number;
+                        };
                     };
                 };
             };
@@ -12079,9 +12122,11 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        success?: boolean;
-                        port?: number;
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: {
+                            success?: boolean;
+                            port?: number;
+                        };
                     };
                 };
             };
@@ -12124,7 +12169,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SocksSession"][];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["SocksSession"][];
+                    };
                 };
             };
         };
@@ -12153,12 +12200,14 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        success?: boolean;
-                        data?: components["schemas"]["Listener"][];
-                        total?: number;
-                        page?: number;
-                        page_size?: number;
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: {
+                            success?: boolean;
+                            data?: components["schemas"]["Listener"][];
+                            total?: number;
+                            page?: number;
+                            page_size?: number;
+                        };
                     };
                 };
             };
@@ -12207,12 +12256,14 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        success?: boolean;
-                        listener?: components["schemas"]["Listener"];
-                        agents?: components["schemas"]["Agent"][];
-                        total?: number;
-                        active?: number;
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: {
+                            success?: boolean;
+                            listener?: components["schemas"]["Listener"];
+                            agents?: components["schemas"]["Agent"][];
+                            total?: number;
+                            active?: number;
+                        };
                     };
                 };
             };
@@ -12241,7 +12292,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Listener"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["Listener"];
+                    };
                 };
             };
             404: components["responses"]["NotFound"];
@@ -12287,9 +12340,11 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        success?: boolean;
-                        message?: string;
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: {
+                            success?: boolean;
+                            message?: string;
+                        };
                     };
                 };
             };
@@ -12313,9 +12368,11 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        success?: boolean;
-                        message?: string;
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: {
+                            success?: boolean;
+                            message?: string;
+                        };
                     };
                 };
             };
@@ -12379,7 +12436,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Credential"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["Credential"];
+                    };
                 };
             };
             404: components["responses"]["NotFound"];
@@ -12786,8 +12845,10 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        beacon_key?: string;
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: {
+                            beacon_key?: string;
+                        };
                     };
                 };
             };
@@ -12909,9 +12970,11 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        success?: boolean;
-                        message?: string;
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: {
+                            success?: boolean;
+                            message?: string;
+                        };
                     };
                 };
             };
@@ -12939,9 +13002,11 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        success?: boolean;
-                        message?: string;
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: {
+                            success?: boolean;
+                            message?: string;
+                        };
                     };
                 };
             };
@@ -12982,9 +13047,11 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        success?: boolean;
-                        size?: number;
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: {
+                            success?: boolean;
+                            size?: number;
+                        };
                     };
                 };
             };
@@ -13005,9 +13072,11 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        success?: boolean;
-                        message?: string;
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: {
+                            success?: boolean;
+                            message?: string;
+                        };
                     };
                 };
             };
@@ -13074,10 +13143,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        success?: boolean;
-                        data?: components["schemas"]["AuditLog"][];
-                        total?: number;
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: {
+                            success?: boolean;
+                            data?: components["schemas"]["AuditLog"][];
+                            total?: number;
+                        };
                     };
                 };
             };
@@ -13140,7 +13211,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Task"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["Task"];
+                    };
                 };
             };
             404: components["responses"]["NotFound"];
@@ -13163,9 +13236,11 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        success?: boolean;
-                        message?: string;
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: {
+                            success?: boolean;
+                            message?: string;
+                        };
                     };
                 };
             };
@@ -13191,9 +13266,11 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        success?: boolean;
-                        message?: string;
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: {
+                            success?: boolean;
+                            message?: string;
+                        };
                     };
                 };
             };
@@ -13224,12 +13301,14 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        id?: number;
-                        status?: string;
-                        result?: string;
-                        error?: string;
-                    }[];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: {
+                            id?: number;
+                            status?: string;
+                            result?: string;
+                            error?: string;
+                        }[];
+                    };
                 };
             };
             400: components["responses"]["BadRequest"];
@@ -13250,7 +13329,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AutomationRule"][];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["AutomationRule"][];
+                    };
                 };
             };
         };
@@ -13274,7 +13355,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AutomationRule"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["AutomationRule"];
+                    };
                 };
             };
         };
@@ -13300,7 +13383,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AutomationRule"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["AutomationRule"];
+                    };
                 };
             };
         };
@@ -13364,7 +13449,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Webhook"][];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["Webhook"][];
+                    };
                 };
             };
         };
@@ -13388,7 +13475,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Webhook"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["Webhook"];
+                    };
                 };
             };
         };
@@ -13437,9 +13526,11 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        success?: boolean;
-                        status_code?: number;
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: {
+                            success?: boolean;
+                            status_code?: number;
+                        };
                     };
                 };
             };
@@ -13460,7 +13551,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SystemMetric"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["SystemMetric"];
+                    };
                 };
             };
         };
@@ -13482,7 +13575,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SystemMetric"][];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["SystemMetric"][];
+                    };
                 };
             };
         };
@@ -13504,7 +13599,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Alert"][];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["Alert"][];
+                    };
                 };
             };
         };
@@ -13524,10 +13621,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        active?: number;
-                        acknowledged?: number;
-                        resolved?: number;
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: {
+                            active?: number;
+                            acknowledged?: number;
+                            resolved?: number;
+                        };
                     };
                 };
             };
@@ -13548,7 +13647,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AlertRule"][];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["AlertRule"][];
+                    };
                 };
             };
         };
@@ -13572,7 +13673,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AlertRule"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["AlertRule"];
+                    };
                 };
             };
         };
@@ -13598,7 +13701,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AlertRule"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["AlertRule"];
+                    };
                 };
             };
         };
@@ -13684,10 +13789,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        total?: number;
-                        online?: number;
-                        offline?: number;
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: {
+                            total?: number;
+                            online?: number;
+                            offline?: number;
+                        };
                     };
                 };
             };
@@ -13708,7 +13815,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["BOFFile"][];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["BOFFile"][];
+                    };
                 };
             };
         };
@@ -13788,7 +13897,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TaskResponse"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["TaskResponse"];
+                    };
                 };
             };
         };
@@ -13859,7 +13970,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Task"][];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["Task"][];
+                    };
                 };
             };
         };
@@ -13879,7 +13992,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Plugin"][];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["Plugin"][];
+                    };
                 };
             };
         };
@@ -13903,7 +14018,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Plugin"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["Plugin"];
+                    };
                 };
             };
         };
@@ -13989,7 +14106,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TokenEntry"][];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["TokenEntry"][];
+                    };
                 };
             };
         };
@@ -14011,7 +14130,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TaskResponse"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["TaskResponse"];
+                    };
                 };
             };
         };
@@ -14039,7 +14160,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TaskResponse"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["TaskResponse"];
+                    };
                 };
             };
         };
@@ -14069,7 +14192,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TaskResponse"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["TaskResponse"];
+                    };
                 };
             };
         };
@@ -14091,7 +14216,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TaskResponse"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["TaskResponse"];
+                    };
                 };
             };
         };
@@ -14113,7 +14240,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TaskResponse"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["TaskResponse"];
+                    };
                 };
             };
         };
@@ -14159,7 +14288,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TaskResponse"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["TaskResponse"];
+                    };
                 };
             };
         };
@@ -14201,7 +14332,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CommandTemplate"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["CommandTemplate"];
+                    };
                 };
             };
         };
@@ -14265,7 +14398,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CommandTemplate"][];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["CommandTemplate"][];
+                    };
                 };
             };
         };
@@ -14288,7 +14423,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>[];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: Record<string, never>[];
+                    };
                 };
             };
         };
@@ -14308,7 +14445,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: Record<string, never>;
+                    };
                 };
             };
         };
@@ -14370,9 +14509,11 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        success?: boolean;
-                        download_url?: string;
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: {
+                            success?: boolean;
+                            download_url?: string;
+                        };
                     };
                 };
             };
@@ -14404,7 +14545,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TaskResponse"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["TaskResponse"];
+                    };
                 };
             };
         };
@@ -14426,7 +14569,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ScanResult"][];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["ScanResult"][];
+                    };
                 };
             };
         };
@@ -14448,7 +14593,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ScanResult"][];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["ScanResult"][];
+                    };
                 };
             };
         };
@@ -14470,7 +14617,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Task"][];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["Task"][];
+                    };
                 };
             };
         };
@@ -14492,7 +14641,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Task"][];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["Task"][];
+                    };
                 };
             };
         };
@@ -14512,9 +14663,11 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        nodes?: Record<string, never>[];
-                        edges?: Record<string, never>[];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: {
+                            nodes?: Record<string, never>[];
+                            edges?: Record<string, never>[];
+                        };
                     };
                 };
             };
@@ -14571,7 +14724,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": Record<string, never>;
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: Record<string, never>;
+                    };
                 };
             };
         };
@@ -14874,7 +15029,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ModulesListResponse"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["ModulesListResponse"];
+                    };
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -14904,7 +15061,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ModuleUploadResponse"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["ModuleUploadResponse"];
+                    };
                 };
             };
             400: components["responses"]["BadRequest"];
@@ -14956,7 +15115,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TaskResponse"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["TaskResponse"];
+                    };
                 };
             };
             400: components["responses"]["BadRequest"];
@@ -15812,12 +15973,14 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        encode_types: string[];
-                        entry_points: string[];
-                        timestamps: string[];
-                        cert_options: string[];
-                        output_types: string[];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: {
+                            encode_types: string[];
+                            entry_points: string[];
+                            timestamps: string[];
+                            cert_options: string[];
+                            output_types: string[];
+                        };
                     };
                 };
             };
@@ -16980,7 +17143,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TaskResponse"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["TaskResponse"];
+                    };
                 };
             };
         };
@@ -17553,7 +17718,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["UpdateCheckStatus"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["UpdateCheckStatus"];
+                    };
                 };
             };
         };
@@ -17573,7 +17740,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["UpdateVersionInfo"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["UpdateVersionInfo"];
+                    };
                 };
             };
         };
@@ -17593,7 +17762,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["UpdateCheckStatus"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["UpdateCheckStatus"];
+                    };
                 };
             };
         };
@@ -18815,11 +18986,13 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        /** @description Base64 of the built artifact */
-                        data: string;
-                        filename: string;
-                        size: number;
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: {
+                            /** @description Base64 of the built artifact */
+                            data: string;
+                            filename: string;
+                            size: number;
+                        };
                     };
                 };
             };
@@ -18869,9 +19042,11 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        data: string;
-                        size: number;
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: {
+                            data: string;
+                            size: number;
+                        };
                     };
                 };
             };
@@ -19228,11 +19403,13 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        screenshots?: string[];
-                        total?: number;
-                        page?: number;
-                        page_size?: number;
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: {
+                            screenshots?: string[];
+                            total?: number;
+                            page?: number;
+                            page_size?: number;
+                        };
                     };
                 };
             };
@@ -22105,7 +22282,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DashboardStats"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["DashboardStats"];
+                    };
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -22126,7 +22305,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AgentListResponse"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["AgentListResponse"];
+                    };
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -22147,10 +22328,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        success?: boolean;
-                        data?: components["schemas"]["Task"][];
-                        total?: number;
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: {
+                            success?: boolean;
+                            data?: components["schemas"]["Task"][];
+                            total?: number;
+                        };
                     };
                 };
             };
@@ -22180,7 +22363,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TaskResponse"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["TaskResponse"];
+                    };
                 };
             };
         };
@@ -22256,19 +22441,21 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        id?: number;
-                        name?: string;
-                        prefix?: string;
-                        last_used?: string;
-                        expires_at?: string;
-                        active?: boolean;
-                        /** @description Comma-separated permission scopes; empty means full access */
-                        scopes?: string;
-                        /** @description Comma-separated source CIDRs; empty means any source */
-                        allowed_cidrs?: string;
-                        created_at?: string;
-                    }[];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: {
+                            id?: number;
+                            name?: string;
+                            prefix?: string;
+                            last_used?: string;
+                            expires_at?: string;
+                            active?: boolean;
+                            /** @description Comma-separated permission scopes; empty means full access */
+                            scopes?: string;
+                            /** @description Comma-separated source CIDRs; empty means any source */
+                            allowed_cidrs?: string;
+                            created_at?: string;
+                        }[];
+                    };
                 };
             };
         };
@@ -22300,20 +22487,22 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        success?: boolean;
-                        data?: {
-                            id?: number;
-                            name?: string;
-                            /** @description Plaintext API key (shown once) */
-                            key?: string;
-                            prefix?: string;
-                            scopes?: string;
-                            allowed_cidrs?: string;
-                            created_at?: string;
-                            expires_at?: string;
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: {
+                            success?: boolean;
+                            data?: {
+                                id?: number;
+                                name?: string;
+                                /** @description Plaintext API key (shown once) */
+                                key?: string;
+                                prefix?: string;
+                                scopes?: string;
+                                allowed_cidrs?: string;
+                                created_at?: string;
+                                expires_at?: string;
+                            };
+                            message?: string;
                         };
-                        message?: string;
                     };
                 };
             };
@@ -22358,17 +22547,19 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        success?: boolean;
-                        data?: {
-                            id?: number;
-                            name?: string;
-                            key?: string;
-                            prefix?: string;
-                            created_at?: string;
-                            expires_at?: string;
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: {
+                            success?: boolean;
+                            data?: {
+                                id?: number;
+                                name?: string;
+                                key?: string;
+                                prefix?: string;
+                                created_at?: string;
+                                expires_at?: string;
+                            };
+                            message?: string;
                         };
-                        message?: string;
                     };
                 };
             };
@@ -22465,7 +22656,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AgentListResponse"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["AgentListResponse"];
+                    };
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -22488,7 +22681,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TaskResponse"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["TaskResponse"];
+                    };
                 };
             };
             401: components["responses"]["Unauthorized"];
@@ -22509,9 +22704,11 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        success?: boolean;
-                        loot?: Record<string, never>[];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: {
+                            success?: boolean;
+                            loot?: Record<string, never>[];
+                        };
                     };
                 };
             };
@@ -22532,13 +22729,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        success?: boolean;
-                        tags?: {
-                            id?: number;
-                            name?: string;
-                            color?: string;
-                        }[];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: {
+                            success?: boolean;
+                            tags?: {
+                                id?: number;
+                                name?: string;
+                                color?: string;
+                            }[];
+                        };
                     };
                 };
             };
@@ -22622,7 +22821,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ReadyResponse"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["ReadyResponse"];
+                    };
                 };
             };
         };
@@ -22642,9 +22843,11 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        success?: boolean;
-                        data?: components["schemas"]["Listener"][];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: {
+                            success?: boolean;
+                            data?: components["schemas"]["Listener"][];
+                        };
                     };
                 };
             };
@@ -22683,19 +22886,21 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        success: boolean;
+                    "application/json": components["schemas"]["SuccessResponse"] & {
                         data: {
-                            id: number;
-                            username: string;
-                            /** @description Built-in (admin|user) or custom role name */
-                            role: string;
-                            permissions: string[];
-                            /**
-                             * Format: int64
-                             * @description Session expiry as ms epoch, when known
-                             */
-                            session_exp?: number;
+                            success: boolean;
+                            data: {
+                                id: number;
+                                username: string;
+                                /** @description Built-in (admin|user) or custom role name */
+                                role: string;
+                                permissions: string[];
+                                /**
+                                 * Format: int64
+                                 * @description Session expiry as ms epoch, when known
+                                 */
+                                session_exp?: number;
+                            };
                         };
                     };
                 };
@@ -22886,7 +23091,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DashboardOSDistributionItem"][];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["DashboardOSDistributionItem"][];
+                    };
                 };
             };
         };
@@ -22906,7 +23113,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DashboardTaskStatusItem"][];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["DashboardTaskStatusItem"][];
+                    };
                 };
             };
         };
@@ -22926,7 +23135,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DashboardTrafficData"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["DashboardTrafficData"];
+                    };
                 };
             };
         };
@@ -22946,7 +23157,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DashboardHeatmapItem"][];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["DashboardHeatmapItem"][];
+                    };
                 };
             };
         };
@@ -22966,7 +23179,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DashboardAgentGeoItem"][];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["DashboardAgentGeoItem"][];
+                    };
                 };
             };
         };
@@ -22986,7 +23201,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DashboardTaskGanttItem"][];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["DashboardTaskGanttItem"][];
+                    };
                 };
             };
         };
@@ -23006,7 +23223,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DashboardCredentialTypeItem"][];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["DashboardCredentialTypeItem"][];
+                    };
                 };
             };
         };
@@ -23026,7 +23245,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DashboardAttackPathData"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["DashboardAttackPathData"];
+                    };
                 };
             };
         };
@@ -23046,8 +23267,10 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        missions?: Record<string, never>[];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: {
+                            missions?: Record<string, never>[];
+                        };
                     };
                 };
             };
@@ -25576,7 +25799,9 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["UpdateProgress"];
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: components["schemas"]["UpdateProgress"];
+                    };
                 };
             };
         };

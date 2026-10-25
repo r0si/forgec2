@@ -29,6 +29,7 @@
     "check:paths": "node scripts/check-api-paths.mjs",
     "check:native-dialogs": "node scripts/check-native-dialogs.mjs",
     "check:openapi-types": "node scripts/check-openapi-types.mjs",
+    "check:openapi-envelope": "node ../scripts/apply-openapi-envelope.mjs --check",
     "check:permissions": "node scripts/check-permissions.mjs",
     "check:bundle": "node scripts/check-bundle.mjs",
     "audit:unused-exports": "node scripts/audit-unused-exports.mjs",

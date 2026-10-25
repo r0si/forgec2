@@ -27,7 +27,7 @@ info:
     - **admin**: Full control (all permissions)
     - **user**: Standard operator permissions (agents, tasks, credentials, limited settings)
 
-  version: 2.6.2
+  version: 2.7.1
   contact:
     name: ForgeC2 Support
     email: support@forgec2.io
@@ -185,7 +185,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HealthResponse'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/HealthResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -252,16 +258,22 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Agent'
-                  total:
-                    type: integer
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          success:
+                            type: boolean
+                          data:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Agent'
+                          total:
+                            type: integer
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -281,9 +293,15 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Agent'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Agent'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -357,8 +375,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TaskResponse'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TaskResponse'
   /agents/{id}/note:
     post:
       tags: [Agents]
@@ -417,9 +440,15 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Task'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Task'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -449,7 +478,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Task'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Task'
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -507,8 +542,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TaskResponse'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TaskResponse'
   /agents/batch:
     post:
       tags: [Agents]
@@ -540,20 +580,25 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  tasks:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        agent_id:
-                          type: string
-                        task_id:
-                          type: integer
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          success:
+                            type: boolean
+                          tasks:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                agent_id:
+                                  type: string
+                                task_id:
+                                  type: integer
   /agents/{id}/command:
     post:
       tags: [Agents]
@@ -599,8 +644,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TaskResponse'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TaskResponse'
   /agents/{id}/screenshot:
     get:
       tags: [Agents]
@@ -638,8 +688,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TaskResponse'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TaskResponse'
   /agents/{id}/ps:
     post:
       tags: [Agents]
@@ -661,8 +716,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TaskResponse'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TaskResponse'
   /agents/{id}/upload:
     post:
       tags: [Files, Agents]
@@ -700,8 +760,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TaskResponse'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TaskResponse'
   /agents/{id}/download:
     post:
       tags: [Files, Agents]
@@ -736,8 +801,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TaskResponse'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TaskResponse'
   /agents/{id}/files/ls:
     post:
       tags: [Files, Agents]
@@ -768,8 +838,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TaskResponse'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TaskResponse'
   /agents/{id}/files/delete:
     post:
       tags: [Files, Agents]
@@ -801,8 +876,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TaskResponse'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TaskResponse'
   /agents/{id}/files/read:
     post:
       tags: [Files, Agents]
@@ -834,8 +914,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TaskResponse'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TaskResponse'
   /agents/{id}/socks_relay/status:
     get:
       tags: [SOCKS, Agents]
@@ -857,13 +942,18 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  active:
-                    type: boolean
-                  port:
-                    type: integer
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          active:
+                            type: boolean
+                          port:
+                            type: integer
   /agents/{id}/socks_relay/start:
     post:
       tags: [SOCKS, Agents]
@@ -885,13 +975,18 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  port:
-                    type: integer
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          success:
+                            type: boolean
+                          port:
+                            type: integer
   /agents/{id}/socks_relay/stop:
     post:
       tags: [SOCKS, Agents]
@@ -929,10 +1024,15 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/SocksSession'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/SocksSession'
   /api/listeners:
     get:
       tags: [Listeners]
@@ -972,20 +1072,26 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Listener'
-                  total:
-                    type: integer
-                  page:
-                    type: integer
-                  page_size:
-                    type: integer
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          success:
+                            type: boolean
+                          data:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Listener'
+                          total:
+                            type: integer
+                          page:
+                            type: integer
+                          page_size:
+                            type: integer
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -1031,20 +1137,26 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  listener:
-                    $ref: '#/components/schemas/Listener'
-                  agents:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Agent'
-                  total:
-                    type: integer
-                  active:
-                    type: integer
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          success:
+                            type: boolean
+                          listener:
+                            $ref: '#/components/schemas/Listener'
+                          agents:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Agent'
+                          total:
+                            type: integer
+                          active:
+                            type: integer
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -1074,7 +1186,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Listener'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Listener'
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -1121,12 +1239,18 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  message:
-                    type: string
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          success:
+                            type: boolean
+                          message:
+                            type: string
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -1150,12 +1274,18 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  message:
-                    type: string
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          success:
+                            type: boolean
+                          message:
+                            type: string
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -1211,7 +1341,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Credential'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Credential'
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -1631,11 +1767,16 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  beacon_key:
-                    type: string
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          beacon_key:
+                            type: string
   /settings/agent:
     post:
       tags: [Settings]
@@ -1760,13 +1901,18 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  message:
-                    type: string
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          success:
+                            type: boolean
+                          message:
+                            type: string
   /settings/purge/audit:
     post:
       tags: [Settings]
@@ -1790,13 +1936,18 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  message:
-                    type: string
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          success:
+                            type: boolean
+                          message:
+                            type: string
   /settings/jwt/regenerate:
     post:
       tags: [Settings]
@@ -1827,13 +1978,18 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  size:
-                    type: integer
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          success:
+                            type: boolean
+                          size:
+                            type: integer
   /settings/db/backup:
     post:
       tags: [Settings]
@@ -1848,13 +2004,18 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  message:
-                    type: string
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          success:
+                            type: boolean
+                          message:
+                            type: string
   /settings/config/download:
     get:
       tags: [Settings]
@@ -1924,17 +2085,22 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/AuditLog'
-                  total:
-                    type: integer
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          success:
+                            type: boolean
+                          data:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/AuditLog'
+                          total:
+                            type: integer
   /tasks:
     get:
       tags: [Tasks]
@@ -1987,7 +2153,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Task'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Task'
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -2011,12 +2183,18 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  message:
-                    type: string
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          success:
+                            type: boolean
+                          message:
+                            type: string
         '400':
           $ref: '#/components/responses/BadRequest'
         '403':
@@ -2044,12 +2222,18 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  message:
-                    type: string
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          success:
+                            type: boolean
+                          message:
+                            type: string
         '400':
           $ref: '#/components/responses/BadRequest'
         '403':
@@ -2081,18 +2265,24 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    id:
-                      type: integer
-                    status:
-                      type: string
-                    result:
-                      type: string
-                    error:
-                      type: string
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                            status:
+                              type: string
+                            result:
+                              type: string
+                            error:
+                              type: string
         '400':
           $ref: '#/components/responses/BadRequest'
 
@@ -2110,10 +2300,15 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/AutomationRule'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AutomationRule'
     post:
       tags: [Automation]
       summary: Create automation rule
@@ -2132,8 +2327,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AutomationRule'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AutomationRule'
   /api/automation/rules/{id}:
     put:
       tags: [Automation]
@@ -2159,8 +2359,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AutomationRule'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AutomationRule'
     delete:
       tags: [Automation]
       summary: Delete automation rule
@@ -2218,10 +2423,15 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Webhook'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Webhook'
     post:
       tags: [Automation]
       summary: Create webhook
@@ -2240,8 +2450,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Webhook'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Webhook'
   /api/webhooks/{id}:
     delete:
       tags: [Automation]
@@ -2289,13 +2504,18 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  status_code:
-                    type: integer
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          success:
+                            type: boolean
+                          status_code:
+                            type: integer
   /api/monitor/metrics:
     get:
       tags: [Monitor]
@@ -2310,8 +2530,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SystemMetric'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SystemMetric'
   /api/monitor/metrics/history:
     get:
       tags: [Monitor]
@@ -2332,10 +2557,15 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/SystemMetric'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/SystemMetric'
   /api/monitor/alerts:
     get:
       tags: [Monitor]
@@ -2356,10 +2586,15 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Alert'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Alert'
   /api/monitor/alerts/stats:
     get:
       tags: [Monitor]
@@ -2374,15 +2609,20 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  active:
-                    type: integer
-                  acknowledged:
-                    type: integer
-                  resolved:
-                    type: integer
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          active:
+                            type: integer
+                          acknowledged:
+                            type: integer
+                          resolved:
+                            type: integer
   /api/monitor/alert-rules:
     get:
       tags: [Monitor]
@@ -2397,10 +2637,15 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/AlertRule'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AlertRule'
     post:
       tags: [Monitor]
       summary: Create alert rule
@@ -2419,8 +2664,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AlertRule'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AlertRule'
   /api/monitor/alert-rules/{id}:
     put:
       tags: [Monitor]
@@ -2446,8 +2696,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AlertRule'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AlertRule'
     delete:
       tags: [Monitor]
       summary: Delete alert rule
@@ -2527,15 +2782,20 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  total:
-                    type: integer
-                  online:
-                    type: integer
-                  offline:
-                    type: integer
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          total:
+                            type: integer
+                          online:
+                            type: integer
+                          offline:
+                            type: integer
   /api/bof/list:
     get:
       tags: [BOF]
@@ -2550,10 +2810,15 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/BOFFile'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/BOFFile'
   /api/bof/upload:
     post:
       tags: [BOF]
@@ -2637,8 +2902,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TaskResponse'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TaskResponse'
   /api/bof/{id}/edit:
     post:
       tags: [BOF]
@@ -2707,10 +2977,15 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Task'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Task'
   /api/plugins:
     get:
       tags: [Plugins]
@@ -2725,10 +3000,15 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Plugin'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Plugin'
     post:
       tags: [Plugins]
       summary: Create plugin
@@ -2747,8 +3027,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Plugin'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Plugin'
   /api/plugins/{id}/toggle:
     post:
       tags: [Plugins]
@@ -2829,10 +3114,15 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/TokenEntry'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/TokenEntry'
   /agents/{id}/token/list_procs:
     post:
       tags: [Tokens, Agents]
@@ -2854,8 +3144,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TaskResponse'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TaskResponse'
   /agents/{id}/token/steal:
     post:
       tags: [Tokens, Agents]
@@ -2886,8 +3181,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TaskResponse'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TaskResponse'
   /agents/{id}/token/make:
     post:
       tags: [Tokens, Agents]
@@ -2922,8 +3222,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TaskResponse'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TaskResponse'
   /agents/{id}/token/revert:
     post:
       tags: [Tokens, Agents]
@@ -2945,8 +3250,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TaskResponse'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TaskResponse'
   /agents/{id}/token/whoami:
     post:
       tags: [Tokens, Agents]
@@ -2968,8 +3278,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TaskResponse'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TaskResponse'
   /agents/{id}/token/{token_id}:
     delete:
       tags: [Tokens, Agents]
@@ -3024,8 +3339,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TaskResponse'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TaskResponse'
   /api/templates:
     get:
       tags: [Templates]
@@ -3054,8 +3374,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CommandTemplate'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CommandTemplate'
   /api/templates/{id}:
     put:
       tags: [Templates]
@@ -3114,10 +3439,15 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/CommandTemplate'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/CommandTemplate'
   /api/timeline/data:
     get:
       tags: [Timeline]
@@ -3143,10 +3473,15 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: object
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
   /api/timeline/export:
     get:
       tags: [Timeline]
@@ -3161,7 +3496,13 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
     post:
       tags: [Timeline]
       summary: Export timeline as CSV
@@ -3233,13 +3574,18 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  download_url:
-                    type: string
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          success:
+                            type: boolean
+                          download_url:
+                            type: string
   /api/scan:
     post:
       tags: [Scanner]
@@ -3271,8 +3617,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TaskResponse'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TaskResponse'
   /api/scan/results/{taskId}:
     get:
       tags: [Scanner]
@@ -3293,10 +3644,15 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ScanResult'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ScanResult'
   /api/scan/agent/{agentId}:
     get:
       tags: [Scanner]
@@ -3318,10 +3674,15 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/ScanResult'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ScanResult'
   /api/lateral/history/{id}:
     get:
       tags: [Lateral Movement]
@@ -3343,10 +3704,15 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Task'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Task'
   /api/privesc/history/{id}:
     get:
       tags: [Privilege Escalation]
@@ -3368,10 +3734,15 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Task'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Task'
   /api/topology/data:
     get:
       tags: [Agents]
@@ -3386,17 +3757,22 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  nodes:
-                    type: array
-                    items:
-                      type: object
-                  edges:
-                    type: array
-                    items:
-                      type: object
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          nodes:
+                            type: array
+                            items:
+                              type: object
+                          edges:
+                            type: array
+                            items:
+                              type: object
   /ws:
     get:
       tags: [WebSocket]
@@ -3434,7 +3810,13 @@ paths:
           content:
             application/json:
               schema:
-                type: object
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
     post:
       tags: [Phishing]
       summary: Create phishing template
@@ -3648,7 +4030,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ModulesListResponse'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ModulesListResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
     post:
@@ -3677,7 +4065,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ModuleUploadResponse'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ModuleUploadResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -3729,7 +4123,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TaskResponse'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TaskResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '404':
@@ -4272,24 +4672,30 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                required: [encode_types, entry_points, timestamps, cert_options, output_types]
-                properties:
-                  encode_types:
-                    type: array
-                    items: { type: string }
-                  entry_points:
-                    type: array
-                    items: { type: string }
-                  timestamps:
-                    type: array
-                    items: { type: string }
-                  cert_options:
-                    type: array
-                    items: { type: string }
-                  output_types:
-                    type: array
-                    items: { type: string }
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
+                        required: [encode_types, entry_points, timestamps, cert_options, output_types]
+                        properties:
+                          encode_types:
+                            type: array
+                            items: { type: string }
+                          entry_points:
+                            type: array
+                            items: { type: string }
+                          timestamps:
+                            type: array
+                            items: { type: string }
+                          cert_options:
+                            type: array
+                            items: { type: string }
+                          output_types:
+                            type: array
+                            items: { type: string }
   /timeline/events:
     get:
       tags: [Timeline]
@@ -5132,8 +5538,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TaskResponse'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TaskResponse'
   /agents/{id}/token:
     get:
       tags: [Agents]
@@ -5538,8 +5949,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UpdateCheckStatus'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UpdateCheckStatus'
   /api/update-check/version:
     get:
       tags: [Settings]
@@ -5553,8 +5969,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UpdateVersionInfo'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UpdateVersionInfo'
   /api/update-check/refresh:
     post:
       tags: [Settings]
@@ -5568,8 +5989,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UpdateCheckStatus'
-
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UpdateCheckStatus'
   /api/update-check/hot-update:
     post:
       tags: [Settings]
@@ -6406,12 +6832,18 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                required: [data, filename, size]
-                properties:
-                  data: { type: string, description: Base64 of the built artifact }
-                  filename: { type: string }
-                  size: { type: integer }
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
+                        required: [data, filename, size]
+                        properties:
+                          data: { type: string, description: Base64 of the built artifact }
+                          filename: { type: string }
+                          size: { type: integer }
         '400':
           description: Invalid request (unknown enum value, empty payload, unsupported option)
           content:
@@ -6451,11 +6883,17 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                required: [data, size]
-                properties:
-                  data: { type: string }
-                  size: { type: integer }
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
+                        required: [data, size]
+                        properties:
+                          data: { type: string }
+                          size: { type: integer }
         '400':
           description: Invalid request (not a PE image, bad timestamp, import manipulation failure)
           content:
@@ -6720,18 +7158,24 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  screenshots:
-                    type: array
-                    items:
-                      type: string
-                  total:
-                    type: integer
-                  page:
-                    type: integer
-                  page_size:
-                    type: integer
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          screenshots:
+                            type: array
+                            items:
+                              type: string
+                          total:
+                            type: integer
+                          page:
+                            type: integer
+                          page_size:
+                            type: integer
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -8824,7 +9268,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DashboardStats'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DashboardStats'
         '401':
           $ref: '#/components/responses/Unauthorized'
   /api/v1/agents:
@@ -8840,7 +9290,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AgentListResponse'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AgentListResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
   /api/v1/tasks:
@@ -8856,14 +9312,20 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success: { type: boolean }
-                  data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Task'
-                  total: { type: integer }
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          success: { type: boolean }
+                          data:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Task'
+                          total: { type: integer }
         '401':
           $ref: '#/components/responses/Unauthorized'
     post:
@@ -8887,7 +9349,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TaskResponse'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TaskResponse'
   /api/scripts:
     get:
       tags: [Settings]
@@ -8936,30 +9404,36 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    id:
-                      type: integer
-                    name:
-                      type: string
-                    prefix:
-                      type: string
-                    last_used:
-                      type: string
-                    expires_at:
-                      type: string
-                    active:
-                      type: boolean
-                    scopes:
-                      type: string
-                      description: Comma-separated permission scopes; empty means full access
-                    allowed_cidrs:
-                      type: string
-                      description: Comma-separated source CIDRs; empty means any source
-                    created_at:
-                      type: string
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: integer
+                            name:
+                              type: string
+                            prefix:
+                              type: string
+                            last_used:
+                              type: string
+                            expires_at:
+                              type: string
+                            active:
+                              type: boolean
+                            scopes:
+                              type: string
+                              description: Comma-separated permission scopes; empty means full access
+                            allowed_cidrs:
+                              type: string
+                              description: Comma-separated source CIDRs; empty means any source
+                            created_at:
+                              type: string
     post:
       tags: [Settings]
       summary: Create API key
@@ -8994,32 +9468,38 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  data:
-                    type: object
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
                     properties:
-                      id:
-                        type: integer
-                      name:
-                        type: string
-                      key:
-                        type: string
-                        description: Plaintext API key (shown once)
-                      prefix:
-                        type: string
-                      scopes:
-                        type: string
-                      allowed_cidrs:
-                        type: string
-                      created_at:
-                        type: string
-                      expires_at:
-                        type: string
-                  message:
-                    type: string
+                      data:
+                        type: object
+                        properties:
+                          success:
+                            type: boolean
+                          data:
+                            type: object
+                            properties:
+                              id:
+                                type: integer
+                              name:
+                                type: string
+                              key:
+                                type: string
+                                description: Plaintext API key (shown once)
+                              prefix:
+                                type: string
+                              scopes:
+                                type: string
+                              allowed_cidrs:
+                                type: string
+                              created_at:
+                                type: string
+                              expires_at:
+                                type: string
+                          message:
+                            type: string
         '400':
           $ref: '#/components/responses/BadRequest'
   /api/api-keys/{id}:
@@ -9058,27 +9538,33 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success:
-                    type: boolean
-                  data:
-                    type: object
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
                     properties:
-                      id:
-                        type: integer
-                      name:
-                        type: string
-                      key:
-                        type: string
-                      prefix:
-                        type: string
-                      created_at:
-                        type: string
-                      expires_at:
-                        type: string
-                  message:
-                    type: string
+                      data:
+                        type: object
+                        properties:
+                          success:
+                            type: boolean
+                          data:
+                            type: object
+                            properties:
+                              id:
+                                type: integer
+                              name:
+                                type: string
+                              key:
+                                type: string
+                              prefix:
+                                type: string
+                              created_at:
+                                type: string
+                              expires_at:
+                                type: string
+                          message:
+                            type: string
         '404':
           $ref: '#/components/responses/NotFound'
   /notifications:
@@ -9145,7 +9631,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AgentListResponse'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AgentListResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
   /agents/{id}/mimikatz:
@@ -9167,7 +9659,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TaskResponse'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TaskResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
   /loot:
@@ -9183,13 +9681,19 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success: { type: boolean }
-                  loot:
-                    type: array
-                    items:
-                      type: object
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          success: { type: boolean }
+                          loot:
+                            type: array
+                            items:
+                              type: object
   /api/tags:
     get:
       tags: [Agents]
@@ -9203,17 +9707,23 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success: { type: boolean }
-                  tags:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        id: { type: integer }
-                        name: { type: string }
-                        color: { type: string }
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          success: { type: boolean }
+                          tags:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: { type: integer }
+                                name: { type: string }
+                                color: { type: string }
     post:
       tags: [Agents]
       summary: Create tag
@@ -9268,7 +9778,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ReadyResponse'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ReadyResponse'
   /api/v1/listeners:
     get:
       tags: [Listeners]
@@ -9282,13 +9798,19 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  success: { type: boolean }
-                  data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Listener'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          success: { type: boolean }
+                          data:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Listener'
   /api/v1/credentials:
     get:
       tags: [Credentials]
@@ -9312,31 +9834,37 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                required: [success, data]
-                properties:
-                  success:
-                    type: boolean
-                  data:
-                    type: object
-                    required: [id, username, role, permissions]
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
                     properties:
-                      id:
-                        type: integer
-                      username:
-                        type: string
-                      role:
-                        type: string
-                        description: Built-in (admin|user) or custom role name
-                      permissions:
-                        type: array
-                        items:
-                          type: string
-                          description: Effective permissions for the role (admin = full set)
-                      session_exp:
-                        type: integer
-                        format: int64
-                        description: Session expiry as ms epoch, when known
+                      data:
+                        type: object
+                        required: [success, data]
+                        properties:
+                          success:
+                            type: boolean
+                          data:
+                            type: object
+                            required: [id, username, role, permissions]
+                            properties:
+                              id:
+                                type: integer
+                              username:
+                                type: string
+                              role:
+                                type: string
+                                description: Built-in (admin|user) or custom role name
+                              permissions:
+                                type: array
+                                items:
+                                  type: string
+                                  description: Effective permissions for the role (admin = full set)
+                              session_exp:
+                                type: integer
+                                format: int64
+                                description: Session expiry as ms epoch, when known
   /api/docs:
     get:
       tags: [Settings]
@@ -9446,9 +9974,15 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/DashboardOSDistributionItem'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/DashboardOSDistributionItem'
   /api/dashboard/task-status:
     get:
       tags: [Agents]
@@ -9462,9 +9996,15 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/DashboardTaskStatusItem'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/DashboardTaskStatusItem'
   /api/dashboard/listener-traffic:
     get:
       tags: [Agents]
@@ -9478,7 +10018,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DashboardTrafficData'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DashboardTrafficData'
   /api/dashboard/activity-heatmap:
     get:
       tags: [Agents]
@@ -9492,9 +10038,15 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/DashboardHeatmapItem'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/DashboardHeatmapItem'
   /api/dashboard/agent-geo:
     get:
       tags: [Agents]
@@ -9508,9 +10060,15 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/DashboardAgentGeoItem'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/DashboardAgentGeoItem'
   /api/dashboard/task-gantt:
     get:
       tags: [Agents]
@@ -9524,9 +10082,15 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/DashboardTaskGanttItem'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/DashboardTaskGanttItem'
   /api/dashboard/credential-types:
     get:
       tags: [Credentials]
@@ -9540,9 +10104,15 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/DashboardCredentialTypeItem'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/DashboardCredentialTypeItem'
   /api/dashboard/attack-path:
     get:
       tags: [Agents]
@@ -9556,7 +10126,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DashboardAttackPathData'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DashboardAttackPathData'
   /api/dashboard/active-missions:
     get:
       tags: [Dashboard]
@@ -9570,12 +10146,18 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  missions:
-                    type: array
-                    items:
-                      type: object
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          missions:
+                            type: array
+                            items:
+                              type: object
   /api/bof/repos:
     get:
       tags: [BOF]
@@ -10958,7 +11540,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UpdateProgress'
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UpdateProgress'
   /config/reload-status:
     get:
       tags: [Ops]
@@ -11098,11 +11686,19 @@ components:
 
     SuccessResponse:
       type: object
+      description: |
+        Every JSON 200 response uses this envelope: respond() wraps the handler
+        payload exactly once as {"success": true, "data": <payload>}. Errors are
+        {"success": false, "error": "..."} on a non-2xx status. A JSON 200
+        schema is expressed as an allOf of this component plus a data property
+        holding the per-operation payload schema.
       required: [success]
       properties:
         success:
           type: boolean
           example: true
+        data:
+          description: The handler payload (shape documented per operation).
         message:
           type: string
 
