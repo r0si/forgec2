@@ -183,14 +183,15 @@ console.log(/vendor-baseui-forms/.test(h) ? 'FAIL: forms preloaded' : 'OK: forms
 - A cold `/login` visit pays one extra round trip for the lazy login chunk; the
   401 prewarm covers the common expired-session path, not a first-ever visit.
 - The entry chunk still carries the full `en` i18n dictionary. **Re-measured
-  2026-10-24**: the critical path is **1030.8 kB across 13 chunks** against the
-  1090 kB budget (5.4% headroom), and the dictionary is no longer in the entry
-  chunk — it now lands in `utils-*.js` (**242.7 kB**, the largest single chunk
-  on the critical path; `en.ts` is 268.9 kB of source). The rest of the path is
-  vendor-baseui 208.1, vendor-react 202.4, entry 115.1, vendor-router 91.5,
-  vendor-icons 66.4, vendor-misc 39.6, vendor-sonner 32.8, wsContext 29.3 and
-  four sub-2 kB chunks. Total bundle is 4.54 MB across 199 files (5.50 MB
-  budget).
+  2026-10-25** after pruning 79 keys that no code referenced (4.0 kB off each
+  dictionary): the critical path is **1027 kB across 13 chunks** against the
+  1090 kB budget (5.8% headroom), and the dictionary is no longer in the entry
+  chunk — it lands in `utils-*.js` (**238.6 kB**, the largest single chunk on
+  the critical path; `en.ts` is 264.4 kB of source, `zh.ts` 263.0 kB and its
+  lazy chunk 233.7 kB). The rest of the path is vendor-baseui 208.1,
+  vendor-react 202.4, entry 115.1, vendor-router 91.5, vendor-icons 66.4,
+  vendor-misc 39.6, vendor-sonner 32.8, wsContext 29.3 and four sub-2 kB
+  chunks. Total bundle is 4.53 MB across 199 files (5.50 MB budget).
 
   Splitting the dictionary is the one change big enough to matter here (it
   would take the path to roughly 790 kB). It is **not** a mechanical split: `t()`

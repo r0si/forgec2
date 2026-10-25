@@ -76,7 +76,9 @@ describe("I18nProvider", () => {
         'zh|保存|输入 "DELETE" 以确认|no.such.key',
       );
     });
-    expect(document.documentElement.lang).toBe("zh");
+    // `lang` is applied by a separate effect keyed on locale, so it can land a
+    // commit after the text does; asserting it synchronously flaked under load.
+    await waitFor(() => expect(document.documentElement.lang).toBe("zh"));
     expect(getLocale()).toBe("zh");
   });
 
