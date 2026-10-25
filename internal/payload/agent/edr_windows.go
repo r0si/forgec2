@@ -170,12 +170,19 @@ func (e *EDRInfo) detectServices() {
 
 	base := unsafe.Pointer(&buf[0])
 	for i := uint32(0); i < servicesReturned; i++ {
-		ep := unsafe.Pointer(uintptr(base) + uintptr(i)*stride)
+		// unsafe.Add keeps the arithmetic relative to the Go allocation, so
+		// checkptr (and -race builds) can validate it. `unsafe.Pointer(uintptr
+		// (base) + n)` is rejected by checkptr, which made `go test -race`
+		// abort with "pointer arithmetic result points to invalid allocation".
+		ep := unsafe.Add(base, uintptr(i)*stride)
 		if namePtr := *(*uintptr)(ep); namePtr != 0 {
 			var nameChars []uint16
-			p := unsafe.Pointer(namePtr)
+			// The service name lives in the same buffer the API filled, so
+			// re-derive it as an offset from base instead of an absolute
+			// uintptr-to-pointer conversion.
+			p := unsafe.Add(base, namePtr-uintptr(base))
 			for j := 0; ; j++ {
-				c := *(*uint16)(unsafe.Pointer(uintptr(p) + uintptr(j)*2))
+				c := *(*uint16)(unsafe.Add(p, uintptr(j)*2))
 				if c == 0 {
 					break
 				}

@@ -14,7 +14,7 @@ The `bash` tool runs **PowerShell 5.1**, not bash. Adapt accordingly:
 ForgeC2 is a mature Go (net/http + sqlite) C2 server plus a Vite + React TypeScript frontend.
 - Server binary: `forgec2-server.exe` (built with `go build ./cmd/server`).
 - Default: port **8000**, config `config.yaml`, sqlite DB `data/db/forgec2.db` (users `admin`/`labtest`).
-- Version: 2.6.2 (see CHANGELOG.md; single source `VERSION`).
+- Version: 2.7.1 (see CHANGELOG.md; single source `VERSION`).
 
 ## Frontend build & embedding (IMPORTANT)
 The frontend is **Vite** (not Next.js).
@@ -41,14 +41,26 @@ jsdom 30 set the minimum). Run from `frontend/`:
 ## Testing
 Backend test suite via CI (`.github/workflows/ci.yml`):
 ```
-go test ./internal/config/... ./internal/crypto/... ./internal/db/... ./internal/malleable/... ./internal/obfuscation/... ./internal/plugin/... ./internal/server/... ./pkg/... -count=1 -timeout 5m
+go test ./internal/config/... ./internal/crypto/... ./internal/db/... ./internal/malleable/... ./internal/obfuscation/... ./internal/payload/... ./internal/plugin/... ./internal/scripting/... ./internal/server/... ./pkg/... ./cmd/... -count=1 -timeout 8m -coverprofile=coverage.out
 ```
+- The race job runs in two parallel legs: `./internal/server/...` and
+  `./internal/db/... ./internal/plugin/... ./internal/scripting/... ./internal/payload/agent/...`
+  (`-race -timeout 20m` each). Locally the server leg alone takes 11–14 m, which is why it is not
+  bundled with the rest.
+- **Windows caveat:** `go test -race ./internal/payload/agent/...` aborts on Windows with
+  `fatal error: checkptr: pointer arithmetic result points to invalid allocation`. The agent's
+  Windows-only shellcode/PE/EDR code walks raw pointers on purpose, and checkptr (implied by `-race`)
+  rejects that arithmetic. CI never sees it because the leg runs on Linux, where those files do not
+  compile. To run that package locally use `go test -race -gcflags=all=-d=checkptr=0 ./internal/payload/agent/...`,
+  and do not treat the abort as a product bug. Making the package fully checkptr-clean would mean
+  rewriting ~40 `unsafe.Pointer(base + offset)` sites to `unsafe.Add` — a separate, risky batch in
+  security-sensitive code.
 - `go vet ./internal/... ./pkg/... ./cmd/...` — but **ignore `internal/payload/agent`** (known unsafe.Pointer warnings; also filtered in CI).
 - CI requires **gofmt** on all changed Go files.
 
 ## Build caveats
 - `go build ./...` passes (the `data/e2e/` helpers have `//go:build ignore` tags).
-- Go version: **1.26.0** (go.mod) with `toolchain go1.26.9` pinned for the standard-library security patches (net/http, crypto/tls, html/template, net/textproto).
+- Go version: **1.26.0** (go.mod) with `toolchain go1.26.10` pinned for the standard-library security patches (net/http, crypto/tls, html/template, net/textproto). CI's `setup-go` uses the same 1.26.10.
 - sqlite driver is **`github.com/glebarez/sqlite`** (pure Go, no cgo). Any DB-verification temp program MUST use this driver, NOT `gorm.io/driver/sqlite` (which needs cgo).
 
 ## CSRF Protection (IMPORTANT)

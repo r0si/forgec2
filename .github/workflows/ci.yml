@@ -128,8 +128,19 @@ jobs:
           kill $(cat /tmp/forgec2-smoke.pid) || true
 
   race:
-    name: Race detector (concurrency-sensitive packages)
+    name: Race detector (${{ matrix.suite }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The server alone takes 11–14 minutes under -race locally; keeping
+          # it in its own leg gives each half the full timeout instead of
+          # sharing one 20-minute budget, and reports which half regressed.
+          - suite: server
+            packages: ./internal/server/...
+          - suite: core
+            packages: ./internal/db/... ./internal/plugin/... ./internal/scripting/... ./internal/payload/agent/...
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -142,7 +153,7 @@ jobs:
       # WebSocket fan-out concurrently; -race is the only gate that catches a
       # shared-state regression there.
       - name: go test -race
-        run: go test -race ./internal/server/... ./internal/plugin/... ./internal/scripting/... ./internal/payload/agent/... ./internal/db/... -count=1 -timeout 20m
+        run: go test -race ${{ matrix.packages }} -count=1 -timeout 20m
 
   # The C implant ships as source and is assembled on operator machines, so no
   # other job would notice a syntax error, a fresh compiler warning, a task type
