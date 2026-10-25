@@ -76,9 +76,7 @@ func TestListMacroRunsCrossTenantHidden(t *testing.T) {
 	var payload struct {
 		Runs []db.MacroRun `json:"runs"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &payload); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	unmarshalData(t, w.Body.Bytes(), &payload)
 	if len(payload.Runs) != 1 {
 		t.Fatalf("tenant-1 operator saw %d runs, want only the 1 own-tenant run", len(payload.Runs))
 	}

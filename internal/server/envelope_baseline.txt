@@ -38,7 +38,6 @@ handlers_emergency.go 5
 handlers_generate_one_liners.go 2
 handlers_i18n.go 4
 handlers_lateral.go 2
-handlers_macros.go 4
 handlers_notification_routes.go 2
 handlers_ntlm.go 2
 handlers_opsec.go 3
@@ -50,7 +49,6 @@ handlers_scan.go 2
 handlers_scheduler.go 2
 handlers_scripting.go 2
 handlers_sessions.go 3
-handlers_siem.go 4
 handlers_templates.go 3
 handlers_toolkit.go 4
 handlers_topology_net.go 1

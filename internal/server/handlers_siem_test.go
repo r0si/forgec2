@@ -183,9 +183,7 @@ func TestSIEMRuleLifecycle(t *testing.T) {
 	var listing struct {
 		Rules []db.SIEMRule `json:"rules"`
 	}
-	if err := jsonUnmarshal(w2.Body.Bytes(), &listing); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	unmarshalData(t, w2.Body.Bytes(), &listing)
 	if len(listing.Rules) != 1 || listing.Rules[0].Name != "password spray" {
 		t.Fatalf("listing = %+v", listing.Rules)
 	}

@@ -72,7 +72,7 @@ func (s *Server) handleListMacros(c *gin.Context) {
 		respondError(c, http.StatusInternalServerError, "query failed")
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "macros": macros})
+	respond(c, gin.H{"macros": macros})
 }
 
 // loadMacroScoped reads one macro honoring tenant visibility (same contract
@@ -116,7 +116,7 @@ func (s *Server) handleCreateMacro(c *gin.Context) {
 		return
 	}
 	s.LogAuditRecord(c, "macro_create", "macro", strconv.FormatUint(uint64(macro.ID), 10), req.Name, true, nil)
-	c.JSON(http.StatusOK, gin.H{"success": true, "macro": macro})
+	respond(c, gin.H{"macro": macro})
 }
 
 func (s *Server) handleUpdateMacro(c *gin.Context) {
@@ -181,7 +181,7 @@ func (s *Server) handleListMacroRuns(c *gin.Context) {
 		respondError(c, http.StatusInternalServerError, "query failed")
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "runs": runs})
+	respond(c, gin.H{"runs": runs})
 }
 
 // handleGetMacroRun was removed. The macro detail dialog is populated from the
@@ -310,7 +310,7 @@ func (s *Server) handleRunMacro(c *gin.Context) {
 	}
 	s.LogAuditRecord(c, "macro_run", "macro", id,
 		fmt.Sprintf("%s dispatched to %d agents", macro.Name, created), true, nil)
-	c.JSON(http.StatusOK, gin.H{"success": true, "dispatched": created})
+	respond(c, gin.H{"dispatched": created})
 }
 
 // executeMacroRun drives one agent through the step list. It re-reads the

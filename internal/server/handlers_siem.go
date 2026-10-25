@@ -27,7 +27,7 @@ func (s *Server) handleListSIEMRules(c *gin.Context) {
 	if rules == nil {
 		rules = []db.SIEMRule{}
 	}
-	c.JSON(http.StatusOK, gin.H{"rules": rules})
+	respond(c, gin.H{"rules": rules})
 }
 
 func (s *Server) handleCreateSIEMRule(c *gin.Context) {
@@ -73,7 +73,7 @@ func (s *Server) handleCreateSIEMRule(c *gin.Context) {
 	}
 	s.reloadSIEMRules()
 	s.LogAuditRecord(c, "siem_rule_create", "siem", rule.Name, "SIEM correlation rule created", true, nil)
-	c.JSON(http.StatusOK, gin.H{"success": true, "rule": rule})
+	respond(c, gin.H{"rule": rule})
 }
 
 func (s *Server) handleUpdateSIEMRule(c *gin.Context) {
@@ -109,7 +109,7 @@ func (s *Server) handleUpdateSIEMRule(c *gin.Context) {
 	}
 	s.reloadSIEMRules()
 	s.LogAuditRecord(c, "siem_rule_update", "siem", rule.Name, "SIEM correlation rule updated", true, nil)
-	c.JSON(http.StatusOK, gin.H{"success": true, "rule": rule})
+	respond(c, gin.H{"rule": rule})
 }
 
 func (s *Server) handleToggleSIEMRule(c *gin.Context) {
@@ -128,7 +128,7 @@ func (s *Server) handleToggleSIEMRule(c *gin.Context) {
 	}
 	s.reloadSIEMRules()
 	s.LogAuditRecord(c, "siem_rule_toggle", "siem", rule.Name, "SIEM correlation rule toggled", true, nil)
-	c.JSON(http.StatusOK, gin.H{"success": true, "enabled": rule.Enabled})
+	respond(c, gin.H{"enabled": rule.Enabled})
 }
 
 func (s *Server) handleDeleteSIEMRule(c *gin.Context) {
