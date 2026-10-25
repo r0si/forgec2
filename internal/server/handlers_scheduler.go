@@ -26,7 +26,7 @@ func (s *Server) handleListOneShotTasks(c *gin.Context) {
 		respondError(c, http.StatusInternalServerError, "query failed")
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "tasks": tasks})
+	respond(c, gin.H{"tasks": tasks})
 }
 
 func (s *Server) handleCreateOneShotTask(c *gin.Context) {
@@ -74,7 +74,7 @@ func (s *Server) handleCreateOneShotTask(c *gin.Context) {
 	}
 	s.LogAuditRecord(c, "oneshot_schedule", "agent", req.AgentID,
 		fmt.Sprintf("one-shot %s scheduled for %s: %s", taskType, row.RunAt.Format(time.RFC3339), truncateStr(req.Command, 120)), true, nil)
-	c.JSON(http.StatusOK, gin.H{"success": true, "task": row})
+	respond(c, gin.H{"task": row})
 }
 
 func (s *Server) handleCancelOneShotTask(c *gin.Context) {

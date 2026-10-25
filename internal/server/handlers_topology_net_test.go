@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -51,17 +50,11 @@ func TestHandleAPINetworkTopology_GraphComposition(t *testing.T) {
 	}
 
 	var resp struct {
-		Success bool              `json:"success"`
-		Nodes   []topologyNetNode `json:"nodes"`
-		Edges   []topologyNetEdge `json:"edges"`
-		Stats   map[string]int    `json:"stats"`
+		Nodes []topologyNetNode `json:"nodes"`
+		Edges []topologyNetEdge `json:"edges"`
+		Stats map[string]int    `json:"stats"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-	if !resp.Success {
-		t.Fatal("success=false")
-	}
+	unmarshalData(t, w.Body.Bytes(), &resp)
 
 	nodeByID := map[string]topologyNetNode{}
 	for _, n := range resp.Nodes {

@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/url"
 	"strings"
@@ -228,15 +227,11 @@ func TestLatestScreenFrameProvidesHTTPFallback(t *testing.T) {
 	assertStatus(t, w, http.StatusOK)
 
 	var response struct {
-		Data struct {
-			Image     string `json:"image"`
-			CaptureID string `json:"capture_id"`
-		} `json:"data"`
+		Image     string `json:"image"`
+		CaptureID string `json:"capture_id"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if response.Data.Image != "data:image/jpeg;base64,/9j/test-frame" || response.Data.CaptureID == "" {
+	unmarshalData(t, w.Body.Bytes(), &response)
+	if response.Image != "data:image/jpeg;base64,/9j/test-frame" || response.CaptureID == "" {
 		t.Fatalf("unexpected fallback response: %s", w.Body.String())
 	}
 }

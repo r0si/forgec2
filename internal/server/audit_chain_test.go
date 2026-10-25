@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -225,8 +224,7 @@ func TestHandleBuildList_SnapshotsFields(t *testing.T) {
 		t.Fatalf("expected 200, got %d; body=%s", w.Code, w.Body.String())
 	}
 	var resp struct {
-		Success bool `json:"success"`
-		Builds  []struct {
+		Builds []struct {
 			ID          string `json:"id"`
 			Status      string `json:"status"`
 			Filename    string `json:"filename"`
@@ -234,10 +232,8 @@ func TestHandleBuildList_SnapshotsFields(t *testing.T) {
 			CompletedAt string `json:"completed_at"`
 		} `json:"builds"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("invalid json: %v; body=%s", err, w.Body.String())
-	}
-	if !resp.Success || len(resp.Builds) != 1 {
+	unmarshalData(t, w.Body.Bytes(), &resp)
+	if len(resp.Builds) != 1 {
 		t.Fatalf("expected 1 build, got %d; body=%s", len(resp.Builds), w.Body.String())
 	}
 	if resp.Builds[0].Status != "completed" || resp.Builds[0].Filename != "agent.exe" {

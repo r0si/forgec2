@@ -98,7 +98,7 @@ func (s *Server) apiDeleteAgent(c *gin.Context) {
 		return
 	}
 	s.LogAuditRecord(c, "delete_agent", "agent", id, "Agent deleted", true, nil)
-	c.JSON(http.StatusOK, gin.H{"success": true, "message": "agent deleted"})
+	respond(c, gin.H{"message": "agent deleted"})
 }
 
 // ── REST API: Tasks ──

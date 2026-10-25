@@ -250,9 +250,7 @@ func TestListAgentsTenantScoped(t *testing.T) {
 		t.Fatalf("status %d body=%s", w.Code, w.Body.String())
 	}
 	var m map[string]any
-	if err := json.Unmarshal(w.Body.Bytes(), &m); err != nil {
-		t.Fatalf("json: %v", err)
-	}
+	unmarshalData(t, w.Body.Bytes(), &m)
 	agents, ok := m["agents"].([]any)
 	if !ok {
 		t.Fatalf("missing agents[]: %v", m)
@@ -361,9 +359,7 @@ func TestDashboardCountsTenantScoped(t *testing.T) {
 		t.Fatalf("status %d body=%s", w.Code, w.Body.String())
 	}
 	var m map[string]any
-	if err := json.Unmarshal(w.Body.Bytes(), &m); err != nil {
-		t.Fatalf("json: %v", err)
-	}
+	unmarshalData(t, w.Body.Bytes(), &m)
 	checks := map[string]float64{
 		"total_agents":  1,
 		"online_agents": 1,

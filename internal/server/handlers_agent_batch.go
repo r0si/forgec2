@@ -81,8 +81,8 @@ func (s *Server) handleBulkDeleteAgents(c *gin.Context) {
 	s.LogAuditRecord(c, "batch_delete_agents", "agent", "", fmt.Sprintf("deleted %d agents", deleted), true, nil)
 	slog.Warn("Bulk agent delete", "deleted", deleted, "user", operator)
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
+	respond(c, gin.H{
+
 		"deleted": deleted,
 		"failed":  0,
 	})
@@ -357,8 +357,8 @@ func (s *Server) handleBatchCommand(c *gin.Context) {
 		Operator:  operator,
 	})
 
-	c.JSON(http.StatusOK, gin.H{
-		"success":        true,
+	respond(c, gin.H{
+
 		"tasks_created":  taskCount,
 		"failed":         failedCount,
 		"locked_skipped": lockedSkipped,
@@ -411,7 +411,7 @@ func (s *Server) handleBulkResults(c *gin.Context) {
 		end = total
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	respond(c, gin.H{
 		"results":   results[start:end],
 		"total":     total,
 		"page":      page,

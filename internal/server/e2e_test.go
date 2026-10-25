@@ -70,7 +70,7 @@ func TestE2E_Smoke_ListEndpoints(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("expected 200, got %d; body=%s", w.Code, w.Body.String())
 		}
-		testutil.AssertKeyExists(t, w.Body.Bytes(), "list listeners", "data")
+		testutil.AssertKeyExists(t, w.Body.Bytes(), "list listeners", "listeners")
 	})
 
 	t.Run("dashboard heatmap returns ok", func(t *testing.T) {

@@ -322,9 +322,9 @@ func (s *Server) handleGetCurrentUser(c *gin.Context) {
 			data["session_exp"] = t.UnixMilli()
 		}
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    data,
+	respond(c, gin.H{
+
+		"data": data,
 	})
 }
 
@@ -436,8 +436,8 @@ func (s *Server) handleExtendSession(c *gin.Context) {
 	slog.Info("Session extended", "username", user.Username, "ip", c.ClientIP(), "max_age", maxAge)
 
 	exp := now.Add(time.Duration(maxAge) * time.Second).UnixMilli()
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    gin.H{"session_exp": exp},
+	respond(c, gin.H{
+
+		"data": gin.H{"session_exp": exp},
 	})
 }

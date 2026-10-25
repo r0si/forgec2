@@ -267,7 +267,7 @@ func (s *Server) handleAIIntentApprove(c *gin.Context) {
 	s.appendAIRunEvent(intent.RunID, "tool_result", result)
 	s.finishRunIfNoPendingIntents(intent.RunID)
 	s.LogOperatorAction(c, OperatorAction{Action: "ai_intent_approve", Resource: "ai", TargetID: intent.ID, RiskLevel: intent.Risk, Details: intent.ArgumentsDigest})
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"id": intent.ID, "status": "executed", "result": summary}})
+	respond(c, gin.H{"id": intent.ID, "status": "executed", "result": summary})
 }
 
 func (s *Server) handleAIIntentReject(c *gin.Context) {
@@ -290,7 +290,7 @@ func (s *Server) handleAIIntentReject(c *gin.Context) {
 	s.appendAIRunEvent(intent.RunID, "tool_result", `{"status":"rejected"}`)
 	s.finishRunIfNoPendingIntents(intent.RunID)
 	s.LogOperatorAction(c, OperatorAction{Action: "ai_intent_reject", Resource: "ai", TargetID: intent.ID, RiskLevel: intent.Risk, Details: intent.ArgumentsDigest})
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{"id": intent.ID, "status": "rejected"}})
+	respond(c, gin.H{"id": intent.ID, "status": "rejected"})
 }
 
 func (s *Server) appendAIRunEvent(runID, eventType, payload string) {

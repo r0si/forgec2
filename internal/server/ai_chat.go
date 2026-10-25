@@ -179,7 +179,7 @@ func (s *Server) handleAIConfig(c *gin.Context) {
 	}
 	username, _ := c.Get("user")
 	slog.Info("AI config saved", "user", username, "enabled", req.Enabled, "provider", req.Provider)
-	c.JSON(http.StatusOK, gin.H{"success": true, "message": "AI config saved"})
+	respond(c, gin.H{"message": "AI config saved"})
 }
 
 // aiDefaultModel resolves a provider's default model from the single provider
@@ -492,7 +492,7 @@ func (s *Server) handleAIPendingTasks(c *gin.Context) {
 			CreatedAt: t.CreatedAt.Format(time.RFC3339),
 		})
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "tasks": out})
+	respond(c, gin.H{"tasks": out})
 }
 
 type aiToolLimits struct {

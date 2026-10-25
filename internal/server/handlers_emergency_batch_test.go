@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -100,9 +99,7 @@ func TestBatchCommandHonorsPerAgentPendingGate(t *testing.T) {
 		TasksCreated int `json:"tasks_created"`
 		Failed       int `json:"failed"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("response parse: %v; body=%s", err, w.Body.String())
-	}
+	unmarshalData(t, w.Body.Bytes(), &resp)
 	if resp.TasksCreated != 0 || resp.Failed != 1 {
 		t.Fatalf("expected agent skipped (0 created, 1 failed), got created=%d failed=%d", resp.TasksCreated, resp.Failed)
 	}

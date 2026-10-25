@@ -1,49 +1,18 @@
-# Raw `c.JSON(http.StatusOK, ...)` call sites per file: the remaining half of
-# the Option-A envelope migration.
+# The migration is complete: every JSON 200 goes through respond() except the
+# entries below, and each has a reason rather than being debt.
 #
-# Every JSON 200 body from this server is {"success": true, "data": ...} (see
-# respond in helpers.go); a handler that writes c.JSON(http.StatusOK, ...)
-# directly still emits a bare payload, which is the inconsistency this
-# migration removes. This file pins today's count per file so the migration can
-# land in batches: TestSuccessEnvelope fails when a file grows past its count
-# (new debt) and also when it drops below it (lower the number in the same
-# commit, so the list cannot go stale).
-#
-# To migrate a site: replace
-#     c.JSON(http.StatusOK, gin.H{...})
-# with
-#     respond(c, gin.H{...})
-# (dropping any hand-built "success" key), then decrement the file's number
-# here. Sites that must stay raw (a non-JSON body, a streaming handler) belong
-# in the allowlist in the test instead of this file.
-ai_chat.go 2
-api.go 5
-build_jobs.go 2
-config_sync.go 1
-extc2.go 2
-handlers_agent_batch.go 3
-handlers_agent_screenshots.go 2
-handlers_agents.go 3
-handlers_ai_sessions.go 2
-handlers_ai_tools_policy.go 2
-handlers_approvals.go 2
-handlers_auth.go 2
-handlers_cookie_proxy.go 3
-handlers_generate_one_liners.go 2
-handlers_lateral.go 2
-handlers_notification_routes.go 2
-handlers_ntlm.go 2
-handlers_privesc.go 3
-handlers_process.go 2
-handlers_saved_views.go 3
-handlers_scan.go 2
-handlers_scheduler.go 2
-handlers_scripting.go 2
-handlers_sessions.go 3
-handlers_templates.go 3
-handlers_topology_net.go 1
-handlers_tun.go 2
+#   helpers.go     respond() itself, the one place that writes the envelope.
+#   api.go         REST v1 list shapes: {"success": true, "data": [...],
+#                  "total": n}, published in api/openapi.yaml for scripting
+#                  clients. Moving total inside data would break them.
+#   extc2.go       the external-C2 protocol reply struct (extC2SendResponse),
+#                  whose Success field is part of that wire format.
+#   render_api.go  renderPageOrJSON emits HTML/JSON page documents, not API
+#                  payloads; wrapping them would change the page JSON contract.
+#   server_http.go /health, whose status/version/uptime keys container and
+#                  deploy probes read at the top level.
 helpers.go 1
-remote_desktop.go 1
+api.go 4
+extc2.go 1
 render_api.go 1
 server_http.go 1

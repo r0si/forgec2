@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -73,9 +72,7 @@ func TestHandleListAgents(t *testing.T) {
 					OS       string `json:"os"`
 				} `json:"agents"`
 			}
-			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-				t.Fatalf("invalid json: %v; body=%s", err, w.Body.String())
-			}
+			unmarshalData(t, w.Body.Bytes(), &resp)
 			if len(resp.Agents) != tc.wantCount {
 				t.Fatalf("expected %d agents, got %d", tc.wantCount, len(resp.Agents))
 			}
@@ -127,9 +124,7 @@ func TestHandleListAgentsGroupByHost(t *testing.T) {
 		Total int    `json:"total"`
 		Group string `json:"group"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("json: %v body=%s", err, w.Body.String())
-	}
+	unmarshalData(t, w.Body.Bytes(), &resp)
 	if resp.Group != "host" {
 		t.Fatalf("expected group=host, got %q", resp.Group)
 	}
@@ -153,9 +148,7 @@ func TestHandleListAgentsGroupByHost(t *testing.T) {
 		} `json:"agents"`
 		Total int `json:"total"`
 	}
-	if err := json.Unmarshal(w2.Body.Bytes(), &page2); err != nil {
-		t.Fatalf("page2 json: %v", err)
-	}
+	unmarshalData(t, w2.Body.Bytes(), &page2)
 	if page2.Total != 2 || len(page2.Agents) != 2 {
 		t.Fatalf("page 2 should return both BOX sessions, got total=%d n=%d ids=%v", page2.Total, len(page2.Agents), page2.Agents)
 	}
@@ -195,9 +188,7 @@ func TestAgentListLinkedFilter(t *testing.T) {
 				ID string `json:"id"`
 			} `json:"agents"`
 		}
-		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.Fatalf("json: %v", err)
-		}
+		unmarshalData(t, w.Body.Bytes(), &resp)
 		ids := make([]string, 0, len(resp.Agents))
 		for _, a := range resp.Agents {
 			ids = append(ids, a.ID)
@@ -243,18 +234,13 @@ func TestAgentListEnvelopeShared(t *testing.T) {
 			t.Fatalf("status %d body=%s", w.Code, w.Body.String())
 		}
 		var m map[string]any
-		if err := json.Unmarshal(w.Body.Bytes(), &m); err != nil {
-			t.Fatalf("json: %v", err)
-		}
+		unmarshalData(t, w.Body.Bytes(), &m)
 		return m
 	}
 
 	a := hit(s.handleListAgents)
 	b := hit(s.apiListAgents)
 	for _, m := range []map[string]any{a, b} {
-		if m["success"] != true {
-			t.Fatalf("expected success=true, got %v", m["success"])
-		}
 		if _, ok := m["agents"].([]any); !ok {
 			t.Fatalf("missing agents[]: %v", m)
 		}
@@ -305,9 +291,7 @@ func TestHandleAgentDetail(t *testing.T) {
 			t.Fatalf("expected 200, got %d; body=%s", w.Code, w.Body.String())
 		}
 		var resp map[string]any
-		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.Fatalf("invalid json: %v; body=%s", err, w.Body.String())
-		}
+		unmarshalData(t, w.Body.Bytes(), &resp)
 		if _, ok := resp["Agent"]; !ok {
 			t.Fatalf("expected 'Agent' key in response; keys=%v", keys(resp))
 		}
@@ -334,9 +318,7 @@ func TestHandleAgentDetail(t *testing.T) {
 			t.Fatalf("expected 200, got %d; body=%s", w.Code, w.Body.String())
 		}
 		var resp map[string]any
-		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.Fatalf("invalid json: %v; body=%s", err, w.Body.String())
-		}
+		unmarshalData(t, w.Body.Bytes(), &resp)
 		if _, exists := resp["UnlinkedAgents"]; exists {
 			t.Fatalf("expected UnlinkedAgents to be omitted with include_unlinked=false; keys=%v", keys(resp))
 		}
@@ -363,9 +345,7 @@ func TestHandleAgentDetail(t *testing.T) {
 			t.Fatalf("expected 200, got %d; body=%s", w.Code, w.Body.String())
 		}
 		var resp map[string]any
-		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.Fatalf("invalid json: %v; body=%s", err, w.Body.String())
-		}
+		unmarshalData(t, w.Body.Bytes(), &resp)
 		unlinked, ok := resp["UnlinkedAgents"].([]any)
 		if !ok || len(unlinked) != 1 {
 			t.Fatalf("expected 1 unlinked agent with default include; got %v", resp["UnlinkedAgents"])
@@ -399,9 +379,7 @@ func TestHandleAgentDetail(t *testing.T) {
 			FailedTasks    int `json:"FailedTasks"`
 			SuccessRate    int `json:"SuccessRate"`
 		}
-		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.Fatalf("invalid json: %v; body=%s", err, w.Body.String())
-		}
+		unmarshalData(t, w.Body.Bytes(), &resp)
 		if resp.TotalTasks != AgentDetailTaskLimit+2 || resp.CompletedTasks != AgentDetailTaskLimit+1 || resp.FailedTasks != 1 || resp.SuccessRate != 98 {
 			t.Fatalf("unexpected aggregate stats: %+v", resp)
 		}
@@ -436,21 +414,16 @@ func TestHandleListAgentScreenshots(t *testing.T) {
 		t.Fatalf("expected 200, got %d; body=%s", w.Code, w.Body.String())
 	}
 	var resp struct {
-		Success bool `json:"success"`
-		Data    struct {
-			Screenshots []string `json:"screenshots"`
-			Total       int      `json:"total"`
-			Page        int      `json:"page"`
-			PageSize    int      `json:"page_size"`
-		} `json:"data"`
+		Screenshots []string `json:"screenshots"`
+		Total       int      `json:"total"`
+		Page        int      `json:"page"`
+		PageSize    int      `json:"page_size"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("invalid json: %v; body=%s", err, w.Body.String())
-	}
-	if !resp.Success || resp.Data.Total != 3 || resp.Data.Page != 1 || resp.Data.PageSize != 2 {
+	unmarshalData(t, w.Body.Bytes(), &resp)
+	if resp.Total != 3 || resp.Page != 1 || resp.PageSize != 2 {
 		t.Fatalf("unexpected response metadata: %+v", resp)
 	}
-	if got, want := resp.Data.Screenshots, []string{"screenshot_300.png", "screenshot_200.png"}; !reflect.DeepEqual(got, want) {
+	if got, want := resp.Screenshots, []string{"screenshot_300.png", "screenshot_200.png"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("screenshots = %v, want %v", got, want)
 	}
 }

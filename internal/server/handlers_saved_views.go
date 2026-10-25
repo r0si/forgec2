@@ -42,7 +42,7 @@ func (s *Server) handleListSavedViews(c *gin.Context) {
 		respondError(c, http.StatusInternalServerError, "query failed")
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "views": views})
+	respond(c, gin.H{"views": views})
 }
 
 func (s *Server) handleCreateSavedView(c *gin.Context) {
@@ -70,7 +70,7 @@ func (s *Server) handleCreateSavedView(c *gin.Context) {
 			respondError(c, http.StatusInternalServerError, "failed to update view")
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"success": true, "view": existing})
+		respond(c, gin.H{"view": existing})
 		return
 	}
 
@@ -85,7 +85,7 @@ func (s *Server) handleCreateSavedView(c *gin.Context) {
 		return
 	}
 	s.LogAuditRecord(c, "saved_view_create", "settings", strconv.FormatUint(uint64(view.ID), 10), req.Page+"/"+req.Name, true, nil)
-	c.JSON(http.StatusOK, gin.H{"success": true, "view": view})
+	respond(c, gin.H{"view": view})
 }
 
 func (s *Server) handleDeleteSavedView(c *gin.Context) {

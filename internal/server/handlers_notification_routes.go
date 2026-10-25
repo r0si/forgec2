@@ -149,7 +149,7 @@ func (s *Server) handleListNotificationRoutes(c *gin.Context) {
 	for i := range routes {
 		routes[i] = redactNotificationRoute(routes[i])
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "routes": routes})
+	respond(c, gin.H{"routes": routes})
 }
 
 func validNotificationChannel(ch string) bool {
@@ -268,7 +268,7 @@ func (s *Server) handleCreateNotificationRoute(c *gin.Context) {
 		return
 	}
 	s.LogAuditRecord(c, "notification_route_create", "settings", strconv.FormatUint(uint64(req.ID), 10), req.Name+" ("+req.Channel+")", true, nil)
-	c.JSON(http.StatusOK, gin.H{"success": true, "route": redactNotificationRoute(req)})
+	respond(c, gin.H{"route": redactNotificationRoute(req)})
 }
 
 func (s *Server) handleUpdateNotificationRoute(c *gin.Context) {

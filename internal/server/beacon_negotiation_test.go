@@ -148,9 +148,7 @@ func TestAgentListFlagsOutdatedProtocol(t *testing.T) {
 			ProtocolCurrent  uint   `json:"protocol_current"`
 		} `json:"agents"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("invalid json: %v; body=%s", err, w.Body.String())
-	}
+	unmarshalData(t, w.Body.Bytes(), &resp)
 	if len(resp.Agents) != 2 {
 		t.Fatalf("expected 2 agents, got %d", len(resp.Agents))
 	}

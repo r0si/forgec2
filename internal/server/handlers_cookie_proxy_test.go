@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"io"
 	"net"
 	"net/http"
@@ -409,9 +408,7 @@ func TestCookieProxyStatusAndJarForOwnAgent(t *testing.T) {
 		Cookies int    `json:"cookies"`
 		Host    string `json:"host"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &statusBody); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	unmarshalData(t, w.Body.Bytes(), &statusBody)
 	if statusBody.Running || statusBody.Host != "127.0.0.1" {
 		t.Fatalf("status body = %+v", statusBody)
 	}
@@ -428,9 +425,7 @@ func TestCookieProxyStatusAndJarForOwnAgent(t *testing.T) {
 		Cookies []cookieJarEntry `json:"cookies"`
 		Count   int              `json:"count"`
 	}
-	if err := json.Unmarshal(w2.Body.Bytes(), &jarBody); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	unmarshalData(t, w2.Body.Bytes(), &jarBody)
 	if jarBody.Count != 1 || jarBody.Cookies[0].Name != "sid" {
 		t.Fatalf("jar body = %+v", jarBody)
 	}

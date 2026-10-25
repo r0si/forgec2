@@ -522,5 +522,5 @@ func (s *Server) handleRDAPIScreenshot(c *gin.Context) {
 
 	s.LogAuditRecord(c, "screenshot_request", "agent", id, "Remote desktop screenshot requested", true, nil)
 	s.broadcastTaskUpdate(id, *task)
-	c.JSON(http.StatusOK, gin.H{"success": true, "task_id": task.ID, "message": "screenshot requested"})
+	respond(c, gin.H{"task_id": task.ID, "message": "screenshot requested"})
 }

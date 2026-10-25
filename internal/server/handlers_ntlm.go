@@ -78,7 +78,7 @@ func (s *Server) handleNTLMRelayStatus(c *gin.Context) {
 	// The store is built in NewServer, but a report endpoint that 500s on a
 	// nil store would be a worse failure than one that reports nothing.
 	if s.ntlmRelays == nil {
-		c.JSON(http.StatusOK, gin.H{"success": true, "active": []interface{}{}, "count": 0, "running": false})
+		respond(c, gin.H{"active": []interface{}{}, "count": 0, "running": false})
 		return
 	}
 	// A relay session is filed against an agent, so hide sessions the caller
@@ -89,8 +89,8 @@ func (s *Server) handleNTLMRelayStatus(c *gin.Context) {
 			visible = append(visible, session)
 		}
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
+	respond(c, gin.H{
+
 		"active":  visible,
 		"count":   len(visible),
 		"running": len(visible) > 0,

@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -108,9 +107,7 @@ func TestAIPendingTasksHostnameLookupIsBatched(t *testing.T) {
 			Hostname string `json:"hostname"`
 		} `json:"tasks"`
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	unmarshalData(t, rec.Body.Bytes(), &body)
 	if len(body.Tasks) != 12 {
 		t.Fatalf("returned %d tasks, want 12", len(body.Tasks))
 	}
@@ -147,9 +144,7 @@ func TestAIPendingTasksUnknownAgentYieldsEmptyHostname(t *testing.T) {
 			Hostname string `json:"hostname"`
 		} `json:"tasks"`
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	unmarshalData(t, rec.Body.Bytes(), &body)
 	for _, task := range body.Tasks {
 		if task.AgentID == "ai-gone" && task.Hostname != "" {
 			t.Fatalf("missing agent rendered hostname %q, want empty", task.Hostname)

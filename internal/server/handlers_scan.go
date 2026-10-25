@@ -150,7 +150,7 @@ func (s *Server) handleScanResults(c *gin.Context) {
 		slog.Error("Failed to query scan results", "err", err)
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	respond(c, gin.H{
 		"results": results,
 		"total":   len(results),
 	})
@@ -165,7 +165,7 @@ func (s *Server) handleScanResultsByAgent(c *gin.Context) {
 		slog.Error("Failed to query agent scan results", "err", err)
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	respond(c, gin.H{
 		"results": results,
 		"total":   len(results),
 	})

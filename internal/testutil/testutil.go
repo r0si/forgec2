@@ -79,13 +79,27 @@ func AssertValidJSON(t *testing.T, body []byte, label string) {
 	}
 }
 
+// AssertKeyExists fails unless the response body carries key. Success bodies are
+// wrapped as {"success": true, "data": <payload>}, so the payload is checked
+// first and a non-envelope body is checked as-is.
 func AssertKeyExists(t *testing.T, body []byte, label, key string) {
 	t.Helper()
-	var bodyObj map[string]any
-	if err := json.Unmarshal(body, &bodyObj); err != nil {
+	var env struct {
+		Success bool           `json:"success"`
+		Data    map[string]any `json:"data"`
+	}
+	if err := json.Unmarshal(body, &env); err != nil {
 		t.Fatalf("%s: invalid json: %v; body=%s", label, err, string(body))
 	}
-	if _, ok := bodyObj[key]; !ok {
+	obj := env.Data
+	if !env.Success || obj == nil {
+		var raw map[string]any
+		if err := json.Unmarshal(body, &raw); err != nil {
+			t.Fatalf("%s: invalid json: %v; body=%s", label, err, string(body))
+		}
+		obj = raw
+	}
+	if _, ok := obj[key]; !ok {
 		t.Fatalf("%s: missing key %q; body=%s", label, key, string(body))
 	}
 }

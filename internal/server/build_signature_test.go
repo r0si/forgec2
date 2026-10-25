@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -37,9 +36,7 @@ func TestBuildStatusIncludesSignatureFields(t *testing.T) {
 		t.Fatalf("status code = %d, body=%s", rec.Code, rec.Body.String())
 	}
 	var got map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
-		t.Fatal(err)
-	}
+	unmarshalData(t, rec.Body.Bytes(), &got)
 	if got["signature_status"] != "untrusted_root" {
 		t.Fatalf("signature_status = %v", got["signature_status"])
 	}

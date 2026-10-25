@@ -258,7 +258,7 @@ func (s *Server) handleAPIExecuteScript(c *gin.Context) {
 	}
 	s.LogAuditRecord(c, "execute_script", "scripting", targetAgentID,
 		scriptRunDetails(scriptLabel, targetAgentID), result.Success, execErr)
-	c.JSON(http.StatusOK, gin.H{"success": true, "result": result})
+	respond(c, gin.H{"result": result})
 }
 
 // scriptRunDetails renders the audit `details` string for a script execution.
@@ -332,5 +332,5 @@ func (s *Server) handleAPIScriptsHistory(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, gin.H{"success": true, "history": entries})
+	respond(c, gin.H{"history": entries})
 }

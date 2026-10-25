@@ -2,7 +2,6 @@ package server
 
 import (
 	"bytes"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -41,10 +40,8 @@ func TestScriptExecuteScopesAgentsGlobal(t *testing.T) {
 		t.Fatalf("status=%d body=%s, want 200", w.Code, w.Body.String())
 	}
 	var resp scriptExecuteResponse
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("decode: %v (%s)", err, w.Body.String())
-	}
-	if !resp.Success || !resp.Result.Success {
+	unmarshalData(t, w.Body.Bytes(), &resp)
+	if !resp.Result.Success {
 		t.Fatalf("execution failed: %+v", resp)
 	}
 	if resp.Result.Output != "g1-scope-target:1" {
@@ -151,9 +148,7 @@ func TestScriptsHistoryServesAuditRuns(t *testing.T) {
 			Error      string `json:"error"`
 		} `json:"history"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	unmarshalData(t, w.Body.Bytes(), &resp)
 
 	if len(resp.History) != 3 {
 		t.Fatalf("history has %d entries, want 3 (own tenant + legacy, no foreign)", len(resp.History))

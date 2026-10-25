@@ -52,9 +52,7 @@ func TestHandleLogin_LockoutAfterFailures(t *testing.T) {
 		t.Errorf("expected 401 after lockout, got %d; body=%s", w.Code, w.Body.String())
 	}
 	var resp map[string]interface{}
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("unmarshal lockout response %q: %v", w.Body.String(), err)
-	}
+	unmarshalData(t, w.Body.Bytes(), &resp)
 	if errMsg, ok := resp["error"].(string); ok && errMsg != "" {
 		if !strings.Contains(errMsg, "Try again") {
 			t.Errorf("expected lockout error message, got: %s", errMsg)
@@ -142,12 +140,7 @@ func TestHandleGetCurrentUser_Active(t *testing.T) {
 			SessionExp int64  `json:"session_exp"`
 		} `json:"data"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("invalid json: %v; body=%s", err, w.Body.String())
-	}
-	if !resp.Success {
-		t.Fatal("expected success=true")
-	}
+	unmarshalData(t, w.Body.Bytes(), &resp)
 	if resp.Data.ID != user.ID {
 		t.Errorf("expected id=%d, got %d", user.ID, resp.Data.ID)
 	}
@@ -191,9 +184,7 @@ func TestHandleGetCurrentUser_ReturnsSessionExp(t *testing.T) {
 			SessionExp int64 `json:"session_exp"`
 		} `json:"data"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("invalid json: %v; body=%s", err, w.Body.String())
-	}
+	unmarshalData(t, w.Body.Bytes(), &resp)
 	if resp.Data.SessionExp == 0 {
 		t.Fatalf("expected session_exp to be present, got %d", resp.Data.SessionExp)
 	}
@@ -239,9 +230,7 @@ func TestHandleGetCurrentUser_ReturnsPermissions(t *testing.T) {
 					Permissions []string `json:"permissions"`
 				} `json:"data"`
 			}
-			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-				t.Fatalf("invalid json: %v; body=%s", err, w.Body.String())
-			}
+			unmarshalData(t, w.Body.Bytes(), &resp)
 			if len(resp.Data.Permissions) == 0 {
 				t.Fatal("expected a non-empty permissions list")
 			}
@@ -297,9 +286,7 @@ func TestHandleGetCurrentUser_CustomRolePermissions(t *testing.T) {
 			Permissions []string `json:"permissions"`
 		} `json:"data"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("invalid json: %v; body=%s", err, w.Body.String())
-	}
+	unmarshalData(t, w.Body.Bytes(), &resp)
 	if resp.Data.Role != "blue-team" {
 		t.Errorf("expected role=blue-team, got %s", resp.Data.Role)
 	}
@@ -341,9 +328,7 @@ func TestHandleGetCurrentUser_UnknownRoleNoPermissions(t *testing.T) {
 			Permissions []string `json:"permissions"`
 		} `json:"data"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("invalid json: %v; body=%s", err, w.Body.String())
-	}
+	unmarshalData(t, w.Body.Bytes(), &resp)
 	if len(resp.Data.Permissions) != 0 {
 		t.Errorf("expected no permissions for unknown role, got %v", resp.Data.Permissions)
 	}
@@ -620,11 +605,9 @@ func TestHandleExtendSession_RotatesTokenAndCookie(t *testing.T) {
 			SessionExp int64 `json:"session_exp"`
 		} `json:"data"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("invalid json: %v; body=%s", err, w.Body.String())
-	}
-	if !resp.Success || resp.Data.SessionExp == 0 {
-		t.Fatalf("expected success + session_exp, got %+v", resp)
+	unmarshalData(t, w.Body.Bytes(), &resp)
+	if resp.Data.SessionExp == 0 {
+		t.Fatalf("expected session_exp, got %+v", resp)
 	}
 
 	// The user_sessions row must track the rotated token, not the old one.

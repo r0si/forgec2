@@ -89,7 +89,7 @@ func (s *Server) handleAISessionsList(c *gin.Context) {
 		nextCursor = strconv.FormatUint(uint64(sessions[limit-1].ID), 10)
 		sessions = sessions[:limit]
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": sessions, "next_cursor": nextCursor})
+	respond(c, gin.H{"data": sessions, "next_cursor": nextCursor})
 }
 
 // handleAISessionsCreate creates a new AI chat session.
@@ -178,7 +178,7 @@ func (s *Server) handleAISessionsGet(c *gin.Context) {
 	for left, right := 0, len(messages)-1; left < right; left, right = left+1, right-1 {
 		messages[left], messages[right] = messages[right], messages[left]
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": messages, "next_cursor": nextCursor})
+	respond(c, gin.H{"data": messages, "next_cursor": nextCursor})
 }
 
 // handleAISessionsMessages creates a new message in an AI chat session.

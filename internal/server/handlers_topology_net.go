@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"strings"
 
 	"github.com/forgec2/forgec2/internal/db"
@@ -216,10 +215,10 @@ func (s *Server) handleAPINetworkTopology(c *gin.Context) {
 			online++
 		}
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"nodes":   nodes,
-		"edges":   edges,
+	respond(c, gin.H{
+
+		"nodes": nodes,
+		"edges": edges,
 		"stats": gin.H{
 			"agents":            len(agents),
 			"online":            online,

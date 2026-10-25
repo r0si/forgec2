@@ -339,8 +339,8 @@ func (s *Server) handleCookieProxyStart(c *gin.Context) {
 	}
 	n, dec := cookieJarStats(jars)
 	s.LogAuditRecord(c, "cookie_proxy_start", "agent", id, fmt.Sprintf("127.0.0.1:%d cookies=%d", actual, n), true, nil)
-	c.JSON(http.StatusOK, gin.H{
-		"success":           true,
+	respond(c, gin.H{
+
 		"host":              "127.0.0.1",
 		"port":              actual,
 		"cookies":           n,
@@ -391,8 +391,8 @@ func (s *Server) handleCookieProxyStatus(c *gin.Context) {
 			port = sess.port
 		}
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"success":   true,
+	respond(c, gin.H{
+
 		"port":      port,
 		"running":   port > 0,
 		"cookies":   n,
@@ -412,7 +412,7 @@ func (s *Server) handleCookieProxyJar(c *gin.Context) {
 		return
 	}
 	jars := s.loadLatestCookieJar(id)
-	c.JSON(http.StatusOK, gin.H{"success": true, "cookies": jars, "count": len(jars)})
+	respond(c, gin.H{"cookies": jars, "count": len(jars)})
 }
 
 func (s *Server) handleCookieProxyNetscape(c *gin.Context) {

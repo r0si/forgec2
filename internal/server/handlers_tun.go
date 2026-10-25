@@ -405,8 +405,8 @@ func (s *Server) handleTunStart(c *gin.Context) {
 	}
 	s.LogAuditRecord(c, "tun_start", "agent", id, fmt.Sprintf("cidr=%s udp=127.0.0.1:%d", cidr, actual), true, nil)
 	s.broadcastTaskUpdate(task.AgentID, *task)
-	c.JSON(http.StatusOK, gin.H{
-		"success":  true,
+	respond(c, gin.H{
+
 		"task_id":  task.ID,
 		"cidr":     cidr,
 		"udp_host": "127.0.0.1",
@@ -447,5 +447,5 @@ func (s *Server) handleTunStatus(c *gin.Context) {
 			sess.mu.Unlock()
 		}
 	}
-	c.JSON(http.StatusOK, out)
+	respond(c, out)
 }

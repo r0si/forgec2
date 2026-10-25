@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -165,18 +164,15 @@ func TestReloadStatusHandler(t *testing.T) {
 		t.Fatalf("status = %d, want 200", w.Code)
 	}
 	var body struct {
-		Success bool `json:"success"`
-		Groups  []struct {
+		Groups []struct {
 			Token     string `json:"token"`
 			Mode      string `json:"mode"`
 			Mechanism string `json:"mechanism"`
 		} `json:"groups"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if !body.Success || len(body.Groups) == 0 {
-		t.Fatalf("bad matrix payload: %+v", body.Success)
+	unmarshalData(t, w.Body.Bytes(), &body)
+	if len(body.Groups) == 0 {
+		t.Fatalf("bad matrix payload: %+v", w.Body.String())
 	}
 	seen := map[string]bool{}
 	for _, g := range body.Groups {

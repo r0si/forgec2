@@ -76,7 +76,7 @@ func (s *Server) handleLateralHistory(c *gin.Context) {
 	}
 	countQ.Count(&total)
 
-	c.JSON(http.StatusOK, gin.H{
+	respond(c, gin.H{
 		"tasks": tasks,
 		"total": total,
 	})
@@ -253,5 +253,5 @@ func (s *Server) handleAPILateralExecute(c *gin.Context) {
 	slog.Info("Lateral movement via JSON API", "agent_id", req.Source, "target", req.Target, "method", req.Method)
 	s.LogAuditRecord(c, "lateral", "agent", req.Source, lateralAuditSummary(spec), true, nil)
 	s.broadcastTaskUpdate(req.Source, *task)
-	c.JSON(http.StatusOK, gin.H{"success": true, "task_id": task.ID})
+	respond(c, gin.H{"task_id": task.ID})
 }

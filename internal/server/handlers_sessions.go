@@ -133,7 +133,7 @@ func (s *Server) handleListUserSessions(c *gin.Context) {
 		respondError(c, http.StatusInternalServerError, "Failed to list sessions")
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "sessions": sessions})
+	respond(c, gin.H{"sessions": sessions})
 }
 
 func (s *Server) handleRevokeSession(c *gin.Context) {
@@ -171,7 +171,7 @@ func (s *Server) handleRevokeSession(c *gin.Context) {
 	}
 	s.LogAuditRecord(c, "session_revoke", "user", userID,
 		fmt.Sprintf("Revoked session %s (ip=%s)", sessionID, session.IP), true, nil)
-	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Session revoked"})
+	respond(c, gin.H{"message": "Session revoked"})
 }
 
 func (s *Server) handleRevokeAllUserSessions(c *gin.Context) {
@@ -192,8 +192,8 @@ func (s *Server) handleRevokeAllUserSessions(c *gin.Context) {
 	}
 	s.LogAuditRecord(c, "session_revoke_all", "user", userID,
 		fmt.Sprintf("Revoked %d session(s) for user %s", result.RowsAffected, userID), true, nil)
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
+	respond(c, gin.H{
+
 		"message": fmt.Sprintf("Revoked %d sessions", result.RowsAffected),
 	})
 }

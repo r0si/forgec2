@@ -45,8 +45,8 @@ func (s *Server) handleGetProcesses(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
+	respond(c, gin.H{
+
 		"task_id": task.ID,
 		"source":  "process_tree",
 		"live":    false,
@@ -96,5 +96,5 @@ func (s *Server) handleGetProcessTree(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, processTreeEnvelope(tasks[0]))
+	respond(c, processTreeEnvelope(tasks[0]))
 }

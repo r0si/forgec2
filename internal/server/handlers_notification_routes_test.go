@@ -56,9 +56,7 @@ func TestCreateNotificationRouteDoesNotEchoSecret(t *testing.T) {
 	var response struct {
 		Route db.NotificationRoute `json:"route"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	unmarshalData(t, w.Body.Bytes(), &response)
 	if response.Route.Secret != notificationRouteMask {
 		t.Fatalf("response exposed secret: %q", response.Route.Secret)
 	}

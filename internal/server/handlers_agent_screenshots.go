@@ -35,16 +35,13 @@ func (s *Server) handleGetAgentScreenshot(c *gin.Context) {
 		return
 	}
 	if frame, ok := s.latestScreenFrame(id); ok && s.IsScreenMonitoring(id) {
-		c.JSON(http.StatusOK, gin.H{
-			"success": true,
-			"data": gin.H{
-				"image":       "data:" + frame.mime + ";base64," + frame.data,
-				"width":       0,
-				"height":      0,
-				"window_name": "Desktop",
-				"capture_id":  "live-" + strconv.FormatInt(frame.capturedAt.UnixNano(), 10),
-				"captured_at": frame.capturedAt.Format(time.RFC3339Nano),
-			},
+		respond(c, gin.H{
+			"image":       "data:" + frame.mime + ";base64," + frame.data,
+			"width":       0,
+			"height":      0,
+			"window_name": "Desktop",
+			"capture_id":  "live-" + strconv.FormatInt(frame.capturedAt.UnixNano(), 10),
+			"captured_at": frame.capturedAt.Format(time.RFC3339Nano),
 		})
 		return
 	}
@@ -89,8 +86,8 @@ func (s *Server) handleGetAgentScreenshot(c *gin.Context) {
 	}
 	width, height := pngDimensions(data)
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
+	respond(c, gin.H{
+
 		"data": gin.H{
 			"image":       "data:image/png;base64," + base64.StdEncoding.EncodeToString(data),
 			"width":       width,

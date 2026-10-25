@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"sync"
 	"time"
 
@@ -313,5 +312,5 @@ func (s *Server) handleReloadStatus(c *gin.Context) {
 	lastReloadMu.Lock()
 	last := lastReload
 	lastReloadMu.Unlock()
-	c.JSON(http.StatusOK, gin.H{"success": true, "groups": out, "last_reload": last})
+	respond(c, gin.H{"groups": out, "last_reload": last})
 }

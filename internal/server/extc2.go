@@ -449,7 +449,7 @@ func (s *Server) handleListExtC2Channels(c *gin.Context) {
 			CreatedAt: ch.CreatedAt.Format(time.RFC3339),
 		})
 	}
-	c.JSON(http.StatusOK, gin.H{"channels": channels})
+	respond(c, gin.H{"channels": channels})
 }
 
 func (s *Server) QueueExtC2Task(channelID string, task extC2Task) {

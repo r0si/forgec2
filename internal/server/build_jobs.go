@@ -183,7 +183,7 @@ func (s *Server) handleBuildStatus(c *gin.Context) {
 		resp["completed_at"] = job.CompletedAt
 	}
 	s.buildJobsMu.RUnlock()
-	c.JSON(http.StatusOK, resp)
+	respond(c, resp)
 }
 
 // handleBuildDownload serves the completed build file.
@@ -215,7 +215,7 @@ func (s *Server) handleBuildDownload(c *gin.Context) {
 
 // handleBuildList returns all active build jobs for the caller.
 func (s *Server) handleBuildList(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"success": true, "builds": s.buildJobSnapshots()})
+	respond(c, gin.H{"builds": s.buildJobSnapshots()})
 }
 
 // buildJobSnapshots returns a lock-protected snapshot of every active build

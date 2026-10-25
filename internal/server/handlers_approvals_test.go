@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -109,15 +108,9 @@ func TestApproveTaskResponseShape(t *testing.T) {
 	s.handleApproveTask(c)
 
 	var resp struct {
-		Success bool   `json:"success"`
 		Message string `json:"message"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("invalid json: %v; body=%s", err, w.Body.String())
-	}
-	if !resp.Success {
-		t.Fatalf("expected success=true, got %+v", resp)
-	}
+	unmarshalData(t, w.Body.Bytes(), &resp)
 	if resp.Message == "" {
 		t.Fatal("expected non-empty message")
 	}

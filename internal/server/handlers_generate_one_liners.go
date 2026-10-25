@@ -111,8 +111,8 @@ func (s *Server) handleGeneratePS1(c *gin.Context) {
 	oneLiner := obfuscation.GenerateCommandLineOneLinerWithOptions(ps1Code, obfuscation.PresetForLevel(form.Obfuscation))
 
 	s.logBuild("windows", "ps1", form.C2URL, form.ListenerID, form.Filename, "success", "", "")
-	c.JSON(http.StatusOK, gin.H{
-		"success":         true,
+	respond(c, gin.H{
+
 		"code":            oneLiner,
 		"original_length": len(ps1Code),
 		"obfuscated_len":  len(oneLiner),
@@ -350,8 +350,8 @@ func (s *Server) handleGenerateOneLiner(c *gin.Context) {
 	}
 
 	s.logBuild(format, "oneliner", form.C2URL, form.ListenerID, filename, "success", "", hostPath)
-	c.JSON(http.StatusOK, gin.H{
-		"success":      true,
+	respond(c, gin.H{
+
 		"payload_id":   payloadID,
 		"filename":     filename,
 		"download_url": payloadURL,

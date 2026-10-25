@@ -130,9 +130,7 @@ func TestBatchCommandIdempotencyKeyDedupesRetry(t *testing.T) {
 			t.Fatalf("expected 200, got %d; body=%s", w.Code, w.Body.String())
 		}
 		var out map[string]interface{}
-		if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil {
-			t.Fatalf("decode response: %v", err)
-		}
+		unmarshalData(t, w.Body.Bytes(), &out)
 		return out
 	}
 

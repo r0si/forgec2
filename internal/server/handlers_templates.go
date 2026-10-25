@@ -60,8 +60,8 @@ func (s *Server) handleCreateTemplate(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success":  true,
+	respond(c, gin.H{
+
 		"template": template,
 	})
 }
@@ -87,7 +87,7 @@ func (s *Server) handleGetTemplatesByCategory(c *gin.Context) {
 		slog.Error("Failed to query templates by category", "err", err)
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	respond(c, gin.H{
 		"templates": templates,
 		"total":     len(templates),
 	})
@@ -127,7 +127,7 @@ func (s *Server) handleListTemplatesJSON(c *gin.Context) {
 		handleQueryError(c, err, "Failed to list templates JSON")
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
+	respond(c, gin.H{
 		"templates": templates,
 		"total":     len(templates),
 	})

@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -75,9 +74,7 @@ func TestHandleGetProcessTreePrefersTreeSnapshot(t *testing.T) {
 		TaskID      uint   `json:"task_id"`
 		CollectedAt string `json:"collected_at"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("json: %v body=%s", err, w.Body.String())
-	}
+	unmarshalData(t, w.Body.Bytes(), &resp)
 	if resp.Live {
 		t.Fatal("handler claimed a live process tree")
 	}
@@ -140,9 +137,7 @@ func TestHandleGetProcessTreeFallsBackToPS(t *testing.T) {
 		Kind   string `json:"kind"`
 		Source string `json:"source"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("json: %v", err)
-	}
+	unmarshalData(t, w.Body.Bytes(), &resp)
 	if resp.Kind != "last_ps_snapshot" || resp.Source != "ps" {
 		t.Fatalf("envelope: %+v", resp)
 	}

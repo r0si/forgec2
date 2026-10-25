@@ -43,8 +43,8 @@ func (s *Server) handlePrivescCheck(c *gin.Context) {
 		agentID, fmt.Sprintf("Check type: %s", req.CheckType),
 		true, nil)
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
+	respond(c, gin.H{
+
 		"task_id": task.ID,
 		"message": fmt.Sprintf("Privilege escalation check started (type: %s)", req.CheckType),
 	})
@@ -93,8 +93,8 @@ func (s *Server) handleProcessPrivescResult(c *gin.Context) {
 		"result": result,
 	})
 
-	c.JSON(http.StatusOK, gin.H{
-		"success":           true,
+	respond(c, gin.H{
+
 		"vulnerabilities":   len(req.Vulnerabilities),
 		"misconfigurations": len(req.Misconfigurations),
 		"message":           "Privilege escalation check completed",
@@ -196,7 +196,7 @@ func (s *Server) handlePrivescHistory(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	respond(c, gin.H{
 		"tasks":    []privescHistoryEntry{s.buildPrivescHistory([]db.Task{task})[0]},
 		"findings": s.parsePrivescFindings(task.Result),
 		"total":    1,

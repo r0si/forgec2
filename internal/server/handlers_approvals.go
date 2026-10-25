@@ -78,7 +78,7 @@ func (s *Server) handleApproveTask(c *gin.Context) {
 		fmt.Sprintf("Approved task #%d (%s) [created_by=%s approved_by=%s args=%s]",
 			taskID, task.Type, task.CreatedBy, approver, taskArgsHash(task)), true, nil)
 	s.broadcastTaskUpdate(task.AgentID, *task)
-	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Task approved and queued for execution"})
+	respond(c, gin.H{"message": "Task approved and queued for execution"})
 }
 
 // handleRejectTask cancels a pending_approval task so it never reaches the agent.
@@ -141,5 +141,5 @@ func (s *Server) handleRejectTask(c *gin.Context) {
 	slog.Info("Task rejected", "agent_id", task.AgentID, "task", taskID, "type", task.Type)
 	s.LogAuditRecord(c, "reject_task", "agent_id", task.AgentID, fmt.Sprintf("Rejected task #%d (%s)", taskID, task.Type), true, nil)
 	s.broadcastTaskUpdate(task.AgentID, *task)
-	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Task rejected"})
+	respond(c, gin.H{"message": "Task rejected"})
 }

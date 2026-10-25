@@ -2,7 +2,6 @@ package server
 
 import (
 	"bytes"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -184,9 +183,7 @@ func TestPrivescHistoryEndpoint(t *testing.T) {
 		Findings []gin.H               `json:"findings"`
 		Total    int                   `json:"total"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &payload); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	unmarshalData(t, w.Body.Bytes(), &payload)
 	if payload.Total != 1 || len(payload.Tasks) != 1 {
 		t.Fatalf("payload = %+v, want one task", payload)
 	}

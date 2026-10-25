@@ -326,7 +326,7 @@ func (s *Server) handleKillAgent(c *gin.Context) {
 	slog.Info("Kill task created", "agent_id", id)
 	s.LogAuditRecord(c, "kill_agent", "agent", id, "kill command", true, nil)
 	s.broadcastTaskUpdate(id, *task)
-	c.JSON(http.StatusOK, gin.H{"success": true, "task_id": task.ID, "message": "Kill command sent. Agent will exit on next beacon."})
+	respond(c, gin.H{"task_id": task.ID, "message": "Kill command sent. Agent will exit on next beacon."})
 }
 
 func (s *Server) handleUpdateNote(c *gin.Context) {
@@ -693,7 +693,6 @@ func (s *Server) writeAgentListJSON(c *gin.Context) {
 		}
 	}
 	out := gin.H{
-		"success":   true,
 		"agents":    resp,
 		"data":      resp,
 		"total":     total,
@@ -703,7 +702,7 @@ func (s *Server) writeAgentListJSON(c *gin.Context) {
 	if groupHost {
 		out["group"] = "host"
 	}
-	c.JSON(http.StatusOK, out)
+	respond(c, out)
 }
 
 // handleListUnlinkedAgents returns agents without a parent for linking dropdown
@@ -901,7 +900,7 @@ func (s *Server) handleAgentDiagnose(c *gin.Context) {
 		return
 	}
 	s.LogAuditRecord(c, "diagnose", "agent", id, fmt.Sprintf("Diagnose snapshot queued (%d tasks)", len(ids)), true, nil)
-	c.JSON(http.StatusOK, gin.H{"success": true, "task_ids": ids, "count": len(ids)})
+	respond(c, gin.H{"task_ids": ids, "count": len(ids)})
 }
 
 func (s *Server) handleSetKillDate(c *gin.Context) {

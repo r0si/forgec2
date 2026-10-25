@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -76,9 +75,7 @@ func TestAISessionGetReturnsNewestMessagesInChronologicalOrder(t *testing.T) {
 	var response struct {
 		Data []db.AIChatMessage `json:"data"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	unmarshalData(t, w.Body.Bytes(), &response)
 	if len(response.Data) != aiSessionMessageLimit {
 		t.Fatalf("expected %d recent messages, got %d", aiSessionMessageLimit, len(response.Data))
 	}
