@@ -171,14 +171,11 @@ func TestKillSwitchDisarmReclaimsUninstallTasks(t *testing.T) {
 		t.Fatalf("expected 200, got %d; body=%s", w.Code, w.Body.String())
 	}
 	var resp struct {
-		Success   bool `json:"success"`
-		Reclaimed int  `json:"reclaimed"`
+		Reclaimed int `json:"reclaimed"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("response parse: %v (body=%s)", err, w.Body.String())
-	}
-	if !resp.Success || resp.Reclaimed != 1 {
-		t.Fatalf("expected 1 reclaimed uninstall task, success=%v reclaimed=%d; body=%s", resp.Success, resp.Reclaimed, w.Body.String())
+	unmarshalData(t, w.Body.Bytes(), &resp)
+	if resp.Reclaimed != 1 {
+		t.Fatalf("expected 1 reclaimed uninstall task, reclaimed=%d; body=%s", resp.Reclaimed, w.Body.String())
 	}
 
 	var task db.Task
@@ -239,9 +236,7 @@ func TestKillSwitchArmBatchesFleetUninstall(t *testing.T) {
 	var resp struct {
 		Dispatched int `json:"tasks_dispatched"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("response parse: %v (body=%s)", err, w.Body.String())
-	}
+	unmarshalData(t, w.Body.Bytes(), &resp)
 	if resp.Dispatched != 2 {
 		t.Fatalf("expected 2 dispatched (one agent saturated), got %d; body=%s", resp.Dispatched, w.Body.String())
 	}

@@ -1058,7 +1058,7 @@ func (s *Server) handleAddCredential(c *gin.Context) {
 		"id":       entry.ID,
 		"agent_id": entry.AgentID,
 	})
-	c.JSON(http.StatusOK, gin.H{"success": true, "id": entry.ID})
+	respond(c, gin.H{"id": entry.ID})
 }
 
 func (s *Server) handleGetCredential(c *gin.Context) {
@@ -1302,8 +1302,7 @@ func (s *Server) handleBatchVerifyCredentials(c *gin.Context) {
 	}
 
 	slog.Info("Batch credential verification", "requested", len(req.IDs), "queued", queued)
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
+	respond(c, gin.H{
 		"queued":  queued,
 		"results": outcomes,
 	})
@@ -1344,7 +1343,7 @@ func (s *Server) handleBatchAddTags(c *gin.Context) {
 		"action": "updated",
 		"count":  len(req.IDs),
 	})
-	c.JSON(http.StatusOK, gin.H{"success": true, "count": len(req.IDs)})
+	respond(c, gin.H{"count": len(req.IDs)})
 }
 
 func (s *Server) handleToggleConfirmed(c *gin.Context) {
@@ -1377,7 +1376,7 @@ func (s *Server) handleToggleConfirmed(c *gin.Context) {
 		"id":       cred.ID,
 		"agent_id": cred.AgentID,
 	})
-	c.JSON(http.StatusOK, gin.H{"success": true, "confirmed": cred.Confirmed})
+	respond(c, gin.H{"confirmed": cred.Confirmed})
 }
 
 // RecordUsage appends an entry to the credential usage ledger. It is safe to

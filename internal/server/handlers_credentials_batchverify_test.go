@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -72,9 +71,7 @@ func batchVerifyBody(t *testing.T, s *Server, username string, ids []uint) []map
 	var body struct {
 		Results []map[string]any `json:"results"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode: %v body=%s", err, w.Body.String())
-	}
+	unmarshalData(t, w.Body.Bytes(), &body)
 	return body.Results
 }
 

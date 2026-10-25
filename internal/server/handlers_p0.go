@@ -73,7 +73,7 @@ func (s *Server) handleRPortFwdRelayStart(c *gin.Context) {
 
 	slog.Info("Reverse port forward relay started", "agent_id", id, "lport", lport, "target", forwardTarget)
 	s.LogAuditRecord(c, "rportfwd_relay_start", "agent", id, fmt.Sprintf("rportfwd relay :%d -> %s via %s", lport, forwardTarget, id), true, nil)
-	c.JSON(http.StatusOK, gin.H{"success": true, "message": fmt.Sprintf("rportfwd relay :%d -> %s via %s", lport, forwardTarget, id)})
+	respond(c, gin.H{"message": fmt.Sprintf("rportfwd relay :%d -> %s via %s", lport, forwardTarget, id)})
 }
 
 func (s *Server) handleRPortFwdStatus(c *gin.Context) {
@@ -102,10 +102,10 @@ func (s *Server) handleRPortFwdStatus(c *gin.Context) {
 	s.rportfwdMu.Unlock()
 
 	if active == nil {
-		c.JSON(http.StatusOK, gin.H{"active": false})
+		respond(c, gin.H{"active": false})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
+	respond(c, gin.H{
 		"active": true,
 		"port":   port,
 		"target": target,
@@ -143,7 +143,7 @@ func (s *Server) handleRPortFwdGlobalStatus(c *gin.Context) {
 	if forwards == nil {
 		forwards = []fwdInfo{}
 	}
-	c.JSON(http.StatusOK, gin.H{"forwards": forwards})
+	respond(c, gin.H{"forwards": forwards})
 }
 
 func (s *Server) handleRPortFwdRelayStop(c *gin.Context) {
@@ -171,7 +171,7 @@ func (s *Server) handleRPortFwdRelayStop(c *gin.Context) {
 	relay.stop()
 	slog.Info("Reverse port forward relay stopped", "agent_id", id, "lport", localPortStr)
 	s.LogAuditRecord(c, "rportfwd_relay_stop", "agent", id, fmt.Sprintf("rportfwd relay stopped :%s", localPortStr), true, nil)
-	c.JSON(http.StatusOK, gin.H{"success": true, "message": "rportfwd relay stopped"})
+	respond(c, gin.H{"message": "rportfwd relay stopped"})
 }
 
 // rportfwdRelay manages a local TCP listener that tunnels through a beacon channel.

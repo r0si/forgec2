@@ -63,7 +63,7 @@ func (s *Server) handleConfigureDiscordC2(c *gin.Context) {
 	s.registerExtC2Runner(fmt.Sprintf("extc2-discord-%s", req.ChannelID), discord)
 
 	s.LogAuditRecord(c, "extc2_discord_configure", "extc2", req.ChannelID, "Discord External C2 configured", true, nil)
-	c.JSON(http.StatusOK, gin.H{"success": true, "channel_id": req.ChannelID, "id": channel.ID})
+	respond(c, gin.H{"channel_id": req.ChannelID, "id": channel.ID})
 }
 
 func (s *Server) handleConfigureSlackC2(c *gin.Context) {
@@ -93,7 +93,7 @@ func (s *Server) handleConfigureSlackC2(c *gin.Context) {
 	s.registerExtC2Runner(fmt.Sprintf("extc2-slack-%s", req.ChannelID), slackC2)
 
 	s.LogAuditRecord(c, "extc2_slack_configure", "extc2", req.ChannelID, "Slack External C2 configured", true, nil)
-	c.JSON(http.StatusOK, gin.H{"success": true, "channel_id": req.ChannelID, "id": channel.ID})
+	respond(c, gin.H{"channel_id": req.ChannelID, "id": channel.ID})
 }
 
 func (s *Server) handleConfigureTelegramC2(c *gin.Context) {
@@ -130,7 +130,7 @@ func (s *Server) handleConfigureTelegramC2(c *gin.Context) {
 	s.registerExtC2Runner(fmt.Sprintf("extc2-telegram-%s", req.ChatID), telegramC2)
 
 	s.LogAuditRecord(c, "extc2_telegram_configure", "extc2", req.ChatID, "Telegram External C2 configured", true, nil)
-	c.JSON(http.StatusOK, gin.H{"success": true, "chat_id": req.ChatID, "id": channel.ID})
+	respond(c, gin.H{"chat_id": req.ChatID, "id": channel.ID})
 }
 
 func (s *Server) handleListExtC2Configs(c *gin.Context) {
@@ -141,7 +141,7 @@ func (s *Server) handleListExtC2Configs(c *gin.Context) {
 	for i := range channels {
 		channels[i].BotToken = "***REDACTED***"
 	}
-	c.JSON(http.StatusOK, gin.H{"channels": channels})
+	respond(c, gin.H{"channels": channels})
 }
 
 func (s *Server) handleDeleteExtC2Config(c *gin.Context) {

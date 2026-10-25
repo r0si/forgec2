@@ -78,8 +78,7 @@ func (s *Server) handleEmergencyStop(c *gin.Context) {
 	if result.RowsAffected == 0 {
 		msg = "No online agents to stop (fleet already idle)"
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"success":       true,
+	respond(c, gin.H{
 		"message":       msg,
 		"scope":         scope,
 		"agents_killed": result.RowsAffected,
@@ -191,8 +190,7 @@ func (s *Server) handleKillSwitch(c *gin.Context) {
 			"user", user.Username,
 			"uninstall_tasks_dispatched", dispatched,
 			"agents_skipped_at_capacity", skipped)
-		c.JSON(http.StatusOK, gin.H{
-			"success":          true,
+		respond(c, gin.H{
 			"message":          "Kill switch armed. All implants will self-destruct on next beacon.",
 			"armed":            true,
 			"tasks_dispatched": dispatched,
@@ -236,8 +234,7 @@ func (s *Server) handleKillSwitch(c *gin.Context) {
 		s.broadcastSystemAlert("KILL SWITCH DISARMED",
 			"Fleet kill-switch disarmed by "+user.Username+".", "kill_switch")
 		slog.Warn("KILL SWITCH DISARMED", "user", user.Username, "uninstall_tasks_reclaimed", reclaimed)
-		c.JSON(http.StatusOK, gin.H{
-			"success":   true,
+		respond(c, gin.H{
 			"message":   "Kill switch has been disarmed.",
 			"armed":     false,
 			"reclaimed": reclaimed,
@@ -360,7 +357,7 @@ func (s *Server) handleKillSwitchStatus(c *gin.Context) {
 			"disarmed_by":  ks.DisarmedBy,
 		}
 	}
-	c.JSON(http.StatusOK, status)
+	respond(c, status)
 }
 
 func (s *Server) handleEmergencyStatus(c *gin.Context) {
@@ -374,8 +371,7 @@ func (s *Server) handleEmergencyStatus(c *gin.Context) {
 		slog.Error("Failed to count pending kills", "err", err)
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success":       true,
+	respond(c, gin.H{
 		"online_agents": onlineCount,
 		"pending_kills": pendingKill,
 	})

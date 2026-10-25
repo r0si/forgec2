@@ -341,7 +341,7 @@ func (s *Server) handleAIRunsCreate(c *gin.Context) {
 	defer s.aiRunCreateMu.Unlock()
 	var existing db.AIChatRun
 	if err := s.db.Where("tenant_id = ? AND owner_id = ? AND idempotency_key = ?", principal.TenantID, principal.UserID, req.IdempotencyKey).First(&existing).Error; err == nil {
-		c.JSON(http.StatusOK, gin.H{"success": true, "data": existing, "reused": true})
+		respond(c, gin.H{"data": existing, "reused": true})
 		return
 	}
 	userLimit, tenantLimit := aiRunUserLimitDefault, aiRunTenantLimitDefault
@@ -405,7 +405,7 @@ func (s *Server) handleAIRunsCreate(c *gin.Context) {
 		}
 		if errors.Is(txErr, gorm.ErrDuplicatedKey) {
 			if s.db.Where("tenant_id = ? AND owner_id = ? AND idempotency_key = ?", principal.TenantID, principal.UserID, req.IdempotencyKey).First(&existing).Error == nil {
-				c.JSON(http.StatusOK, gin.H{"success": true, "data": existing, "reused": true})
+				respond(c, gin.H{"data": existing, "reused": true})
 				return
 			}
 		}
@@ -417,7 +417,7 @@ func (s *Server) handleAIRunsCreate(c *gin.Context) {
 			// otherwise a lost race silently duplicates runs or exceeds caps.
 			var dup db.AIChatRun
 			if err := s.db.Where("tenant_id = ? AND owner_id = ? AND idempotency_key = ?", principal.TenantID, principal.UserID, req.IdempotencyKey).First(&dup).Error; err == nil {
-				c.JSON(http.StatusOK, gin.H{"success": true, "data": dup, "reused": true})
+				respond(c, gin.H{"data": dup, "reused": true})
 				return
 			}
 			var userActive, tenantActive int64
@@ -442,7 +442,7 @@ func (s *Server) handleAIRunsCreate(c *gin.Context) {
 			} else if errors.Is(err, gorm.ErrDuplicatedKey) {
 				// Lost the race after all: return the winner instead of 500.
 				if s.db.Where("tenant_id = ? AND owner_id = ? AND idempotency_key = ?", principal.TenantID, principal.UserID, req.IdempotencyKey).First(&dup).Error == nil {
-					c.JSON(http.StatusOK, gin.H{"success": true, "data": dup, "reused": true})
+					respond(c, gin.H{"data": dup, "reused": true})
 					return
 				}
 				respondError(c, http.StatusInternalServerError, "failed to create AI run")

@@ -122,15 +122,9 @@ func TestHandleCreateCredential_Success(t *testing.T) {
 		t.Fatalf("expected 200, got %d; body=%s", w.Code, w.Body.String())
 	}
 	var resp struct {
-		Success bool `json:"success"`
-		ID      uint `json:"id"`
+		ID uint `json:"id"`
 	}
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("invalid json: %v; body=%s", err, w.Body.String())
-	}
-	if !resp.Success {
-		t.Fatal("expected success=true")
-	}
+	unmarshalData(t, w.Body.Bytes(), &resp)
 	if resp.ID == 0 {
 		t.Fatal("expected non-zero credential ID")
 	}
