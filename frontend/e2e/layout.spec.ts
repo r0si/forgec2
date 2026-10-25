@@ -182,7 +182,9 @@ test.describe("route transitions", () => {
     await prepare(page);
     await installTransitionCounter(page);
     await loadChatRedirect(page);
-    expect(await transitionCalls(page)).toBeGreaterThan(0);
+    // Poll: the counter is installed by an init script but the router may call
+    // it a tick after waitForURL resolves, which flaked under parallel load.
+    await expect.poll(() => transitionCalls(page)).toBeGreaterThan(0);
   });
 
   test("reduced motion keeps the instant swap", async ({ page }) => {
@@ -190,6 +192,9 @@ test.describe("route transitions", () => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await installTransitionCounter(page);
     await loadChatRedirect(page);
+    // Give the client navigation a moment to finish before asserting the
+    // counter stayed at zero.
+    await page.waitForTimeout(300);
     expect(await transitionCalls(page)).toBe(0);
   });
 });

@@ -193,17 +193,29 @@ console.log(/vendor-baseui-forms/.test(h) ? 'FAIL: forms preloaded' : 'OK: forms
   vendor-misc 39.6, vendor-sonner 32.8, wsContext 29.3 and four sub-2 kB
   chunks. Total bundle is 4.53 MB across 199 files (5.50 MB budget).
 
-  Splitting the dictionary is the one change big enough to matter here (it
-  would take the path to roughly 790 kB). It is **not** a mechanical split: `t()`
-  is synchronous, so the split needs a small **bootstrap dictionary** (shell,
-  nav, login, common, a11y, error text) loaded synchronously plus the full `en`
-  dictionary fetched like `zh` already is and merged into the lookup. The
-  failure mode to avoid is a visible frame of raw key names on whichever route
-  renders before the async dictionary resolves — that means either
-  route-level awaiting or a bootstrap set proved complete for first paint,
-  verified with `e2e` and refreshed win32 **and** Linux visual baselines
-  (a missing key changes rendered text, not just pixels). Until that is built
-  and verified, leaving it tracked is safer than a partially loaded dictionary.
+  **Implemented 2026-10-25.** The dictionary is no longer on the first-paint
+  path: the critical path dropped from 1027 kB to **798 kB** (−229 kB, 27%),
+  which is below the 968 kB the batch-S work reached and leaves 292 kB of
+  headroom against the 1090 kB budget. How it works:
+
+  - `src/lib/i18n/bootstrap.ts` (**generated**, 175 keys) holds the namespaces
+    the shell renders before any route chunk: `nav.`, `topbar.`, `section.`,
+    `a11y.`, `common.`, `login.`, `error.`. Regenerate with
+    `node scripts/gen-i18n-bootstrap.mjs`; `check:i18n-bootstrap` (in
+    `npm run check`) fails when it drifts from `en.ts`.
+  - `I18nProvider` loads `./en` with a dynamic import and merges it in; `t()`
+    is still synchronous and falls back bootstrap → full → key.
+  - The build aliases `@i18n-sync` to an empty module, so `./en` is only
+    reachable through that dynamic import and lands in its own chunk. Dev and
+    test alias it to the real dictionary, which is why the 947 unit tests did
+    not need touching.
+  - `AppLayout` renders `PageSpinner` for the routed area until the dictionary
+    is ready (the shell paints immediately from the bootstrap slice), so no
+    frame can show a raw key on a cold load.
+  - Adding a key that the shell needs before the first route render means
+    putting its namespace in the generator's prefix list — otherwise it appears
+    on the first frame as a raw key, which is what the e2e `smoke` project
+    (`mounts without uncaught errors`) plus the visual baselines would catch.
 
 - Race-suite runtime (2026-10-24): `go test -race ./internal/server/...` takes
   **670–855 s** on this machine against the CI job's `-timeout 20m`. That is

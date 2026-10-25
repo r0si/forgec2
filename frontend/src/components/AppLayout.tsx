@@ -18,10 +18,11 @@ import { startIdleRoutePrefetch } from "@/lib/route-prefetch";
 import { isFlushPath } from "@/lib/layout";
 import { cn } from "@/lib/utils";
 import { useWS } from "@/lib/wsContext";
+import { PageSpinner } from "@/components/ui/spinner";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation();
-  const { t } = useI18n();
+  const { t, ready } = useI18n();
   const isMobile = useAppStore((s) => s.isMobile);
   const setIsMobile = useAppStore((s) => s.setIsMobile);
   const setMobileMenuOpen = useAppStore((s) => s.setMobileMenuOpen);
@@ -135,7 +136,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <AgentStatusBanner />
               </>
             )}
-            <div className={cn(flush && "flex min-h-0 flex-1 flex-col")}>{children}</div>
+            <div className={cn(flush && "flex min-h-0 flex-1 flex-col")}>
+              {/* The full en dictionary is a separate chunk in production; hold
+                  the routed page until it arrives so no raw key can flash. The
+                  shell above already rendered from the synchronous bootstrap
+                  slice. */}
+              {ready ? children : <PageSpinner />}
+            </div>
           </div>
         </main>
         <GlobalInteractDock />

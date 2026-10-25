@@ -26,6 +26,7 @@
     "check:webdist": "node ../scripts/check-webdist.mjs",
     "check:readme": "node ../scripts/gen-readme-facts.mjs --check && node ../scripts/check-readme-parity.mjs",
     "check:i18n": "node scripts/check-i18n.mjs",
+    "check:i18n-bootstrap": "node scripts/gen-i18n-bootstrap.mjs --check",
     "check:paths": "node scripts/check-api-paths.mjs",
     "check:native-dialogs": "node scripts/check-native-dialogs.mjs",
     "check:openapi-types": "node scripts/check-openapi-types.mjs",

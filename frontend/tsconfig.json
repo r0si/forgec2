@@ -20,6 +20,9 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "@i18n-sync": [
+        "./src/lib/i18n/en.sync.ts"
       ]
     }
   },

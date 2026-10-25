@@ -36,6 +36,9 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
+      // Tests get the full dictionary synchronously (the production build
+      // aliases this to an empty module and loads it as a separate chunk).
+      '@i18n-sync': fileURLToPath(new URL('./src/lib/i18n/en.sync.ts', import.meta.url)),
     },
   },
 })

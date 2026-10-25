@@ -1,0 +1,1 @@
+import{Yn as e}from"./vendor-baseui-afl0ep6C.js";import{t}from"./card-header-Bt-GvlSx.js";var n=e();function r(e){return(0,n.jsx)(t,{...e})}export{r as t};

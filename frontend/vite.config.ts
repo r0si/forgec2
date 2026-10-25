@@ -81,6 +81,17 @@ export default defineConfig(({ command }) => {
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
+      // The English dictionary is ~239 kB — the largest chunk on the
+      // first-paint path. A production build resolves this alias to an empty
+      // module so `./en` is only reachable through the provider's dynamic
+      // import (its own chunk); dev and test keep the synchronous dictionary
+      // so tests can assert translated text immediately.
+      "@i18n-sync": fileURLToPath(
+        new URL(
+          command === "build" ? "./src/lib/i18n/en.sync.prod.ts" : "./src/lib/i18n/en.sync.ts",
+          import.meta.url,
+        ),
+      ),
     },
   },
   build: {
