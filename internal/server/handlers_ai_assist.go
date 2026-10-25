@@ -24,6 +24,9 @@ var errAIDisabled = errors.New("ai not configured")
 
 const aiOneShotTimeout = 45 * time.Second
 
+// aiSuggestionMaxItems caps the ranked next-step list handed to the UI.
+const aiSuggestionMaxItems = 6
+
 // aiAssistReady reports whether one-shot AI helpers may run.
 func (s *Server) aiAssistReady() bool {
 	if s.cfg == nil {
@@ -405,22 +408,24 @@ Order by operational value. Prefer OPSEC-quiet actions. If host is elevated with
 		respondError(c, http.StatusBadGateway, "model returned unparseable suggestions")
 		return
 	}
-	if len(suggestions) > 6 {
-		suggestions = suggestions[:6]
-	}
-	out := make([]gin.H, 0, len(suggestions))
+	// Filter before capping: a suggestion with no action is noise, and letting
+	// it consume one of the six slots silently shortens the useful list.
+	cleaned := make([]gin.H, 0, len(suggestions))
 	for _, sg := range suggestions {
 		if strings.TrimSpace(sg.Action) == "" {
 			continue
 		}
-		out = append(out, gin.H{
+		cleaned = append(cleaned, gin.H{
 			"action":       truncateStr(sg.Action, 120),
 			"reason":       truncateStr(sg.Reason, 400),
 			"risk":         validRisk(sg.Risk),
 			"command_hint": truncateStr(sg.CommandHint, 300),
 		})
+		if len(cleaned) == aiSuggestionMaxItems {
+			break
+		}
 	}
-	respond(c, gin.H{"agent_id": aid, "hostname": agent.Hostname, "suggestions": out})
+	respond(c, gin.H{"agent_id": aid, "hostname": agent.Hostname, "suggestions": cleaned})
 }
 
 var nlQueryStatuses = map[string]bool{
