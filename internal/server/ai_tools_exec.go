@@ -59,7 +59,7 @@ func (s *Server) executeToolSwitchCtx(reqCtx *aiReqCtx, name string, argsJSON st
 			slog.Error("AI: failed to list agents", "err", err)
 			return `{"error":"failed to list agents"}`
 		}
-		var out []map[string]interface{}
+		out := []map[string]interface{}{}
 		for _, a := range agents {
 			row := map[string]interface{}{
 				"id": a.ID, "hostname": a.Hostname, "ip": a.IP,
@@ -211,7 +211,7 @@ func (s *Server) executeToolSwitchCtx(reqCtx *aiReqCtx, name string, argsJSON st
 		if err := s.db.Where("agent_id = ?", aid).Order("created_at desc").Limit(10).Find(&tasks).Error; err != nil {
 			slog.Error("AI: failed to query agent tasks", "err", err)
 		}
-		var out []map[string]interface{}
+		out := []map[string]interface{}{}
 		for _, t := range tasks {
 			r := map[string]interface{}{
 				"id": t.ID, "type": t.Type, "command": t.Command,
@@ -236,7 +236,7 @@ func (s *Server) executeToolSwitchCtx(reqCtx *aiReqCtx, name string, argsJSON st
 		if err := s.aiTenantScope(s.db.Order("created_at desc"), reqCtx).Limit(500).Find(&listeners).Error; err != nil {
 			slog.Error("AI: failed to list listeners", "err", err)
 		}
-		var out []map[string]interface{}
+		out := []map[string]interface{}{}
 		for _, l := range listeners {
 			out = append(out, map[string]interface{}{
 				"id": l.ID, "name": l.Name, "type": l.Type,
@@ -258,7 +258,7 @@ func (s *Server) executeToolSwitchCtx(reqCtx *aiReqCtx, name string, argsJSON st
 		if err := credentialQuery.Find(&creds).Error; err != nil {
 			slog.Error("AI: failed to list credentials", "err", err)
 		}
-		var out []map[string]interface{}
+		out := []map[string]interface{}{}
 		for _, c := range creds {
 			entry := map[string]interface{}{
 				"id": c.ID, "domain": c.Domain, "username": c.Username,
@@ -308,7 +308,7 @@ func (s *Server) executeToolSwitchCtx(reqCtx *aiReqCtx, name string, argsJSON st
 		if err := taskQuery.Order("created_at desc").Limit(q.Limit).Find(&tasks).Error; err != nil {
 			return `{"error":"failed to search tasks"}`
 		}
-		var out []map[string]interface{}
+		out := []map[string]interface{}{}
 		for _, t := range tasks {
 			out = append(out, map[string]interface{}{
 				"id": t.ID, "agent_id": t.AgentID, "type": t.Type, "command": truncateStr(t.Command, 200),
@@ -390,7 +390,7 @@ func (s *Server) executeToolSwitchCtx(reqCtx *aiReqCtx, name string, argsJSON st
 	case "list_macros":
 		var macros []db.CommandMacro
 		s.aiTenantScope(s.db.Order("name"), reqCtx).Limit(AutomationRuleLimit).Find(&macros)
-		var out []map[string]interface{}
+		out := []map[string]interface{}{}
 		for _, m := range macros {
 			var steps []interface{}
 			_ = json.Unmarshal([]byte(m.Steps), &steps)
@@ -803,7 +803,7 @@ func (s *Server) executeToolSwitchCtx(reqCtx *aiReqCtx, name string, argsJSON st
 		}
 		var tasks []db.Task
 		q.Order("created_at desc").Limit(p.Limit).Find(&tasks)
-		var out []map[string]interface{}
+		out := []map[string]interface{}{}
 		for _, t := range tasks {
 			out = append(out, map[string]interface{}{
 				"id": t.ID, "agent_id": t.AgentID, "type": t.Type,
@@ -1339,7 +1339,7 @@ func (s *Server) executeToolSwitchCtx(reqCtx *aiReqCtx, name string, argsJSON st
 		if err := q.Order("created_at desc").Limit(p.Limit).Find(&alerts).Error; err != nil {
 			return `{"error":"failed to list alerts"}`
 		}
-		var out []map[string]interface{}
+		out := []map[string]interface{}{}
 		for _, a := range alerts {
 			out = append(out, map[string]interface{}{
 				"id": a.ID, "type": a.Type, "severity": a.Severity,
