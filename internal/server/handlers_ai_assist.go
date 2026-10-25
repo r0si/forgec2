@@ -27,6 +27,9 @@ const aiOneShotTimeout = 45 * time.Second
 // aiSuggestionMaxItems caps the ranked next-step list handed to the UI.
 const aiSuggestionMaxItems = 6
 
+// aiPlaybookMaxSteps caps a drafted playbook; the macro runner takes the rest.
+const aiPlaybookMaxSteps = 12
+
 // aiAssistReady reports whether one-shot AI helpers may run.
 func (s *Server) aiAssistReady() bool {
 	if s.cfg == nil {
@@ -585,9 +588,9 @@ Rules: 2-8 steps, each step self-contained and quiet (prefer built-in tools over
 		pb.Name = "ai_playbook_" + strconv.FormatInt(time.Now().Unix(), 10)
 	}
 	pb.Name = strings.Trim(pb.Name, "_ ")
-	if len(pb.Steps) > 12 {
-		pb.Steps = pb.Steps[:12]
-	}
+	// Filter before capping, for the same reason as the suggestion list: a
+	// step with no command is noise, and letting it consume one of the twelve
+	// slots silently shortens a usable playbook.
 	steps := make([]gin.H, 0, len(pb.Steps))
 	for _, st := range pb.Steps {
 		cmd := strings.TrimSpace(st.Command)
@@ -603,6 +606,9 @@ Rules: 2-8 steps, each step self-contained and quiet (prefer built-in tools over
 			"shell":     shell,
 			"rationale": truncateStr(st.Rationale, 300),
 		})
+		if len(steps) == aiPlaybookMaxSteps {
+			break
+		}
 	}
 	if len(steps) == 0 {
 		respondError(c, http.StatusBadGateway, "playbook had no usable steps")
