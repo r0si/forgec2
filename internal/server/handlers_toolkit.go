@@ -95,8 +95,7 @@ func (s *Server) handleToolkitQuickAction(c *gin.Context) {
 
 	s.broadcastTaskUpdate(agentID, *task)
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
+	respond(c, gin.H{
 		"task_id": task.ID,
 		"message": fmt.Sprintf("Action %s dispatched to agent", action),
 	})
@@ -254,7 +253,7 @@ func (s *Server) handleToolkitRecentResults(c *gin.Context) {
 		slog.Error("Toolkit: failed to query recent results", "err", err)
 	}
 
-	c.JSON(http.StatusOK, gin.H{"tasks": tasks})
+	respond(c, gin.H{"tasks": tasks})
 }
 
 func (s *Server) handleToolkitAgentInfo(c *gin.Context) {
@@ -285,7 +284,7 @@ func (s *Server) handleToolkitAgentInfo(c *gin.Context) {
 		slog.Error("Failed to count agent tasks", "agent_id", agentID, "err", err)
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	respond(c, gin.H{
 		"agent":        agent,
 		"task_count":   taskCount,
 		"success_rate": successRateStr,
@@ -301,5 +300,5 @@ func (s *Server) handleToolkitAgentTasks(c *gin.Context) {
 		slog.Error("Toolkit: failed to query agent tasks", "err", err)
 	}
 
-	c.JSON(http.StatusOK, gin.H{"tasks": tasks})
+	respond(c, gin.H{"tasks": tasks})
 }

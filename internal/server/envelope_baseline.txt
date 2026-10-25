@@ -32,7 +32,6 @@ handlers_auth.go 2
 handlers_browser_creds.go 3
 handlers_cookie_proxy.go 3
 handlers_generate_one_liners.go 2
-handlers_i18n.go 4
 handlers_lateral.go 2
 handlers_notification_routes.go 2
 handlers_ntlm.go 2
@@ -45,9 +44,7 @@ handlers_scheduler.go 2
 handlers_scripting.go 2
 handlers_sessions.go 3
 handlers_templates.go 3
-handlers_toolkit.go 4
 handlers_topology_net.go 1
-handlers_traffic_profile.go 4
 handlers_tun.go 2
 helpers.go 1
 remote_desktop.go 1

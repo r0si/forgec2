@@ -111,7 +111,7 @@ func (s *Server) handleTrafficProfileGet(c *gin.Context) {
 	if len(recent) > maxRecentRecords {
 		recent = recent[len(recent)-maxRecentRecords:]
 	}
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": gin.H{
+	respond(c, gin.H{
 		"agent_id":             agentID,
 		"sample_count":         len(st.agentLogs),
 		"baseline_interval":    st.baselineInterval,
@@ -124,7 +124,7 @@ func (s *Server) handleTrafficProfileGet(c *gin.Context) {
 		"auto_adapt":           autoAdapt,
 		"recent_records":       recent,
 		"suggestion":           suggestion,
-	}})
+	})
 }
 
 // handleTrafficProfileAdapt queues a real set_sleep task that moves the agent
@@ -154,7 +154,7 @@ func (s *Server) handleTrafficProfileAdapt(c *gin.Context) {
 	interval := clampInt(suggestion.DesiredInterval, 1, 86400)
 	jitter := clampInt(suggestion.DesiredJitter, 0, 100)
 	if interval == agent.CurrentInterval && jitter == agent.CurrentJitter {
-		c.JSON(http.StatusOK, gin.H{"success": true, "message": "agent already matches the suggested profile"})
+		respond(c, gin.H{"message": "agent already matches the suggested profile"})
 		return
 	}
 
@@ -165,7 +165,7 @@ func (s *Server) handleTrafficProfileAdapt(c *gin.Context) {
 	}
 	slog.Info("Traffic adaptation task queued", "agent_id", agentID, "task_id", task.ID, "sleep", sleep)
 	s.LogAuditRecord(c, "traffic_adapt", "agent", agentID, "Adaptation task queued: set_sleep "+sleep, true, nil)
-	c.JSON(http.StatusOK, gin.H{"success": true, "task_id": task.ID, "message": "set_sleep " + sleep})
+	respond(c, gin.H{"task_id": task.ID, "message": "set_sleep " + sleep})
 }
 
 // handleTrafficProfileAutoAdapt persists the per-agent auto-adapt toggle.
@@ -195,7 +195,7 @@ func (s *Server) handleTrafficProfileAutoAdapt(c *gin.Context) {
 	s.broadcastAgentDataUpdate(agentID, map[string]interface{}{"auto_adapt": req.Enabled})
 	s.LogAuditRecord(c, "traffic_auto_adapt", "agent", agentID,
 		"Auto-adapt toggled "+boolWord(req.Enabled), true, nil)
-	c.JSON(http.StatusOK, gin.H{"success": true, "auto_adapt": req.Enabled, "message": "auto-adapt " + boolWord(req.Enabled)})
+	respond(c, gin.H{"auto_adapt": req.Enabled, "message": "auto-adapt " + boolWord(req.Enabled)})
 }
 
 // maybeAutoAdaptBeacon implements the server-side auto-adapt loop: on every

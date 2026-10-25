@@ -144,14 +144,11 @@ func TestHandleTrafficProfileAdapt(t *testing.T) {
 			t.Fatalf("expected 200, got %d; body=%s", w.Code, w.Body.String())
 		}
 		var resp struct {
-			Success bool   `json:"success"`
 			TaskID  uint   `json:"task_id"`
 			Message string `json:"message"`
 		}
-		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.Fatalf("invalid json: %v", err)
-		}
-		if !resp.Success || resp.TaskID == 0 {
+		unmarshalData(t, w.Body.Bytes(), &resp)
+		if resp.TaskID == 0 {
 			t.Fatalf("expected created task, got %+v", resp)
 		}
 		var task db.Task
@@ -205,14 +202,11 @@ func TestHandleTrafficProfileAutoAdapt(t *testing.T) {
 			t.Fatalf("expected 200, got %d; body=%s", w.Code, w.Body.String())
 		}
 		var resp struct {
-			Success   bool `json:"success"`
 			AutoAdapt bool `json:"auto_adapt"`
 		}
-		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.Fatalf("invalid json: %v", err)
-		}
-		if !resp.Success || !resp.AutoAdapt {
-			t.Errorf("expected success+enabled, got %+v", resp)
+		unmarshalData(t, w.Body.Bytes(), &resp)
+		if !resp.AutoAdapt {
+			t.Errorf("expected enabled, got %+v", resp)
 		}
 		var agent db.Implant
 		if err := s.db.First(&agent, "id = ?", "agent-1").Error; err != nil {

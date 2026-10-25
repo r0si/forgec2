@@ -34,8 +34,7 @@ func (s *Server) handleSetLanguage(c *gin.Context) {
 		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success":  true,
+	respond(c, gin.H{
 		"language": lang,
 		"message":  "Language updated",
 	})
@@ -64,8 +63,7 @@ func (s *Server) handleGetTranslations(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success":      true,
+	respond(c, gin.H{
 		"language":     lang,
 		"translations": translations,
 		"count":        len(translations),
@@ -82,8 +80,7 @@ func (s *Server) handleTranslationStats(c *gin.Context) {
 
 	allKeys := GetAllTranslationKeys()
 
-	c.JSON(http.StatusOK, gin.H{
-		"success":    true,
+	respond(c, gin.H{
 		"languages":  SupportedLanguages,
 		"stats":      stats,
 		"total_keys": len(allKeys),
@@ -101,8 +98,7 @@ func (s *Server) handleTranslationCheck(c *gin.Context) {
 	placeholderIssues := CheckPlaceholderConsistency(DefaultLanguage, lang)
 	htmlIssues := CheckHTMLTags(lang)
 
-	c.JSON(http.StatusOK, gin.H{
-		"success":              true,
+	respond(c, gin.H{
 		"language":             lang,
 		"missing_translations": missing,
 		"missing_count":        len(missing),
