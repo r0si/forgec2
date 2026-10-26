@@ -546,13 +546,41 @@ func (s *Server) LogPluginAction(c *gin.Context, action, pluginName, details str
 	})
 }
 
+// sensitiveConfigFieldMarkers name the config fields whose VALUES must never be
+// written to the audit log. Matching is deliberately broad ("key", "token",
+// "secret"): over-redacting an innocent field costs a reader a value, leaking a
+// key material costs the engagement.
+var sensitiveConfigFieldMarkers = []string{
+	"secret", "password", "passwd", "key", "token", "credential", "cookie", "session",
+}
+
+func isSensitiveConfigField(field string) bool {
+	f := strings.ToLower(field)
+	for _, marker := range sensitiveConfigFieldMarkers {
+		if strings.Contains(f, marker) {
+			return true
+		}
+	}
+	return false
+}
+
 // LogConfigChange logs system configuration changes.
+//
+// The values are part of the details string as "old=… new=…", which the generic
+// sanitizer cannot recognise as sensitive: the key it sees is "old"/"new", not
+// the field name. A change to jwt_secret therefore wrote both secrets to a
+// long-lived, admin-readable table. Sensitive fields now record that they
+// changed without recording either value.
 func (s *Server) LogConfigChange(c *gin.Context, field, oldValue, newValue string) {
+	details := "old=" + oldValue + " new=" + newValue
+	if isSensitiveConfigField(field) {
+		details = "values redacted (sensitive field)"
+	}
 	s.LogOperatorAction(c, OperatorAction{
 		Action:    "config_change",
 		Resource:  "system_config",
 		TargetID:  field,
-		Details:   "old=" + oldValue + " new=" + newValue,
+		Details:   details,
 		RiskLevel: "high",
 	})
 }
