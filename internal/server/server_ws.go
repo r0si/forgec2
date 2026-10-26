@@ -231,7 +231,9 @@ func (s *Server) userCanViewScreen(username string) bool {
 	if err := s.db.Select("role").Where("username = ?", username).First(&user).Error; err != nil {
 		return false
 	}
-	if user.Role == "viewer" || user.Role == "" {
+	// Same operator gate as the HTTP side (unknown roles are refused there
+	// too) plus the agents.write permission.
+	if !s.roleGrantsOperator(user.Role) {
 		return false
 	}
 	return db.RoleHasPermissionDB(s.db, user.Role, db.PermAgentsWrite)

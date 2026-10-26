@@ -28,6 +28,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Security
 
+- **Two more role checks were blocklists.** `handleRerunTask` only refused the literal `viewer`, so a request with no `user_role` in context — or any unknown role — could clone a task and queue it as a new write; it now uses `requireOperator`. `userCanViewScreen` (the dashboard socket's live-frame fan-out) had the same shape and now goes through `roleGrantsOperator`, so an unknown role cannot receive screen frames even if a permission lookup were to drift. Both are pinned by regression tests covering the no-role, viewer and unknown-role cases.
 - **`requireOperator` failed open when the role was absent.** The gate was a blocklist — `if role == "viewer" || role == ""` — but `c.Get` returns a nil interface when the key is missing, and comparing that to a string is always false, so **any request whose context carried no `user_role` was treated as an operator**. It also let any unknown role string through. The check now requires a role that (a) is `admin`/`user`/the legacy `operator` alias, or (b) exists in `custom_roles`, and denies `viewer`, `guest`, the empty role and anything unverified (a DB error denies too). Twelve existing tests were passing *because of* the bypass — they never set a role — and now set one explicitly; the role matrix is pinned by a new table-driven test.
 
 ### CI

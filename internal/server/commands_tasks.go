@@ -151,9 +151,10 @@ func (s *Server) handleRerunTask(c *gin.Context) {
 	agentID := c.Param("id")
 	taskIDStr := c.Param("taskId")
 
-	role, _ := c.Get("user_role")
-	if role == "viewer" {
-		respondError(c, http.StatusForbidden, "viewers cannot rerun tasks")
+	// Rerun creates a new task, so it needs the same operator gate as any
+	// other write. The old check was `role == "viewer"`, which let a request
+	// with no user_role in context (and any unknown role) through.
+	if !s.requireOperator(c) {
 		return
 	}
 	if _, ok := s.getAgentOrFail(c, agentID); !ok {
