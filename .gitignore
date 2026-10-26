@@ -55,6 +55,8 @@ Thumbs.db
 # Test data, not temp output: pins the response-envelope migration backlog
 # (see TestSuccessEnvelope). It has to be committed or the gate cannot pass.
 !internal/server/envelope_baseline.txt
+# Same reason: the per-file count of raw error bodies (TestErrorEnvelope).
+!internal/server/envelope_error_baseline.txt
 !README.md
 # The lint debt ceiling is checked in on purpose (see scripts/check-lint-debt.sh).
 !scripts/lint-backlog.txt

@@ -1,0 +1,16 @@
+# Raw (non-envelope) error JSON responses per file. The success envelope has
+# had a ratchet for a while; this is the mirror for failures. Each number may
+# only go down, and a file that improves must lower it in the same commit.
+#
+# extc2.go: the external-C2 wire reply struct is a protocol contract, not an
+# API envelope (see envelope_baseline.txt for the same exception).
+#
+extc2.go 11
+handlers_generate_binaries.go 4
+handlers_generate_profiles.go 2
+handlers_listeners.go 1
+handlers_settings.go 1
+operator_plane.go 2
+routes_recon.go 1
+sensitive_export.go 1
+server_http.go 2
