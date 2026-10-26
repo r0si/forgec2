@@ -11,7 +11,12 @@ import (
 func (s *Server) registerMiscRoutes(auth *gin.RouterGroup) {
 	auth.GET("/api/update-check", s.handleUpdateCheck)
 	auth.GET("/api/update-check/version", s.handleCheckVersion)
-	auth.POST("/api/update-check/refresh", s.handleRefreshUpdateCheck)
+	// Refresh forces an outbound GitHub API call and rewrites the server's
+	// update state, so it needs a write permission: a viewer used to be able
+	// to trigger unlimited egress with it. Reading the status stays open to
+	// every authenticated operator.
+	auth.POST("/api/update-check/refresh",
+		middleware.RequirePermission(db.PermSettingsWrite), s.handleRefreshUpdateCheck)
 	auth.GET("/api/update-progress", s.handleUpdateProgress)
 
 	auth.POST("/api/update-check/hot-update", middleware.RequireRole(db.RoleAdmin), s.handleHotUpdate)
