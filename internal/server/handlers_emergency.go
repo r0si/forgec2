@@ -21,9 +21,17 @@ func (s *Server) handleEmergencyStop(c *gin.Context) {
 		return
 	}
 
-	userID, _ := c.Get("user_id")
+	// Resolve the caller first: First(&user, any) with a nil primary key
+	// matched the first row in the table, so a context without user_id
+	// confirmed the password against an arbitrary account and then armed the
+	// kill switch. Unknown principals are refused outright.
+	uid, ok := currentUserID(c)
+	if !ok {
+		respondError(c, http.StatusUnauthorized, "unauthorized")
+		return
+	}
 	var user db.User
-	if err := s.db.First(&user, userID).Error; err != nil {
+	if err := s.db.First(&user, uid).Error; err != nil {
 		respondError(c, http.StatusInternalServerError, "User not found")
 		return
 	}
@@ -152,9 +160,17 @@ func (s *Server) handleKillSwitch(c *gin.Context) {
 		return
 	}
 
-	userID, _ := c.Get("user_id")
+	// Resolve the caller first: First(&user, any) with a nil primary key
+	// matched the first row in the table, so a context without user_id
+	// confirmed the password against an arbitrary account and then armed the
+	// kill switch. Unknown principals are refused outright.
+	uid, ok := currentUserID(c)
+	if !ok {
+		respondError(c, http.StatusUnauthorized, "unauthorized")
+		return
+	}
 	var user db.User
-	if err := s.db.First(&user, userID).Error; err != nil {
+	if err := s.db.First(&user, uid).Error; err != nil {
 		respondError(c, http.StatusInternalServerError, "User not found")
 		return
 	}

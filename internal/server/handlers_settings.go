@@ -329,8 +329,14 @@ func (s *Server) consumePasswordChangeSlot(userID uint) (time.Duration, bool) {
 }
 
 func (s *Server) handleChangePassword(c *gin.Context) {
-	userID, _ := c.Get("user_id")
-	uid, _ := userID.(uint)
+	// A missing user_id used to leave the lookup unscoped (First(&user, nil)
+	// matched the first row), so the "current password" was checked against an
+	// arbitrary account and that account's password was the one rotated.
+	uid, ok := currentUserID(c)
+	if !ok {
+		respondError(c, http.StatusUnauthorized, "unauthorized")
+		return
+	}
 
 	if remaining, ok := s.consumePasswordChangeSlot(uid); !ok {
 		respondError(c, http.StatusTooManyRequests,
@@ -351,7 +357,7 @@ func (s *Server) handleChangePassword(c *gin.Context) {
 		return
 	}
 
-	userID, _ = c.Get("user_id")
+	userID := uid
 	var user db.User
 	if err := s.db.First(&user, userID).Error; err != nil {
 		respondError(c, http.StatusUnauthorized, "User not found")
