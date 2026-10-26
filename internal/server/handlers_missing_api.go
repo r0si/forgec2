@@ -308,10 +308,10 @@ func (s *Server) handleAPIChatHistory(c *gin.Context) {
 
 func (s *Server) handleAPIChatChannels(c *gin.Context) {
 	type channelRow struct {
-		Channel      string `gorm:"column:channel"`
-		MessageCount int    `gorm:"column:message_count"`
-		LastMessage  string `gorm:"column:last_message"`
-		LastTime     string `gorm:"column:last_time"`
+		Channel      string `gorm:"column:channel" json:"channel"`
+		MessageCount int    `gorm:"column:message_count" json:"message_count"`
+		LastMessage  string `gorm:"column:last_message" json:"last_message"`
+		LastTime     string `gorm:"column:last_time" json:"last_time"`
 	}
 	var rows []channelRow
 	if err := s.db.Model(&db.ChatMessage{}).
