@@ -377,14 +377,21 @@ func (s *Server) handleKillSwitchStatus(c *gin.Context) {
 }
 
 func (s *Server) handleEmergencyStatus(c *gin.Context) {
+	// Never fall through with zeros here: this is the panel an operator reads
+	// while deciding whether the fleet is down, and a failed count would look
+	// exactly like "nothing is online / nothing is pending".
 	var onlineCount int64
 	if err := s.db.Model(&db.Implant{}).Where("status != ?", "offline").Count(&onlineCount).Error; err != nil {
 		slog.Error("Failed to count online agents", "err", err)
+		respondError(c, http.StatusInternalServerError, "failed to count online agents")
+		return
 	}
 
 	var pendingKill int64
 	if err := s.db.Model(&db.Task{}).Where("type = ? AND status IN ?", "kill", []string{"pending", "running"}).Count(&pendingKill).Error; err != nil {
 		slog.Error("Failed to count pending kills", "err", err)
+		respondError(c, http.StatusInternalServerError, "failed to count pending kills")
+		return
 	}
 
 	respond(c, gin.H{
