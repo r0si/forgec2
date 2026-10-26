@@ -169,8 +169,10 @@ func (s *Server) handleAutoTagApply(c *gin.Context) {
 		if err := s.db.Transaction(func(tx *gorm.DB) error {
 			return tx.CreateInBatches(&pending, 500).Error
 		}); err != nil {
+			// A total batch failure is not a success: nothing was applied, and
+			// no caller reads the "partial" flag, so a 200 here read as "done".
 			slog.Error("Auto-tag: failed to apply assignment batch", "count", len(pending), "err", err)
-			respond(c, gin.H{"applied": 0, "partial": true, "error": "batch insert failed"})
+			respondError(c, http.StatusInternalServerError, "auto-tag batch insert failed")
 			return
 		}
 		applied = len(pending)

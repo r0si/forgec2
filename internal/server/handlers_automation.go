@@ -428,7 +428,7 @@ func (s *Server) handlePluginDelete(c *gin.Context) {
 		return
 	}
 
-	if p.Name != "" {
+	if p.Name != "" && s.pluginManager != nil {
 		pluginDir := s.pluginManager.PluginDir(p.Name)
 		quarantineDir := filepath.Join("data", "quarantine", "plugins", p.Name)
 		if pluginDir != "" {

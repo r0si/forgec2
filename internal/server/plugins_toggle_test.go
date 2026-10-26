@@ -72,3 +72,34 @@ func TestPluginToggleWithoutManager(t *testing.T) {
 		t.Fatalf("unknown plugin = %d %s", w.Code, w.Body.String())
 	}
 }
+
+// TestPluginDeleteWithoutManager pins the same nil-manager guard on the delete
+// path: removing a plugin record must not dereference a manager the server does
+// not have.
+func TestPluginDeleteWithoutManager(t *testing.T) {
+	s := mustTenantServer(t)
+	if s.pluginManager != nil {
+		t.Skip("this server has a plugin manager")
+	}
+	p := db.Plugin{Name: "delete-me", Version: "1.0.0", Enabled: true, Type: "command"}
+	if err := s.db.Create(&p).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodDelete, "/api/plugins/"+p.Name, nil)
+	c.Set("user", "admin1")
+	c.Set("user_role", db.RoleAdmin)
+	c.Set("user_id", uint(1))
+	c.Params = gin.Params{{Key: "id", Value: p.Name}}
+	s.handlePluginDelete(c)
+	if w.Code != http.StatusOK {
+		t.Fatalf("delete = %d %s", w.Code, w.Body.String())
+	}
+	var count int64
+	s.db.Model(&db.Plugin{}).Where("id = ?", p.ID).Count(&count)
+	if count != 0 {
+		t.Fatal("plugin row survived the delete")
+	}
+}
