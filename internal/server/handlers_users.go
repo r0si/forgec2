@@ -16,7 +16,9 @@ import (
 // handleUsersPage shows user management
 func (s *Server) handleUsersPage(c *gin.Context) {
 	var users []db.User
-	if err := s.db.Order("created_at desc").Limit(1000).Find(&users).Error; err != nil {
+	// User rows carry a tenant; a tenant-scoped admin must not see other
+	// tenants' accounts. A legacy (tenant 0) admin stays global.
+	if err := s.tenantScope(s.db, c).Order("created_at desc").Limit(1000).Find(&users).Error; err != nil {
 		slog.Error("Failed to list users", "err", err)
 	}
 
@@ -67,6 +69,12 @@ func (s *Server) handleAddUser(c *gin.Context) {
 		return
 	}
 
+	// Resolve the tenant BEFORE opening the transaction: currentTenantID runs
+	// its own query, and issuing it inside the tx deadlocks a single-connection
+	// SQLite pool (the tx holds the only connection while the nested query
+	// waits for one).
+	tenantID := s.currentTenantID(c)
+
 	var user db.User
 	err = s.db.Transaction(func(tx *gorm.DB) error {
 		user = db.User{
@@ -74,6 +82,9 @@ func (s *Server) handleAddUser(c *gin.Context) {
 			PasswordHash: hash,
 			Role:         role,
 			IsActive:     true,
+			// Stamp the creator's tenant: an unstamped row (0) is the legacy
+			// unscoped bucket, which every tenant can see and administer.
+			TenantID: tenantID,
 		}
 		return tx.Create(&user).Error
 	})
@@ -99,7 +110,7 @@ func (s *Server) handleToggleUser(c *gin.Context) {
 	}
 	idStr := c.Param("id")
 	var user db.User
-	if !s.findOrFail(c, &user, idStr, "User") {
+	if !s.findTenantOrFail(c, &user, idStr, "User") {
 		return
 	}
 
@@ -160,7 +171,7 @@ func (s *Server) handleEditUser(c *gin.Context) {
 	}
 
 	var user db.User
-	if !s.findOrFail(c, &user, idStr, "User") {
+	if !s.findTenantOrFail(c, &user, idStr, "User") {
 		return
 	}
 
@@ -218,7 +229,7 @@ func (s *Server) handleForceLogoutUser(c *gin.Context) {
 
 	currentUser, _ := c.Get("user")
 	var target db.User
-	if !s.findOrFail(c, &target, idStr, "User") {
+	if !s.findTenantOrFail(c, &target, idStr, "User") {
 		return
 	}
 
@@ -268,7 +279,7 @@ func (s *Server) handleDeleteUser(c *gin.Context) {
 	}
 
 	var user db.User
-	if !s.findOrFail(c, &user, idStr, "User") {
+	if !s.findTenantOrFail(c, &user, idStr, "User") {
 		return
 	}
 
@@ -333,7 +344,14 @@ func (s *Server) handleSetUserPassword(c *gin.Context) {
 		respondError(c, http.StatusBadRequest, "invalid user ID")
 		return
 	}
-	result := s.db.Model(&db.User{}).Where("id = ?", id).Update("password_hash", hash)
+	// Tenant scope the target before touching it: the old direct update by id
+	// let a tenant-1 admin reset a tenant-2 user's password and sign in as
+	// them.
+	var target db.User
+	if !s.findTenantOrFail(c, &target, strconv.FormatUint(id, 10), "User") {
+		return
+	}
+	result := s.db.Model(&db.User{}).Where("id = ?", target.ID).Update("password_hash", hash)
 	if result.Error != nil {
 		respondError(c, http.StatusInternalServerError, "Database error")
 		return
