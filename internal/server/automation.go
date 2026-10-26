@@ -287,7 +287,7 @@ func (s *Server) executeWebhook(params struct {
 	Headers map[string]string `json:"headers"`
 	Secret  string            `json:"secret"`
 }, evt Event) {
-	if err := validateWebhookURL(params.URL); err != nil {
+	if err := webhookTargetValidator(params.URL); err != nil {
 		slog.Error("Automation: webhook URL rejected", "error", err)
 		return
 	}

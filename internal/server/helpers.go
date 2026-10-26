@@ -534,6 +534,11 @@ func validateFilePath(filePath, baseDir string) error {
 }
 
 // validateWebhookURL checks that a webhook URL does not target private/internal IPs.
+// webhookTargetValidator is the SSRF gate for outbound webhook deliveries.
+// It is a var so tests can point a delivery at a local receiver; production
+// uses validateWebhookURL unchanged (same pattern as releaseAssetsURLFmt).
+var webhookTargetValidator = validateWebhookURL
+
 func validateWebhookURL(rawURL string) error {
 	u, err := url.Parse(rawURL)
 	if err != nil {
