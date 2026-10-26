@@ -157,11 +157,21 @@ func TestRDWebRTCSignalOperatorLoop(t *testing.T) {
 	if frame := readFrame(); frame["type"] != "waiting" {
 		t.Fatalf("offer frame = %+v", frame)
 	}
-	sess.mu.Lock()
-	pending := len(sess.pending)
-	sess.mu.Unlock()
-	if pending != 1 {
-		t.Fatalf("buffered frames = %d, want the offer", pending)
+	// The "waiting" frame is written BEFORE the offer is appended to the
+	// buffer, so reading `pending` straight after the frame is a race. Poll
+	// briefly instead of failing on a scheduler hiccup.
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		sess.mu.Lock()
+		pending := len(sess.pending)
+		sess.mu.Unlock()
+		if pending == 1 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("buffered frames = %d, want the offer", pending)
+		}
+		time.Sleep(5 * time.Millisecond)
 	}
 
 	// An empty SDP is rejected instead of buffered.
