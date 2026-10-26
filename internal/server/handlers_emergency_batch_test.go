@@ -59,6 +59,7 @@ func TestBatchCommandRejectsOversizedCommand(t *testing.T) {
 	body := `{"agent_ids":["b1"],"task_type":"shell","command":"` + strings.Repeat("A", MaxCommandLength+1) + `"}`
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
+	c.Set("user_role", db.RoleAdmin)
 	c.Request, _ = http.NewRequest(http.MethodPost, "/api/batch/command", strings.NewReader(body))
 	c.Request.Header.Set("Content-Type", "application/json")
 	s.handleBatchCommand(c)
@@ -88,6 +89,7 @@ func TestBatchCommandHonorsPerAgentPendingGate(t *testing.T) {
 	body := `{"agent_ids":["` + agentID + `"],"task_type":"shell","command":"whoami"}`
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
+	c.Set("user_role", db.RoleAdmin)
 	c.Request, _ = http.NewRequest(http.MethodPost, "/api/tasks/command", strings.NewReader(body))
 	c.Request.Header.Set("Content-Type", "application/json")
 	s.handleBatchCommand(c)
@@ -120,6 +122,7 @@ func TestBatchCommandAcceptsWithinLimit(t *testing.T) {
 	body := `{"agent_ids":["b2"],"task_type":"shell","command":"whoami"}`
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
+	c.Set("user_role", db.RoleAdmin)
 	c.Request, _ = http.NewRequest(http.MethodPost, "/api/tasks/command", strings.NewReader(body))
 	c.Request.Header.Set("Content-Type", "application/json")
 	s.handleBatchCommand(c)
@@ -159,6 +162,7 @@ func TestKillSwitchDisarmReclaimsUninstallTasks(t *testing.T) {
 	body := `{"action":"disarm","password":"killpw"}`
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
+	c.Set("user_role", db.RoleAdmin)
 	c.Request, _ = http.NewRequest(http.MethodPost, "/api/killswitch", strings.NewReader(body))
 	c.Request.Header.Set("Content-Type", "application/json")
 	c.Set("user_id", user.ID)
@@ -222,6 +226,7 @@ func TestKillSwitchArmBatchesFleetUninstall(t *testing.T) {
 	body := `{"action":"arm","password":"killpw"}`
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
+	c.Set("user_role", db.RoleAdmin)
 	c.Request, _ = http.NewRequest(http.MethodPost, "/api/killswitch", strings.NewReader(body))
 	c.Request.Header.Set("Content-Type", "application/json")
 	c.Set("user_id", user.ID)

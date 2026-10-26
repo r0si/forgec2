@@ -26,6 +26,7 @@ func TestHandleListCredentials_Empty(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
+	c.Set("user_role", db.RoleAdmin)
 	c.Request, _ = http.NewRequest(http.MethodGet, "/api/credentials", nil)
 
 	s.apiListCredentials(c)
@@ -65,6 +66,7 @@ func TestHandleListCredentials_WithData(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
+	c.Set("user_role", db.RoleAdmin)
 	c.Request, _ = http.NewRequest(http.MethodGet, "/api/credentials", nil)
 
 	s.apiListCredentials(c)
@@ -113,6 +115,7 @@ func TestHandleCreateCredential_Success(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
+	c.Set("user_role", db.RoleAdmin)
 	c.Request, _ = http.NewRequest(http.MethodPost, "/credentials/add", strings.NewReader(form.Encode()))
 	c.Request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
@@ -154,6 +157,7 @@ func TestHandleCreateCredential_MissingFields(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
+	c.Set("user_role", db.RoleAdmin)
 	c.Request, _ = http.NewRequest(http.MethodPost, "/credentials/add", strings.NewReader(form.Encode()))
 	c.Request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
@@ -188,6 +192,7 @@ func TestHandleDeleteCredential_Success(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
+	c.Set("user_role", db.RoleAdmin)
 	c.Request, _ = http.NewRequest(http.MethodDelete, "/credentials/1", nil)
 	c.Params = gin.Params{{Key: "cred_id", Value: "1"}}
 
@@ -218,6 +223,7 @@ func TestHandleDeleteCredential_NotFound(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
+	c.Set("user_role", db.RoleAdmin)
 	c.Request, _ = http.NewRequest(http.MethodDelete, "/credentials/99999", nil)
 	c.Params = gin.Params{{Key: "cred_id", Value: "99999"}}
 
@@ -244,6 +250,7 @@ func TestHandleCredentialsPage_AgentIDFilter(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
+	c.Set("user_role", db.RoleAdmin)
 	c.Request, _ = http.NewRequest(http.MethodGet, "/credentials?agent_id=agent-A&limit=1", nil)
 
 	s.handleCredentialsPage(c)
@@ -290,6 +297,7 @@ func TestHandleCredentialsPage_NoAgentFilter(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
+	c.Set("user_role", db.RoleAdmin)
 	c.Request, _ = http.NewRequest(http.MethodGet, "/credentials", nil)
 
 	s.handleCredentialsPage(c)

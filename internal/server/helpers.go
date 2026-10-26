@@ -163,15 +163,40 @@ func (s *Server) requireAdmin(c *gin.Context) bool {
 	return true
 }
 
-// requireOperator checks that the current user has operator or admin role.
-// Returns false and sends a 403 response for viewers.
+// requireOperator checks that the current user holds a role that exists and is
+// not a read-only legacy role. It used to be a blocklist ("viewer" and ""),
+// which meant any unknown or mistyped role string silently gained operator
+// rights; a role must now be a built-in one (admin/user), the legacy
+// "operator" alias that MigrateOldRoles rewrites to "user", or a custom role
+// that actually exists in custom_roles.
 func (s *Server) requireOperator(c *gin.Context) bool {
 	role, _ := c.Get("user_role")
-	if role == "viewer" || role == "" {
+	roleStr, _ := role.(string)
+	if !s.roleGrantsOperator(roleStr) {
 		respondError(c, http.StatusForbidden, "operator role required")
 		return false
 	}
 	return true
+}
+
+// roleGrantsOperator reports whether role may act as an operator. Unknown
+// roles fail closed (a DB error also denies) so a forged or future role name
+// cannot inherit operator rights by default.
+func (s *Server) roleGrantsOperator(role string) bool {
+	switch role {
+	case "", "viewer", "guest":
+		return false
+	case db.RoleAdmin, db.RoleUser, "operator":
+		return true
+	}
+	if s.db == nil {
+		return false
+	}
+	var count int64
+	if err := s.db.Model(&db.CustomRole{}).Where("name = ?", role).Count(&count).Error; err != nil {
+		return false
+	}
+	return count > 0
 }
 
 // findOrFail fetches a record by primary key. Returns true if found, or sends a

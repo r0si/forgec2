@@ -45,6 +45,7 @@ func TestHandleBatchAgentTags_ReturnsTags(t *testing.T) {
 	body, _ := json.Marshal(map[string]interface{}{"agent_ids": []string{agent.ID}})
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
+	c.Set("user_role", db.RoleAdmin)
 	c.Request, _ = http.NewRequest(http.MethodPost, "/agents/batch/tags", bytes.NewReader(body))
 
 	s.handleBatchAgentTags(c)
@@ -74,6 +75,7 @@ func TestHandleAgentTags_ReturnsTags(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
+	c.Set("user_role", db.RoleAdmin)
 	c.Params = gin.Params{{Key: "id", Value: agent.ID}}
 	c.Request, _ = http.NewRequest(http.MethodGet, "/api/agents/"+agent.ID+"/tags", nil)
 
@@ -101,6 +103,7 @@ func TestHandleAPITagDelete_ClearsAssignments(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
+	c.Set("user_role", db.RoleAdmin)
 	c.Params = gin.Params{{Key: "id", Value: tag.ID}}
 	c.Request, _ = http.NewRequest(http.MethodDelete, "/api/tags/"+tag.ID, nil)
 
@@ -121,6 +124,7 @@ func TestHandleAPITagDelete_ClearsAssignments(t *testing.T) {
 func tagCreateContext(body string) (*httptest.ResponseRecorder, *gin.Context) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
+	c.Set("user_role", db.RoleAdmin)
 	c.Request, _ = http.NewRequest(http.MethodPost, "/api/tags", bytes.NewReader([]byte(body)))
 	c.Set("user_role", "operator")
 	return w, c

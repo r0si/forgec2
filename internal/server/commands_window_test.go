@@ -18,6 +18,7 @@ func TestHandleWindowCloseRequiresTarget(t *testing.T) {
 	}
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
+	c.Set("user_role", db.RoleAdmin)
 	c.Params = gin.Params{{Key: "id", Value: "a1"}}
 	c.Request, _ = http.NewRequest(http.MethodPost, "/agents/a1/window/close", nil)
 	s.handleWindowClose(c)
@@ -34,6 +35,7 @@ func TestHandleWindowCloseDispatches(t *testing.T) {
 	}
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
+	c.Set("user_role", db.RoleAdmin)
 	c.Params = gin.Params{{Key: "id", Value: "a1"}}
 	c.Request, _ = http.NewRequest(http.MethodPost, "/agents/a1/window/close", strings.NewReader("command=1234"))
 	c.Request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -58,6 +60,7 @@ func TestHandleWindowListDispatches(t *testing.T) {
 	}
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
+	c.Set("user_role", db.RoleAdmin)
 	c.Params = gin.Params{{Key: "id", Value: "a1"}}
 	c.Request, _ = http.NewRequest(http.MethodPost, "/agents/a1/window/list", nil)
 	s.handleWindowList(c)

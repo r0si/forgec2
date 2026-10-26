@@ -62,6 +62,7 @@ func TestCredentialExportWritesAuditLog(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
+	c.Set("user_role", db.RoleAdmin)
 	c.Request, _ = http.NewRequest(http.MethodGet, "/api/credentials/export", nil)
 
 	s.handleExportCredentials(c)
@@ -94,6 +95,7 @@ func TestCredentialCrudWritesAuditLog(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
+	c.Set("user_role", db.RoleAdmin)
 	c.Request, _ = http.NewRequest(http.MethodPost, "/credentials/add", strings.NewReader(form.Encode()))
 	c.Request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	s.handleAddCredential(c)
@@ -105,6 +107,7 @@ func TestCredentialCrudWritesAuditLog(t *testing.T) {
 
 	w2 := httptest.NewRecorder()
 	c2, _ := gin.CreateTestContext(w2)
+	c2.Set("user_role", db.RoleAdmin)
 	c2.Request, _ = http.NewRequest(http.MethodDelete, "/credentials/"+strconv.FormatUint(uint64(created.ID), 10), nil)
 	c2.Params = gin.Params{{Key: "cred_id", Value: strconv.FormatUint(uint64(created.ID), 10)}}
 	s.handleDeleteCredential(c2)
