@@ -64,7 +64,12 @@ func (s *Server) handleBOFUpload(c *gin.Context) {
 	// Same gates the command-path BOF uploader enforces: extension allowlist
 	// plus magic-byte rejection. The library upload previously accepted ANY
 	// bytes (including PE/MZ binaries) that were later shipped to implants.
-	if err := validateUploadExtension(file.Filename, ".o,.obo"); err != nil {
+	//
+	// The first argument is the allowlist KEY, not the filename: passing
+	// (file.Filename, ".o,.obo") looked up the extension map under the
+	// uploaded name, fell through to the generic text allowlist and rejected
+	// every real upload.
+	if err := validateUploadExtension("bof", file.Filename); err != nil {
 		respondError(c, http.StatusBadRequest, sanitizeError(err, "BOF operation"))
 		return
 	}
@@ -80,7 +85,7 @@ func (s *Server) handleBOFUpload(c *gin.Context) {
 		Data:        data,
 		Size:        file.Size,
 		Description: desc,
-		CreatedBy:   c.GetString("username"),
+		CreatedBy:   c.GetString("user"),
 	}
 
 	if err := s.db.Create(&bof).Error; err != nil {

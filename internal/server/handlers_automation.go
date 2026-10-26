@@ -782,7 +782,7 @@ func (s *Server) handleBOFRepoImport(c *gin.Context) {
 		Data:        data,
 		Size:        int64(len(data)),
 		Description: "Imported from " + req.URL,
-		CreatedBy:   c.GetString("username"),
+		CreatedBy:   c.GetString("user"),
 	}
 	if err := s.db.Create(&bof).Error; err != nil {
 		respondError(c, http.StatusInternalServerError, sanitizeError(err, "BOF operation"))

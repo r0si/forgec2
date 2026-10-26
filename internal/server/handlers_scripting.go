@@ -110,7 +110,7 @@ func (s *Server) handleAPISaveScript(c *gin.Context) {
 			Description: req.Description,
 			Code:        req.Code,
 			Enabled:     true,
-			CreatedBy:   c.GetString("username"),
+			CreatedBy:   c.GetString("user"),
 			CreatedAt:   now,
 			UpdatedAt:   now,
 		}
@@ -225,7 +225,7 @@ func (s *Server) handleAPIExecuteScript(c *gin.Context) {
 	engine := scripting.GetEngine()
 	var result scripting.ExecutionResult
 	caller := scripting.Caller{
-		Username: c.GetString("username"),
+		Username: c.GetString("user"),
 		Role:     c.GetString("user_role"),
 		TenantID: s.currentTenantID(c),
 	}
