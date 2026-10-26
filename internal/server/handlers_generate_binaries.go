@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"strings"
@@ -579,7 +580,10 @@ func (s *Server) handleGenerateEXE(c *gin.Context) {
 	}
 	cfg, err := s.buildImplantConfig(form)
 	if err != nil {
-		respondError(c, http.StatusInternalServerError, err.Error())
+		// Keep the raw error in the log: it names key material and paths, which
+		// must not travel to the client even for an authenticated operator.
+		slog.Error("Implant build setup failed", "err", err)
+		respondError(c, http.StatusInternalServerError, sanitizeError(err, "Implant build"))
 		return
 	}
 	agentsDir := s.extractAgentsDir()
@@ -610,7 +614,10 @@ func (s *Server) handleGenerateDLL(c *gin.Context) {
 	}
 	cfg, err := s.buildImplantConfig(form)
 	if err != nil {
-		respondError(c, http.StatusInternalServerError, err.Error())
+		// Keep the raw error in the log: it names key material and paths, which
+		// must not travel to the client even for an authenticated operator.
+		slog.Error("Implant build setup failed", "err", err)
+		respondError(c, http.StatusInternalServerError, sanitizeError(err, "Implant build"))
 		return
 	}
 	agentsDir := s.extractAgentsDir()
@@ -649,7 +656,10 @@ func (s *Server) handleGenerateLinux(c *gin.Context) {
 	}
 	cfg, err := s.buildImplantConfig(form)
 	if err != nil {
-		respondError(c, http.StatusInternalServerError, err.Error())
+		// Keep the raw error in the log: it names key material and paths, which
+		// must not travel to the client even for an authenticated operator.
+		slog.Error("Implant build setup failed", "err", err)
+		respondError(c, http.StatusInternalServerError, sanitizeError(err, "Implant build"))
 		return
 	}
 	agentsDir := s.extractAgentsDir()
@@ -680,7 +690,10 @@ func (s *Server) handleGenerateMacOS(c *gin.Context) {
 	}
 	cfg, err := s.buildImplantConfig(form)
 	if err != nil {
-		respondError(c, http.StatusInternalServerError, err.Error())
+		// Keep the raw error in the log: it names key material and paths, which
+		// must not travel to the client even for an authenticated operator.
+		slog.Error("Implant build setup failed", "err", err)
+		respondError(c, http.StatusInternalServerError, sanitizeError(err, "Implant build"))
 		return
 	}
 	agentsDir := s.extractAgentsDir()

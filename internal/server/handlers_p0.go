@@ -65,7 +65,10 @@ func (s *Server) handleRPortFwdRelayStart(c *gin.Context) {
 
 	relay := newRPortFwdRelay(s, id, lport, forwardTarget)
 	if err := relay.bind(); err != nil {
-		respondError(c, http.StatusInternalServerError, "failed to bind rportfwd: "+err.Error())
+		// The bind error names the local address and, on some platforms, the
+		// socket state: log it and answer with the sanitized reason instead.
+		slog.Error("rportfwd bind failed", "agent_id", id, "lport", lport, "err", err)
+		respondError(c, http.StatusInternalServerError, sanitizeError(err, "Reverse port forward bind"))
 		return
 	}
 	s.rportfwdListeners[key] = relay

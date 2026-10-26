@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -77,7 +78,10 @@ func (s *Server) handleGeneratePS1(c *gin.Context) {
 
 	regSecretID, regSecretB64, beaconKey, err := s.ensureV3RegSecret(beaconKey, s.currentTenantID(c))
 	if err != nil {
-		respondError(c, http.StatusInternalServerError, err.Error())
+		// Keep the raw error in the log: it names key material and paths, which
+		// must not travel to the client even for an authenticated operator.
+		slog.Error("Registration secret setup failed", "err", err)
+		respondError(c, http.StatusInternalServerError, sanitizeError(err, "Registration secret"))
 		return
 	}
 
@@ -224,7 +228,10 @@ func (s *Server) handleGenerateOneLiner(c *gin.Context) {
 
 	regSecretID, regSecretB64, beaconKey, err := s.ensureV3RegSecret(beaconKey, s.currentTenantID(c))
 	if err != nil {
-		respondError(c, http.StatusInternalServerError, err.Error())
+		// Keep the raw error in the log: it names key material and paths, which
+		// must not travel to the client even for an authenticated operator.
+		slog.Error("Registration secret setup failed", "err", err)
+		respondError(c, http.StatusInternalServerError, sanitizeError(err, "Registration secret"))
 		return
 	}
 
