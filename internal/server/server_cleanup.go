@@ -298,7 +298,11 @@ func (s *Server) staleThreshold() time.Duration {
 	s.configMu.RLock()
 	d := s.offlineThresholdSecLocked()
 	s.configMu.RUnlock()
-	return time.Duration(d) * StaleThresholdMultiplier
+	// The multiplier applies to the threshold in SECONDS, not to the bare int:
+	// `time.Duration(d) * StaleThresholdMultiplier` yielded nanoseconds, which
+	// made the "stale" band a 180-nanosecond window and classified every agent
+	// older than the offline threshold as offline instead.
+	return time.Duration(d) * StaleThresholdMultiplier * time.Second
 }
 
 // offlineThresholdFor scales the static offline threshold by the agent's own
