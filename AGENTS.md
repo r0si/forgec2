@@ -38,6 +38,27 @@ jsdom 30 set the minimum). Run from `frontend/`:
 - `npx tsc --noEmit` (typecheck)
 - `npm run gen:openapi` regenerates `src/lib/api-schema.d.ts`
 
+## Static gates
+`npm run check` also runs structural guards over the Go source. Each one exists
+because the class of bug it catches was found by hand at least once; do not
+weaken one to make a change pass — fix the change.
+- `check:route-auth` (`scripts/check-route-auth.mjs`) — every mutating route must
+  sit behind `middleware.RequirePermission`/`RequireRole`, or carry a handler-level
+  gate. The intentional public routes (login, session extend/logout, the language
+  setter, the rate-limited phishing landing) are listed with a reason in the script.
+- `check:context-keys` (`scripts/check-context-keys.mjs`) — a gin context key read
+  with `c.Get*` must be written by production code; test-only setters do not count,
+  and `const` key names are resolved.
+- `check:error-sanitization` (`scripts/check-error-sanitization.mjs`) — a 5xx must
+  answer a literal or `sanitizeError(...)`, never a raw `err.Error()`.
+- `check:tx-queries` (`scripts/check-tx-queries.mjs`) — no query through the pool
+  handle inside a transaction block: SQLite is pinned to one connection, so the
+  nested query waits forever and the handler hangs instead of erroring.
+- `TestSuccessEnvelope` / `TestErrorEnvelope` (Go) — ratchets over raw (non-envelope)
+  JSON success and error responses, per file, failing in both directions: a new raw
+  response, or a file that improved without lowering its number. Update the matching
+  `internal/server/envelope*_baseline.txt` in the same commit.
+
 ## Testing
 Backend test suite via CI (`.github/workflows/ci.yml`):
 ```
