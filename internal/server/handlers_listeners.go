@@ -83,7 +83,11 @@ func (s *Server) handleListenerDetail(c *gin.Context) {
 
 	var activeCount int64
 	if err := s.tenantScope(s.db.Model(&db.Implant{}), c).Where("listener_id = ? AND last_seen > ?", listener.ID, time.Now().Add(-ListenerActiveThreshold)).Count(&activeCount).Error; err != nil {
+		// Do not fall through with 0: the detail page renders this as a large
+		// "active" figure, and a failed count would read as a reassuring zero.
 		slog.Error("Failed to count active agents", "err", err)
+		respondError(c, http.StatusInternalServerError, "failed to count active agents")
+		return
 	}
 
 	stats := s.getNavStats(c)
@@ -122,7 +126,11 @@ func (s *Server) handleAPIGetListener(c *gin.Context) {
 
 	var activeCount int64
 	if err := s.tenantScope(s.db.Model(&db.Implant{}), c).Where("listener_id = ? AND last_seen > ?", listener.ID, time.Now().Add(-ListenerActiveThreshold)).Count(&activeCount).Error; err != nil {
+		// Do not fall through with 0: the detail page renders this as a large
+		// "active" figure, and a failed count would read as a reassuring zero.
 		slog.Error("Failed to count active agents", "err", err)
+		respondError(c, http.StatusInternalServerError, "failed to count active agents")
+		return
 	}
 
 	respond(c, gin.H{
