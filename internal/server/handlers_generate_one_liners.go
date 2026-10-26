@@ -337,12 +337,20 @@ func (s *Server) handleGenerateOneLiner(c *gin.Context) {
 		}
 	}
 
-	// Build the download URL from the current request
+	// Build the download URL from the current request. The Host header is
+	// attacker-controlled and ends up inside PowerShell/curl commands the
+	// operator copies: a spoofed value could point the download at another
+	// server or break out of the quoted string, so it is validated first.
 	scheme := "http"
 	if c.Request.TLS != nil {
 		scheme = "https"
 	}
-	baseURL := fmt.Sprintf("%s://%s", scheme, c.Request.Host)
+	requestHost, ok := sanitizeRequestHost(c.Request.Host)
+	if !ok {
+		respondError(c, http.StatusBadRequest, "invalid Host header")
+		return
+	}
+	baseURL := fmt.Sprintf("%s://%s", scheme, requestHost)
 	payloadURL := fmt.Sprintf("%s/payloads/%s/%s", baseURL, payloadID, filename)
 
 	// Generate one-liner variants (verified variants carry the SHA-256 so the

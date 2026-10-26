@@ -567,12 +567,14 @@ func (h *webrtcHub) turnURL(c *gin.Context) (string, error) {
 	h.turnMu.Unlock()
 	// Prefer the host the operator actually used: a public hostname may be
 	// fronted/proxied and need not equal the relay IP. public_ip remains the
-	// fallback when the request has no usable host.
-	if reqHost := strings.TrimSpace(c.Request.Host); reqHost != "" {
+	// fallback when the request has no usable host, and the same Host
+	// validation as the one-liner generator applies (an injected value must not
+	// reach the ICE server list).
+	if reqHost, ok := sanitizeRequestHost(c.Request.Host); ok && reqHost != "" {
 		if hostOnly, _, err := net.SplitHostPort(reqHost); err == nil && hostOnly != "" {
 			host = hostOnly
-		} else if !strings.Contains(reqHost, ":") {
-			host = reqHost
+		} else {
+			host = strings.Trim(reqHost, "[]")
 		}
 	}
 	if port == "" {

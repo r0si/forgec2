@@ -101,6 +101,60 @@ func sanitizeError(err error, context string) string {
 	}
 }
 
+// sanitizeRequestHost validates the Host header before it is embedded in a URL
+// or a generated command. Host is attacker-controlled: an unvalidated value can
+// point a generated one-liner at another server (the operator then downloads
+// and runs an attacker payload) or break out of the quoted string entirely.
+// Accepts hostname[:port] and bracketed IPv6, nothing else.
+func sanitizeRequestHost(raw string) (string, bool) {
+	host := strings.TrimSpace(raw)
+	if host == "" || len(host) > 255 {
+		return "", false
+	}
+	hostOnly, port, err := net.SplitHostPort(host)
+	if err != nil {
+		// No port part. A bare IPv6 literal needs brackets to be unambiguous.
+		if strings.ContainsAny(host, "[]") {
+			if strings.HasPrefix(host, "[") && strings.HasSuffix(host, "]") &&
+				net.ParseIP(strings.Trim(host, "[]")) != nil {
+				return host, true
+			}
+			return "", false
+		}
+		if strings.Contains(host, ":") {
+			return "", false
+		}
+		hostOnly, port = host, ""
+	}
+	if hostOnly == "" {
+		return "", false
+	}
+	if port != "" {
+		n, convErr := strconv.Atoi(port)
+		if convErr != nil || n < 1 || n > 65535 {
+			return "", false
+		}
+	}
+	if net.ParseIP(hostOnly) == nil {
+		// A hostname: letters, digits, dots and hyphens only. This is what
+		// blocks quotes, spaces, semicolons, '$' and backticks.
+		for _, r := range hostOnly {
+			switch {
+			case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '.', r == '-':
+			default:
+				return "", false
+			}
+		}
+		if strings.HasPrefix(hostOnly, "-") || strings.HasSuffix(hostOnly, "-") {
+			return "", false
+		}
+	}
+	if port != "" {
+		return net.JoinHostPort(hostOnly, port), true
+	}
+	return hostOnly, true
+}
+
 var sanitizeRe = regexp.MustCompile(`[^\w.\-]`)
 
 // registerBoth registers a handler under both /api/<path> and /<path>.
