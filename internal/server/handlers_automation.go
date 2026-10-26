@@ -404,9 +404,18 @@ func (s *Server) handlePluginToggle(c *gin.Context) {
 		respondError(c, http.StatusInternalServerError, "failed to toggle plugin")
 		return
 	}
-	if p.Name != "" {
+	if p.Name != "" && s.pluginManager != nil {
 		if err := s.pluginManager.SetEnabled(p.Name, p.Enabled); err != nil {
+			// The row already carries the new state, but the runtime refused it.
+			// Reporting success would leave the console claiming a state the
+			// manager never adopted, so revert the row and fail the request.
+			revert := !p.Enabled
+			if rbErr := s.db.Model(&db.Plugin{}).Where("id = ?", p.ID).Update("enabled", revert).Error; rbErr != nil {
+				slog.Error("Automation: failed to revert plugin toggle", "plugin_id", p.ID, "error", rbErr)
+			}
 			slog.Error("Automation: failed to set plugin enabled state", "plugin_name", p.Name, "enabled", p.Enabled, "error", err)
+			respondError(c, http.StatusConflict, "plugin manager rejected the change: "+sanitizeError(err, "Plugin toggle"))
+			return
 		}
 	}
 	respond(c, gin.H{"enabled": p.Enabled})
