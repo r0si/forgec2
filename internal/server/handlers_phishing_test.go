@@ -394,13 +394,16 @@ func TestLaunchPhishingCampaignValidation(t *testing.T) {
 	}
 
 	// A second launch while running is refused with "already running"
-	// (claim semantics).
-	if err := s.db.Model(&db.PhishingCampaign{}).Where("id = ?", draft.ID).
-		Update("status", "running").Error; err != nil {
-		t.Fatalf("set running: %v", err)
+	// (claim semantics). Validation now runs before the claim, so the campaign
+	// must have a valid target list — otherwise the request is rejected for the
+	// real reason (no targets) and the running campaign stays untouched.
+	runningCamp := db.PhishingCampaign{Name: "running", TemplateID: tpl.ID, Status: "running",
+		SMTPHost: "127.0.0.1", TargetList: "target@example.test"}
+	if err := s.db.Create(&runningCamp).Error; err != nil {
+		t.Fatalf("seed running campaign: %v", err)
 	}
 	c2, w2 := phishingCtx("operator", "")
-	c2.Params = gin.Params{{Key: "id", Value: uintToStr(draft.ID)}}
+	c2.Params = gin.Params{{Key: "id", Value: uintToStr(runningCamp.ID)}}
 	s.handleAPILaunchPhishingCampaign(c2)
 	if w2.Code != http.StatusBadRequest {
 		t.Fatalf("re-launch: status=%d, want 400", w2.Code)

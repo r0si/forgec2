@@ -350,6 +350,30 @@ func (s *Server) handleAPILaunchPhishingCampaign(c *gin.Context) {
 		return
 	}
 
+	// Validate BEFORE claiming the launch. The claim flips the status to
+	// "running", and the token's purpose is to stop two concurrent requests
+	// from emailing every target twice — but claiming first meant a campaign
+	// that failed validation (no template, no targets, no smtp_host, no
+	// from_email) stayed "running" forever and could never be launched again.
+	var tpl db.PhishingTemplate
+	if camp.TemplateID == 0 || s.db.First(&tpl, camp.TemplateID).Error != nil {
+		respondError(c, http.StatusBadRequest, "campaign template not found")
+		return
+	}
+	targets := parsePhishingTargets(camp.TargetList)
+	if len(targets) == 0 {
+		respondError(c, http.StatusBadRequest, "no valid targets in target_list")
+		return
+	}
+	if camp.SMTPHost == "" {
+		respondError(c, http.StatusBadRequest, "smtp_host is required")
+		return
+	}
+	if tpl.FromEmail == "" {
+		respondError(c, http.StatusBadRequest, "template from_email is required")
+		return
+	}
+
 	// Atomically claim the launch: the old check-then-save let two concurrent
 	// requests both observe "draft" and both start runPhishingCampaign —
 	// emailing every target twice.
@@ -365,21 +389,6 @@ func (s *Server) handleAPILaunchPhishingCampaign(c *gin.Context) {
 		return
 	}
 
-	var tpl db.PhishingTemplate
-	if camp.TemplateID == 0 || s.db.First(&tpl, camp.TemplateID).Error != nil {
-		respondError(c, http.StatusBadRequest, "campaign template not found")
-		return
-	}
-	targets := parsePhishingTargets(camp.TargetList)
-	if len(targets) == 0 {
-		respondError(c, http.StatusBadRequest, "no valid targets in target_list")
-		return
-	}
-	if camp.SMTPHost == "" {
-		respondError(c, http.StatusBadRequest, "smtp_host is required")
-		return
-	}
-
 	s.configMu.RLock()
 	credKey := s.cfg.Crypto.TotpKey
 	s.configMu.RUnlock()
@@ -387,10 +396,6 @@ func (s *Server) handleAPILaunchPhishingCampaign(c *gin.Context) {
 	if err != nil {
 		// fallback: treat as plaintext for legacy rows
 		smtpPass = camp.SMTPPass
-	}
-	if tpl.FromEmail == "" {
-		respondError(c, http.StatusBadRequest, "template from_email is required")
-		return
 	}
 
 	camp.Status = "running"
