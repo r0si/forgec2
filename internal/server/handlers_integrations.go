@@ -81,7 +81,10 @@ func integrationToMap(wh db.WebhookConfig) map[string]interface{} {
 // handleIntegrationsList returns configured integrations from DB plus capability catalog.
 func (s *Server) handleIntegrationsList(c *gin.Context) {
 	var webhooks []db.WebhookConfig
-	if err := s.db.Order("updated_at desc").Limit(200).Find(&webhooks).Error; err != nil {
+	// The integrations view reads the same webhook table as the automation
+	// webhook handlers, so it must apply the same tenant scope: an unscoped
+	// list showed other tenants' targets (and their config secrets).
+	if err := s.tenantScope(s.db, c).Order("updated_at desc").Limit(200).Find(&webhooks).Error; err != nil {
 		slog.Error("Failed to list webhooks for integrations", "err", err)
 	}
 
@@ -175,6 +178,9 @@ func (s *Server) handleIntegrationsCreate(c *gin.Context) {
 		Method:    "POST",
 		Headers:   marshalIntegrationConfig(cfg),
 		Enabled:   enabled,
+		// Stamp the caller's tenant: webhook delivery matches on tenant_id, so
+		// an unstamped row (0) silently never fires for a tenant-scoped event.
+		TenantID:  s.currentTenantID(c),
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -192,7 +198,7 @@ func (s *Server) handleIntegrationsUpdate(c *gin.Context) {
 	}
 	id := c.Param("id")
 	var wh db.WebhookConfig
-	if !s.findOrFail(c, &wh, id, "integration") {
+	if !s.findTenantOrFail(c, &wh, id, "integration") {
 		return
 	}
 	var req struct {
@@ -270,8 +276,15 @@ func (s *Server) handleIntegrationsDelete(c *gin.Context) {
 		return
 	}
 	id := c.Param("id")
-	if err := s.db.Delete(&db.WebhookConfig{}, "id = ?", id).Error; err != nil {
-		respondError(c, http.StatusInternalServerError, sanitizeError(err, "Integration"))
+	// Tenant-scoped delete: an id outside the caller's tenant deletes nothing
+	// and reports 404 instead of silently succeeding.
+	res := s.tenantScope(s.db, c).Delete(&db.WebhookConfig{}, "id = ?", id)
+	if res.Error != nil {
+		respondError(c, http.StatusInternalServerError, sanitizeError(res.Error, "Integration"))
+		return
+	}
+	if res.RowsAffected == 0 {
+		respondError(c, http.StatusNotFound, "integration not found")
 		return
 	}
 	s.LogAuditRecord(c, "delete_integration", "integration", id, "", true, nil)
@@ -284,7 +297,7 @@ func (s *Server) handleIntegrationsToggle(c *gin.Context) {
 	}
 	id := c.Param("id")
 	var wh db.WebhookConfig
-	if !s.findOrFail(c, &wh, id, "integration") {
+	if !s.findTenantOrFail(c, &wh, id, "integration") {
 		return
 	}
 	wh.Enabled = !wh.Enabled
