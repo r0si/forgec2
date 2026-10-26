@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -145,6 +146,11 @@ func (s *Server) handleListenerBeacon(transport, agentID string, reqJSON []byte,
 // callers from both passing the check and exceeding the limit.
 func (s *Server) startExtraListener(l *db.Listener, key, scheme string) error {
 	s.extraListenersMu.Lock()
+	// A Server built without the registry (tests, future constructors) must
+	// not panic on the placeholder insert below.
+	if s.extraListeners == nil {
+		s.extraListeners = make(map[string]io.Closer)
+	}
 	if len(s.extraListeners) >= MaxExtraListeners {
 		s.extraListenersMu.Unlock()
 		return fmt.Errorf("extra listener limit reached (%d)", MaxExtraListeners)

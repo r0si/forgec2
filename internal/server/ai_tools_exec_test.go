@@ -28,7 +28,7 @@ func setupToolExecServer(t *testing.T) *Server {
 	t.Cleanup(func() { _ = sqlDB.Close() })
 	if err := database.AutoMigrate(
 		&db.User{}, &db.Implant{}, &db.Task{}, &db.Listener{}, &db.Alert{}, &db.CredentialEntry{},
-		&db.CommandMacro{},
+		&db.CommandMacro{}, &db.AutomationRule{},
 		&db.AIChatSession{}, &db.AIChatMessage{}, &db.AIChatRun{}, &db.AIChatRunEvent{},
 		&db.AIExecutionIntent{}, &db.AIProviderProfile{}, &db.AIAttachment{},
 		&db.AIKnowledgeCollection{}, &db.AIKnowledgeSource{}, &db.AIKnowledgeChunk{},

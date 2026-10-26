@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/forgec2/forgec2/internal/db"
+	"github.com/google/uuid"
 )
 
 // ── Tool switch (one case per tool) ───────────────────────────────────────
@@ -477,7 +478,10 @@ func (s *Server) executeToolSwitchCtx(reqCtx *aiReqCtx, name string, argsJSON st
 			return `{"error":"command or macro_id required"}`
 		}
 		rule := db.AutomationRule{
-			ID:         fmt.Sprintf("ai-%d", time.Now().UnixNano()),
+			// UUID rather than a UnixNano suffix: the Windows clock can return the
+			// same nanosecond twice, and two AI-created rules from one reply then
+			// collided on the primary key (500, UNIQUE constraint failed).
+			ID:         "ai-" + uuid.NewString(),
 			Name:       p.Name,
 			EventType:  p.EventType,
 			Conditions: "[]",

@@ -19,6 +19,7 @@ import (
 
 	"github.com/forgec2/forgec2/internal/db"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 // validateExternalURL guards server-initiated fetches against SSRF. It accepts
@@ -187,7 +188,9 @@ func (s *Server) handleSaveAutomationRule(c *gin.Context) {
 		return
 	}
 	if rule.ID == "" {
-		rule.ID = fmt.Sprintf("rule_%d", time.Now().UnixNano())
+		// Same clock-collision guard as the AI tool path: two operators saving a
+		// rule in the same tick must not collide on the primary key.
+		rule.ID = "rule_" + uuid.NewString()
 	}
 	// New rules belong to the operator's tenant; the body must not set it.
 	rule.TenantID = s.currentTenantID(c)
