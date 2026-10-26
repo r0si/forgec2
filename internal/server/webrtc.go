@@ -1070,8 +1070,17 @@ func (s *Server) handleRDWebRTCAgent(c *gin.Context) {
 			// Agent state is advisory; forward the display/status text.
 			sess.sendRawToOperator(raw)
 		case "error":
+			// Forward the truncated frame, not the raw one: the cap used to be
+			// applied to a value that was then discarded, so an agent could
+			// relay an error reason up to the whole read limit.
 			if len(msg.Reason) > 512 {
 				msg.Reason = msg.Reason[:512]
+				clipped, marshalErr := json.Marshal(msg)
+				if marshalErr != nil {
+					continue
+				}
+				sess.sendRawToOperator(clipped)
+				continue
 			}
 			sess.sendRawToOperator(raw)
 		case "stop":
