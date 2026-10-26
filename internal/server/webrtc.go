@@ -177,9 +177,15 @@ func (s *webrtcSession) sendRawToAgent(raw []byte) bool {
 	return conn.WriteMessage(websocket.TextMessage, raw) == nil
 }
 
+// attachOperator installs the operator socket and reports whether THIS attach
+// succeeded. It deliberately does not report agent readiness: the caller used to
+// treat the returned bool as "attached", so whenever the browser connected
+// before the agent's signaling socket (the normal order — the operator dials as
+// soon as it has the session, the agent attaches after a round trip) the
+// operator socket was closed immediately and remote desktop never worked.
+// Readiness is queried separately with agentAttached.
 func (s *webrtcSession) attachOperator(conn *websocket.Conn) bool {
 	s.mu.Lock()
-	agentReady := s.agent != nil
 	if s.operator != nil || s.ended {
 		s.mu.Unlock()
 		return false
@@ -187,7 +193,7 @@ func (s *webrtcSession) attachOperator(conn *websocket.Conn) bool {
 	s.operator = conn
 	s.mu.Unlock()
 	s.stopAwaitTimerIfReady()
-	return agentReady
+	return true
 }
 
 // peersReady reports whether both sides of the signaling channel are present.

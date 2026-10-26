@@ -125,8 +125,16 @@ func TestWebRTCSessionSignalingAndTeardown(t *testing.T) {
 	opSrv, opCli := newWSConnPair(t)
 	agSrv, agCli := newWSConnPair(t)
 
-	if ready := sess.attachOperator(opSrv); ready {
-		t.Fatal("operator attach reported the agent ready before it attached")
+	// The operator attaches before the agent: that must succeed (the operator
+	// dials first in the real flow) and must not report the agent as ready.
+	if sess.agentAttached() {
+		t.Fatal("agent reported attached before it attached")
+	}
+	if !sess.attachOperator(opSrv) {
+		t.Fatal("operator attach failed with no agent present")
+	}
+	if sess.agentAttached() {
+		t.Fatal("agent reported attached after an operator-only attach")
 	}
 	if sess.attachOperator(opSrv) {
 		t.Fatal("a second operator attach was accepted")
