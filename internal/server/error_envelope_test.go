@@ -20,11 +20,14 @@ const errorEnvelopeBaselineFile = "envelope_error_baseline.txt"
 
 var rawErrorJSONMarker = "c.JSON(http.Status"
 
-// countRawErrorResponses counts c.JSON(...) calls whose status argument is a
-// 4xx/5xx constant. Success responses are the other test's job.
+// countRawErrorResponses counts c.JSON(...) calls with a 4xx/5xx status that
+// do NOT carry "success". A hand-built body that sets "success": false is
+// envelope-shaped (some carry extra fields such as diagnostics), so counting it
+// would pad the baseline with non-violations and make the ratchet meaningless.
 func countRawErrorResponses(src string) int {
+	lines := strings.Split(src, "\n")
 	n := 0
-	for _, line := range strings.Split(src, "\n") {
+	for i, line := range lines {
 		idx := strings.Index(line, rawErrorJSONMarker)
 		if idx < 0 {
 			continue
@@ -39,6 +42,11 @@ func countRawErrorResponses(src string) int {
 			!strings.HasPrefix(rest, "TooManyRequests") &&
 			!strings.HasPrefix(rest, "ServiceUnavailable") &&
 			!strings.HasPrefix(rest, "RequestEntityTooLarge") {
+			continue
+		}
+		// Scan the call for "success" (the literal may span several lines).
+		window := strings.Join(lines[i:min(i+4, len(lines))], "\n")
+		if strings.Contains(window, "\"success\"") {
 			continue
 		}
 		n++
