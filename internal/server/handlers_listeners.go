@@ -576,11 +576,13 @@ func (s *Server) handleDeleteListener(c *gin.Context) {
 	var agentCount int64
 	if err := s.db.Model(&db.Implant{}).Where("listener_id = ?", id).Count(&agentCount).Error; err != nil {
 		slog.Error("Failed to count listener agents", "listener_id", id, "err", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check agent count"})
+		respondError(c, http.StatusInternalServerError, "failed to check agent count")
 		return
 	}
 	if agentCount > 0 {
+		// Envelope-shaped error that still carries the count the UI shows.
 		c.JSON(http.StatusBadRequest, gin.H{
+			"success":     false,
 			"error":       fmt.Sprintf("Cannot delete listener: %d agents still using this listener", agentCount),
 			"agent_count": agentCount,
 		})
