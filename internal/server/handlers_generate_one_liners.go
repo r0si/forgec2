@@ -394,7 +394,9 @@ func (s *Server) handleServePayload(c *gin.Context) {
 		return
 	}
 	if _, err := os.Stat(payloadPath); os.IsNotExist(err) {
-		c.Status(http.StatusNotFound)
+		// c.String rather than a bare c.Status: an empty body leaves the status
+		// unflushed on a recorder (and gives clients nothing to log).
+		c.String(http.StatusNotFound, "not found")
 		return
 	}
 	serveFileSafe(c, payloadPath, allowedDir, filename)
