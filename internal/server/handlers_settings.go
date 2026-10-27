@@ -594,6 +594,22 @@ func (s *Server) handlePurgeAuditLogs(c *gin.Context) {
 		days = 730
 	}
 	cutoff := time.Now().AddDate(0, 0, -days)
+	scope := s.auditTenantScope(s.db.Model(&db.AuditLog{}), c)
+
+	// Count first so the purge can describe itself: destroying audit history is
+	// exactly the operation that must leave a record of its own.
+	var toPurge int64
+	if err := scope.Where("created_at < ?", cutoff).Count(&toPurge).Error; err != nil {
+		respondError(c, http.StatusInternalServerError, "Failed to count purgable audit logs")
+		return
+	}
+	if toPurge > 0 {
+		// Written before the delete so it cannot be removed by it: the marker is
+		// newer than the cutoff.
+		s.LogAuditRecord(c, "audit_purge", "audit", "",
+			fmt.Sprintf("purged %d audit rows older than %d days", toPurge, days), true, nil)
+	}
+
 	result := s.auditTenantScope(s.db.Model(&db.AuditLog{}), c).
 		Where("created_at < ?", cutoff).Delete(&db.AuditLog{})
 	if result.Error != nil {

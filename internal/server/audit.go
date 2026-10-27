@@ -206,6 +206,9 @@ type auditChainVerdict struct {
 	Checked    int    `json:"checked"`
 	FirstBadID uint   `json:"first_bad_id,omitempty"`
 	Reason     string `json:"reason,omitempty"`
+	// Discontinuities counts purged gaps accepted at the window start (a purge
+	// removes rows by design; it is not tampering).
+	Discontinuities int `json:"discontinuities,omitempty"`
 }
 
 // verifyAuditChain walks the newest `limit` audit rows in id order and checks the
@@ -240,18 +243,28 @@ func (s *Server) verifyAuditChain(limit int) auditChainVerdict {
 
 	expectPrev := anchor
 	checked := 0
+	purgedBoundaries := 0
 	for i := range rows {
 		row := &rows[i]
 		if want := auditEntryHash(row); row.EntryHash != want {
 			return auditChainVerdict{Checked: checked, FirstBadID: row.ID, Reason: "entry content does not match its hash"}
 		}
 		if expectPrev != "" && row.PrevHash != expectPrev {
-			return auditChainVerdict{Checked: checked, FirstBadID: row.ID, Reason: "previous-hash link is broken (row edited, removed or reordered)"}
+			// A gap in the id sequence means rows were removed, and an audit purge
+			// legitimately deletes old rows (scoped per tenant, so the removed ids
+			// are usually not contiguous). Treat the first row after such a gap as
+			// a new anchor; without this the purge endpoint made /ready cry
+			// tampering on its own maintenance.
+			if i == 0 && prev.ID != 0 && prev.ID+1 < row.ID {
+				purgedBoundaries++
+			} else {
+				return auditChainVerdict{Checked: checked, FirstBadID: row.ID, Reason: "previous-hash link is broken (row edited, removed or reordered)"}
+			}
 		}
 		expectPrev = row.EntryHash
 		checked++
 	}
-	return auditChainVerdict{OK: true, Checked: checked}
+	return auditChainVerdict{OK: true, Checked: checked, Discontinuities: purgedBoundaries}
 }
 
 // handleVerifyAuditChain reports whether the audit chain is intact. Read-only:

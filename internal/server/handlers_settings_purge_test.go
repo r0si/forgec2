@@ -170,8 +170,17 @@ func TestPurgeAuditLogsIsTenantScoped(t *testing.T) {
 	if err := s.db.Model(&db.AuditLog{}).Count(&count).Error; err != nil {
 		t.Fatalf("count: %v", err)
 	}
-	if count != 2 {
-		t.Fatalf("%d audit rows remain, want the foreign row and the fresh one", count)
+	// Three rows: the foreign one, the fresh one, and the purge marker the
+	// handler now writes so destroying audit history leaves a record of itself.
+	if count != 3 {
+		t.Fatalf("%d audit rows remain, want the foreign row, the fresh one and the purge marker", count)
+	}
+	var markers int64
+	if err := s.db.Model(&db.AuditLog{}).Where("action = ?", "audit_purge").Count(&markers).Error; err != nil {
+		t.Fatalf("count markers: %v", err)
+	}
+	if markers != 1 {
+		t.Fatalf("purge markers = %d, want 1", markers)
 	}
 	var foreign int64
 	if err := s.db.Model(&db.AuditLog{}).Where("tenant_id = ?", 2).Count(&foreign).Error; err != nil {
