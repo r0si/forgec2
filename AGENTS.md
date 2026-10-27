@@ -79,6 +79,13 @@ by hand at least once; do not weaken one to make a change pass — fix the chang
   find. One direction only, deliberately: 53 documented types are handled by the
   core dispatcher or the C implant rather than by that registry, so demanding a
   handler for every row would fail on legitimate entries.
+- `check:tenant-scope` (`scripts/check-tenant-scope.mjs`) — a query scoped with
+  `tenantScope`/`auditTenantScope` must target a model that **has a tenant column**; those
+  helpers append `WHERE tenant_id = ?`, so scoping a table without one produced
+  `no such column: tenant_id` and answered **500** for every tenant-scoped operator
+  (`agent_status_events` did). The model is resolved from the scope line, its statement, the
+  query destination variable, or the function's only table; a call it cannot resolve is
+  **reported, not guessed**, and a deliberate exception carries `// check:tenant-scope-ok`.
 - `check:docs` (`gen-command-reference.mjs --check` + `gen-capability-matrix.mjs --check`) —
   the generated docs must match their sources: the command reference, and the **generated
   task-inventory block** plus the version stamp in `docs/CAPABILITY_MATRIX.md`. CI runs these
