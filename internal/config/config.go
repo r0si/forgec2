@@ -722,6 +722,14 @@ func Load(path string) (*Config, error) {
 	if err := yaml.Unmarshal(data, cfg); err != nil {
 		return nil, err
 	}
+	// Silently ignoring an unknown key is the dangerous default for a security
+	// product: a typo in a control name ("require_release_signature") is dropped and
+	// the operator believes it is on. Warn with the exact paths - refuse would break
+	// a config written by a newer build.
+	if unknown := UnknownConfigKeys(data); len(unknown) > 0 {
+		slog.Warn("config contains keys this build does not recognise; they were ignored",
+			"path", path, "keys", formatUnknownKeys(unknown), "count", len(unknown))
+	}
 	cfg.ConfigPath = path
 
 	// Container deployments keep the persistent volume at /data while the
