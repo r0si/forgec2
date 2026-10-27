@@ -581,7 +581,12 @@ func (s *Server) performHotUpdate(latest string) error {
 	signingKey := s.cfg.Crypto.UpdateSigningKey
 	requireSig := s.cfg.Crypto.RequireReleaseSignature
 	s.configMu.RUnlock()
-	if strings.TrimSpace(signingKey) != "" {
+	enforceSig, policyErr := updateSignatureEnforced(signingKey, requireSig)
+	if policyErr != nil {
+		os.Remove(newPath)
+		return fail(policyErr)
+	}
+	if enforceSig {
 		sig, err := fetchReleaseSignature(checksumAsset.BrowserDownloadURL)
 		if err != nil {
 			os.Remove(newPath)
@@ -592,9 +597,6 @@ func (s *Server) performHotUpdate(latest string) error {
 			return fail(fmt.Errorf("release signature rejected: %w", err))
 		}
 		slog.Info("Hot update: release signature verified")
-	} else if requireSig {
-		os.Remove(newPath)
-		return fail(fmt.Errorf("hot update refused: crypto.require_release_signature is set but crypto.update_signing_key is empty"))
 	} else {
 		slog.Warn("Hot update without release signature: set crypto.update_signing_key (and crypto.require_release_signature=true) to require signed releases")
 	}
