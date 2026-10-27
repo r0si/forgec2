@@ -47,7 +47,9 @@ func ObfuscatePowerShellSource(code string, opts PSObfuscateOptions) string {
 		out = scrubTriggers(out, newRand(opts))
 	}
 	if opts.VarRename {
-		out = renameVariables(out, newRand(opts))
+		// Quote-aware: renaming "$x" inside a single-quoted literal changes the
+		// payload's behaviour, because PowerShell does not expand variables there.
+		out = renameVariablesOutsideSingleQuotes(out, newRand(opts))
 	}
 	if opts.StringSplit {
 		out = splitStrings(out, newRand(opts))
