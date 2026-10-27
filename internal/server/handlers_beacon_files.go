@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"path/filepath"
 
 	"github.com/forgec2/forgec2/internal/db"
 )
@@ -13,7 +12,11 @@ import (
 // saveFileChunk writes a base64-encoded file chunk to disk for upload/download
 // results. Returns true if the caller should skip normal task-result processing.
 func saveFileChunk(s *Server, uuid string, task *db.Task, r taskResult, logPrefix string, resultPrefix string) bool {
-	uploadBase := safeJoin(filepath.Join(s.rawDataDir(), "uploads"), uuid)
+	uploadsRoot, rootErr := s.uploadsRootDir()
+	if rootErr != nil {
+		return s.failUploadTask(nil, task, "server.data_dir is not configured; refusing to write the chunk relative to the working directory")
+	}
+	uploadBase := safeJoin(uploadsRoot, uuid)
 	if uploadBase == "" {
 		slog.Error("Invalid agent ID for upload path", "agent_id", uuid)
 		task.Result = "ERROR: invalid agent id"
