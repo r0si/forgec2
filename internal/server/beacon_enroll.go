@@ -24,6 +24,13 @@ func blockedReasonSuffix(reason string) string {
 	return " (" + reason + ")"
 }
 
+// processAgentRegistration enrolls or refreshes an implant row.
+//
+// The returned bool reports whether the agent is NEW; it is NOT a success flag.
+// A refusal (blocked implant, ghost registration, failed write) returns a
+// zero-value implant with an empty ID, which is what the beacon path checks.
+// Keeping the two signals apart matters: treating false as "rejected" would
+// drop every returning agent's beacon.
 func (s *Server) processAgentRegistration(req beaconRequest, publicIP string, now time.Time) (db.Implant, bool) {
 	req.Info = sanitizeInfo(req.Info)
 	// C + Go implants send hostname/username/ip base64 with encoding=base64.
