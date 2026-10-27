@@ -205,7 +205,10 @@ func normalizeLsResult(raw string) string {
 
 // executeTaskCallback POSTs task completion results to the configured callback URL.
 func (s *Server) executeTaskCallback(task db.Task, agentID string) {
-	if err := validateWebhookURL(task.CallbackURL); err != nil {
+	// Same SSRF gate as webhook delivery (and the same test seam): a callback
+	// carries command output to an operator-supplied URL, so it must never be
+	// the one outbound path that skips the address policy.
+	if err := webhookTargetValidator(task.CallbackURL); err != nil {
 		slog.Error("Callback URL rejected by SSRF filter", "task_id", task.ID, "url", task.CallbackURL, "error", err)
 		return
 	}
