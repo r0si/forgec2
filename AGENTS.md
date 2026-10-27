@@ -108,6 +108,15 @@ by hand at least once; do not weaken one to make a change pass — fix the chang
   agent handler implements", and a comment cannot enforce that. It also rejects a malformed
   technique id. Measured when added: 32 techniques, 28 mapped, 4 honestly uncovered, 0 unknown
   types.
+- `check:runtime-paths` (`scripts/check-runtime-paths.mjs`) — a file operation in server code
+  must not start from a path relative to the **process working directory**. This shape shipped
+  five times with five different symptoms: hosted payloads and uploads wrote a relative
+  `payloads`/`uploads` directory (files next to wherever the binary started, cleanup scanning
+  another tree), the ACME handler put a TLS **private key** there, build output resolved to
+  `<cwd>/agents`, `GET /api/docs/openapi.yaml` answered 500 in every release (the archives ship
+  no `api/` directory), and plugin **quarantine** moved deleted sources into `<cwd>/data`. The
+  implant is exempt: absolute host paths (`/etc/hosts`, `/proc/<pid>`) are the point. A
+  deliberate relative path carries a reason in the script's ALLOWLIST.
 - `check:docs` (`gen-command-reference.mjs --check` + `gen-capability-matrix.mjs --check`) —
   the generated docs must match their sources: the command reference, and the **generated
   task-inventory block** plus the version stamp in `docs/CAPABILITY_MATRIX.md`. CI runs these

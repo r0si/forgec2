@@ -435,7 +435,14 @@ func (s *Server) handlePluginDelete(c *gin.Context) {
 
 	if p.Name != "" && s.pluginManager != nil {
 		pluginDir := s.pluginManager.PluginDir(p.Name)
-		quarantineDir := filepath.Join("data", "quarantine", "plugins", p.Name)
+		// Quarantine under the CONFIGURED data directory: the hardcoded "data" was relative
+		// to the process working directory, so a deleted plugin's source was moved somewhere
+		// else entirely, and any cleanup walking the configured tree never saw it.
+		quarantineRoot := s.rawDataDir()
+		if quarantineRoot == "" {
+			quarantineRoot = "data"
+		}
+		quarantineDir := filepath.Join(quarantineRoot, "quarantine", "plugins", p.Name)
 		if pluginDir != "" {
 			if _, statErr := os.Stat(pluginDir); statErr == nil {
 				if mkErr := os.MkdirAll(filepath.Dir(quarantineDir), 0o755); mkErr != nil {
