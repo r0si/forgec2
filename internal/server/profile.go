@@ -451,7 +451,7 @@ func (s *Server) extractPlacedBody(c *gin.Context) []byte {
 			return nil
 		}
 		var steps []malleable.Transform
-		for _, st := range malleable.ParseWire(chain) {
+		for _, st := range malleable.ParseWireCached(chain) {
 			steps = append(steps, malleable.Transform{Type: st.Type, Value: st.Value})
 		}
 		decoded := []byte(encoded)
