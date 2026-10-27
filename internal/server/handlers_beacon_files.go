@@ -72,6 +72,10 @@ func saveFileChunk(s *Server, uuid string, task *db.Task, r taskResult, logPrefi
 		slog.Warn("Oversized exfil chunk rejected", "agent_id", uuid, "task_id", task.ID, "size", len(decoded))
 		return true
 	}
+	// Remember the link this chunk is about to replace: every local failure below
+	// (invalid offset, open/seek/write error) rolls it back, so a transient disk problem
+	// cannot advance the chain and poison the rest of the upload.
+	chainPrev := s.chainLinkFor(task.ID)
 	if err := s.verifyAndCommitChain(uuid, task.ID, r.MAC, decoded); err != nil {
 		task.Result = fmt.Sprintf("ERROR: %v", err)
 		_ = s.encryptTaskFieldsOrBlank(task)
@@ -103,6 +107,7 @@ func saveFileChunk(s *Server, uuid string, task *db.Task, r taskResult, logPrefi
 			slog.Error("Failed to save offset error", "task_id", task.ID, "error", saveErr)
 		}
 		slog.Warn("File chunk rejected: invalid offset", "agent_id", uuid, "task_id", task.ID, "offset", off)
+		s.rollbackChainLink(task.ID, chainPrev)
 		return true
 	}
 	openFlags := os.O_CREATE | os.O_WRONLY
@@ -122,6 +127,7 @@ func saveFileChunk(s *Server, uuid string, task *db.Task, r taskResult, logPrefi
 		}).Error; saveErr != nil {
 			slog.Error("Failed to save open file error", "task_id", task.ID, "error", saveErr)
 		}
+		s.rollbackChainLink(task.ID, chainPrev)
 		return true
 	}
 	defer f.Close()
@@ -138,6 +144,7 @@ func saveFileChunk(s *Server, uuid string, task *db.Task, r taskResult, logPrefi
 			}).Error; err != nil {
 				slog.Error("Failed to save "+logPrefix+" seek error", "task_id", task.ID, "error", err)
 			}
+			s.rollbackChainLink(task.ID, chainPrev)
 			return true
 		}
 	}
@@ -153,6 +160,7 @@ func saveFileChunk(s *Server, uuid string, task *db.Task, r taskResult, logPrefi
 		}).Error; err != nil {
 			slog.Error("Failed to save "+logPrefix+" write error", "task_id", task.ID, "error", err)
 		}
+		s.rollbackChainLink(task.ID, chainPrev)
 		return true
 	}
 	task.Result = fmt.Sprintf("%s: %s offset %d (%d bytes)", resultPrefix, filename, off, r.Size)
