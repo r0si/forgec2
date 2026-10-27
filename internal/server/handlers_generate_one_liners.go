@@ -299,8 +299,30 @@ func (s *Server) handleGenerateOneLiner(c *gin.Context) {
 		return
 	}
 
-	// Copy the payload to the hosted payloads directory for download
-	payloadsDir := filepath.Join(s.rawDataDir(), "payloads")
+	// Validate the request Host BEFORE anything touches the filesystem: it is
+	// attacker-controlled and ends up inside the PowerShell/curl commands, and the
+	// previous order wrote the hosted payload first and only then rejected a spoofed
+	// Host - leaving a directory behind for every rejected request.
+	scheme := "http"
+	if c.Request.TLS != nil {
+		scheme = "https"
+	}
+	requestHost, ok := sanitizeRequestHost(c.Request.Host)
+	if !ok {
+		s.logBuild(format, "oneliner", form.C2URL, form.ListenerID, filename, "failed", "invalid Host header", "")
+		respondError(c, http.StatusBadRequest, "invalid Host header")
+		return
+	}
+
+	// Copy the payload to the hosted payloads directory for download. The helper refuses
+	// an empty data_dir rather than writing a RELATIVE "payloads" directory next to
+	// whatever cwd the process started in.
+	payloadsDir, err := s.hostedPayloadsDir()
+	if err != nil {
+		s.logBuild(format, "oneliner", form.C2URL, form.ListenerID, filename, "failed", "build error", "")
+		respondError(c, http.StatusInternalServerError, sanitizeError(err, "Payload generation"))
+		return
+	}
 	if err := os.MkdirAll(payloadsDir, 0750); err != nil {
 		s.logBuild(format, "oneliner", form.C2URL, form.ListenerID, filename, "failed", "build error", "")
 		respondError(c, http.StatusInternalServerError, sanitizeError(err, "Payload generation"))
@@ -337,19 +359,8 @@ func (s *Server) handleGenerateOneLiner(c *gin.Context) {
 		}
 	}
 
-	// Build the download URL from the current request. The Host header is
-	// attacker-controlled and ends up inside PowerShell/curl commands the
-	// operator copies: a spoofed value could point the download at another
-	// server or break out of the quoted string, so it is validated first.
-	scheme := "http"
-	if c.Request.TLS != nil {
-		scheme = "https"
-	}
-	requestHost, ok := sanitizeRequestHost(c.Request.Host)
-	if !ok {
-		respondError(c, http.StatusBadRequest, "invalid Host header")
-		return
-	}
+	// Build the download URL from the request; the Host was validated above, before the
+	// payload was written.
 	baseURL := fmt.Sprintf("%s://%s", scheme, requestHost)
 	payloadURL := fmt.Sprintf("%s/payloads/%s/%s", baseURL, payloadID, filename)
 

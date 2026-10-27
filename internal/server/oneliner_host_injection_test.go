@@ -57,6 +57,9 @@ func TestSanitizeRequestHost(t *testing.T) {
 // download URL (and therefore the generated commands) from an injected Host.
 func TestOneLinerRejectsSpoofedHost(t *testing.T) {
 	s := mustTenantServer(t)
+	// Hosted payloads need a writable data dir; without one the handler now refuses
+	// instead of writing a relative "payloads" directory into the package tree.
+	s.cfg.Server.DataDir = t.TempDir()
 	seedMissingAPIAdmin(t, s)
 	if err := s.db.Create(&db.Listener{Name: "ol", Scheme: "http", Host: "0.0.0.0", Port: 8080, Enabled: true}).Error; err != nil {
 		t.Fatal(err)

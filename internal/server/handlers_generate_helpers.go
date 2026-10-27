@@ -231,7 +231,10 @@ func (s *Server) rawDataDir() string {
 // http.ServeContent, so interrupted downloads can resume with curl -C - while
 // the payload is retained.
 func (s *Server) cleanupOldPayloads() {
-	payloadsDir := filepath.Join(s.rawDataDir(), "payloads")
+	payloadsDir, err := s.hostedPayloadsDir()
+	if err != nil {
+		return
+	}
 	entries, err := os.ReadDir(payloadsDir)
 	if err != nil {
 		return
