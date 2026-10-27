@@ -91,6 +91,7 @@ func (s *Server) registerReconRoutes(auth *gin.RouterGroup) {
 		auditRead.GET("/audit", s.handleAuditLogPage)
 		auditRead.GET("/audit/logs", s.handleGetAuditLogs)
 		auditRead.GET("/audit/verify", s.handleVerifyAuditChain)
+		auditRead.GET("/audit/export", s.handleExportAuditChain)
 	}
 }
 

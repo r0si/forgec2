@@ -89,6 +89,28 @@ Current timeouts, and where they live:
 | `socksRelayEngine` connections | `cleanupStaleSocks` ticker | 5 min |
 | `socksRelayEngine` control/rportfwd queues | cleared by `stopSession` | — |
 
+## Audit chain
+The audit log is a hash chain (`auditEntryHash`, `PrevHash` -> `EntryHash`).
+Three things are easy to get wrong here:
+
+- **Never state that it detects a full rewrite.** The hash is unkeyed, the
+  algorithm is public and PrevHash is not part of the entry hash, so it detects
+  **partial** edits (one row changed, a row removed, a link rewritten) - the shape
+  an operator or a compromised account produces through the app or a DB client. An
+  attacker with write access who recomputes every hash is **not** detected; that
+  would need a keyed MAC or an external anchor.
+- **Anything that deletes rows must leave a marker.** handlePurgeAuditLogs
+  writes an `audit_purge` record before deleting, and `verifyAuditChain` accepts a
+  discontinuity only at the window start when the id sequence has a gap - a
+  legitimate purge must not make /ready cry tampering, and an interior deletion
+  must still fail.
+- **Keep an out-of-band copy.** GET /api/audit/export streams NDJSON with every
+  hashed field plus both hashes, so a third party can verify offline; a later
+  rewrite of the whole table cannot match their copy.
+
+/ready reports checks.audit_chain and a warnings entry when verification
+fails, but deliberately stays **ready**: a tampered log is an alarm about the past.
+
 ## Testing
 Backend test suite via CI (`.github/workflows/ci.yml`):
 ```

@@ -1,8 +1,10 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -196,10 +198,63 @@ func (s *Server) flushAuditEntriesSync(entries []db.AuditLog) {
 	s.sendToSIEM(entries)
 }
 
-// auditEntryHash computes the tamper-evident chain hash for one entry.
-// TenantID is deliberately NOT part of the chain input: entries written
-// before the column existed hash over the same field set, so adding tenant
-// scoping does not invalidate historical EntryHash values.
+// auditChainExportRow is one machine-verifiable audit row. It carries both hashes
+// and every field the entry hash covers, so a verifier outside this process can
+// recompute the chain without database access.
+type auditChainExportRow struct {
+	ID        uint   `json:"id"`
+	TenantID  uint   `json:"tenant_id"`
+	User      string `json:"user"`
+	Action    string `json:"action"`
+	Resource  string `json:"resource"`
+	AgentID   string `json:"agent_id"`
+	IP        string `json:"ip"`
+	Success   bool   `json:"success"`
+	Error     string `json:"error"`
+	Details   string `json:"details"`
+	PrevHash  string `json:"prev_hash"`
+	EntryHash string `json:"entry_hash"`
+	CreatedAt string `json:"created_at"`
+}
+
+// handleExportAuditChain streams the chain as newline-delimited JSON so an
+// investigator can verify it offline, and so a copy exists that a later rewrite of
+// the whole table cannot match.
+func (s *Server) handleExportAuditChain(c *gin.Context) {
+	if s == nil || s.db == nil {
+		respondError(c, http.StatusServiceUnavailable, "database is not initialized")
+		return
+	}
+	limit := atoiDefault(c.Query("limit"), 50000)
+	if limit <= 0 || limit > 200000 {
+		limit = 50000
+	}
+	var rows []db.AuditLog
+	if err := s.auditTenantScope(s.db.Model(&db.AuditLog{}), c).
+		Order("id ASC").Limit(limit).Find(&rows).Error; err != nil {
+		respondError(c, http.StatusInternalServerError, "failed to read the audit chain")
+		return
+	}
+
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	for i := range rows {
+		row := auditChainExportRow{
+			ID: rows[i].ID, TenantID: rows[i].TenantID, User: rows[i].User,
+			Action: rows[i].Action, Resource: rows[i].Resource, AgentID: rows[i].AgentID,
+			IP: rows[i].IP, Success: rows[i].Success, Error: rows[i].Error,
+			Details: rows[i].Details, PrevHash: rows[i].PrevHash, EntryHash: rows[i].EntryHash,
+			CreatedAt: rows[i].CreatedAt.UTC().Format(time.RFC3339Nano),
+		}
+		if err := enc.Encode(&row); err != nil {
+			slog.Error("Failed to encode an audit chain row", "id", rows[i].ID, "err", err)
+			return
+		}
+	}
+	c.Header("Content-Disposition", `attachment; filename="forgec2-audit-chain.ndjson"`)
+	c.Data(http.StatusOK, "application/x-ndjson; charset=utf-8", buf.Bytes())
+}
+
 // auditChainVerdict is the result of verifying the tamper-evident audit chain.
 type auditChainVerdict struct {
 	OK         bool   `json:"ok"`
@@ -282,6 +337,10 @@ func (s *Server) handleVerifyAuditChain(c *gin.Context) {
 	respond(c, verdict)
 }
 
+// auditEntryHash computes the tamper-evident chain hash for one entry.
+// TenantID is deliberately NOT part of the chain input: entries written before
+// the column existed hash over the same field set, so adding tenant scoping does
+// not invalidate historical EntryHash values.
 func auditEntryHash(e *db.AuditLog) string {
 	// fmt.Appendf writes the exact same bytes as []byte(fmt.Sprintf(...))
 	// without the intermediate string allocation, so the digest — and the
