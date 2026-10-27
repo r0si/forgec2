@@ -156,10 +156,16 @@ func TestFileChainDowngradeRejected(t *testing.T) {
 	if err := s.verifyAndCommitChain("agent-9", 91, "", []byte("stripped chunk")); err == nil {
 		t.Fatal("stripped MAC mid-transfer must be rejected")
 	}
-	// The reset must clear chain state so a retry restarts from the seed.
+	// A stripped MAC is an active downgrade, not a glitch: the transfer is POISONED,
+	// so a retry is refused until the task lifecycle resets it. Resetting on failure
+	// (the previous behaviour) let the very same chunk through again.
 	macRetry := linkMAC(t, chainKey, make([]byte, 32), chunk1)
+	if err := s.verifyAndCommitChain("agent-9", 91, macRetry, chunk1); err == nil {
+		t.Fatal("a poisoned transfer accepted a retry without an explicit reset")
+	}
+	s.fileChains.reset(91)
 	if err := s.verifyAndCommitChain("agent-9", 91, macRetry, chunk1); err != nil {
-		t.Fatalf("retry after reset should restart from seed: %v", err)
+		t.Fatalf("an explicitly reset transfer should restart from the seed: %v", err)
 	}
 }
 

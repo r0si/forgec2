@@ -39,10 +39,20 @@ type fileChainState struct {
 	mu      sync.Mutex
 	chains  map[uint][]byte
 	touched map[uint]time.Time
+	// broken records transfers that failed a link check. Resetting the chain to zero on
+	// failure was not enough: a replay (or a reordered chunk) failed, the failure
+	// zeroed the state, and the SAME chunk then matched again - so a duplicate could be
+	// accepted repeatedly. A poisoned transfer stays refused until the task lifecycle
+	// calls reset (a new upload task), and the sweep expires the poison with the rest.
+	broken map[uint]time.Time
 }
 
 func newFileChainState() *fileChainState {
-	return &fileChainState{chains: make(map[uint][]byte), touched: make(map[uint]time.Time)}
+	return &fileChainState{
+		chains:  make(map[uint][]byte),
+		touched: make(map[uint]time.Time),
+		broken:  make(map[uint]time.Time),
+	}
 }
 
 // sweep drops chain links idle longer than ttl (abandoned mid-transfer when
@@ -59,6 +69,7 @@ func (fc *fileChainState) sweep(ttl time.Duration) int {
 		if ts.Before(cutoff) {
 			delete(fc.chains, id)
 			delete(fc.touched, id)
+			delete(fc.broken, id)
 			n++
 		}
 	}
@@ -66,7 +77,7 @@ func (fc *fileChainState) sweep(ttl time.Duration) int {
 }
 
 // reset drops chain state for a task (task errored or completed).
-func (fc *fileChainState) reset(taskID uint) {
+func (fc *fileChainState) reset(taskID uint) { // clears the link AND the poisoned mark
 	if fc == nil {
 		return
 	}
@@ -74,6 +85,7 @@ func (fc *fileChainState) reset(taskID uint) {
 	defer fc.mu.Unlock()
 	delete(fc.chains, taskID)
 	delete(fc.touched, taskID)
+	delete(fc.broken, taskID)
 }
 
 // fileChainKey returns the HMAC chain key for an implant (derived from its
@@ -99,51 +111,71 @@ func (s *Server) verifyAndCommitChain(agentID string, taskID uint, expectedHex s
 	if fc == nil {
 		return fmt.Errorf("file chain state not initialized")
 	}
+	chainKey := s.fileChainKey(agentID)
+
+	// EVERYTHING below runs under one lock: the poison check, the legacy downgrade
+	// check, the comparison and the commit. Splitting them let a goroutine pass the
+	// poison check, wait on the lock while another chunk failed and zeroed the chain,
+	// and then match the zero-prev link - four of eight concurrent duplicates were
+	// accepted that way.
+	fc.mu.Lock()
+	defer fc.mu.Unlock()
+
+	if _, poisoned := fc.broken[taskID]; poisoned {
+		s.fileChainNote("poisoned_rejected", taskID, agentID)
+		return fmt.Errorf("file transfer is locked after an integrity failure")
+	}
+
 	if expectedHex == "" {
-		// Legacy agents that don't compute MACs: allow empty MAC only while
-		// the transfer has no chained state. Once a MAC'd chunk committed,
-		// a stripped chunk is a downgrade (a compromised relay parent
-		// dropping MACs to dodge HMAC) and fails closed.
-		fc.mu.Lock()
-		_, chained := fc.chains[taskID]
-		fc.mu.Unlock()
-		if chained {
+		// Legacy agents that don't compute MACs: allow an empty MAC only while the
+		// transfer has no chained state. Once a MAC'd chunk committed, a stripped chunk
+		// is a downgrade (a compromised relay parent dropping MACs to dodge HMAC) and
+		// fails closed.
+		if _, chained := fc.chains[taskID]; chained {
 			s.fileChainNote("downgrade_rejected", taskID, agentID)
 			slog.Warn("File chunk MAC stripped mid-transfer, rejecting", "agent_id", agentID, "task_id", taskID)
-			fc.reset(taskID)
+			delete(fc.chains, taskID)
+			delete(fc.touched, taskID)
+			fc.broken[taskID] = time.Now()
 			return fmt.Errorf("chain MAC stripped mid-transfer")
 		}
 		s.fileChainNote("legacy_bypass", taskID, agentID)
 		return nil
 	}
+
 	want, err := hex.DecodeString(expectedHex)
 	if err != nil || len(want) != 32 {
+		s.poisonTransferLocked(fc, taskID)
 		s.fileChainNote("mismatch", taskID, agentID)
-		fc.reset(taskID)
 		return fmt.Errorf("malformed chain MAC")
 	}
-	chainKey := s.fileChainKey(agentID)
 	if chainKey == nil {
+		s.poisonTransferLocked(fc, taskID)
 		s.fileChainNote("mismatch", taskID, agentID)
-		fc.reset(taskID)
 		return fmt.Errorf("cannot derive file chain key")
 	}
-	fc.mu.Lock()
-	defer fc.mu.Unlock()
+
 	prev := fc.chains[taskID]
 	if prev == nil {
 		prev = make([]byte, 32)
 	}
 	got := crypto.FileChunkMAC(chainKey, prev, chunkData)
 	if subtle.ConstantTimeCompare(got, want) != 1 {
-		delete(fc.chains, taskID)
-		delete(fc.touched, taskID)
+		s.poisonTransferLocked(fc, taskID)
 		s.fileChainNote("mismatch", taskID, agentID)
 		return fmt.Errorf("chunk HMAC mismatch (tampered/reordered chunk)")
 	}
 	fc.chains[taskID] = want
 	fc.touched[taskID] = time.Now()
 	return nil
+}
+
+// poisonTransferLocked marks a transfer unusable until the task lifecycle resets it.
+// Caller holds fc.mu.
+func (s *Server) poisonTransferLocked(fc *fileChainState, taskID uint) {
+	delete(fc.chains, taskID)
+	delete(fc.touched, taskID)
+	fc.broken[taskID] = time.Now()
 }
 
 // chainForPush computes the chain link the agent must verify for a push-upload
