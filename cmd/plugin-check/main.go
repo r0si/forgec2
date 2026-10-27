@@ -1,7 +1,7 @@
 // Command plugin-check validates a ForgeC2 plugin package the way the server
 // loads it: manifest, entry, package digest/signature, tier-specific structure
-// (the WASM ABI surface is inspected with the server's own runtime) and,
-// with -run, one real execution through the server's executor followed by the
+// (the WASM ABI surface is inspected with the server's own runtime) and, with
+// -run, one real execution through the server's executor followed by the
 // output-contract check for the plugin's type.
 //
 // Every finding has a stable code (manifest.invalid, wasm.bad_abi,
@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -27,25 +28,35 @@ import (
 )
 
 func main() {
-	run := flag.Bool("run", false, "execute the plugin once with a sample input after the static checks (only for packages you trust)")
-	input := flag.String("input", "", "raw JSON input for -run (default: the manifest's own defaults)")
-	timeout := flag.Int("timeout", 0, "run timeout in seconds (default: the manifest's)")
-	root := flag.String("root", "", "package tree root anchoring manifest.includes (default: the package directory)")
-	keys := flag.String("key", "", "comma-separated hex Ed25519 public keys for signature verification")
-	requireSigned := flag.Bool("require-signed", false, "fail unsigned packages (mirrors plugins.require_signed)")
-	asJSON := flag.Bool("json", false, "print the machine-readable report instead of text")
-	flag.Parse()
+	os.Exit(runCLI(os.Args[1:], os.Stdout, os.Stderr))
+}
 
-	args := flag.Args()
-	if len(args) == 0 || strings.TrimSpace(args[0]) == "" {
-		usage()
-		os.Exit(2)
+// runCLI is the whole tool behind an io.Writer wall so the exit-code and output
+// contract can be tested without spawning a process (main_test.go).
+func runCLI(args []string, stdout, stderr io.Writer) int {
+	fs := flag.NewFlagSet("plugin-check", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	run := fs.Bool("run", false, "execute the plugin once with a sample input after the static checks (only for packages you trust)")
+	input := fs.String("input", "", "raw JSON input for -run (default: the manifest's own defaults)")
+	timeout := fs.Int("timeout", 0, "run timeout in seconds (default: the manifest's)")
+	root := fs.String("root", "", "package tree root anchoring manifest.includes (default: the package directory)")
+	keys := fs.String("key", "", "comma-separated hex Ed25519 public keys for signature verification")
+	requireSigned := fs.Bool("require-signed", false, "fail unsigned packages (mirrors plugins.require_signed)")
+	asJSON := fs.Bool("json", false, "print the machine-readable report instead of text")
+	if err := fs.Parse(args); err != nil {
+		return 2
 	}
-	dir := strings.TrimSpace(args[0])
+
+	positional := fs.Args()
+	if len(positional) == 0 || strings.TrimSpace(positional[0]) == "" {
+		usage(fs, stderr)
+		return 2
+	}
+	dir := strings.TrimSpace(positional[0])
 	// Go's flag package stops at the first positional argument; accept the
 	// natural `plugin-check ./dir -run` reading order by parsing the rest.
-	if rest := args[1:]; len(rest) > 0 {
-		_ = flag.CommandLine.Parse(rest)
+	if rest := positional[1:]; len(rest) > 0 {
+		_ = fs.Parse(rest)
 	}
 
 	opts := plugin.CheckOptions{
@@ -62,51 +73,53 @@ func main() {
 
 	report := plugin.CheckPlugin(opts)
 	if *asJSON {
-		enc := json.NewEncoder(os.Stdout)
+		enc := json.NewEncoder(stdout)
 		enc.SetIndent("", "  ")
 		if err := enc.Encode(report); err != nil {
-			fmt.Fprintln(os.Stderr, "plugin-check: "+err.Error())
-			os.Exit(1)
+			fmt.Fprintln(stderr, "plugin-check: "+err.Error())
+			return 1
 		}
 	} else {
-		printText(report)
+		printText(stdout, report)
 	}
 	if !report.OK() {
-		os.Exit(1)
+		return 1
 	}
+	return 0
 }
 
-func usage() {
-	fmt.Fprintln(os.Stderr, "usage: plugin-check [flags] <plugin-directory>")
-	fmt.Fprintln(os.Stderr, "flags:")
-	flag.PrintDefaults()
+func usage(fs *flag.FlagSet, stderr io.Writer) {
+	fmt.Fprintln(stderr, "usage: plugin-check [flags] <plugin-directory>")
+	fmt.Fprintln(stderr, "flags:")
+	fs.SetOutput(stderr)
+	fs.PrintDefaults()
 }
 
-func printText(report *plugin.CheckReport) {
+func printText(stdout io.Writer, report *plugin.CheckReport) {
 	if report.Name == "" {
-		fmt.Println(report.Dir)
+		fmt.Fprintln(stdout, report.Dir)
 	} else {
-		fmt.Printf("%s: name=%s version=%s type=%s interpreter=%s entry=%s\n",
+		fmt.Fprintf(stdout, "%s: name=%s version=%s type=%s interpreter=%s entry=%s\n",
 			report.Dir, report.Name, report.Version, report.Type, report.Interpreter, report.Entry)
 	}
 	for _, d := range report.Diagnostics {
-		fmt.Printf("  [%-7s] %-26s %s\n", d.Level, d.Code, d.Message)
+		fmt.Fprintf(stdout, "  [%-7s] %-26s %s\n", d.Level, d.Code, d.Message)
 	}
 	if report.Ran && (report.Stdout != "" || report.Stderr != "") {
-		fmt.Println("  --- run output ---")
+		fmt.Fprintln(stdout, "  --- run output ---")
 		if report.Stdout != "" {
-			fmt.Println("  stdout: " + firstLines(report.Stdout, 8))
+			fmt.Fprintln(stdout, "  stdout: "+firstLines(report.Stdout, 8))
 		}
 		if report.Stderr != "" {
-			fmt.Println("  stderr: " + firstLines(report.Stderr, 8))
+			fmt.Fprintln(stdout, "  stderr: "+firstLines(report.Stderr, 8))
 		}
 	}
 	summary := fmt.Sprintf("%d error(s), %d warning(s)", report.Errors, report.Warnings)
 	if report.OK() {
-		fmt.Println("OK: " + summary)
+		fmt.Fprintln(stdout, "OK: "+summary)
 		return
 	}
-	fmt.Println("FAIL: " + summary)
+	fmt.Fprintln(stdout, "FAIL: "+summary)
 }
 
 // firstLines keeps the terminal honest for plugins that print a wall of text.
