@@ -12,6 +12,35 @@ import (
 // compactToolResultJSON minifies tool output for the model: drop empty
 // fields, no indent, and cap runaway payloads so free/small models don't
 // drown in tokens.
+// buildToolEvent renders the SSE "tool" frame. The frame used to be built with
+// Sprintf, which embedded the tool name and the result unescaped: a model-supplied
+// name containing a quote, or a tool whose output is not JSON (compactToolResultJSON
+// falls back to the raw text), produced an INVALID JSON frame the client could not
+// parse. Non-JSON results are now carried as a JSON string instead.
+func buildToolEvent(id, name, result string) string {
+	type toolEvent struct {
+		ID     string          `json:"id"`
+		Name   string          `json:"name"`
+		Result json.RawMessage `json:"result"`
+	}
+	payload := toolEvent{ID: id, Name: name}
+	if json.Valid([]byte(result)) && result != "" {
+		payload.Result = json.RawMessage(result)
+	} else {
+		quoted, err := json.Marshal(result)
+		if err != nil {
+			payload.Result = json.RawMessage(`""`)
+		} else {
+			payload.Result = json.RawMessage(quoted)
+		}
+	}
+	b, err := json.Marshal(payload)
+	if err != nil {
+		return `{"error":"tool event marshal failed"}`
+	}
+	return string(b)
+}
+
 func compactToolResultJSON(raw string) string {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
