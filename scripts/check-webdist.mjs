@@ -133,6 +133,13 @@ if (stale.length || eolOnly.length) {
     console.error("");
   }
   console.error("Run from repo root:  powershell -File scripts/build-embedded.ps1  (or refresh dist only)");
+  console.error("");
+  console.error("If you did NOT change frontend sources, this is probably a rebuild of a tree with");
+  console.error("uncommitted frontend changes: `npm run build` regenerates frontend/out from the");
+  console.error("working tree, so out/ no longer represents the committed bundle. Restore it");
+  console.error("without touching anyone's work by copying the committed bundle back:");
+  console.error("  Remove-Item -Recurse -Force frontend/out; New-Item -ItemType Directory frontend/out | Out-Null");
+  console.error("  Copy-Item -Recurse -Force internal/webdist/dist/* frontend/out/");
   for (const line of stale.slice(0, 40)) console.error(`  - ${line}`);
   if (stale.length > 40) console.error(`  ... and ${stale.length - 40} more`);
   process.exit(1);

@@ -28,6 +28,14 @@ The frontend is **Vite** (not Next.js).
   - **No two modules may share a basename.** The bundler disambiguates chunk names from the module path, which Windows and Linux spell differently (`pages/traffic/TrafficPage` vs `pages/beacons/detail/traffic/TrafficPage` produced different chunk names on the two platforms). Keep the page components uniquely named (`BeaconTrafficPage`, `BeaconFilesPage`, …).
   - To refresh the committed bundle from a Linux host: dispatch `.github/workflows/webdist-export.yml` (upload-artifact) and replace `internal/webdist/dist` with the artifact — the same way the Linux visual baselines are refreshed.
 
+A local `npm run build` regenerates `frontend/out` from the **working tree**. If anyone has
+uncommitted frontend changes, `out/` stops matching the committed
+`internal/webdist/dist` and `check:webdist` fails — that failure means "out is not the
+committed bundle", not "dist is stale". Restore it by copying the committed bundle back
+(`Remove-Item -Recurse -Force frontend/out`, recreate it, then
+`Copy-Item -Recurse -Force internal/webdist/dist/* frontend/out/`), and do **not** commit a
+dist built from a tree with someone else's work in it.
+
 ## Frontend verification
 Node **24.15+** is the floor (CI and release workflows use `24`; Vitest 5 and
 jsdom 30 set the minimum). Run from `frontend/`:
