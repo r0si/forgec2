@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/forgec2/forgec2/internal/db"
@@ -39,6 +41,45 @@ func (s *Server) webhooksForEvent(evt Event) []db.WebhookConfig {
 	return webhooks
 }
 
+// redactWebhookTarget removes a webhook URL from a message. Webhook targets are
+// frequently secrets in themselves (a Slack incoming-webhook URL is the
+// credential), and a *url.Error stringifies the whole URL - so logging the raw
+// delivery error wrote the token into the log, right below a line that
+// deliberately avoids logging the URL.
+func redactWebhookTarget(msg, rawURL string) string {
+	if rawURL == "" || msg == "" {
+		return msg
+	}
+	return strings.ReplaceAll(msg, rawURL, redactURLForLog(rawURL))
+}
+
+// redactURLForLog keeps the scheme and host (enough to tell endpoints apart) and
+// drops the path and query, which is where the token lives.
+func redactURLForLog(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil || u.Host == "" {
+		return "<webhook-url>"
+	}
+	return u.Scheme + "://" + u.Host + "/<redacted>"
+}
+
+// webhookBackoffSteps is the delay before each retry. webhookMaxRetries must not
+// exceed its length; webhookRetryDelay reuses the last step if it ever does, so a
+// raised constant cannot index out of range at runtime.
+var webhookBackoffSteps = []time.Duration{time.Second, 3 * time.Second, 7 * time.Second}
+
+// webhookRetryDelay returns the delay before the next attempt, reusing the last
+// step if webhookMaxRetries is ever raised past the length of the table.
+func webhookRetryDelay(attempt int) time.Duration {
+	if attempt < 0 {
+		return webhookBackoffSteps[0]
+	}
+	if attempt >= len(webhookBackoffSteps) {
+		return webhookBackoffSteps[len(webhookBackoffSteps)-1]
+	}
+	return webhookBackoffSteps[attempt]
+}
+
 func (s *Server) fireWebhook(wh db.WebhookConfig, evt Event) error {
 	if err := validateWebhookURL(wh.URL); err != nil {
 		// No URL in the log: webhook targets may embed secret tokens.
@@ -57,7 +98,6 @@ func (s *Server) fireWebhook(wh db.WebhookConfig, evt Event) error {
 		return fmt.Errorf("webhook payload marshal failed: %w", err)
 	}
 
-	backoff := []time.Duration{time.Second, 3 * time.Second, 7 * time.Second}
 	for attempt := 0; attempt <= webhookMaxRetries; attempt++ {
 		select {
 		case <-s.ctx.Done():
@@ -84,15 +124,15 @@ func (s *Server) fireWebhook(wh db.WebhookConfig, evt Event) error {
 		resp, err := ssrfSafeClient(s.httpClient).Do(req)
 		if err != nil {
 			if attempt < webhookMaxRetries {
-				slog.Warn("Webhook delivery failed, retrying", "name", wh.Name, "attempt", attempt+1, "error", err)
+				slog.Warn("Webhook delivery failed, retrying", "name", wh.Name, "attempt", attempt+1, "error", redactWebhookTarget(err.Error(), wh.URL))
 				select {
 				case <-s.ctx.Done():
 					return fmt.Errorf("webhook delivery aborted: server shutting down")
-				case <-time.After(backoff[attempt]):
+				case <-time.After(webhookRetryDelay(attempt)):
 				}
 				continue
 			}
-			slog.Error("Webhook delivery failed, exhausted retries", "name", wh.Name, "error", err)
+			slog.Error("Webhook delivery failed, exhausted retries", "name", wh.Name, "error", redactWebhookTarget(err.Error(), wh.URL))
 			return err
 		}
 		resp.Body.Close()
@@ -122,7 +162,7 @@ func (s *Server) fireWebhook(wh db.WebhookConfig, evt Event) error {
 			select {
 			case <-s.ctx.Done():
 				return fmt.Errorf("webhook delivery aborted: server shutting down")
-			case <-time.After(backoff[attempt]):
+			case <-time.After(webhookRetryDelay(attempt)):
 			}
 			continue
 		}
