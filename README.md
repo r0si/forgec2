@@ -197,6 +197,7 @@ first boot and stored in the same file with `0600` permissions.
 - [docs/PLUGIN_AUTHORING.md](docs/PLUGIN_AUTHORING.md) — plugin manifest, tiers and signing
 - [CONTRIBUTING.md](CONTRIBUTING.md) — build, test and release conventions
 - [SECURITY.md](SECURITY.md) — vulnerability disclosure
+- [docs/AUDIT_INTEGRITY.md](docs/AUDIT_INTEGRITY.md) — the audit hash chain: what it proves, and the verify/export/anchor workflow
 - [CHANGELOG.md](CHANGELOG.md) — release history
 
 ## Legal

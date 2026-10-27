@@ -192,6 +192,7 @@ C2 基础设施本身就是高价值目标，所以发布链路的目标是“�
 - [docs/PLUGIN_AUTHORING.md](docs/PLUGIN_AUTHORING.md) —— 插件清单、分级与签名
 - [CONTRIBUTING.md](CONTRIBUTING.md) —— 构建、测试与发版规范
 - [SECURITY.md](SECURITY.md) —— 漏洞披露
+- [docs/AUDIT_INTEGRITY.md](docs/AUDIT_INTEGRITY.md) —— 审计哈希链：能证明什么，以及校验/导出/锚定的操作流程
 - [CHANGELOG.md](CHANGELOG.md) —— 发布历史
 
 ## 法律声明
