@@ -309,12 +309,21 @@ func (s *Server) verifyAuditChain(limit int) auditChainVerdict {
 	if limit <= 0 || limit > 5000 {
 		limit = 1000
 	}
+	// Newest first, then reversed in memory: ORDER BY id ASC LIMIT n returned the
+	// OLDEST n rows, so on any server with more than a window of history the verifier
+	// re-checked the same ancient block forever and recent tampering was never seen -
+	// the opposite of what this function exists for. The walk below still needs
+	// ascending order, and rows[0] must stay the oldest row of the window so the anchor
+	// lookup keeps working.
 	var rows []db.AuditLog
-	if err := s.db.Order("id ASC").Limit(limit).Find(&rows).Error; err != nil {
+	if err := s.db.Order("id DESC").Limit(limit).Find(&rows).Error; err != nil {
 		return auditChainVerdict{Reason: "audit rows could not be read"}
 	}
 	if len(rows) == 0 {
 		return auditChainVerdict{OK: true}
+	}
+	for i, j := 0, len(rows)-1; i < j; i, j = i+1, j-1 {
+		rows[i], rows[j] = rows[j], rows[i]
 	}
 
 	// Anchor: the row immediately before the window (if any).
