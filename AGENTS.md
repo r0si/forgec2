@@ -39,9 +39,12 @@ jsdom 30 set the minimum). Run from `frontend/`:
 - `npm run gen:openapi` regenerates `src/lib/api-schema.d.ts`
 
 ## Static gates
-`npm run check` also runs structural guards over the Go source. Each one exists
-because the class of bug it catches was found by hand at least once; do not
-weaken one to make a change pass — fix the change.
+`npm run check` also runs structural guards over the Go source, and CI runs the
+same set through `npm run check:pre`. They were defined as scripts for a while
+but never added to either task list (`concurrently -n` still listed the labels),
+so they enforced nothing until that wiring was fixed — when you add a gate, add it
+to **both** lists. Each one exists because the class of bug it catches was found
+by hand at least once; do not weaken one to make a change pass — fix the change.
 - `check:route-auth` (`scripts/check-route-auth.mjs`) — every mutating route must
   sit behind `middleware.RequirePermission`/`RequireRole`, or carry a handler-level
   gate. The intentional public routes (login, session extend/logout, the language
@@ -54,6 +57,14 @@ weaken one to make a change pass — fix the change.
 - `check:tx-queries` (`scripts/check-tx-queries.mjs`) — no query through the pool
   handle inside a transaction block: SQLite is pinned to one connection, so the
   nested query waits forever and the handler hangs instead of erroring.
+- `check:command-separators` (`scripts/check-command-separators.mjs`) — a function
+  that joins a task command with `"|"` must validate its fields first
+  (`validateCommandArg` or `credentialCommandHasSeparator`). The implant splits the
+  command on `"|"`, so an unvalidated separator in one field shifts every later
+  field and the task silently means something else. That shipped four times:
+  password_spray re-targeted the domain, cred_check probed the wrong account **and
+  bypassed the lockout fuse**, persistence removed a different entry, uac_bypass
+  ran a different payload. In-memory key builders are allowlisted with a reason.
 - `TestSuccessEnvelope` / `TestErrorEnvelope` (Go) — ratchets over raw (non-envelope)
   JSON success and error responses, per file, failing in both directions: a new raw
   response, or a file that improved without lowering its number. Update the matching

