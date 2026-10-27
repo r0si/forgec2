@@ -54,7 +54,9 @@ func ObfuscatePowerShellSource(code string, opts PSObfuscateOptions) string {
 		out = renameVariablesOutsideSingleQuotes(out, newRand(opts))
 	}
 	if opts.StringSplit {
-		out = splitStrings(out, newRand(opts))
+		// Safe split: the regex version also rewrote single quotes nested inside a
+		// double-quoted string, which changed that string's value.
+		out = splitStringsSafe(out, newRand(opts))
 	}
 	if opts.CaseRandomize {
 		out = randomizeKeywordCase(out, newRand(opts))
@@ -254,27 +256,6 @@ func renameVariables(code string, r *jitterRand) string {
 }
 
 var strLitRegex = regexp.MustCompile(`'[^'\n]{2,32}'`)
-
-func splitStrings(code string, r *jitterRand) string {
-	return strLitRegex.ReplaceAllStringFunc(code, func(m string) string {
-		inner := m[1 : len(m)-1]
-		// Skip things that must stay byte-exact: URLs, paths, format strings.
-		if strings.Contains(inner, "://") || strings.Contains(inner, "\\") ||
-			strings.Contains(inner, "{0}") || strings.Contains(inner, "%s") ||
-			!r.coin(60) {
-			return m
-		}
-		parts := make([]string, 0, len(inner))
-		for _, ch := range inner {
-			s := string(ch)
-			if ch == '\'' {
-				s = "''"
-			}
-			parts = append(parts, "'"+s+"'")
-		}
-		return "(" + strings.Join(parts, "+") + ")"
-	})
-}
 
 // safeKeywords are PowerShell keywords/cmdlets safe to case-randomize
 // (the language is case-insensitive for them, and they never appear as
