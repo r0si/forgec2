@@ -905,6 +905,11 @@ func (s *Server) handleStartScreenMonitor(c *gin.Context) {
 		})
 		return
 	}
+	// Reap dead streams first: a crashed agent must not hold a slot (or be
+	// reported as still streaming) forever.
+	if dropped := s.sweepScreenMonitorsLocked(time.Now()); dropped > 0 {
+		slog.Info("Dropped stale screen monitoring entries", "dropped", dropped)
+	}
 	if len(s.screenMonitorImplants) >= MaxScreenMonitors {
 		s.screenMonitorMu.Unlock()
 		respondError(c, http.StatusTooManyRequests, "screen monitor limit reached")
@@ -1016,11 +1021,45 @@ func (s *Server) handleStopScreenMonitor(c *gin.Context) {
 	respond(c, gin.H{"active": false, "task_id": stopTask.ID})
 }
 
+// screenMonitorStaleAfter is the heartbeat timeout of a screen stream: every
+// frame refreshes the entry, so anything older than this belongs to a stream
+// that died without a stop (agent crash, console closed).
+//
+// Without this maintenance the entry stayed forever, which meant
+// IsScreenMonitoring() kept returning true for a dead stream and saveScreenshot
+// silently refused to persist that agent's screenshots from then on - the
+// operator just saw screenshots stop appearing. Stale entries also counted
+// against MaxScreenMonitors, eventually refusing new streams.
+const screenMonitorStaleAfter = 2 * time.Minute
+
+// sweepScreenMonitorsLocked drops stale stream entries and reports how many were
+// removed. Callers must hold screenMonitorMu.
+func (s *Server) sweepScreenMonitorsLocked(now time.Time) int {
+	cutoff := now.Add(-screenMonitorStaleAfter)
+	dropped := 0
+	for key, lastFrame := range s.screenMonitorImplants {
+		if lastFrame.Before(cutoff) {
+			delete(s.screenMonitorImplants, key)
+			dropped++
+		}
+	}
+	return dropped
+}
+
 func (s *Server) IsScreenMonitoring(agentID string) bool {
 	s.screenMonitorMu.Lock()
 	defer s.screenMonitorMu.Unlock()
-	_, ok := s.screenMonitorImplants[strings.ToLower(agentID)]
-	return ok
+	key := strings.ToLower(agentID)
+	lastFrame, ok := s.screenMonitorImplants[key]
+	if !ok {
+		return false
+	}
+	if time.Since(lastFrame) > screenMonitorStaleAfter {
+		delete(s.screenMonitorImplants, key)
+		slog.Info("Dropped a stale screen monitoring entry", "agent_id", key, "last_frame", lastFrame)
+		return false
+	}
+	return true
 }
 
 func (s *Server) BroadcastScreenshot(agentID string, base64Data string) {
