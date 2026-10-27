@@ -251,6 +251,12 @@ func TestBackupManagerLifecycle(t *testing.T) {
 	}
 
 	bm.Stop()
+	// Stop does not wait for a backup already in flight: the goroutine may be
+	// inside createBackup when the channel closes. Taking runMu here guarantees
+	// it has finished, otherwise t.TempDir's cleanup races a file the goroutine
+	// still holds - which flaked under -coverprofile, where everything is slower.
+	bm.runMu.Lock()
+	bm.runMu.Unlock()
 	bm.mu.Lock()
 	stillRunning := bm.running
 	tickerNil := bm.ticker == nil
