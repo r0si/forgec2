@@ -11,6 +11,15 @@ import (
 	"github.com/forgec2/forgec2/internal/malleable"
 )
 
+// Bounds on the placed-body scan (extractPlacedBody). A real beacon sends one value of a
+// few KiB; the caps exist so an unauthenticated request cannot buy unbounded decode work by
+// carrying thousands of parameters.
+const (
+	maxPlacementCandidates   = 64
+	maxPlacementValueBytes   = 32 << 10
+	maxPlacementDecodeBudget = 256 << 10
+)
+
 // placementsStatInterval bounds how often the cache re-stats the profile file.
 const placementsStatInterval = 200 * time.Millisecond
 

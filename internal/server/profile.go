@@ -471,6 +471,12 @@ func (s *Server) extractPlacedBody(c *gin.Context) []byte {
 		}
 		return nil
 	}
+	// The scan is by value, because the parameter name may rotate per beacon through the
+	// profile's pool - but it is BOUNDED: this endpoint is unauthenticated, and an
+	// unbounded scan let one request carrying thousands of parameters buy thousands of
+	// decode passes before any beacon work happened. A real beacon sends one value.
+	budget := maxPlacementDecodeBudget
+	candidates := 0
 	for _, pl := range pls {
 		kind, name, ok := malleable.ParsePlacementTarget(pl.Target)
 		if !ok {
@@ -478,10 +484,16 @@ func (s *Server) extractPlacedBody(c *gin.Context) []byte {
 		}
 		switch kind {
 		case "query":
-			// Scan every query value: the param name may rotate per
-			// beacon through the profile's parameter pool.
 			for _, vals := range c.Request.URL.Query() {
 				for _, v := range vals {
+					if candidates >= maxPlacementCandidates || budget <= 0 {
+						return nil
+					}
+					candidates++
+					budget -= len(v)
+					if len(v) > maxPlacementValueBytes {
+						continue
+					}
 					if dec := tryDecode(v, pl.Chain); dec != nil {
 						return dec
 					}
@@ -489,8 +501,16 @@ func (s *Server) extractPlacedBody(c *gin.Context) []byte {
 			}
 			_ = name
 		case "cookie":
-			// Same scan-all policy as query for rotated names.
+			// Same bounded scan-all policy as query for rotated names.
 			for _, ck := range c.Request.Cookies() {
+				if candidates >= maxPlacementCandidates || budget <= 0 {
+					return nil
+				}
+				candidates++
+				budget -= len(ck.Value)
+				if len(ck.Value) > maxPlacementValueBytes {
+					continue
+				}
 				if dec := tryDecode(ck.Value, pl.Chain); dec != nil {
 					return dec
 				}
