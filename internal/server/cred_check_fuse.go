@@ -6,6 +6,22 @@ import (
 	"time"
 )
 
+// credentialSeparator is the field separator of the cred_check / password_spray
+// wire format. The implant splits the command on it, so a value containing it
+// shifts every later field.
+const credentialSeparator = '|'
+
+// credentialCommandHasSeparator reports whether any field would break the
+// separator-joined command format.
+func credentialCommandHasSeparator(fields ...string) bool {
+	for _, f := range fields {
+		if strings.ContainsRune(f, credentialSeparator) {
+			return true
+		}
+	}
+	return false
+}
+
 // credCheckFuseMax is the number of consecutive invalid/locked results per
 // (agent, domain) allowed before the server refuses to dispatch further
 // credential checks. Mirrors the agent-side fuse to protect target accounts

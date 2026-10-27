@@ -1276,6 +1276,18 @@ func (s *Server) handleBatchVerifyCredentials(c *gin.Context) {
 			continue
 		}
 
+		// The implant splits this on "|". A stored password containing one (legal,
+		// and common in generated passwords) shifts every later field, so the
+		// check would run against the wrong account or domain — and the fuse that
+		// prevents lockouts keys on the domain the SERVER thinks it is checking.
+		// Skip the entry visibly instead of queueing a task that means something
+		// else.
+		if credentialCommandHasSeparator(entry.Username, entry.Domain, entry.Password) {
+			out.Status = "skipped_separator"
+			out.Error = "value contains the credential separator (|)"
+			outcomes = append(outcomes, out)
+			continue
+		}
 		cmd := entry.Username + "|" + entry.Domain + "|" + entry.Password + "|"
 		task, err := s.createTask(entry.AgentID, "cred_check", cmd, "", "", "", 0, 0, callerOpts(c)...)
 		if err != nil {

@@ -132,6 +132,14 @@ func (s *Server) handleCredCheck(c *gin.Context) {
 		return
 	}
 
+	// Same separator hazard as the spray path, plus a fuse bypass: the lockout
+	// fuse keys on the domain the server parsed, so a "|" that shifts the fields
+	// would make the implant check a different account than the fuse accounts
+	// for. Refuse rather than build a task that means something else.
+	if credentialCommandHasSeparator(user, domain, password, dc) {
+		respondError(c, http.StatusBadRequest, "user, domain, password and dc must not contain the '|' separator")
+		return
+	}
 	cmd := user + "|" + domain + "|" + password + "|" + dc
 	task := s.issueAgentTask(c, id, TaskSpec{Type: "cred_check", Command: cmd})
 	if task == nil {
