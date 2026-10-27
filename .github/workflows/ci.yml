@@ -482,10 +482,14 @@ jobs:
           node ../scripts/gen-capability-matrix.mjs --check
       - run: npx tsc --noEmit
       - run: npm run lint
-      # 9 static checks run concurrently via the bundled `check:pre` script
-      # (package.json) instead of 9 sequential CI steps; `check:bundle` and the
+      # 14 static checks run concurrently via the bundled `check:pre` script
+      # (package.json) instead of 14 sequential CI steps; `check:bundle` and the
       # post-build webdist freshness check stay separate to preserve granularity.
-      - name: Static checks (css/tokens/i18n/paths/dialogs/openapi/perms/layout/readme, concurrent)
+      # The five Go structural gates (route-auth, context-keys,
+      # error-sanitization, tx-queries, command-separators) live in this list:
+      # they were once defined but missing from it, and therefore enforced
+      # nothing.
+      - name: Static checks (css/tokens/i18n/paths/dialogs/openapi/perms/layout/readme + 5 Go gates, concurrent)
         run: npm run check:pre
       - run: npm test
       # Ratcheting floor: today 14.91% of statements in src/ (8473/56846).
