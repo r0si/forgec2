@@ -38,8 +38,10 @@ type BackupManager struct {
 	keyID     string
 	running   bool
 	mu        sync.Mutex
-	ticker    *time.Ticker
-	stopCh    chan struct{}
+	// runMu serialises snapshot creation (scheduled vs manual).
+	runMu  sync.Mutex
+	ticker *time.Ticker
+	stopCh chan struct{}
 	// retain is how many encrypted .fbk snapshots to keep (>=1). The previous
 	// hard-coded 7 made retention a non-operational decision.
 	retain int
@@ -283,6 +285,11 @@ func (bm *BackupManager) createBackup() (string, int64, error) {
 	if !isSQLiteDB(bm.db) {
 		return "", 0, errNonSQLiteBackup
 	}
+	// One backup at a time: a scheduled run and a manual one can overlap, and two
+	// concurrent VACUUM INTO snapshots would fight over the writer and the output
+	// directory.
+	bm.runMu.Lock()
+	defer bm.runMu.Unlock()
 	start := time.Now()
 	slog.Info("Starting database backup")
 
@@ -311,6 +318,15 @@ func (bm *BackupManager) createBackup() (string, int64, error) {
 
 	timestamp := time.Now().Format(backupTimestamp)
 	backupFile := filepath.Join(bm.backupDir, fmt.Sprintf("forgec2_backup_%s.fbk", timestamp))
+	// Two backups can land in the same second (the scheduler fires on Start and a
+	// manual run arrives immediately after). Without a suffix the second rename
+	// overwrites the first on Unix and fails outright on Windows.
+	for i := 2; ; i++ {
+		if _, statErr := os.Stat(backupFile); os.IsNotExist(statErr) {
+			break
+		}
+		backupFile = filepath.Join(bm.backupDir, fmt.Sprintf("forgec2_backup_%s_%d.fbk", timestamp, i))
+	}
 
 	data, err := os.ReadFile(snapshotPath)
 	if err != nil {

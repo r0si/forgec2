@@ -226,14 +226,24 @@ func TestBackupManagerLifecycle(t *testing.T) {
 	if err := bm.PerformBackup(); err != nil {
 		t.Fatalf("PerformBackup: %v", err)
 	}
-	entries, err := os.ReadDir(bm.backupDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	// Start() kicks off an immediate backup in its goroutine, so the manual run
+	// and the scheduled one race to be first; poll rather than assume which one
+	// produced the file.
+	deadline := time.Now().Add(5 * time.Second)
 	found := false
-	for _, e := range entries {
-		if strings.HasSuffix(e.Name(), ".fbk") {
-			found = true
+	for time.Now().Before(deadline) && !found {
+		entries, readErr := os.ReadDir(bm.backupDir)
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		for _, e := range entries {
+			if strings.HasSuffix(e.Name(), ".fbk") {
+				found = true
+				break
+			}
+		}
+		if !found {
+			time.Sleep(10 * time.Millisecond)
 		}
 	}
 	if !found {

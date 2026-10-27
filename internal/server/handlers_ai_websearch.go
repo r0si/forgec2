@@ -29,6 +29,17 @@ var aiWebSearchAllowlist = []string{
 var tagRE = regexp.MustCompile(`<[^>]*>`)
 var wsRE = regexp.MustCompile(`\s+`)
 
+// aiToolErrorJSON renders a tool error payload with proper escaping. The old
+// Sprintf form embedded err.Error() raw, so a message containing a quote (a URL,
+// for example) produced invalid JSON for the tool-result parser.
+func aiToolErrorJSON(msg string) string {
+	b, err := json.Marshal(map[string]string{"error": msg})
+	if err != nil {
+		return `{"error":"internal error"}`
+	}
+	return string(b)
+}
+
 func aiWebSearchAllowedHost(host string) bool {
 	h := strings.ToLower(host)
 	for _, suf := range aiWebSearchAllowlist {
@@ -63,7 +74,7 @@ func (s *Server) executeAIWebSearchTool(reqCtx *aiReqCtx, argsJSON string) strin
 	params.Set("q", q)
 	searchURL := "https://lite.duckduckgo.com/lite/?" + params.Encode()
 	if err := validateExternalURL(searchURL); err != nil {
-		return fmt.Sprintf(`{"error":"search URL blocked: %s"}`, truncateString(err.Error(), 200))
+		return aiToolErrorJSON("search URL blocked: " + truncateString(err.Error(), 200))
 	}
 	if !aiWebSearchAllowedHost("lite.duckduckgo.com") {
 		return `{"error":"search host not allowlisted"}`
@@ -76,7 +87,7 @@ func (s *Server) executeAIWebSearchTool(reqCtx *aiReqCtx, argsJSON string) strin
 	httpReq.Header.Set("Accept", "text/html")
 	resp, err := client.Do(httpReq)
 	if err != nil {
-		return fmt.Sprintf(`{"error":"web search failed: %s"}`, truncateString(err.Error(), 300))
+		return aiToolErrorJSON("web search failed: " + truncateString(err.Error(), 300))
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
