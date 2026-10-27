@@ -69,6 +69,17 @@ func (s *Server) handlePasswordSpray(c *gin.Context) {
 		respondError(c, http.StatusBadRequest, "usernames list is required")
 		return
 	}
+	// The wire format is password|domain|dc|delay, and the implant splits it on
+	// '|'. A separator inside any one field shifts the rest: a password such as
+	// "pa|ss" makes the implant read the domain as "ss" and spray the WRONG
+	// domain, which can lock out accounts in it. Refuse instead of building a
+	// task that silently means something else.
+	for name, value := range map[string]string{"password": password, "domain": domain, "dc": dc, "delay_ms": delayMs} {
+		if strings.ContainsRune(value, '|') {
+			respondError(c, http.StatusBadRequest, name+" must not contain '|'")
+			return
+		}
+	}
 
 	if _, ok := s.getAgentOrFail(c, id); !ok {
 		return
