@@ -58,6 +58,11 @@ func reloadGroups() []reloadGroup {
 		{Token: "webrtc", Mode: reloadStatic},
 		{Token: "protocol", Mode: reloadStatic},
 		{Token: "crypto.update_signing_key", Mode: reloadHot},
+		// Read live per hot-update (performHotUpdate consults the current config), so
+		// no hook is needed - but the token must exist: without it a change was
+		// reported as "unknown token (diffConfig/table drift)" and the reload was
+		// recorded as a failure instead of an applied change.
+		{Token: "crypto.require_release_signature", Mode: reloadHot},
 		{Token: "crypto.backup_key", Mode: reloadStatic},
 		{Token: "crypto.max_decrypted_payload_size", Mode: reloadHot},
 		{Token: "database.driver", Mode: reloadStatic},
