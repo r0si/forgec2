@@ -377,6 +377,10 @@ type BulkResult struct {
 	Skipped   int       `json:"skipped_locked"`
 	Failed    int       `json:"failed"`
 	Operator  string    `json:"operator"`
+	// TenantID scopes the in-memory history: the bulk endpoints returned every
+	// tenant's commands (and their command strings, which can carry credentials)
+	// to any operator with the permission.
+	TenantID uint `json:"tenant_id"`
 }
 
 const maxBulkHistory = 50

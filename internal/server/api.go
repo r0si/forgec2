@@ -508,11 +508,7 @@ func (s *Server) apiBulkResults(c *gin.Context) {
 		return
 	}
 
-	s.bulkHistoryMu.Lock()
-	results := make([]BulkResult, len(s.bulkHistory))
-	copy(results, s.bulkHistory)
-	s.bulkHistoryMu.Unlock()
-
+	results := s.bulkHistoryFor(c)
 	c.JSON(http.StatusOK, gin.H{"success": true, "results": results, "total": len(results)})
 }
 

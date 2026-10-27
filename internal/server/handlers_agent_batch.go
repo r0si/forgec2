@@ -348,6 +348,7 @@ func (s *Server) handleBatchCommand(c *gin.Context) {
 	s.LogAuditRecord(c, "batch_command", "agent", "", fmt.Sprintf("%s to %d agents (%d failed, %d locked-skipped, %d deduped)", req.TaskType, taskCount, failedCount, lockedSkipped, dedupSkipped), true, nil)
 
 	s.pushBulkResult(BulkResult{
+		TenantID:  s.currentTenantID(c),
 		Timestamp: time.Now(),
 		Command:   req.Command,
 		TaskType:  req.TaskType,
@@ -364,6 +365,22 @@ func (s *Server) handleBatchCommand(c *gin.Context) {
 		"locked_skipped": lockedSkipped,
 		"deduped":        dedupSkipped,
 	})
+}
+
+// bulkHistoryFor returns the bulk-command history visible to this caller. The
+// history is process-wide, so it must be filtered by tenant: before this it
+// returned every tenant's rows, including the command strings.
+func (s *Server) bulkHistoryFor(c *gin.Context) []BulkResult {
+	tid := s.currentTenantID(c)
+	s.bulkHistoryMu.Lock()
+	out := make([]BulkResult, 0, len(s.bulkHistory))
+	for _, r := range s.bulkHistory {
+		if tid == 0 || r.TenantID == tid || r.TenantID == 0 {
+			out = append(out, r)
+		}
+	}
+	s.bulkHistoryMu.Unlock()
+	return out
 }
 
 func (s *Server) handleBulkResults(c *gin.Context) {
@@ -396,10 +413,7 @@ func (s *Server) handleBulkResults(c *gin.Context) {
 		pageSize = 100
 	}
 
-	s.bulkHistoryMu.Lock()
-	results := make([]BulkResult, len(s.bulkHistory))
-	copy(results, s.bulkHistory)
-	s.bulkHistoryMu.Unlock()
+	results := s.bulkHistoryFor(c)
 
 	total := len(results)
 	start := (page - 1) * pageSize
