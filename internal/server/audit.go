@@ -268,6 +268,24 @@ type auditChainVerdict struct {
 	Discontinuities int `json:"discontinuities,omitempty"`
 }
 
+// auditHealthCacheTTL bounds how often the UI health endpoint re-walks the chain.
+const auditHealthCacheTTL = time.Minute
+
+// cachedAuditChainVerdict returns a verdict no older than ttl, recomputing it
+// otherwise. Only the UI health view uses the cache; /ready verifies every poll
+// because it is the thing an alert fires on.
+func (s *Server) cachedAuditChainVerdict(ttl time.Duration) auditChainVerdict {
+	s.auditVerdictMu.Lock()
+	defer s.auditVerdictMu.Unlock()
+	if !s.auditVerdictAt.IsZero() && time.Since(s.auditVerdictAt) < ttl {
+		return s.auditVerdict
+	}
+	verdict := s.verifyAuditChain(auditReadyChainWindow)
+	s.auditVerdict = verdict
+	s.auditVerdictAt = time.Now()
+	return verdict
+}
+
 // verifyAuditChain walks the newest `limit` audit rows in id order and checks the
 // two properties the chain exists for: each row's EntryHash still matches its
 // own content, and each row's PrevHash names the previous row's EntryHash.

@@ -746,6 +746,11 @@ func TestSocksCollectPendingFramesRequeuesRemainderLosslessly(t *testing.T) {
 // socksPair returns a real loopback TCP pair: net.Pipe's strict synchrony makes
 // a blocked server write look like a handshake timeout, which is not what these
 // guards are about.
+// socksTestIOTimeout is the liveness window for the loopback SOCKS tests. They wait
+// on real TCP so a loaded CI runner can exceed a tight deadline; the assertions
+// are unchanged, only the patience is larger.
+const socksTestIOTimeout = 15 * time.Second
+
 func socksPair(t *testing.T) (client, server net.Conn) {
 	t.Helper()
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -767,7 +772,7 @@ func socksPair(t *testing.T) (client, server net.Conn) {
 	}
 	select {
 	case server = <-accepted:
-	case <-time.After(5 * time.Second):
+	case <-time.After(socksTestIOTimeout):
 		t.Fatal("no accepted connection")
 	}
 	t.Cleanup(func() { client.Close(); server.Close() })
@@ -783,7 +788,7 @@ func socksGreet(t *testing.T, client net.Conn, version byte, methods ...byte) []
 		t.Fatalf("write greeting: %v", err)
 	}
 	reply := make([]byte, 2)
-	if err := client.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
+	if err := client.SetReadDeadline(time.Now().Add(socksTestIOTimeout)); err != nil {
 		t.Fatalf("deadline: %v", err)
 	}
 	if _, err := io.ReadFull(client, reply); err != nil {
@@ -842,7 +847,7 @@ func TestHandleOperatorConnRejectsBadHandshakes(t *testing.T) {
 
 			tc.drive(t, client)
 			reply := make([]byte, 10)
-			if err := client.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
+			if err := client.SetReadDeadline(time.Now().Add(socksTestIOTimeout)); err != nil {
 				t.Fatalf("deadline: %v", err)
 			}
 			n, err := io.ReadFull(client, reply)
@@ -859,7 +864,7 @@ func TestHandleOperatorConnRejectsBadHandshakes(t *testing.T) {
 			client.Close()
 			select {
 			case <-done:
-			case <-time.After(5 * time.Second):
+			case <-time.After(socksTestIOTimeout):
 				t.Fatal("handleOperatorConn did not return")
 			}
 			// A refused handshake must leave no connection behind.
@@ -898,7 +903,7 @@ func TestHandleOperatorConnConnectQueuesFrameAndRelays(t *testing.T) {
 		t.Fatalf("write request: %v", err)
 	}
 	reply := make([]byte, 10)
-	if err := client.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
+	if err := client.SetReadDeadline(time.Now().Add(socksTestIOTimeout)); err != nil {
 		t.Fatalf("deadline: %v", err)
 	}
 	if _, err := io.ReadFull(client, reply); err != nil {
@@ -918,7 +923,7 @@ func TestHandleOperatorConnConnectQueuesFrameAndRelays(t *testing.T) {
 	if _, err := client.Write([]byte("ping")); err != nil {
 		t.Fatalf("write payload: %v", err)
 	}
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := time.Now().Add(socksTestIOTimeout)
 	var relayed []socksFrame
 	for time.Now().Before(deadline) {
 		relayed = s.socksEngine.collectPendingFrames("agent-1", 0, 0)
@@ -935,7 +940,7 @@ func TestHandleOperatorConnConnectQueuesFrameAndRelays(t *testing.T) {
 	client.Close()
 	select {
 	case <-done:
-	case <-time.After(5 * time.Second):
+	case <-time.After(socksTestIOTimeout):
 		t.Fatal("handleOperatorConn did not return after the operator closed")
 	}
 	s.socksEngine.mu.Lock()
@@ -1011,7 +1016,7 @@ func TestCleanupStaleSocksStopsWithServer(t *testing.T) {
 	cancel()
 	select {
 	case <-done:
-	case <-time.After(5 * time.Second):
+	case <-time.After(socksTestIOTimeout):
 		t.Fatal("cleanupStaleSocks did not return after cancellation")
 	}
 }

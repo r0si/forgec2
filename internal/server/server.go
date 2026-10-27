@@ -218,6 +218,10 @@ type Server struct {
 	// auditAnchorFile records the chain head outside the audit table. Resolved at
 	// startup (initAuditAnchor) because the audit path must not take configMu.
 	auditAnchorFile string
+	// auditVerdict* cache the chain verdict for the UI health endpoint.
+	auditVerdictMu sync.Mutex
+	auditVerdict   auditChainVerdict
+	auditVerdictAt time.Time
 
 	// Backlog metric label hygiene: agents currently exported as per-agent
 	// gauge series, so drained agents can be pruned.

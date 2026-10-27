@@ -534,6 +534,19 @@ func (s *Server) apiHealth(c *gin.Context) {
 		}
 	}
 
+	// Audit chain integrity, cached: the console polls this endpoint, and a full
+	// verification walks rows. /ready stays uncached (it must notice tampering
+	// promptly); the UI view tolerates a minute of staleness.
+	if s != nil && s.db != nil {
+		verdict := s.cachedAuditChainVerdict(auditHealthCacheTTL)
+		health["audit_chain"] = gin.H{
+			"ok":           verdict.OK,
+			"checked":      verdict.Checked,
+			"first_bad_id": verdict.FirstBadID,
+			"reason":       verdict.Reason,
+		}
+	}
+
 	// Backup freshness: an operator (or monitor) should be able to see that the
 	// last snapshot is stale without shelling into the box.
 	if s != nil && s.backupManager != nil {
