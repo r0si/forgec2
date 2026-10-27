@@ -13,19 +13,26 @@ func MigrateProfileJSON(raw []byte, fallbackName string) (*ProfileV2, error) {
 	if err := json.Unmarshal(raw, &probe); err != nil {
 		return nil, fmt.Errorf("profile is not valid JSON: %w", err)
 	}
-	// Already v2 if it carries any v2-only chain or beacon_uris.
+	// v2 detection cannot rely on the key alone: "server_output",
+	// "client_metadata" and "parameter" exist in BOTH shapes. In v1 they are
+	// strings (a wire name such as "base64"); in v2 they are arrays of steps. A
+	// v1 profile was therefore classified as v2, the unmarshal failed on the
+	// string, and the most common legacy profile could not be imported at all.
+	// Parse as v2, and when that fails fall through to the legacy/v1 paths if the
+	// document also carries v1-only keys.
 	if hasAnyKey(probe, "client_metadata", "client_id", "server_output", "beacon_uris", "uris", "parameter") {
 		var v2 ProfileV2
-		if err := json.Unmarshal(raw, &v2); err != nil {
+		if err := json.Unmarshal(raw, &v2); err == nil {
+			if v2.Name == "" {
+				v2.Name = fallbackName
+			}
+			if verr := ValidateProfileV2(&v2); verr != nil {
+				return &v2, verr
+			}
+			return &v2, nil
+		} else if !hasAnyKey(probe, "beacon_uri", "user_agent", "method", "sleep", "jitter", "headers", "placements") {
 			return nil, err
 		}
-		if v2.Name == "" {
-			v2.Name = fallbackName
-		}
-		if err := ValidateProfileV2(&v2); err != nil {
-			return &v2, err
-		}
-		return &v2, nil
 	}
 	// Legacy http_get/http_post blocks?
 	if hasAnyKey(probe, "http_get", "http_post") {
