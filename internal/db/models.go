@@ -221,8 +221,11 @@ type KillSwitch struct {
 
 // Task represents a command/task sent to an agent
 type Task struct {
-	ID       uint   `gorm:"primaryKey" json:"id"`
-	TenantID uint   `gorm:"index" json:"tenant_id"` // multi-tenant isolation (0 = legacy/unscoped)
+	ID uint `gorm:"primaryKey" json:"id"`
+	// The composite index matters for the operator task list: with only the plain
+	// tenant_id index, "WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 50" read
+	// every row of the tenant and sorted it in a TEMP B-TREE on every page load.
+	TenantID uint   `gorm:"index;index:idx_tasks_tenant_created,priority:1" json:"tenant_id"` // multi-tenant isolation (0 = legacy/unscoped)
 	AgentID  string `gorm:"index;index:idx_tasks_agent_status,priority:1;index:idx_tasks_agent_created,priority:1" json:"agent_id"`
 	Type     string `json:"type"`
 	Command  string `json:"command"`
@@ -280,7 +283,7 @@ type Task struct {
 	// on the same agent returns the existing task instead of a duplicate.
 	// Empty = no dedup. Terminal tasks never block reuse of a key.
 	IdempotencyKey string    `gorm:"size:64;index" json:"idempotency_key,omitempty"`
-	CreatedAt      time.Time `gorm:"index;index:idx_tasks_agent_created,priority:2;index:idx_tasks_status_created,priority:2" json:"created_at"`
+	CreatedAt      time.Time `gorm:"index;index:idx_tasks_agent_created,priority:2;index:idx_tasks_status_created,priority:2;index:idx_tasks_tenant_created,priority:2" json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 	Agent          Implant   `gorm:"foreignKey:AgentID" json:"-"`
 }
