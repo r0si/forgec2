@@ -200,6 +200,75 @@ func (s *Server) flushAuditEntriesSync(entries []db.AuditLog) {
 // TenantID is deliberately NOT part of the chain input: entries written
 // before the column existed hash over the same field set, so adding tenant
 // scoping does not invalidate historical EntryHash values.
+// auditChainVerdict is the result of verifying the tamper-evident audit chain.
+type auditChainVerdict struct {
+	OK         bool   `json:"ok"`
+	Checked    int    `json:"checked"`
+	FirstBadID uint   `json:"first_bad_id,omitempty"`
+	Reason     string `json:"reason,omitempty"`
+}
+
+// verifyAuditChain walks the newest `limit` audit rows in id order and checks the
+// two properties the chain exists for: each row's EntryHash still matches its
+// own content, and each row's PrevHash names the previous row's EntryHash.
+//
+// Nothing verified the chain before: six comments call it tamper-evident and the
+// retention floor exists to protect it, but a hand-edited row or a deleted one
+// went unnoticed. The anchor row just before the window supplies the predecessor
+// hash, so the first checked row is verified too.
+func (s *Server) verifyAuditChain(limit int) auditChainVerdict {
+	if s == nil || s.db == nil {
+		return auditChainVerdict{OK: true}
+	}
+	if limit <= 0 || limit > 5000 {
+		limit = 1000
+	}
+	var rows []db.AuditLog
+	if err := s.db.Order("id ASC").Limit(limit).Find(&rows).Error; err != nil {
+		return auditChainVerdict{Reason: "audit rows could not be read"}
+	}
+	if len(rows) == 0 {
+		return auditChainVerdict{OK: true}
+	}
+
+	// Anchor: the row immediately before the window (if any).
+	anchor := ""
+	var prev db.AuditLog
+	if err := s.db.Where("id < ?", rows[0].ID).Order("id DESC").Limit(1).Find(&prev).Error; err == nil && prev.ID != 0 {
+		anchor = prev.EntryHash
+	}
+
+	expectPrev := anchor
+	checked := 0
+	for i := range rows {
+		row := &rows[i]
+		if want := auditEntryHash(row); row.EntryHash != want {
+			return auditChainVerdict{Checked: checked, FirstBadID: row.ID, Reason: "entry content does not match its hash"}
+		}
+		if expectPrev != "" && row.PrevHash != expectPrev {
+			return auditChainVerdict{Checked: checked, FirstBadID: row.ID, Reason: "previous-hash link is broken (row edited, removed or reordered)"}
+		}
+		expectPrev = row.EntryHash
+		checked++
+	}
+	return auditChainVerdict{OK: true, Checked: checked}
+}
+
+// handleVerifyAuditChain reports whether the audit chain is intact. Read-only:
+// it exists so an investigator can prove the log was not edited after the fact.
+func (s *Server) handleVerifyAuditChain(c *gin.Context) {
+	verdict := s.verifyAuditChain(atoiDefault(c.Query("limit"), 1000))
+	if verdict.OK {
+		respond(c, verdict)
+		return
+	}
+	// A broken chain is a finding, not a server error: answer 200 with ok=false
+	// so the console can render it, and record it.
+	slog.Error("Audit chain verification failed", "first_bad_id", verdict.FirstBadID, "reason", verdict.Reason)
+	s.LogAuditRecord(c, "audit_chain_verify", "audit", "", fmt.Sprintf("chain verification FAILED at row %d: %s", verdict.FirstBadID, verdict.Reason), false, nil)
+	respond(c, verdict)
+}
+
 func auditEntryHash(e *db.AuditLog) string {
 	// fmt.Appendf writes the exact same bytes as []byte(fmt.Sprintf(...))
 	// without the intermediate string allocation, so the digest — and the
