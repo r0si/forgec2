@@ -11,6 +11,7 @@ import (
 	"github.com/forgec2/forgec2/internal/db"
 	"github.com/forgec2/forgec2/internal/scripting"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 func (s *Server) loadScriptsFromDB() {
@@ -26,7 +27,7 @@ func (s *Server) loadScriptsFromDB() {
 
 func (s *Server) handleScriptingPage(c *gin.Context) {
 	stats := s.getNavStats(c)
-	scripts, err := s.listScriptsFromDB()
+	scripts, err := s.listScriptsFromDB(c)
 	if err != nil {
 		handleQueryError(c, err, "Failed to list scripts")
 		return
@@ -43,9 +44,31 @@ func (s *Server) handleScriptingPage(c *gin.Context) {
 	s.renderPageOrJSON(c, data)
 }
 
-func (s *Server) listScriptsFromDB() ([]scripting.Script, error) {
+// scriptScope restricts script rows to the caller's tenant. The scripts table has no tenant
+// column, so ownership runs through the creator: a script belongs to the users of the tenant that
+// created it. A failed tenant lookup denies everything, and legacy rows with no creator are
+// visible only to unscoped (tenant 0) operators - assigning ownership of a blank row to whoever
+// asked first would let any tenant claim it.
+func (s *Server) scriptScope(c *gin.Context) (*gorm.DB, bool) {
+	tid, ok := s.resolveTenant(c)
+	if !ok {
+		return nil, false
+	}
+	q := s.db.Model(&db.Script{})
+	if tid == 0 {
+		return q, true
+	}
+	users := s.db.Model(&db.User{}).Select("username").Where("tenant_id = ?", tid)
+	return q.Where("created_by IN (?)", users), true
+}
+
+func (s *Server) listScriptsFromDB(c *gin.Context) ([]scripting.Script, error) {
+	scope, ok := s.scriptScope(c)
+	if !ok {
+		return []scripting.Script{}, nil
+	}
 	var rows []db.Script
-	if err := s.db.Order("updated_at desc").Limit(200).Find(&rows).Error; err != nil {
+	if err := scope.Order("updated_at desc").Limit(200).Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	out := make([]scripting.Script, 0, len(rows))
@@ -65,7 +88,7 @@ func (s *Server) listScriptsFromDB() ([]scripting.Script, error) {
 }
 
 func (s *Server) handleAPIGetScripts(c *gin.Context) {
-	scripts, err := s.listScriptsFromDB()
+	scripts, err := s.listScriptsFromDB(c)
 	if err != nil {
 		handleQueryError(c, err, "Failed to list scripts")
 		return
@@ -92,7 +115,15 @@ func (s *Server) handleAPISaveScript(c *gin.Context) {
 	now := time.Now()
 	if req.ID != "" {
 		if id, err := strconv.ParseUint(req.ID, 10, 64); err == nil {
-			if err := s.db.First(&row, id).Error; err == nil {
+			// Scope the LOOKUP, not just the save: editing by id is how one tenant would
+			// overwrite another tenant's script, and a script runs with whoever triggers it -
+			// so an unscoped update here is a code-injection path into the victim's events.
+			scope, okScope := s.scriptScope(c)
+			if !okScope {
+				respondError(c, http.StatusNotFound, "script not found")
+				return
+			}
+			if err := scope.Where("id = ?", id).First(&row).Error; err == nil {
 				row.Name = req.Name
 				row.Description = req.Description
 				row.Code = req.Code
@@ -146,8 +177,13 @@ func (s *Server) handleAPIDeleteScript(c *gin.Context) {
 		respondError(c, http.StatusBadRequest, "invalid script id")
 		return
 	}
+	scope, okScope := s.scriptScope(c)
+	if !okScope {
+		respondError(c, http.StatusNotFound, "script not found")
+		return
+	}
 	var row db.Script
-	if err := s.db.First(&row, uid).Error; err != nil {
+	if err := scope.Where("id = ?", uid).First(&row).Error; err != nil {
 		respondError(c, http.StatusNotFound, "script not found")
 		return
 	}
