@@ -72,7 +72,10 @@ by hand at least once; do not weaken one to make a change pass — fix the chang
   TURN resolver error verbatim.
 - `check:tx-queries` (`scripts/check-tx-queries.mjs`) — no query through the pool
   handle inside a transaction block: SQLite is pinned to one connection, so the
-  nested query waits forever and the handler hangs instead of erroring.
+  nested query waits forever and the handler hangs instead of erroring. The receiver may be a
+  **chain with arguments** (`s.db.WithContext(ctx).Transaction(…)`): the first pattern required
+  bare method names, so that whole block — it exists in `audit.go` — was never recognised as a
+  transaction, and the pool handle beneath the chain is flagged too.
 - `check:command-separators` (`scripts/check-command-separators.mjs`) — a function
   that joins a task command with `"|"` must validate its fields first
   (`validateCommandArg` or `credentialCommandHasSeparator`). The implant splits the

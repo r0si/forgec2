@@ -75,19 +75,38 @@ for (const file of files) {
   const src = fs.readFileSync(file, "utf8");
   const lines = src.split("\n");
   for (let i = 0; i < lines.length; i++) {
-    const m = lines[i].match(/([A-Za-z_]\w*(?:\.\w+)*)\.Transaction\(/);
+    // A chained segment may carry an argument list: "s.db.WithContext(ctx).Transaction(".
+    // The old pattern required method names with NO parentheses, so that whole block - which
+    // exists in audit.go - was never seen as a transaction at all, let alone scanned for pool
+    // queries inside it.
+    const m = lines[i].match(/([A-Za-z_]\w*(?:\.\w+(?:\([^()]*\))?)*)\.Transaction\(/);
     if (!m) continue;
     const receiver = m[1];
+    // "s.db.WithContext(ctx).Transaction(...)": the receiver captured above is the whole
+    // chain, so an inner "s.db.First(...)" matched nothing and a pool query inside that
+    // transaction would have passed this gate. Reduce the chain to its base handle and flag
+    // that too.
+    const base = receiver.replace(/(\.\w+\([^()]*\))+$/, "");
     const body = transactionBody(lines, i);
     blocks.push({ file: path.relative(root, file), line: i + 1, receiver, lines: body.length });
     const escaped = receiver.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const callRe = new RegExp(`\\b${escaped}\\.([A-Za-z_]\\w*)`, "g");
+    const escapedBase = base.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const baseRe = base !== receiver ? new RegExp(`\\b${escapedBase}\\.([A-Za-z_]\\w*)`, "g") : null;
     for (const entry of body) {
       for (const hit of entry.text.matchAll(callRe)) {
         if (hit[1] === "Transaction") continue;
         const key = `${path.relative(root, file)}:${entry.line}:${hit[1]}`;
         if (ALLOWLIST.has(key)) continue;
         findings.push({ file: path.relative(root, file), line: entry.line, call: `${receiver}.${hit[1]}` });
+      }
+      if (baseRe) {
+        for (const hit of entry.text.matchAll(baseRe)) {
+          if (hit[1] === "Transaction") continue;
+          const key = `${path.relative(root, file)}:${entry.line}:${hit[1]}`;
+          if (ALLOWLIST.has(key)) continue;
+          findings.push({ file: path.relative(root, file), line: entry.line, call: `${base}.${hit[1]}` });
+        }
       }
     }
   }
