@@ -188,6 +188,10 @@ func (r *ConfigReloader) reload() {
 		slog.Error("Failed to parse config file", "error", err)
 		return
 	}
+	// Re-apply the FORGEC2_* overrides: a reload must not silently drop a value the
+	// environment supplied at startup (data_dir, db path, crypto keys, the plugin
+	// trust policy). Load and this path have to agree on what "the config" means.
+	config.ApplyEnvOverrides(newCfg)
 
 	if err := newCfg.Validate(); err != nil {
 		slog.Error("New config failed validation, keeping current config", "error", err)
@@ -228,6 +232,8 @@ func (r *ConfigReloader) Reload() error {
 	if err := newCfg.LoadFromData(data); err != nil {
 		return fmt.Errorf("parse config: %w", err)
 	}
+	// Same reason as the watcher path: the environment keeps applying after a reload.
+	config.ApplyEnvOverrides(newCfg)
 
 	if err := newCfg.Validate(); err != nil {
 		return fmt.Errorf("config validation failed: %w", err)

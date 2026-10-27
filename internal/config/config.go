@@ -10,7 +10,6 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -732,151 +731,16 @@ func Load(path string) (*Config, error) {
 	}
 	cfg.ConfigPath = path
 
-	// Container deployments keep the persistent volume at /data while the
-	// default data_dir is relative to the working directory.
-	applyDataDirEnv(cfg)
-
-	// Env override for JWT secret (takes precedence over config file)
-	if envSecret := os.Getenv("FORGEC2_JWT_SECRET"); envSecret != "" {
-		cfg.Server.JWTSecret = envSecret
+	// Every FORGEC2_* override, then the secret minting only a real startup may
+	// perform. The hot-reload path calls ApplyEnvOverrides for the first half, which
+	// is exactly what used to be missing there.
+	// Order matters: minting saves the file, so it must run before the full override
+	// set is applied or the save would copy environment secrets onto disk.
+	applySecretEnvForMinting(cfg)
+	if err := generateMissingSecrets(cfg, path); err != nil {
+		return nil, err
 	}
-
-	// Auto-generate JWT secret if using default/insecure value
-	if cfg.Server.JWTSecret == "" || isWeakSecret(cfg.Server.JWTSecret) {
-		key := make([]byte, 32)
-		if _, err := rand.Read(key); err != nil {
-			return nil, err
-		}
-		cfg.Server.JWTSecret = hex.EncodeToString(key)
-		if err := cfg.Save(path); err != nil {
-			return nil, err
-		}
-		slog.Warn("JWT secret auto-generated. To use a custom secret, set FORGEC2_JWT_SECRET env var or edit server.jwt_secret in config.yaml")
-	}
-
-	// Auto-generate beacon pre-shared key if empty (agents must be built with it)
-	if cfg.Server.BeaconKey == "" || isWeakSecret(cfg.Server.BeaconKey) {
-		key := make([]byte, 32)
-		if _, err := rand.Read(key); err != nil {
-			return nil, err
-		}
-		cfg.Server.BeaconKey = hex.EncodeToString(key)
-		if err := cfg.Save(path); err != nil {
-			return nil, err
-		}
-		slog.Warn("Beacon key auto-generated. To use a custom key, set server.beacon_key in config.yaml")
-	}
-
-	// Auto-generate ExtC2 API token if using default/insecure value
-	if cfg.RateLimit.ExtC2.APIToken == "" || isWeakSecret(cfg.RateLimit.ExtC2.APIToken) {
-		key := make([]byte, 32)
-		if _, err := rand.Read(key); err != nil {
-			return nil, err
-		}
-		cfg.RateLimit.ExtC2.APIToken = hex.EncodeToString(key)
-		if err := cfg.Save(path); err != nil {
-			return nil, err
-		}
-		slog.Warn("ExtC2 API token auto-generated. To use a custom token, edit rate_limit.extc2.api_token in config.yaml")
-	}
-
-	// Env override for loot key (takes precedence over config file)
-	if envLootKey := os.Getenv("FORGEC2_LOOT_KEY"); envLootKey != "" {
-		cfg.Crypto.LootKey = envLootKey
-	}
-
-	// Env override for ExtC2 key (takes precedence over config file)
-	if envExtC2Key := os.Getenv("FORGEC2_EXTC2_KEY"); envExtC2Key != "" {
-		cfg.Crypto.ExtC2Key = envExtC2Key
-	}
-
-	// Env override for backup key (takes precedence over config file)
-	if envBackupKey := os.Getenv("FORGEC2_BACKUP_KEY"); envBackupKey != "" {
-		cfg.Crypto.BackupKey = envBackupKey
-	}
-
-	// Env override for the credential key (takes precedence over config file)
-	if envTotpKey := os.Getenv("FORGEC2_TOTP_KEY"); envTotpKey != "" {
-		cfg.Crypto.TotpKey = envTotpKey
-	}
-
-	// Env override for CSRF key (takes precedence over config file)
-	if envCsrfKey := os.Getenv("FORGEC2_CSRF_KEY"); envCsrfKey != "" {
-		cfg.Crypto.CsrfKey = envCsrfKey
-	}
-
-	// Env override for AI API key (takes precedence over config file)
-	if envAIKey := os.Getenv("FORGEC2_AI_API_KEY"); envAIKey != "" {
-		cfg.AI.APIKey = envAIKey
-	}
-
-	// Plugin trust via env: comma-separated hex Ed25519 public keys, a boolean
-	// strictness switch, the concurrency ceiling, and the CPU-time budget.
-	if envKeys := os.Getenv("FORGEC2_PLUGIN_TRUSTED_KEYS"); envKeys != "" {
-		cfg.Plugins.TrustedKeys = splitAndTrim(envKeys)
-	}
-	if envSigned := os.Getenv("FORGEC2_PLUGINS_REQUIRE_SIGNED"); envSigned != "" {
-		if v, err := strconv.ParseBool(envSigned); err == nil {
-			cfg.Plugins.RequireSigned = v
-		} else {
-			slog.Warn("Ignoring FORGEC2_PLUGINS_REQUIRE_SIGNED: not a boolean", "value", envSigned)
-		}
-	}
-	if envConc := os.Getenv("FORGEC2_PLUGINS_MAX_CONCURRENT"); envConc != "" {
-		if v, err := strconv.Atoi(envConc); err == nil && v >= 0 {
-			cfg.Plugins.MaxConcurrent = v
-		} else {
-			slog.Warn("Ignoring FORGEC2_PLUGINS_MAX_CONCURRENT: not a non-negative integer", "value", envConc)
-		}
-	}
-	if envCPU := os.Getenv("FORGEC2_PLUGINS_MAX_CPU_SECONDS"); envCPU != "" {
-		if v, err := strconv.Atoi(envCPU); err == nil && v >= 0 {
-			cfg.Plugins.MaxCPUSeconds = v
-		} else {
-			slog.Warn("Ignoring FORGEC2_PLUGINS_MAX_CPU_SECONDS: not a non-negative integer", "value", envCPU)
-		}
-	}
-	if envWrite := os.Getenv("FORGEC2_PLUGINS_MAX_WRITE_MB"); envWrite != "" {
-		if v, err := strconv.Atoi(envWrite); err == nil && v >= 0 {
-			cfg.Plugins.MaxWriteMB = v
-		} else {
-			slog.Warn("Ignoring FORGEC2_PLUGINS_MAX_WRITE_MB: not a non-negative integer", "value", envWrite)
-		}
-	}
-
-	// Backup retention / schedule via env.
-	if envRetain := os.Getenv("FORGEC2_BACKUP_RETAIN"); envRetain != "" {
-		if v, err := strconv.Atoi(envRetain); err == nil && v >= 0 {
-			cfg.Backup.Retain = v
-		} else {
-			slog.Warn("Ignoring FORGEC2_BACKUP_RETAIN: not a non-negative integer", "value", envRetain)
-		}
-	}
-	if envSchedule := os.Getenv("FORGEC2_BACKUP_SCHEDULE"); envSchedule != "" {
-		cfg.Backup.Schedule = envSchedule
-	}
-
-	// Env overrides for critical settings
-	if envDBPath := os.Getenv("FORGEC2_DB_PATH"); envDBPath != "" {
-		cfg.Database.Path = envDBPath
-	}
-	if envDBDriver := os.Getenv("FORGEC2_DB_DRIVER"); envDBDriver != "" {
-		cfg.Database.Driver = envDBDriver
-	}
-	if envDBDSN := os.Getenv("FORGEC2_DB_DSN"); envDBDSN != "" {
-		cfg.Database.DSN = envDBDSN
-	}
-	if envHost := os.Getenv("FORGEC2_HOST"); envHost != "" {
-		cfg.Server.Host = envHost
-	}
-	if envPort := os.Getenv("FORGEC2_PORT"); envPort != "" {
-		if p, err := strconv.Atoi(envPort); err == nil && p > 0 && p <= 65535 {
-			cfg.Server.Port = p
-		}
-	}
-	if envSlackToken := os.Getenv("FORGEC2_SLACK_BOT_TOKEN"); envSlackToken != "" {
-		cfg.Integrations.Slack.BotToken = envSlackToken
-	}
+	ApplyEnvOverrides(cfg)
 
 	return cfg, nil
 }
