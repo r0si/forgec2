@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/csv"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -254,11 +255,23 @@ func (s *Server) handleExportScanResults(c *gin.Context) {
 	s.LogAuditRecord(c, "scan_export", "task", taskID, "scan results exported as CSV", true, nil)
 
 	// Build CSV
+	// Build CSV through encoding/csv: the hand-built rows only escaped formula
+	// leaders, so a comma in Service or Version (common: "Apache 2.4.1,
+	// OpenSSL 1.1.1") shifted the columns and mapped a banner to the wrong port.
 	var b strings.Builder
-	b.WriteString("Port,Protocol,State,Service,Version,Banner\n")
+	writer := csv.NewWriter(&b)
+	_ = writer.Write([]string{"Port", "Protocol", "State", "Service", "Version", "Banner"})
 	for _, r := range results {
-		b.WriteString(fmt.Sprintf("%d,%s,%s,%s,%s,\"%s\"\n", r.Port, csvSanitize(r.Protocol), csvSanitize(r.State), csvSanitize(r.Service), csvSanitize(r.Version), csvSanitize(r.Banner)))
+		_ = writer.Write([]string{
+			strconv.Itoa(r.Port),
+			csvSanitize(r.Protocol),
+			csvSanitize(r.State),
+			csvSanitize(r.Service),
+			csvSanitize(r.Version),
+			csvSanitize(r.Banner),
+		})
 	}
+	writer.Flush()
 
 	c.Header("Content-Disposition", "attachment; filename=scan_results.csv")
 	c.Header("Content-Type", "text/csv")

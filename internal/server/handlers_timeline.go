@@ -1,8 +1,10 @@
 package server
 
 import (
+	"encoding/csv"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"time"
 
 	"github.com/forgec2/forgec2/internal/db"
@@ -211,15 +213,19 @@ func (s *Server) handleTimelineExport(c *gin.Context) {
 	)
 	s.LogAuditRecord(c, "timeline_export", "timeline", "", "timeline exported as CSV", true, nil)
 
-	// Generate CSV
+	// Generate CSV. encoding/csv does the quoting: the previous hand-built rows
+	// only escaped formula leaders, so a comma in Details shifted every later
+	// column and a newline broke the row entirely - silently mis-associating a
+	// timestamp with the wrong agent in the operator's report.
 	c.Header("Content-Disposition", "attachment; filename=timeline_export.csv")
 	c.Header("Content-Type", "text/csv")
-	if _, err := c.Writer.WriteString("Timestamp,Type,User,Action,Details,Agent ID,Agent Name,IP,Success\n"); err != nil {
+	writer := csv.NewWriter(c.Writer)
+	if err := writer.Write([]string{"Timestamp", "Type", "User", "Action", "Details", "Agent ID", "Agent Name", "IP", "Success"}); err != nil {
 		return // client gone; further writes are futile
 	}
 
 	for _, ev := range events {
-		if _, err := c.Writer.WriteString(fmt.Sprintf("%s,%s,%s,%s,%s,%s,%s,%s,%t\n",
+		if err := writer.Write([]string{
 			ev.Timestamp.Format("2006-01-02 15:04:05"),
 			csvSanitize(ev.Type),
 			csvSanitize(ev.User),
@@ -228,9 +234,13 @@ func (s *Server) handleTimelineExport(c *gin.Context) {
 			csvSanitize(ev.AgentID),
 			csvSanitize(ev.AgentName),
 			csvSanitize(ev.IP),
-			ev.Success,
-		)); err != nil {
+			strconv.FormatBool(ev.Success),
+		}); err != nil {
 			return
 		}
+	}
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		return
 	}
 }
