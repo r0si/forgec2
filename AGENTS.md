@@ -136,6 +136,36 @@ Three things are easy to get wrong here:
 /ready reports checks.audit_chain and a warnings entry when verification
 fails, but deliberately stays **ready**: a tampered log is an alarm about the past.
 
+## Recurring defect shapes, and where the guard lives
+
+Nine audited rounds found the same few shapes over and over. Each now has a test or a
+gate, so the point of this section is: **when you touch one of these areas, the guard
+tells you if you break it — do not delete the guard to make a change pass.**
+
+| shape | what it looked like | guard |
+|---|---|---|
+| "reports success, nothing happened" | `Load` applied 21 `FORGEC2_*` vars, the reload path applied none; `CopyFrom` skipped four sections; reload reported a token it had no handler for | `TestReloadKeepsEnvironmentOverrides`, `TestCopyFromCoversEverySection`, `TestReloadTokensMatchBetweenDiffAndTable`, `TestDiffConfigHasNoDuplicates` |
+| config silently dropped or deleted | a misspelled key was ignored; a console save rewrote the file and deleted keys the build did not know | `TestUnknownConfigKeysFindsTypos`, `TestSavePreservesUnknownKeys`, `TestShippedExampleConfigHasNoUnknownKeys` |
+| a filter plus a sort the index cannot serve | `WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 50` read every row of the tenant and sorted in a TEMP B-TREE | `TestHotQueriesHaveNoUnindexedSortOrScan`, `TestListPageIndexesExist` |
+| a comment that describes the opposite of the code | "walks the newest rows" while querying `ORDER BY id ASC LIMIT n` — the verifier re-checked ancient history forever | `TestAuditVerifyChecksTheNewestWindow`, `TestAuditVerifySeesDeletionNearTheHead` |
+| a guarantee that lived only in a comment | "each chunk is HMAC-chained", but the push chain was keyed per chunk so every chunk restarted from the zero seed | `TestPushChainCarriesAcrossChunks`, `TestPushChainCatchesReordering` |
+| a failure path that un-did its own protection | a rejected chunk reset the chain, so the same chunk matched again (4 of 8 concurrent duplicates accepted) | `TestFileChainRejectsReplay`, `TestFileChainConcurrentDuplicateOnlyOneWins` |
+| a local failure treated as tampering | a disk error advanced the chain, poisoning the transfer permanently | `TestChainRollbackAfterLocalFailure`, `TestRollbackClearsPoison` |
+| a lookup by id with no tenant or visibility check | bulk history, build jobs, approval prompts | the tenant tests in `bulk_history_tenant_test.go`, `build_job_tenant_test.go`, `approval_expiry_test.go` |
+| a hot path re-doing work per request | profile JSON re-read and re-parsed per beacon; the transform chain re-parsed per decode | `BenchmarkActivePlacements`, `BenchmarkParseWireCached`, `TestActivePlacementsCacheIsUsed` |
+
+Two habits produced all of these, and both are cheap:
+
+- **Measure before claiming.** The clean example is the task-list index: the
+  whole-handler benchmark was noisy and showed nothing, while the isolated query went
+  983µs → 555µs. Reporting the handler number would have been a story.
+- **When a guard fails on your change, first ask whether the guard is wrong.** Three times
+  the answer was "the code is right, my expectation was not" (the placements staleness
+  bound, the manager quota default when the config says 0, and a test that demanded
+  instant profile refresh); once it was "the guard is right, the code is wrong" (the
+  concurrent-duplicate test that exposed the poisoned-transfer bug). Read the real values
+  before editing either side.
+
 ## Testing
 Backend test suite via CI (`.github/workflows/ci.yml`):
 ```
