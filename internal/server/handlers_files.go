@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/base64"
+	"encoding/hex"
 	"io"
 	"log/slog"
 	"mime/multipart"
@@ -340,6 +341,16 @@ func (s *Server) handleUploadFile(c *gin.Context) {
 		}
 	}
 
+	// The chain link must carry across the WHOLE transfer: keying it by each chunk's own
+	// task id restarted every chunk from the zero seed, so a relay could reorder or
+	// replace chunk 2 onwards and each still verified on its own.
+	chainKey := s.fileChainKey(id)
+	var chainPrev []byte
+	if chainKey == nil {
+		respondError(c, http.StatusInternalServerError, "cannot derive the upload integrity key")
+		return
+	}
+
 	var taskIDs []uint
 	for _, ch := range chunks {
 		task := s.issueAgentTask(c, id, TaskSpec{Type: "upload", Command: targetPath, Path: targetPath, Data: ch.data, Offset: ch.offset})
@@ -354,13 +365,14 @@ func (s *Server) handleUploadFile(c *gin.Context) {
 			respondError(c, http.StatusBadRequest, "failed to decode file data")
 			return
 		}
-		if prevMAC, mac, err := s.chainForPush(id, task.ID, rawChunk); err != nil {
+		if prevMAC, mac, err := chainForPushSequence(chainKey, chainPrev, rawChunk); err != nil {
 			slog.Error("Failed to build upload integrity chain", "agent_id", id, "task_id", task.ID, "error", err)
 			respondError(c, http.StatusInternalServerError, "failed to sign upload chunk")
 			return
 		} else {
 			task.PrevMAC = prevMAC
 			task.MAC = mac
+			chainPrev, _ = hex.DecodeString(mac)
 		}
 		if err := s.db.Save(task).Error; err != nil {
 			respondError(c, http.StatusInternalServerError, "failed to save upload offset")
