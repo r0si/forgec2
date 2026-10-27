@@ -18,6 +18,8 @@ const (
 	maxPlacementCandidates   = 64
 	maxPlacementValueBytes   = 32 << 10
 	maxPlacementDecodeBudget = 256 << 10
+	// maxPlacementQueryBytes caps the whole query string before it is parsed.
+	maxPlacementQueryBytes = 64 << 10
 )
 
 // placementsStatInterval bounds how often the cache re-stats the profile file.

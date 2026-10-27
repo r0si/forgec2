@@ -484,6 +484,13 @@ func (s *Server) extractPlacedBody(c *gin.Context) []byte {
 		}
 		switch kind {
 		case "query":
+			// Refuse to parse a pathological query string at all: url.ParseQuery allocates
+			// for every parameter, and that cost lands BEFORE the per-value budget below.
+			// A real beacon sends a short query; 64 KiB is far above it and far below what
+			// makes the parse itself worth attacking.
+			if len(c.Request.URL.RawQuery) > maxPlacementQueryBytes {
+				break
+			}
 			for _, vals := range c.Request.URL.Query() {
 				for _, v := range vals {
 					if candidates >= maxPlacementCandidates || budget <= 0 {

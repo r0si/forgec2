@@ -98,3 +98,32 @@ func malleableHasBase64Step(chain string) bool {
 	out, err := tb.Apply([]byte("x"), true)
 	return err == nil && len(out) > 0 && string(out) == "eA=="
 }
+
+// TestExtractPlacedBodySkipsPathologicalQuery pins the second half of the bound: the
+// per-value budget cannot help if url.ParseQuery has to allocate a parameter per byte
+// first, so an over-long query string is skipped unparsed. A real beacon sends a short
+// query, and the caller falls back to the request body either way.
+func TestExtractPlacedBodySkipsPathologicalQuery(t *testing.T) {
+	s := mustTenantServer(t)
+	payload := base64.StdEncoding.EncodeToString([]byte(`{"k":"v"}`))
+
+	// Build a query string far over the cap, with the valid value at the very start: if
+	// the gate works, it is not even looked at.
+	q := "p0=" + payload + "&" + strings.Repeat("junk=AAAAAAAAAAAAAAAA&", maxPlacementQueryBytes/8)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/beacon?"+q, nil)
+	s.cfg.Malleable.Placements = `[{"target":"query:p0","chain":"base64"}]`
+
+	if got := s.extractPlacedBody(c); got != nil {
+		t.Fatalf("an over-long query string was parsed and decoded (%d bytes of query)", len(q))
+	}
+
+	// The same value in a normal-sized query is still found.
+	small := httptest.NewRecorder()
+	c2, _ := gin.CreateTestContext(small)
+	c2.Request = httptest.NewRequest(http.MethodGet, "/beacon?p0="+url.QueryEscape(payload), nil)
+	if got := s.extractPlacedBody(c2); got == nil {
+		t.Fatal("a normal query string stopped resolving the placed value")
+	}
+}
