@@ -68,12 +68,49 @@ func IsSQLiteLockError(err error) bool {
 		strings.Contains(s, "database is busy")
 }
 
-// execMigration runs a migration SQL statement and logs unexpected errors.
-// Duplicate column/index errors are expected during migrations and are silently ignored.
+// execMigration runs a migration SQL statement. Duplicate column/index errors are
+// expected during migrations and are ignored; every other failure is RECORDED so the
+// runner can refuse to mark the migration applied (see migration_failures.go).
 func execMigration(db *gorm.DB, sql, label string) {
-	if err := db.Exec(sql).Error; err != nil && !isMigrationIgnorable(err) {
-		slog.Warn("Migration warning", "label", label, "err", err)
+	err := db.Exec(sql).Error
+	if err == nil || isMigrationIgnorable(err) {
+		return
 	}
+	// Schema migrations run BEFORE AutoMigrate, so an ALTER for a table that this
+	// installation does not have yet is expected on a legacy upgrade: AutoMigrate creates
+	// the table from the model, columns included. Skip those, but keep recording a
+	// "no such table" for a table that DOES exist, which is the mis-ordered DDL the
+	// classification was written for.
+	if strings.Contains(err.Error(), "no such table") {
+		if table := migrationTargetTable(sql); table != "" && !db.Migrator().HasTable(table) {
+			slog.Debug("Migration targets a table AutoMigrate will create", "label", label, "table", table)
+			return
+		}
+	}
+	noteMigrationFailure(label, err)
+}
+
+// migrationTargetTable extracts the table a migration statement refers to, so the
+// "not created yet" case can be told apart from a genuine ordering bug.
+func migrationTargetTable(sql string) string {
+	up := strings.ToUpper(strings.TrimSpace(sql))
+	for _, marker := range []string{"ALTER TABLE ", " ON ", " INTO ", " FROM "} {
+		if i := strings.Index(up, marker); i >= 0 {
+			rest := strings.TrimSpace(sql[i+len(marker):])
+			if f := strings.Fields(rest); len(f) > 0 {
+				name := strings.Trim(f[0], "`\"[];,")
+				// "ON tasks(status)" -> "tasks": an index or column list must not leak into
+				// the table name.
+				if j := strings.IndexAny(name, "(;,"); j > 0 {
+					name = name[:j]
+				}
+				if name != "" && !strings.HasPrefix(strings.ToUpper(name), "SELECT") {
+					return name
+				}
+			}
+		}
+	}
+	return ""
 }
 
 func isMigrationIgnorable(err error) bool {

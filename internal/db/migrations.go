@@ -1240,17 +1240,29 @@ var indexMigrations = []*gormigrate.Migration{
 var Migrations = append(append([]*gormigrate.Migration{}, schemaMigrations...), indexMigrations...)
 
 func runSchemaMigrations(db *gorm.DB) error {
+	resetMigrationFailures()
 	m := gormigrate.New(db, gormigrate.DefaultOptions, schemaMigrations)
 	m.InitSchema(func(tx *gorm.DB) error {
 		return nil
 	})
-	return m.Migrate()
+	if err := m.Migrate(); err != nil {
+		return err
+	}
+	// A statement that failed for a non-ignorable reason must keep its migration UNapplied,
+	// or gormigrate records it as done and never retries.
+	return migrationFailureError("schema migrations")
 }
 
 func runIndexMigrations(db *gorm.DB) error {
+	resetMigrationFailures()
 	m := gormigrate.New(db, gormigrate.DefaultOptions, indexMigrations)
 	m.InitSchema(func(tx *gorm.DB) error {
 		return nil
 	})
-	return m.Migrate()
+	if err := m.Migrate(); err != nil {
+		return err
+	}
+	// A CREATE INDEX that failed must keep the migration unapplied too: otherwise the index
+	// is absent forever and the only trace is a warning line at startup.
+	return migrationFailureError("index migrations")
 }
