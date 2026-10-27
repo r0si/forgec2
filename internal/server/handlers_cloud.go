@@ -37,6 +37,10 @@ func (s *Server) handleCloudSteal(c *gin.Context) {
 		req.Provider = "aws"
 	}
 
+	// agent_id is client-supplied: verify it belongs to the caller before queueing work on it.
+	if _, ok := s.getAgentOrFail(c, req.AgentID); !ok {
+		return
+	}
 	task, err := s.createTask(req.AgentID, "cloud_steal", req.Provider, "", "", "", 0, 0)
 	if err != nil {
 		respondError(c, http.StatusInternalServerError, sanitizeError(err, "Create task"))

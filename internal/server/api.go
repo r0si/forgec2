@@ -193,6 +193,12 @@ func (s *Server) apiCreateTask(c *gin.Context) {
 	// Path/Data are optional but required by some types (rename/chmod need
 	// data). A missing mandatory parameter is a client error: answer 400 with
 	// the parameter name instead of an opaque 500.
+	// The agent id comes from the REQUEST BODY, and createTask does not scope by tenant
+	// (background callers have no gin context). Without this check a tenant-1 API client
+	// could queue a task on a tenant-2 implant merely by knowing its id.
+	if _, ok := s.getAgentOrFail(c, req.AgentID); !ok {
+		return
+	}
 	task, err := s.createTask(req.AgentID, req.Type, req.Command, req.Shell, req.Path, req.Data, 0, 0)
 	if err != nil {
 		var reqErr *taskRequestError

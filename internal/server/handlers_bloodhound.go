@@ -71,6 +71,10 @@ func (s *Server) handleBloodHoundCollect(c *gin.Context) {
 		req.Method = "Default"
 	}
 
+	// agent_id is client-supplied: verify it belongs to the caller before queueing work on it.
+	if _, ok := s.getAgentOrFail(c, req.AgentID); !ok {
+		return
+	}
 	task, err := s.createTask(req.AgentID, protocol.TaskTypeSharpHound, req.Method, "", "", "", 0, 0)
 	if err != nil {
 		respondError(c, http.StatusInternalServerError, sanitizeError(err, "Create task"))
