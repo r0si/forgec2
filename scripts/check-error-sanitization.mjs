@@ -25,6 +25,8 @@ const internalDir = join(root, "internal");
 const listOnly = process.argv.includes("--list");
 
 // 5xx responses that deliberately echo an error, with the reason.
+const DIRECT_5XX =
+  /(?:c\.(?:JSON|String|AbortWithStatusJSON)|respondError\(\s*c)\s*[,(]\s*(?:http\.Status(?:InternalServerError|BadGateway|ServiceUnavailable|GatewayTimeout)|\b5\d\d\b)/;
 const ALLOWLIST = new Map([]);
 
 function walk(dir, out = []) {
@@ -45,7 +47,13 @@ for (const f of files) {
   const lines = src.split("\n");
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    if (!line.includes("respondError(")) continue;
+    // Two shapes write a 5xx: the respondError helper, and a direct write. The gate only
+    // knew the first, so `c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})`
+    // - or the same with StatusServiceUnavailable, a String body, AbortWithStatusJSON, or a
+    // numeric 500 - could echo a raw error and never fail this check.
+    const helper = line.includes("respondError(");
+    const direct = DIRECT_5XX.test(line);
+    if (!helper && !direct) continue;
     // Join the call's continuation lines until the parentheses balance.
     let call = line;
     let depth = (line.match(/\(/g) || []).length - (line.match(/\)/g) || []).length;
@@ -56,6 +64,22 @@ for (const f of files) {
       depth += (lines[j].match(/\(/g) || []).length - (lines[j].match(/\)/g) || []).length;
     }
     sites.push({ file: path.relative(root, f), line: i + 1, call: call.trim() });
+
+    if (direct) {
+      const statusMatch = call.match(DIRECT_5XX);
+      if (!statusMatch) continue;
+      const afterStatus = call.slice(call.indexOf(statusMatch[0]) + statusMatch[0].length);
+      const message = afterStatus.trim();
+      const safe = message.includes("sanitizeError(") || message.includes("sanitizeErrorForUser(");
+      const raw =
+        (message.includes("err.Error()") || (/fmt\.Sprintf/.test(message) && /\berr\b/.test(message))) && !safe;
+      if (raw) {
+        const key = `${path.relative(root, f)}:${i + 1}`;
+        if (!ALLOWLIST.has(key)) findings.push({ file: path.relative(root, f), line: i + 1, message });
+      }
+      continue;
+    }
+
     if (!call.includes("StatusInternalServerError")) continue;
     // Everything after the status argument.
     const afterStatus = call.slice(call.indexOf("StatusInternalServerError") + "StatusInternalServerError".length);

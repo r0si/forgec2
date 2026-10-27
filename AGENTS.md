@@ -65,7 +65,11 @@ by hand at least once; do not weaken one to make a change pass — fix the chang
   with `c.Get*` must be written by production code; test-only setters do not count,
   and `const` key names are resolved.
 - `check:error-sanitization` (`scripts/check-error-sanitization.mjs`) — a 5xx must
-  answer a literal or `sanitizeError(...)`, never a raw `err.Error()`.
+  answer a literal or `sanitizeError(...)`, never a raw `err.Error()`. It reads **both** ways a
+  5xx is written — the `respondError(…)` helper **and** a direct `c.JSON`/`c.String`/
+  `c.AbortWithStatusJSON` with any 5xx status or a numeric `500` — because knowing only the
+  helper (and only `StatusInternalServerError`) left a **503** in the WebRTC path echoing the
+  TURN resolver error verbatim.
 - `check:tx-queries` (`scripts/check-tx-queries.mjs`) — no query through the pool
   handle inside a transaction block: SQLite is pinned to one connection, so the
   nested query waits forever and the handler hangs instead of erroring.

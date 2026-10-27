@@ -733,7 +733,10 @@ func (s *Server) handleWebRTCStart(c *gin.Context) {
 	turnURL, err := hub.turnURL(c)
 	if err != nil {
 		slog.Error("WebRTC TURN unavailable", "agent_id", id, "err", err)
-		respondError(c, http.StatusServiceUnavailable, "WebRTC TURN relay is unavailable: "+err.Error())
+		// No raw error text on the wire: the TURN failure carries the resolver error, which
+		// names hosts and ports. sanitizeError keeps a class of message and the detail is
+		// already logged above.
+		respondError(c, http.StatusServiceUnavailable, sanitizeError(err, "WebRTC TURN relay"))
 		return
 	}
 	ttl := time.Duration(hub.cfg.WebRTC.SessionTTLSeconds) * time.Second
