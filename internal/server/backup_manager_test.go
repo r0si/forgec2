@@ -250,13 +250,10 @@ func TestBackupManagerLifecycle(t *testing.T) {
 		t.Fatal("PerformBackup produced no snapshot")
 	}
 
+	// Stop now waits for the schedule goroutine, so t.TempDir's cleanup cannot race a
+	// backup still writing files. (It used to not wait; taking runMu here was the
+	// workaround, which still left a window for the loop to start another run.)
 	bm.Stop()
-	// Stop does not wait for a backup already in flight: the goroutine may be
-	// inside createBackup when the channel closes. Taking runMu here guarantees
-	// it has finished, otherwise t.TempDir's cleanup races a file the goroutine
-	// still holds - which flaked under -coverprofile, where everything is slower.
-	bm.runMu.Lock()
-	bm.runMu.Unlock()
 	bm.mu.Lock()
 	stillRunning := bm.running
 	tickerNil := bm.ticker == nil

@@ -16,6 +16,7 @@ import (
 	"github.com/forgec2/forgec2/internal/config"
 	"github.com/forgec2/forgec2/internal/db"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 // errAIDisabled is returned by every assist endpoint when the AI subsystem
@@ -363,7 +364,12 @@ func (s *Server) handleAISuggestNextSteps(c *gin.Context) {
 		respondError(c, http.StatusInternalServerError, "failed to build agent context")
 		return
 	}
-	covTac, gapTac, _, err := s.mitreCoverageCounts()
+	// Scope the census to this agent's tenant: it used to be computed from every
+	// tenant's task history, so the suggestion itself leaked other teams' activity.
+	tenantAgentIDs := s.db.Model(&db.Implant{}).Select("id").Where("tenant_id = ?", agent.TenantID)
+	covTac, gapTac, _, err := s.mitreCoverageCounts(func(q *gorm.DB) *gorm.DB {
+		return q.Where("agent_id IN (?)", tenantAgentIDs)
+	})
 	if err != nil {
 		slog.Error("AI suggestion MITRE context query failed", "agent_id", aid, "err", err)
 		respondError(c, http.StatusInternalServerError, "failed to build MITRE context")

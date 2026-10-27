@@ -11,7 +11,7 @@ func TestMITRECoverageCountsPropagatesDatabaseError(t *testing.T) {
 	if err := s.db.Migrator().DropTable(&db.Task{}); err != nil {
 		t.Fatalf("drop tasks table: %v", err)
 	}
-	if _, _, _, err := s.mitreCoverageCounts(); err == nil {
+	if _, _, _, err := s.mitreCoverageCounts(nil); err == nil {
 		t.Fatal("expected MITRE coverage query error")
 	}
 }

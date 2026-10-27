@@ -43,6 +43,10 @@ type BackupManager struct {
 	runMu  sync.Mutex
 	ticker *time.Ticker
 	stopCh chan struct{}
+	// done closes when the schedule goroutine has returned. Stop waits on it so a
+	// caller (Shutdown, a test cleaning up its temp dir) is not racing a backup that is
+	// still writing files.
+	done chan struct{}
 	// retain is how many encrypted .fbk snapshots to keep (>=1). The previous
 	// hard-coded 7 made retention a non-operational decision.
 	retain int
@@ -211,8 +215,13 @@ func (bm *BackupManager) Start(cronSchedule string) error {
 
 	bm.ticker = time.NewTicker(duration)
 	stopCh := make(chan struct{})
+	done := make(chan struct{})
+	bm.mu.Lock()
 	bm.stopCh = stopCh
+	bm.done = done
+	bm.mu.Unlock()
 	go func() {
+		defer close(done)
 		defer func() {
 			if r := recover(); r != nil {
 				slog.Error("recovered from panic", "err", r, "stack", string(debug.Stack()))
@@ -243,9 +252,25 @@ func (bm *BackupManager) Stop() {
 		close(bm.stopCh)
 		bm.stopCh = nil
 	}
+	done := bm.done
+	bm.done = nil
 	bm.mu.Unlock()
+
+	// Wait for the goroutine to actually return: it may be inside PerformBackup, and a
+	// caller that proceeds immediately (Shutdown closing the DB, a test removing its
+	// temp dir) would race the files it is still writing.
+	if done != nil {
+		select {
+		case <-done:
+		case <-time.After(backupStopDrainTimeout):
+			slog.Warn("Backup manager stopped with a run still in flight", "timeout", backupStopDrainTimeout)
+		}
+	}
 	slog.Info("Backup manager stopped")
 }
+
+// backupStopDrainTimeout bounds how long Stop waits for an in-flight backup.
+const backupStopDrainTimeout = 30 * time.Second
 
 func parseCronSchedule(schedule string) (time.Duration, error) {
 	switch schedule {

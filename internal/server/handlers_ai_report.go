@@ -13,9 +13,17 @@ import (
 // mitreCoverageCounts summarizes technique coverage: how many tactics have at
 // least one exercised technique vs tactics whose mapped task types were never
 // run. Shared by get_coverage_gaps and generate_report.
-func (s *Server) mitreCoverageCounts() (coveredTactics, gapTactics int, usedTypes []string, err error) {
+//
+// scope narrows the census to the caller's visible agents; nil is the unscoped
+// (legacy single-tenant) view. Without it the numbers came from EVERY tenant's task
+// history, so one team's report revealed which techniques another team had run.
+func (s *Server) mitreCoverageCounts(scope func(*gorm.DB) *gorm.DB) (coveredTactics, gapTactics int, usedTypes []string, err error) {
 	used := map[string]bool{}
-	if err := s.db.Table("tasks").Distinct().Pluck("type", &usedTypes).Error; err != nil {
+	typeQuery := s.db.Table("tasks")
+	if scope != nil {
+		typeQuery = scope(typeQuery)
+	}
+	if err := typeQuery.Distinct().Pluck("type", &usedTypes).Error; err != nil {
 		return 0, 0, nil, fmt.Errorf("load MITRE task types: %w", err)
 	}
 	for _, t := range usedTypes {
@@ -134,13 +142,21 @@ func (s *Server) buildAIMarkdownReport(scope string, reqCtx *aiReqCtx) (string, 
 	}
 	sort.Slice(iocs, func(i, j int) bool { return iocs[i].Count > iocs[j].Count })
 
-	covTac, gapTac, usedTypes, err := s.mitreCoverageCounts()
+	// The report already narrows tasks and credentials to the visible agents; the
+	// coverage census and the recent-failure list were the two queries that did not.
+	reportScope := func(q *gorm.DB) *gorm.DB {
+		if scoped {
+			return q.Where("agent_id IN (?)", agentScope)
+		}
+		return q
+	}
+	covTac, gapTac, usedTypes, err := s.mitreCoverageCounts(reportScope)
 	if err != nil {
 		return "", nil, err
 	}
 
 	var failed []db.Task
-	if err := s.db.Where("status = ? AND created_at >= ?", "failed", since).Order("created_at desc").Limit(8).Find(&failed).Error; err != nil {
+	if err := scopedTasks(s.db.Where("status = ? AND created_at >= ?", "failed", since)).Order("created_at desc").Limit(8).Find(&failed).Error; err != nil {
 		return "", nil, fmt.Errorf("load recent failures: %w", err)
 	}
 
