@@ -1046,6 +1046,15 @@ func (s *Server) sweepScreenMonitorsLocked(now time.Time) int {
 	return dropped
 }
 
+// dropCachedScreenFrame forgets the last relayed frame for an agent. It is only
+// useful while a stream is live: each entry holds a whole base64 JPEG, and the
+// periodic sweep that used to be its only reclamation runs once a day.
+func (s *Server) dropCachedScreenFrame(monitorKey string) {
+	s.screenFrameMu.Lock()
+	delete(s.screenFrames, monitorKey)
+	s.screenFrameMu.Unlock()
+}
+
 func (s *Server) IsScreenMonitoring(agentID string) bool {
 	s.screenMonitorMu.Lock()
 	defer s.screenMonitorMu.Unlock()
@@ -1056,6 +1065,8 @@ func (s *Server) IsScreenMonitoring(agentID string) bool {
 	}
 	if time.Since(lastFrame) > screenMonitorStaleAfter {
 		delete(s.screenMonitorImplants, key)
+		monitorKey := key
+		defer s.dropCachedScreenFrame(monitorKey)
 		slog.Info("Dropped a stale screen monitoring entry", "agent_id", key, "last_frame", lastFrame)
 		return false
 	}

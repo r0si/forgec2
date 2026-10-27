@@ -128,3 +128,31 @@ func TestBroadcastScreenshotRefreshesHeartbeat(t *testing.T) {
 		t.Fatal("a refreshed stream is not reported as active")
 	}
 }
+
+// TestExpiredStreamDropsItsCachedFrame pins the memory side: the cached frame is a
+// whole base64 JPEG per agent, and the periodic sweep that used to reclaim it ran
+// once every 24 hours. When the stream expires, its frame goes with it.
+func TestExpiredStreamDropsItsCachedFrame(t *testing.T) {
+	s := mustTenantServer(t)
+	s.screenMonitorMu.Lock()
+	s.ensureScreenMonitorMapsLocked()
+	s.screenMonitorImplants["agent-frame"] = time.Now().Add(-2 * screenMonitorStaleAfter)
+	s.screenMonitorMu.Unlock()
+	s.screenFrameMu.Lock()
+	if s.screenFrames == nil {
+		s.screenFrames = make(map[string]cachedScreenFrame)
+	}
+	s.screenFrames["agent-frame"] = cachedScreenFrame{mime: "image/jpeg", data: "jpeg", capturedAt: time.Now()}
+	s.screenFrameMu.Unlock()
+
+	if s.IsScreenMonitoring("agent-frame") {
+		t.Fatal("the dead stream is still reported as active")
+	}
+
+	s.screenFrameMu.Lock()
+	_, frameLeft := s.screenFrames["agent-frame"]
+	s.screenFrameMu.Unlock()
+	if frameLeft {
+		t.Fatal("the expired stream kept its cached frame")
+	}
+}
