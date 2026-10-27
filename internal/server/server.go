@@ -691,15 +691,7 @@ func New(cfg *config.Config, database *gorm.DB) *Server { // config-lock: constr
 	// load (with a warning) unless plugins.require_signed is set, so the
 	// bundled plugins keep working out of the box.
 	s.applyPluginTrust()
-	if maxConc := s.cfg.Plugins.MaxConcurrent; maxConc > 0 {
-		s.pluginManager.SetMaxConcurrent(maxConc)
-	}
-	if maxCPU := s.cfg.Plugins.MaxCPUSeconds; maxCPU > 0 {
-		s.pluginManager.SetMaxCPUSeconds(maxCPU)
-	}
-	if maxWrite := s.cfg.Plugins.MaxWriteMB; maxWrite > 0 {
-		s.pluginManager.SetMaxWriteMB(maxWrite)
-	}
+
 	pluginDir := filepath.Join(s.cfg.Server.DataDir, "plugins")
 	if err := os.MkdirAll(pluginDir, 0750); err != nil {
 		slog.Warn("Failed to create plugin data directory", "dir", pluginDir, "err", err)
@@ -1018,7 +1010,23 @@ func (s *Server) applyPluginTrust() error {
 	s.configMu.RLock()
 	trustedKeys := append([]string(nil), s.cfg.Plugins.TrustedKeys...)
 	requireSigned := s.cfg.Plugins.RequireSigned
+	maxConc := s.cfg.Plugins.MaxConcurrent
+	maxCPU := s.cfg.Plugins.MaxCPUSeconds
+	maxWrite := s.cfg.Plugins.MaxWriteMB
 	s.configMu.RUnlock()
+
+	// The quota setters are part of the same policy: without them a reload that edits
+	// plugins.max_concurrent reported "plugins applied" and kept the old ceiling,
+	// because only the trust call was wired into the hook.
+	if maxConc > 0 {
+		s.pluginManager.SetMaxConcurrent(maxConc)
+	}
+	if maxCPU > 0 {
+		s.pluginManager.SetMaxCPUSeconds(maxCPU)
+	}
+	if maxWrite > 0 {
+		s.pluginManager.SetMaxWriteMB(maxWrite)
+	}
 
 	keys, err := plugin.ParseTrustedPluginKeys(trustedKeys)
 	if err != nil {

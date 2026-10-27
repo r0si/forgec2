@@ -70,6 +70,42 @@ func NewManager(database *gorm.DB) *Manager {
 }
 
 // SetMaxConcurrent caps how many plugin processes may run simultaneously.
+// Effective quota accessors. They exist so the status surface and the reload tests can
+// read what the manager will actually enforce, instead of assuming a Set* call took.
+func (m *Manager) MaxConcurrent() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if m.exec == nil {
+		return 0
+	}
+	return cap(m.exec.slots)
+}
+
+func (m *Manager) MaxCPUSeconds() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if m.exec == nil {
+		return 0
+	}
+	return int(m.exec.cpuQuota / time.Second)
+}
+
+func (m *Manager) MaxWriteMB() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if m.exec == nil {
+		return 0
+	}
+	return int(m.exec.writeQuota >> 20)
+}
+
+// RequireSigned reports whether the trust policy refuses unsigned packages.
+func (m *Manager) RequireSigned() bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.trust.RequireSigned
+}
+
 func (m *Manager) SetMaxConcurrent(n int) {
 	if n <= 0 {
 		return
