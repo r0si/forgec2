@@ -153,12 +153,17 @@ func TestSourceTransformsPreserveSemantics(t *testing.T) {
 	if strings.Contains(out, "$count") {
 		t.Fatalf("variable not renamed: %q", out)
 	}
-	// Trigger token broken up.
-	if strings.Contains(out, "Invoke-Mimikatz") {
-		t.Fatalf("trigger not scrubbed: %q", out)
+	// Trigger tokens are scrubbed only where that is SAFE. "Invoke-Mimikatz" is a
+	// command name: splitting it into Invoke-('mimi'+'katz') is a parse error, so it is
+	// left intact on purpose (see scrub_safe.go). A standalone occurrence is still split.
+	if strings.Contains(out, "'mimi'+'katz'") {
+		t.Fatalf("a command name was rewritten into a parse error: %q", out)
 	}
-	if !strings.Contains(out, "Invoke-") {
-		t.Fatalf("scrubbed parts missing: %q", out)
+	standalone := ObfuscatePowerShellSource("Write-Output mimikatz", PSObfuscateOptions{
+		ScrubTriggers: true, Seed: 1, SeedSet: true,
+	})
+	if strings.Contains(standalone, "mimikatz") {
+		t.Fatalf("a standalone trigger was not scrubbed: %q", standalone)
 	}
 	// Automatics untouched.
 	auto := ObfuscatePowerShellSource("$true $null $args $env:PATH", fixedOpts())

