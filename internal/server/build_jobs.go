@@ -115,9 +115,14 @@ func (s *Server) abandonBuildJob(job *BuildJob) {
 	s.buildJobsMu.Unlock()
 }
 
-// cleanupBuildJobs removes completed jobs older than 1 hour.
+// buildJobSweepInterval is how often cleanupBuildJobs sweeps. A variable so a test can
+// prove the loop actually reaps without waiting fifteen minutes.
+var buildJobSweepInterval = 15 * time.Minute
+
+// cleanupBuildJobs runs for the life of the server: every buildJobSweepInterval it removes
+// completed jobs older than an hour and one-shot artifacts whose expiry has passed.
 func (s *Server) cleanupBuildJobs() {
-	ticker := time.NewTicker(15 * time.Minute)
+	ticker := time.NewTicker(buildJobSweepInterval)
 	defer ticker.Stop()
 	for {
 		select {
