@@ -8,6 +8,7 @@ import (
 
 	"github.com/forgec2/forgec2/internal/db"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 // One-shot scheduled tasks: "at 02:00 run X on agent Y". Distinct from
@@ -21,12 +22,33 @@ type oneShotRequest struct {
 }
 
 func (s *Server) handleListOneShotTasks(c *gin.Context) {
+	// one_shot_tasks has no tenant column, so the scope runs through the AGENT that owns the
+	// row: without it every operator saw every tenant's scheduled COMMANDS and target ids.
+	sub, ok := s.visibleAgentIDSubquery(c)
+	if !ok {
+		respond(c, gin.H{"tasks": []db.OneShotTask{}})
+		return
+	}
 	var tasks []db.OneShotTask
-	if err := s.db.Order("run_at asc").Limit(200).Find(&tasks).Error; err != nil {
+	if err := s.db.Where("agent_id IN (?)", sub).Order("run_at asc").Limit(200).Find(&tasks).Error; err != nil {
 		respondError(c, http.StatusInternalServerError, "query failed")
 		return
 	}
 	respond(c, gin.H{"tasks": tasks})
+}
+
+// visibleAgentIDSubquery returns a subquery of the agent ids the caller may act on, or ok=false
+// when the tenant lookup failed (fail closed: the caller answers an empty set, never the world).
+func (s *Server) visibleAgentIDSubquery(c *gin.Context) (*gorm.DB, bool) {
+	tid, resolved := s.resolveTenant(c)
+	if !resolved {
+		return nil, false
+	}
+	sub := s.db.Model(&db.Implant{}).Select("id")
+	if tid != 0 {
+		sub = sub.Where("tenant_id = ?", tid)
+	}
+	return sub, true
 }
 
 func (s *Server) handleCreateOneShotTask(c *gin.Context) {
@@ -79,7 +101,13 @@ func (s *Server) handleCreateOneShotTask(c *gin.Context) {
 
 func (s *Server) handleCancelOneShotTask(c *gin.Context) {
 	id := c.Param("id")
-	res := s.db.Model(&db.OneShotTask{}).Where("id = ? AND status = ?", id, "pending").Update("status", "cancelled")
+	sub, ok := s.visibleAgentIDSubquery(c)
+	if !ok {
+		respondError(c, http.StatusNotFound, "pending task not found")
+		return
+	}
+	// Same scope as the list: a cancel by id must not reach another tenant's schedule.
+	res := s.db.Model(&db.OneShotTask{}).Where("id = ? AND status = ? AND agent_id IN (?)", id, "pending", sub).Update("status", "cancelled")
 	if res.Error != nil {
 		respondError(c, http.StatusInternalServerError, "failed to cancel")
 		return
