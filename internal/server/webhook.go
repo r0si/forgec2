@@ -80,6 +80,14 @@ func webhookRetryDelay(attempt int) time.Duration {
 	return webhookBackoffSteps[attempt]
 }
 
+// webhookAuditDetails renders the delivery audit row. The URL is redacted: an
+// audit row outlives the log line and is shown in the console, and a webhook URL
+// is a credential. sanitizeDetails does not catch it - a Slack-style URL carries
+// no "key=" for the pattern to match.
+func webhookAuditDetails(name, rawURL string, status int) string {
+	return fmt.Sprintf("Webhook %s -> %s: %d", name, redactURLForLog(rawURL), status)
+}
+
 func (s *Server) fireWebhook(wh db.WebhookConfig, evt Event) error {
 	if err := validateWebhookURL(wh.URL); err != nil {
 		// No URL in the log: webhook targets may embed secret tokens.
@@ -142,7 +150,7 @@ func (s *Server) fireWebhook(wh db.WebhookConfig, evt Event) error {
 				User:    "system",
 				Action:  "webhook",
 				Success: true,
-				Details: fmt.Sprintf("Webhook %s -> %s: %d", wh.Name, wh.URL, resp.StatusCode),
+				Details: webhookAuditDetails(wh.Name, wh.URL, resp.StatusCode),
 			}})
 			// Record the real delivery so the integrations list can show
 			// truthful event_count/last_trigger instead of fabricated zeroes.
@@ -172,7 +180,7 @@ func (s *Server) fireWebhook(wh db.WebhookConfig, evt Event) error {
 			User:    "system",
 			Action:  "webhook",
 			Success: false,
-			Details: fmt.Sprintf("Webhook %s -> %s: %d", wh.Name, wh.URL, resp.StatusCode),
+			Details: webhookAuditDetails(wh.Name, wh.URL, resp.StatusCode),
 		}})
 		return fmt.Errorf("webhook delivery failed with status %d", resp.StatusCode)
 	}

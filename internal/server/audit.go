@@ -214,6 +214,14 @@ func auditEntryHash(e *db.AuditLog) string {
 // persistAuditBatch chains entries onto prevHash ("": read from DB) and
 // inserts them in a single bounded transaction.
 func (s *Server) persistAuditBatch(entries []db.AuditLog, prevHash string) error {
+	// The single choke point before the DB, so the sanitizer runs here as well as
+	// in buildAuditEntries: callers that construct db.AuditLog rows directly (the
+	// webhook and callback paths do) used to skip it entirely, and one of them
+	// persisted a webhook URL - which is a credential. Idempotent.
+	for i := range entries {
+		entries[i].Details = sanitizeDetails(entries[i].Details)
+		entries[i].Error = sanitizeDetails(entries[i].Error)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), auditWriteTimeout)
 	defer cancel()
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
