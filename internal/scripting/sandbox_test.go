@@ -80,18 +80,40 @@ func TestScriptSourceLimit(t *testing.T) {
 	}
 }
 
-// TestScriptParseTimeout proves a top-level infinite loop cannot wedge
-// LoadScript forever: the reparse VM is interrupted on the event timeout.
-func TestScriptParseTimeout(t *testing.T) {
+// TestLoadScriptDoesNotExecute pins the load contract: saving a script must
+// only parse it. The previous implementation RAN the body in the reparse VM, so
+//   - "while(true){}" wedged the save until the parse timeout,
+//   - a top-level sendTask() fired a real task at save time,
+//   - any reference to a per-run binding (agent_id, args, ...) failed with
+//     ReferenceError, so most useful scripts could never be saved.
+//
+// A valid loop now loads instantly; a syntax error is still rejected.
+func TestLoadScriptDoesNotExecute(t *testing.T) {
 	if testing.Short() {
 		t.Skip("timeout test")
 	}
 	e := NewScriptEngine()
-	err := e.LoadScript(1, "spin", "while(true){}")
-	if err == nil {
-		t.Fatal("expected the spinning script to be rejected")
+
+	if err := e.LoadScript(1, "spin", "while(true){}"); err != nil {
+		t.Fatalf("a syntactically valid script was rejected at load: %v", err)
 	}
-	if !strings.Contains(err.Error(), "timeout") {
-		t.Fatalf("unexpected error: %v", err)
+	// Loading must not have executed it: the engine still answers requests.
+	if res := e.ExecuteCode(`"alive"`, nil, Caller{Username: "admin1", Role: "admin"}); !res.Success || res.Output != "alive" {
+		t.Fatalf("the engine is wedged after loading a loop: %+v", res)
+	}
+
+	// Side effects at the top level are not run at load: a script that calls
+	// sendTask would otherwise fire a task merely by being saved.
+	e2 := NewScriptEngine()
+	if err := e2.LoadScript(2, "sends", `sendTask("agent", "shell", "{}")`); err != nil {
+		t.Fatalf("a side-effecting script was rejected at load: %v", err)
+	}
+
+	// Syntax errors are still caught, and nothing is added to the engine.
+	if err := e2.LoadScript(3, "broken", "function ("); err == nil {
+		t.Fatal("a syntax error was accepted")
+	}
+	if res := e2.Execute("broken", nil, Caller{Username: "admin1", Role: "admin"}); res.Success {
+		t.Fatal("a script that failed to parse is executable")
 	}
 }

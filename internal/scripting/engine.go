@@ -288,16 +288,28 @@ func (e *ScriptEngine) reparseEvents(s *LoadedScript) error {
 	if err := validateScriptSource(s.Code); err != nil {
 		return err
 	}
+	// Enable the same surface executeScript installs. A bare VM made load-time
+	// validation stricter than the runtime: a script that calls console.log (or
+	// require("console")) parsed fine when executed but was REJECTED here with
+	// "ReferenceError: console is not defined", so it could never be saved.
 	vm := goja.New()
+	newScriptRegistry().Enable(vm)
+	console.Enable(vm)
 	events := make(map[string]bool)
 	setAPIOn(vm, "on", func(call goja.FunctionCall) goja.Value {
 		eventType := call.Argument(0).String()
 		events[eventType] = true
 		return goja.Undefined()
 	})
+	// Compile only - never run the script here. Running it made "save the
+	// script" execute the whole script body: a top-level sendTask() fired a real
+	// task against an agent, sleep() blocked the request, and any reference to a
+	// context binding (agent_id, args, ...) failed with ReferenceError because the
+	// per-run bindings do not exist at load time. Compiling still reports syntax
+	// errors, which is all this check is for.
 	done := make(chan error, 1)
 	go func() {
-		_, err := vm.RunString(s.Code)
+		_, err := goja.Compile("", s.Code, false)
 		done <- err
 	}()
 	timer := time.NewTimer(scriptParseTimeout)
