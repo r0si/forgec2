@@ -2,9 +2,8 @@ package server
 
 import (
 	"net/http"
-	"os"
-	"path/filepath"
 
+	"github.com/forgec2/forgec2/api"
 	"github.com/gin-gonic/gin"
 )
 
@@ -75,30 +74,11 @@ func (s *Server) handleAPIDocs(c *gin.Context) {
 	c.String(http.StatusOK, swaggerUIHTML)
 }
 
-func resolveOpenAPIPath() string {
-	candidates := []string{
-		filepath.Join(".", "api", "openapi.yaml"),
-	}
-	if exe, err := os.Executable(); err == nil {
-		candidates = append(candidates, filepath.Join(filepath.Dir(exe), "api", "openapi.yaml"))
-	}
-	for _, p := range candidates {
-		if _, err := os.Stat(p); err == nil {
-			return p
-		}
-	}
-	return candidates[0]
-}
-
 func (s *Server) handleAPIDocsYAML(c *gin.Context) {
-	data, err := os.ReadFile(resolveOpenAPIPath())
-	if err != nil {
-		respondError(c, http.StatusInternalServerError, "failed to read OpenAPI specification")
-		return
-	}
-
+	// Served from the binary: see api/embed.go for why the filesystem is the wrong place to
+	// look for this file.
 	c.Header("Content-Type", "application/x-yaml")
-	c.Data(http.StatusOK, "application/x-yaml", data)
+	c.Data(http.StatusOK, "application/x-yaml", api.OpenAPISpec)
 }
 
 func (s *Server) handleAPIDocsRedirect(c *gin.Context) {
