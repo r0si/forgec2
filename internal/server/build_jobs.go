@@ -464,6 +464,12 @@ func (s *Server) extractAgentsDir() string {
 	s.configMu.RLock()
 	dataDir := s.cfg.Server.DataDir
 	s.configMu.RUnlock()
+	// Default to "data" the way writeScreenshotFile does, instead of resolving to
+	// <cwd>/agents: an empty data_dir means "misconfigured", and build output belongs in
+	// the conventional tree rather than beside whatever directory the process started in.
+	if dataDir == "" {
+		dataDir = "data"
+	}
 	agentsDir := filepath.Join(dataDir, "agents")
 	if !filepath.IsAbs(agentsDir) {
 		if abs, err := filepath.Abs(agentsDir); err == nil {
