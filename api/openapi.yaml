@@ -2101,6 +2101,43 @@ paths:
                               $ref: '#/components/schemas/AuditLog'
                           total:
                             type: integer
+  /audit/verify:
+    get:
+      tags: [Audit]
+      summary: Verify the audit hash chain
+      description: Walk the newest audit rows and report whether the tamper-evident hash chain is intact
+      operationId: verifyAuditChain
+      security:
+        - SessionCookie: []
+      parameters:
+        - name: limit
+          in: query
+          description: How many of the newest rows to check (default 1000, max 5000)
+          schema:
+            type: integer
+            default: 1000
+      responses:
+        '200':
+          description: Verification verdict (ok=false is a finding, not a server error)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          ok:
+                            type: boolean
+                          checked:
+                            type: integer
+                          first_bad_id:
+                            type: integer
+                          reason:
+                            type: string
   /tasks:
     get:
       tags: [Tasks]

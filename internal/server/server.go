@@ -211,6 +211,10 @@ type Server struct {
 	auditQueue    chan []db.AuditLog
 	auditLastHash string
 	auditDropped  atomic.Int64
+	// auditTamperID is the row id of the last reported chain-integrity failure,
+	// so /ready polls do not re-log the same finding every few seconds.
+	auditTamperMu sync.Mutex
+	auditTamperID uint
 
 	// Backlog metric label hygiene: agents currently exported as per-agent
 	// gauge series, so drained agents can be pruned.

@@ -1190,6 +1190,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/audit/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Verify the audit hash chain
+         * @description Walk the newest audit rows and report whether the tamper-evident hash chain is intact
+         */
+        get: operations["verifyAuditChain"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks": {
         parameters: {
             query?: never;
@@ -13148,6 +13168,36 @@ export interface operations {
                             success?: boolean;
                             data?: components["schemas"]["AuditLog"][];
                             total?: number;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    verifyAuditChain: {
+        parameters: {
+            query?: {
+                /** @description How many of the newest rows to check (default 1000, max 5000) */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Verification verdict (ok=false is a finding, not a server error) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: {
+                            ok?: boolean;
+                            checked?: number;
+                            first_bad_id?: number;
+                            reason?: string;
                         };
                     };
                 };

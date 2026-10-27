@@ -1,12 +1,38 @@
 package server
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 
 	"github.com/forgec2/forgec2/internal/db"
 	"github.com/gin-gonic/gin"
 )
+
+// auditReadyChainWindow bounds the work /ready does on the audit chain: enough to
+// catch tampering with recent history, cheap on a poll every few seconds.
+const auditReadyChainWindow = 200
+
+// noteAuditChainTamper records a chain-integrity failure once per bad row, so a
+// health probe polling /ready does not write an audit entry (and a log line)
+// every few seconds.
+func (s *Server) noteAuditChainTamper(verdict auditChainVerdict) {
+	if s == nil {
+		return
+	}
+	s.auditTamperMu.Lock()
+	repeated := s.auditTamperID == verdict.FirstBadID
+	if !repeated {
+		s.auditTamperID = verdict.FirstBadID
+	}
+	s.auditTamperMu.Unlock()
+	if repeated {
+		return
+	}
+	slog.Error("Audit chain integrity failure", "first_bad_id", verdict.FirstBadID, "reason", verdict.Reason)
+	s.LogAuditRecord(nil, "audit_chain_tamper", "audit", "",
+		fmt.Sprintf("audit chain verification failed at row %d: %s", verdict.FirstBadID, verdict.Reason), false, nil)
+}
 
 func (s *Server) handleReadyCheck(c *gin.Context) {
 	checks := gin.H{}
@@ -38,6 +64,22 @@ func (s *Server) handleReadyCheck(c *gin.Context) {
 		checks["listeners"] = listenerCount
 	}
 
+	// Audit chain integrity. Deliberately does NOT make the server unready: a
+	// tampered log is a forensic alarm about the past, and taking the C2 offline
+	// over it would be the wrong response. It is reported in checks/warnings and
+	// logged once per finding, so /ready polling cannot spam the log.
+	var warnings []string
+	if s != nil && s.db != nil {
+		verdict := s.verifyAuditChain(auditReadyChainWindow)
+		if verdict.OK {
+			checks["audit_chain"] = fmt.Sprintf("ok (%d entries)", verdict.Checked)
+		} else {
+			checks["audit_chain"] = fmt.Sprintf("integrity failure at row %d: %s", verdict.FirstBadID, verdict.Reason)
+			warnings = append(warnings, "audit chain integrity failure")
+			s.noteAuditChainTamper(verdict)
+		}
+	}
+
 	status := "ok"
 	code := http.StatusOK
 	if !ready {
@@ -45,10 +87,14 @@ func (s *Server) handleReadyCheck(c *gin.Context) {
 		code = http.StatusServiceUnavailable
 	}
 
-	c.JSON(code, gin.H{
+	payload := gin.H{
 		"status": status,
 		"checks": checks,
-	})
+	}
+	if len(warnings) > 0 {
+		payload["warnings"] = warnings
+	}
+	c.JSON(code, payload)
 }
 
 func (s *Server) handleBuildLogs(c *gin.Context) {
