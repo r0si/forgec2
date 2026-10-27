@@ -27,11 +27,9 @@ func (s *Server) handleSetLanguage(c *gin.Context) {
 	middleware.SetCookieWithSameSite(c, "forgec2_lang", lang, LangCookieMaxAgeSec, "/", middleware.CookieSecure, true, http.SameSiteLaxMode)
 
 	referer := c.GetHeader("Referer")
-	if referer != "" && strings.HasPrefix(referer, "/") && !strings.HasPrefix(referer, "//") {
-		if parsedURL, err := url.Parse(referer); err == nil && parsedURL.Host == "" {
-			c.Redirect(http.StatusFound, referer)
-			return
-		}
+	if isSafeLocalRedirect(referer) {
+		c.Redirect(http.StatusFound, referer)
+		return
 	}
 
 	respond(c, gin.H{
@@ -105,4 +103,25 @@ func (s *Server) handleTranslationCheck(c *gin.Context) {
 		"placeholder_issues":   placeholderIssues,
 		"html_tag_issues":      htmlIssues,
 	})
+}
+
+// isSafeLocalRedirect accepts only a path on this server.
+//
+// The previous check was "starts with / and not with //", which a backslash walks around:
+// browsers normalise "\" to "/" in a Location, so "/\evil.com" is fetched as "//evil.com"
+// and lands on another host. A control character would let the header be split. This runs on
+// the unauthenticated /lang/set route, so it is reachable without a session.
+func isSafeLocalRedirect(ref string) bool {
+	if ref == "" || !strings.HasPrefix(ref, "/") || strings.HasPrefix(ref, "//") {
+		return false
+	}
+	if strings.ContainsAny(ref, "\\\r\n\t") {
+		return false
+	}
+	u, err := url.Parse(ref)
+	if err != nil {
+		return false
+	}
+	// A scheme or an authority means the reference is not a local path.
+	return u.Scheme == "" && u.Host == ""
 }
