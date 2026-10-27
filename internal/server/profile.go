@@ -3,7 +3,6 @@ package server
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"math/rand"
@@ -433,38 +432,7 @@ func (s *Server) stripMalleableRequest(raw []byte) []byte {
 // activePlacements returns the server-side placement list: global config
 // Placements JSON first, else the active profile file's placements.
 func (s *Server) activePlacements() []malleable.PlacementV2 {
-	s.configMu.RLock()
-	raw := s.cfg.Malleable.Placements
-	name := s.cfg.Malleable.ProfileName
-	s.configMu.RUnlock()
-	if strings.TrimSpace(raw) != "" {
-		var pls []malleable.PlacementV2
-		if err := json.Unmarshal([]byte(raw), &pls); err == nil && len(pls) > 0 {
-			return pls
-		}
-	}
-	if strings.TrimSpace(name) == "" {
-		return nil
-	}
-	dir := s.profileDataDir()
-	sanitized := strings.Map(func(r rune) rune {
-		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '-' {
-			return r
-		}
-		return '_'
-	}, strings.TrimSpace(name))
-	if sanitized == "" {
-		return nil
-	}
-	rawBytes, err := os.ReadFile(filepath.Join(dir, "profiles", sanitized+".json"))
-	if err != nil {
-		return nil
-	}
-	v2, err := malleable.MigrateProfileJSON(rawBytes, sanitized)
-	if err != nil || v2 == nil {
-		return nil
-	}
-	return v2.Placements
+	return s.activePlacementSet()
 }
 
 // extractPlacedBody tries each configured placement location and returns the

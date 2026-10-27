@@ -232,8 +232,9 @@ type Server struct {
 	ntlmRelays *ntlmRelayStore
 
 	// Bulk operation history ring buffer
-	bulkHistory   []BulkResult
-	bulkHistoryMu sync.Mutex
+	placementsCache placementsCache
+	bulkHistory     []BulkResult
+	bulkHistoryMu   sync.Mutex
 
 	// Per-agent task queue depth tracking (agentID → pending task count)
 	agentPendingTasks   map[string]int
