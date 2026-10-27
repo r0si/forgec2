@@ -33,12 +33,47 @@ func newNTLMRelayStore() *ntlmRelayStore {
 	return &ntlmRelayStore{sessions: make(map[string]*ntlmRelaySession)}
 }
 
+// ntlmRelaySessionMaxAge bounds how long a relay session stays listed without a
+// stop. Relays are short-lived; a session that was never stopped (agent died,
+// console closed) would otherwise stay "active" forever, both leaking memory and
+// showing the operator a relay that is no longer running.
+const ntlmRelaySessionMaxAge = 12 * time.Hour
+
 func (st *ntlmRelayStore) add(session *ntlmRelaySession) {
 	st.mu.Lock()
 	defer st.mu.Unlock()
+	// A session without a start time would look infinitely old to sweep(); treat
+	// it as starting now rather than dropping it on the next status poll.
+	if session.StartedAt.IsZero() {
+		session.StartedAt = time.Now()
+	}
+	// One relay per agent: a second start replaces the previous session instead
+	// of leaving an orphan that the stop handler never finds (findByAgent
+	// returned an arbitrary match).
+	for id, existing := range st.sessions {
+		if existing.AgentID == session.AgentID {
+			delete(st.sessions, id)
+			slog.Warn("Replaced an unfinished NTLM relay session", "agent_id", session.AgentID, "previous", id)
+		}
+	}
 	st.seq++
 	session.ID = fmt.Sprintf("ntlm-%d", st.seq)
 	st.sessions[session.ID] = session
+}
+
+// sweep drops sessions older than maxAge and reports how many were removed.
+func (st *ntlmRelayStore) sweep(now time.Time, maxAge time.Duration) int {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	cutoff := now.Add(-maxAge)
+	dropped := 0
+	for id, session := range st.sessions {
+		if session.StartedAt.Before(cutoff) {
+			delete(st.sessions, id)
+			dropped++
+		}
+	}
+	return dropped
 }
 
 func (st *ntlmRelayStore) remove(id string) bool {
@@ -83,6 +118,11 @@ func (s *Server) handleNTLMRelayStatus(c *gin.Context) {
 	}
 	// A relay session is filed against an agent, so hide sessions the caller
 	// has no visibility of rather than dumping the whole fleet's relays.
+	// Sweep first: a session that was never stopped (agent died, console closed)
+	// must not be reported as still running.
+	if dropped := s.ntlmRelays.sweep(time.Now(), ntlmRelaySessionMaxAge); dropped > 0 {
+		slog.Warn("Dropped stale NTLM relay sessions", "dropped", dropped)
+	}
 	visible := make([]*ntlmRelaySession, 0, 1)
 	for _, session := range s.ntlmRelays.list() {
 		if s.resolveVisibleAgentID(c, session.AgentID) != "" {
