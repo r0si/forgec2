@@ -69,7 +69,11 @@ for (const f of files) {
     if (key === null) dynamicWriters.add(m[1].trim());
     else sets.set(key, (sets.get(key) || 0) + 1);
   }
-  for (const m of src.matchAll(/\bc\.(?:Get|GetString|MustGet)\(\s*([^)]+?)\s*\)/g)) {
+  // Every gin CONTEXT accessor, not just Get/GetString/MustGet: c.GetBool("auth_via_api_key")
+  // decides whether an API key is treated as scoped or as a legacy full-access key, and the
+  // narrower pattern could not see that read at all. GetHeader/GetRawData/GetCookie/
+  // GetPostForm/GetQuery are request accessors, not context keys, and are deliberately absent.
+  for (const m of src.matchAll(/\bc\.(?:MustGet|GetStringMapStringSlice|GetStringMapString|GetStringMap|GetStringSlice|GetString|GetBool|GetInt64|GetInt|GetUint64|GetUint|GetFloat64|GetFloat32|GetTime|GetDuration|Get)\(\s*([^)]+?)\s*\)/g)) {
     const key = resolve(m[1]);
     if (key !== null) gets.set(key, (gets.get(key) || 0) + 1);
   }

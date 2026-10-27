@@ -62,8 +62,10 @@ by hand at least once; do not weaken one to make a change pass — fix the chang
   `handler_*.go` `register*` function were invisible, and `POST /api/dns/start` (which starts a
   listener on :53) sat on the global auth group with no permission check because of it.
 - `check:context-keys` (`scripts/check-context-keys.mjs`) — a gin context key read
-  with `c.Get*` must be written by production code; test-only setters do not count,
-  and `const` key names are resolved.
+  with `c.Get*` must be written by production code; test-only setters do not count, and `const`
+  key names are resolved. "`c.Get*`" means **every context accessor**, not just `Get`,
+  `GetString` and `MustGet`: `c.GetBool("auth_via_api_key")` decides whether an API key is
+  scoped or a legacy full-access key, and the narrow pattern could not see that read at all.
 - `check:error-sanitization` (`scripts/check-error-sanitization.mjs`) — a 5xx must
   answer a literal or `sanitizeError(...)`, never a raw `err.Error()`. It reads **both** ways a
   5xx is written — the `respondError(…)` helper **and** a direct `c.JSON`/`c.String`/
