@@ -417,12 +417,15 @@ func allowedOrigin(cfg *config.Config, r *http.Request) bool {
 	if err != nil {
 		return false
 	}
-	originHost := u.Hostname()
+	originHost := strings.ToLower(u.Hostname())
 	if len(cfg.Server.AllowedOrigins) == 0 {
 		return originHost == "localhost" || originHost == "127.0.0.1" || originHost == "::1"
 	}
+	// Hostnames are case-insensitive (RFC 4343). A config entry typed with
+	// capitals used to never match the browser's lowercase Origin, so an
+	// operator who had just added their host was still refused.
 	for _, allowed := range cfg.Server.AllowedOrigins {
-		if originHost == allowed {
+		if originHost == strings.ToLower(strings.TrimSpace(allowed)) {
 			return true
 		}
 	}

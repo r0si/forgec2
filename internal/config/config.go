@@ -1336,8 +1336,12 @@ func (c *Config) AllowedOrigin(hostname string) bool {
 	if len(c.Server.AllowedOrigins) == 0 {
 		return false
 	}
+	// Case-insensitive for the same reason as the server-side check: RFC 4343
+	// hostnames are not case-sensitive, and a config entry typed with capitals
+	// must not silently never match.
+	want := strings.ToLower(strings.TrimSpace(hostname))
 	for _, allowed := range c.Server.AllowedOrigins {
-		if hostname == allowed {
+		if want == strings.ToLower(strings.TrimSpace(allowed)) {
 			return true
 		}
 	}
