@@ -93,7 +93,14 @@ func (s *Server) collectSituation(reqCtx *aiReqCtx) aiSituation {
 		tasks.Where("status = ? AND created_by = ?", "pending_approval", "ai").Count(&out.AIPending)
 	}
 	if hasPermission(db.PermOpsecRead) {
-		s.db.Model(&db.Alert{}).Where("status = ?", "active").Count(&out.ActiveAlerts)
+		// Alerts carry the alerting agent's tenant, so this count must be scoped like
+		// everything else here. It was global: one tenant could see how noisy another
+		// tenant's estate was by asking the assistant for a summary.
+		alerts := s.db.Model(&db.Alert{}).Where("status = ?", "active")
+		if scoped {
+			alerts = alerts.Where("tenant_id = ?", reqCtx.Principal.TenantID)
+		}
+		alerts.Count(&out.ActiveAlerts)
 	}
 	if hasPermission(db.PermCredsRead) {
 		credentials := s.db.Model(&db.CredentialEntry{})
