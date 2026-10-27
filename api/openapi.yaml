@@ -2171,6 +2171,42 @@ paths:
                 type: string
         '503':
           description: Database is not initialized
+  /audit/anchor:
+    get:
+      tags: [Audit]
+      summary: Current audit chain head, for out-of-band archiving
+      description: >-
+        The newest audit row's id and entry hash, plus whether the server-side
+        anchor file agrees with the table. Pasting this into an incident report
+        gives a later investigator something a rewrite of the table cannot
+        reproduce.
+      operationId: getAuditChainAnchor
+      security:
+        - SessionCookie: []
+      responses:
+        '200':
+          description: Chain head
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          id:
+                            type: integer
+                          entry_hash:
+                            type: string
+                          created_at:
+                            type: string
+                          anchor_matches:
+                            type: boolean
+                          anchor_recorded:
+                            type: boolean
   /tasks:
     get:
       tags: [Tasks]

@@ -1230,6 +1230,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/audit/anchor": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Current audit chain head, for out-of-band archiving
+         * @description The newest audit row's id and entry hash, plus whether the server-side anchor file agrees with the table. Pasting this into an incident report gives a later investigator something a rewrite of the table cannot reproduce.
+         */
+        get: operations["getAuditChainAnchor"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks": {
         parameters: {
             query?: never;
@@ -13266,6 +13286,34 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    getAuditChainAnchor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Chain head */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: {
+                            id?: number;
+                            entry_hash?: string;
+                            created_at?: string;
+                            anchor_matches?: boolean;
+                            anchor_recorded?: boolean;
+                        };
+                    };
+                };
             };
         };
     };

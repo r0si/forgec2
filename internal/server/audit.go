@@ -423,6 +423,47 @@ func (s *Server) auditAnchorHead() string {
 	return ""
 }
 
+// auditChainHead is the fingerprint an operator archives out of band: the newest
+// row id and its entry hash, plus whether the server-side anchor file agrees.
+// Pasting it into an incident report (or a ticket) gives a later investigator
+// something to compare against that a rewrite of the table cannot reproduce.
+type auditChainHead struct {
+	ID        uint   `json:"id"`
+	EntryHash string `json:"entry_hash"`
+	CreatedAt string `json:"created_at,omitempty"`
+	// AnchorMatches is false when the anchor file disagrees with the table, which
+	// is the signature of a rewritten or replaced audit table.
+	AnchorMatches bool `json:"anchor_matches"`
+	// AnchorRecording is true when an anchor exists at all; a fresh install has
+	// none yet, which is not a failure.
+	AnchorRecorded bool `json:"anchor_recorded"`
+}
+
+// handleAuditChainAnchor returns the current chain head for out-of-band archiving.
+func (s *Server) handleAuditChainAnchor(c *gin.Context) {
+	if s == nil || s.db == nil {
+		respondError(c, http.StatusServiceUnavailable, "database is not initialized")
+		return
+	}
+	var newest db.AuditLog
+	head := auditChainHead{AnchorMatches: true}
+	query := s.auditTenantScope(s.db.Model(&db.AuditLog{}), c)
+	if err := query.Order("id DESC").Limit(1).Find(&newest).Error; err != nil {
+		respondError(c, http.StatusInternalServerError, "failed to read the audit chain")
+		return
+	}
+	if newest.ID != 0 {
+		head.ID = newest.ID
+		head.EntryHash = newest.EntryHash
+		head.CreatedAt = newest.CreatedAt.UTC().Format(time.RFC3339Nano)
+	}
+	if anchored := s.auditAnchorHead(); anchored != "" {
+		head.AnchorRecorded = true
+		head.AnchorMatches = head.EntryHash == "" || anchored == head.EntryHash
+	}
+	respond(c, head)
+}
+
 // handleVerifyAuditChain reports whether the audit chain is intact. Read-only:
 // it exists so an investigator can prove the log was not edited after the fact.
 func (s *Server) handleVerifyAuditChain(c *gin.Context) {
