@@ -35,6 +35,11 @@ type BuildJob struct {
 	// Authenticode classification for a direct Windows EXE/DLL output. Empty
 	// when the build is not a direct Windows binary (ZIP/LNK bundles and other
 	// platforms are deliberately not inspected).
+	// TenantID scopes the job to the tenant that started it: the status and
+	// download endpoints looked jobs up by id alone, so an id that leaked into a
+	// log or a screenshot let another tenant fetch the binary (which embeds the
+	// listener URL and profile).
+	TenantID        uint
 	SignatureStatus string
 	SignatureSigner string
 	SignatureIssuer string
@@ -43,13 +48,14 @@ type BuildJob struct {
 
 // startBuildJob creates a build job, stores it, and returns its ID.
 func (s *Server) startBuildJob(platform, format, c2URL string, listenerID uint, filename string) *BuildJob {
-	return s.startBuildJobWithProfile(platform, format, c2URL, listenerID, filename, "", "")
+	return s.startBuildJobWithProfile(platform, format, c2URL, listenerID, filename, "", "", 0)
 }
 
 // startBuildJobWithProfile additionally records the malleable profile for audit.
-func (s *Server) startBuildJobWithProfile(platform, format, c2URL string, listenerID uint, filename, profileName, profileHash string) *BuildJob {
+func (s *Server) startBuildJobWithProfile(platform, format, c2URL string, listenerID uint, filename, profileName, profileHash string, tenantID uint) *BuildJob {
 	job := &BuildJob{
 		ID:          protocol.UUIDv7(),
+		TenantID:    tenantID,
 		Status:      "building",
 		Phase:       "queued",
 		Platform:    platform,
@@ -62,6 +68,11 @@ func (s *Server) startBuildJobWithProfile(platform, format, c2URL string, listen
 		CreatedAt:   time.Now(),
 	}
 	s.buildJobsMu.Lock()
+	// NewServer initializes the map, but a server assembled another way (tests,
+	// partial startup) must not panic on the first build.
+	if s.buildJobs == nil {
+		s.buildJobs = make(map[string]*BuildJob)
+	}
 	s.buildJobs[job.ID] = job
 	s.buildJobsMu.Unlock()
 	return job
@@ -152,14 +163,32 @@ func (s *Server) sweepBuildJobsOnce() {
 }
 
 // handleBuildStatus returns the current status of an async build.
+// buildJobVisibleTo reports whether the caller may read this build job. A build
+// belongs to the tenant that started it; an unscoped caller (tid 0) keeps the
+// single-tenant view, and a job with no tenant (created by a path that predates
+// this field) stays readable so existing builds do not become invisible.
+func (s *Server) buildJobVisibleTo(c *gin.Context, job *BuildJob) bool {
+	if job == nil {
+		return false
+	}
+	tid := s.currentTenantID(c)
+	if tid == 0 || job.TenantID == 0 {
+		return true
+	}
+	return job.TenantID == tid
+}
+
 func (s *Server) handleBuildStatus(c *gin.Context) {
 	buildID := c.Param("id")
 	// Snapshot all fields under the lock: completeBuildJob mutates the job
 	// from the build goroutine, so lock-free reads would race with it.
 	s.buildJobsMu.RLock()
 	job, ok := s.buildJobs[buildID]
-	if !ok {
+	visible := s.buildJobVisibleTo(c, job)
+	if !ok || !visible {
 		s.buildJobsMu.RUnlock()
+		// 404 rather than 403: another tenant's build must not even be confirmed
+		// to exist.
 		respondError(c, http.StatusNotFound, "build not found")
 		return
 	}
@@ -200,9 +229,11 @@ func (s *Server) handleBuildDownload(c *gin.Context) {
 	s.buildJobsMu.RLock()
 	job, ok := s.buildJobs[buildID]
 	var status, output string
-	if ok {
+	if ok && s.buildJobVisibleTo(c, job) {
 		status = job.Status
 		output = job.Output
+	} else {
+		ok = false
 	}
 	s.buildJobsMu.RUnlock()
 	if !ok {
