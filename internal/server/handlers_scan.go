@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -81,6 +82,21 @@ func (s *Server) handleScannerPage(c *gin.Context) {
 	s.renderPageOrJSON(c, data)
 }
 
+// validateScanTarget guards the "<target>:<ports>" wire format. The implant
+// splits the command on the FIRST colon (SplitN(command, ":", 2)), so an IPv6
+// literal such as 2001:db8::1 would be read as target "2001" with a nonsense port
+// list and the scan would hit a different host than the operator named. A
+// comma-separated multi-target list stays supported.
+func validateScanTarget(target string) error {
+	if target == "" {
+		return errors.New("target is required")
+	}
+	if strings.ContainsAny(target, ": \t\r\n") {
+		return errors.New("target must not contain ':' or whitespace: the implant splits <target>:<ports> on the first colon, so IPv6 literals are not supported")
+	}
+	return nil
+}
+
 // handleScanTask creates a new scan task for an agent
 func (s *Server) handleScanTask(c *gin.Context) {
 	agentID := c.PostForm("agent_id")
@@ -93,12 +109,8 @@ func (s *Server) handleScanTask(c *gin.Context) {
 		respondError(c, http.StatusBadRequest, "agent_id and target are required")
 		return
 	}
-	// The wire format is "<target>:<ports>" and the implant splits it on the FIRST
-	// colon (SplitN(command, ":", 2)), so an IPv6 literal such as 2001:db8::1 is
-	// read as target "2001" with a nonsense port list — the scan then hits the
-	// wrong host. Multi-target lists are comma separated and stay supported.
-	if strings.ContainsAny(target, ": \t\r\n") {
-		respondError(c, http.StatusBadRequest, "target must not contain ':' or whitespace: the implant splits <target>:<ports> on the first colon, so IPv6 literals are not supported")
+	if err := validateScanTarget(target); err != nil {
+		respondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 

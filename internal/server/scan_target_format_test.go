@@ -79,3 +79,25 @@ func TestHandleScanTaskBuildsCommaSeparatedTargets(t *testing.T) {
 		t.Fatalf("command = %q", task.Command)
 	}
 }
+
+// TestValidateScanTarget pins the guard directly, including the shapes that must
+// still pass: a bare IPv4 and a comma-separated multi-target list.
+func TestValidateScanTarget(t *testing.T) {
+	for _, bad := range []string{
+		"2001:db8::1",       // IPv6 literal: the implant would read target "2001"
+		"10.0.0.1:80",       // host:port already carries a colon
+		"10.0.0.1 10.0.0.2", // space-separated list
+		"10.0.0.1\n",        // trailing newline
+		"10.0.0.1\t",
+		"",
+	} {
+		if err := validateScanTarget(bad); err == nil {
+			t.Errorf("validateScanTarget(%q) = nil, want an error", bad)
+		}
+	}
+	for _, good := range []string{"10.0.0.1", "10.0.0.1,10.0.0.2", "dc01.corp.local", "10.0.0.1,dc01.corp.local"} {
+		if err := validateScanTarget(good); err != nil {
+			t.Errorf("validateScanTarget(%q) = %v, want nil", good, err)
+		}
+	}
+}
