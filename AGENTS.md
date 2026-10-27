@@ -129,6 +129,24 @@ by hand at least once; do not weaken one to make a change pass — fix the chang
   response, or a file that improved without lowering its number. Update the matching
   `internal/server/envelope*_baseline.txt` in the same commit.
 
+## Tables without a tenant column
+
+`tenantScope` appends `WHERE tenant_id = ?`, so it can only be used on a model that HAS the
+column. Several tables deliberately (or historically) do not, and scoping them has to run
+through a relationship instead:
+
+| table | scope through |
+|---|---|
+| `agent_status_events`, `one_shot_tasks` | the **agent** (`agent_id IN (SELECT id FROM implants …)`) |
+| `scripts`, `bof_files` | the **uploader/creator** (`created_by IN (SELECT username FROM users WHERE tenant_id = ?)`) |
+| `ai_attachments`, `ai_chat_sessions` | the **owner column** plus the tenant on the row |
+| `phishing_templates`, `phishing_campaigns`, `workflows`, `agent_groups`, `agent_tags`, `auto_tag_rules`, `custom_roles` | **not scoped at all today** — global by default; `findOrFail` does not scope them |
+
+`findOrFail(c, &row, id, name)` takes the context and **ignores it** for scoping — it is a plain
+`First` by id. It now flags nothing, which is why every caller must think about the table. The
+`check:tenant-scope` gate covers the models that DO have the column; the remainder are tracked
+here so the next change does not assume they are isolated.
+
 ## In-memory registries and eviction
 The server keeps several per-agent registries in memory. The recurring bug in this
 area is a registry that has a **writer but no reachable eviction** — the entry is

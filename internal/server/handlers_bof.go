@@ -10,13 +10,19 @@ import (
 
 	"github.com/forgec2/forgec2/internal/db"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 func (s *Server) handleBOFPage(c *gin.Context) {
 	stats := s.getNavStats(c)
 
+	scope, ok := s.bofScope(c)
+	if !ok {
+		respond(c, gin.H{"bofs": []gin.H{}})
+		return
+	}
 	var bofs []db.BOFFile
-	if err := s.db.Order("created_at desc").Limit(500).Find(&bofs).Error; err != nil {
+	if err := scope.Order("created_at desc").Limit(500).Find(&bofs).Error; err != nil {
 		handleQueryError(c, err, "Failed to list BOFs")
 		return
 	}
@@ -98,9 +104,46 @@ func (s *Server) handleBOFUpload(c *gin.Context) {
 	respond(c, gin.H{"bof": bof})
 }
 
+// bofScope restricts BOF blobs to the caller's tenant. bof_files has no tenant column, so
+// ownership runs through the uploader (created_by), exactly like scripts. Without it ANY operator
+// could list, download, edit, delete and RUN another tenant's uploaded blob - and a BOF is an
+// executable the implant loads.
+func (s *Server) bofScope(c *gin.Context) (*gorm.DB, bool) {
+	tid, ok := s.resolveTenant(c)
+	if !ok {
+		return nil, false
+	}
+	q := s.db.Model(&db.BOFFile{})
+	if tid == 0 {
+		return q, true
+	}
+	users := s.db.Model(&db.User{}).Select("username").Where("tenant_id = ?", tid)
+	return q.Where("created_by IN (?)", users), true
+}
+
+// findVisibleBOF loads a BOF by id within the caller's scope; false answers 404 like a miss.
+func (s *Server) findVisibleBOF(c *gin.Context, id string) (db.BOFFile, bool) {
+	var bof db.BOFFile
+	scope, ok := s.bofScope(c)
+	if !ok {
+		respondError(c, http.StatusNotFound, "BOF not found")
+		return bof, false
+	}
+	if err := scope.Where("id = ?", id).First(&bof).Error; err != nil {
+		respondError(c, http.StatusNotFound, "BOF not found")
+		return bof, false
+	}
+	return bof, true
+}
+
 func (s *Server) handleBOFList(c *gin.Context) {
+	scope, ok := s.bofScope(c)
+	if !ok {
+		respond(c, gin.H{"bofs": []gin.H{}})
+		return
+	}
 	var bofs []db.BOFFile
-	if err := s.db.Order("created_at desc").Limit(500).Find(&bofs).Error; err != nil {
+	if err := scope.Order("created_at desc").Limit(500).Find(&bofs).Error; err != nil {
 		handleQueryError(c, err, "Failed to list BOFs")
 		return
 	}
@@ -125,8 +168,8 @@ func (s *Server) handleBOFDelete(c *gin.Context) {
 	}
 	bofID := c.Param("id")
 
-	var bof db.BOFFile
-	if !s.findOrFail(c, &bof, bofID, "BOF") {
+	bof, ok := s.findVisibleBOF(c, bofID)
+	if !ok {
 		return
 	}
 
@@ -142,8 +185,8 @@ func (s *Server) handleBOFDelete(c *gin.Context) {
 func (s *Server) handleBOFDownload(c *gin.Context) {
 	bofID := c.Param("id")
 
-	var bof db.BOFFile
-	if !s.findOrFail(c, &bof, bofID, "BOF") {
+	bof, ok := s.findVisibleBOF(c, bofID)
+	if !ok {
 		return
 	}
 
@@ -164,8 +207,8 @@ func (s *Server) handleBOFRun(c *gin.Context) {
 		return
 	}
 
-	var bof db.BOFFile
-	if !s.findOrFail(c, &bof, bofID, "BOF") {
+	bof, ok := s.findVisibleBOF(c, bofID)
+	if !ok {
 		return
 	}
 
@@ -272,8 +315,8 @@ func (s *Server) handleBOFEdit(c *gin.Context) {
 	}
 	bofID := c.Param("id")
 
-	var bof db.BOFFile
-	if !s.findOrFail(c, &bof, bofID, "BOF") {
+	bof, ok := s.findVisibleBOF(c, bofID)
+	if !ok {
 		return
 	}
 
