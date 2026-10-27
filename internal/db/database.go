@@ -224,11 +224,21 @@ func InitDBWithDriver(driver, dsn, fallbackPath string, logLevel slog.Level, dbM
 		// DSNs; DSNs that already carry query parameters are left
 		// untouched.
 		sqliteDSN := fallbackPath
-		if !strings.Contains(sqliteDSN, "?") {
-			sqliteDSN += fmt.Sprintf(
-				"?_pragma=foreign_keys(1)&_pragma=busy_timeout(%d)&_pragma=synchronous(1)&_pragma=cache_size(-2000)&_pragma=temp_store(2)&_pragma=mmap_size(268435456)",
+		// A DSN that already names pragmas is left alone (the operator asked for
+		// something specific). Any OTHER query string still gets the pragmas
+		// appended: the previous code skipped them whenever a "?" was present, so
+		// "file:data.db?cache=shared" silently ran without foreign_keys - orphan
+		// rows were no longer rejected and nothing said so.
+		if !strings.Contains(sqliteDSN, "_pragma=") {
+			pragmas := fmt.Sprintf(
+				"_pragma=foreign_keys(1)&_pragma=busy_timeout(%d)&_pragma=synchronous(1)&_pragma=cache_size(-2000)&_pragma=temp_store(2)&_pragma=mmap_size(268435456)",
 				SQLiteBusyTimeoutMS,
 			)
+			if strings.Contains(sqliteDSN, "?") {
+				sqliteDSN += "&" + pragmas
+			} else {
+				sqliteDSN += "?" + pragmas
+			}
 		}
 		db, err = gorm.Open(glebarez.Open(sqliteDSN), gormConfig)
 		if err != nil {
