@@ -709,7 +709,7 @@ func (s *Server) aiDoRequestWithConfig(ctx context.Context, payload []byte, snap
 				}
 				continue
 			}
-			slog.Error("AI API error", "status", resp.StatusCode, "url", urlStr, "body", bodyStr)
+			slog.Error("AI API error", "status", resp.StatusCode, "url", redactURLForLog(urlStr), "body", bodyStr)
 			return nil, fmt.Errorf("API %d from %s: %s", resp.StatusCode, urlStr, bodyStr)
 		}
 		return resp, nil

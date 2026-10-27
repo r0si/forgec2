@@ -12,15 +12,15 @@ import (
 	"time"
 )
 
-// TestRedactWebhookTargetHidesTheToken pins the redaction: a webhook URL is often
+// TestRedactURLFromMessageHidesTheToken pins the redaction: a webhook URL is often
 // the credential itself (a Slack incoming-webhook URL is), and a *url.Error
 // stringifies the whole URL — so logging the raw delivery error wrote the token
 // into the log.
-func TestRedactWebhookTargetHidesTheToken(t *testing.T) {
+func TestRedactURLFromMessageHidesTheToken(t *testing.T) {
 	const secretURL = "https://hooks.example.com/services/T000/B000/SUPERSECRETTOKEN"
 	msg := `Post "` + secretURL + `": dial tcp 10.0.0.1:443: connect: connection refused`
 
-	got := redactWebhookTarget(msg, secretURL)
+	got := redactURLFromMessage(msg, secretURL)
 	if strings.Contains(got, "SUPERSECRETTOKEN") {
 		t.Fatalf("the token survived redaction: %s", got)
 	}
@@ -29,14 +29,14 @@ func TestRedactWebhookTargetHidesTheToken(t *testing.T) {
 	}
 	// A message with query parameters is redacted too.
 	q := "https://hooks.example.com/x?token=abc123"
-	if out := redactWebhookTarget("failed: "+q, q); strings.Contains(out, "abc123") {
+	if out := redactURLFromMessage("failed: "+q, q); strings.Contains(out, "abc123") {
 		t.Fatalf("a query token survived: %s", out)
 	}
 	// Inputs that do not mention the URL are untouched.
-	if out := redactWebhookTarget("plain failure", secretURL); out != "plain failure" {
+	if out := redactURLFromMessage("plain failure", secretURL); out != "plain failure" {
 		t.Fatalf("an unrelated message was rewritten: %s", out)
 	}
-	if out := redactWebhookTarget("x", ""); out != "x" {
+	if out := redactURLFromMessage("x", ""); out != "x" {
 		t.Fatal("an empty URL changed the message")
 	}
 }

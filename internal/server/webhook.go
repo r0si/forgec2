@@ -41,12 +41,12 @@ func (s *Server) webhooksForEvent(evt Event) []db.WebhookConfig {
 	return webhooks
 }
 
-// redactWebhookTarget removes a webhook URL from a message. Webhook targets are
-// frequently secrets in themselves (a Slack incoming-webhook URL is the
-// credential), and a *url.Error stringifies the whole URL - so logging the raw
-// delivery error wrote the token into the log, right below a line that
+// redactURLFromMessage removes a target URL from a log message. Outbound targets are
+// frequently secrets in themselves (a Slack incoming-webhook URL, or a provider URL
+// with ?key=... appended), and a *url.Error stringifies the whole URL - so logging the raw
+// delivery error writes the token into the log, right below a line that
 // deliberately avoids logging the URL.
-func redactWebhookTarget(msg, rawURL string) string {
+func redactURLFromMessage(msg, rawURL string) string {
 	if rawURL == "" || msg == "" {
 		return msg
 	}
@@ -124,7 +124,7 @@ func (s *Server) fireWebhook(wh db.WebhookConfig, evt Event) error {
 		resp, err := ssrfSafeClient(s.httpClient).Do(req)
 		if err != nil {
 			if attempt < webhookMaxRetries {
-				slog.Warn("Webhook delivery failed, retrying", "name", wh.Name, "attempt", attempt+1, "error", redactWebhookTarget(err.Error(), wh.URL))
+				slog.Warn("Webhook delivery failed, retrying", "name", wh.Name, "attempt", attempt+1, "error", redactURLFromMessage(err.Error(), wh.URL))
 				select {
 				case <-s.ctx.Done():
 					return fmt.Errorf("webhook delivery aborted: server shutting down")
@@ -132,7 +132,7 @@ func (s *Server) fireWebhook(wh db.WebhookConfig, evt Event) error {
 				}
 				continue
 			}
-			slog.Error("Webhook delivery failed, exhausted retries", "name", wh.Name, "error", redactWebhookTarget(err.Error(), wh.URL))
+			slog.Error("Webhook delivery failed, exhausted retries", "name", wh.Name, "error", redactURLFromMessage(err.Error(), wh.URL))
 			return err
 		}
 		resp.Body.Close()

@@ -209,7 +209,7 @@ func (s *Server) executeTaskCallback(task db.Task, agentID string) {
 	// carries command output to an operator-supplied URL, so it must never be
 	// the one outbound path that skips the address policy.
 	if err := webhookTargetValidator(task.CallbackURL); err != nil {
-		slog.Error("Callback URL rejected by SSRF filter", "task_id", task.ID, "url", task.CallbackURL, "error", err)
+		slog.Error("Callback URL rejected by SSRF filter", "task_id", task.ID, "url", redactURLForLog(task.CallbackURL), "error", redactURLFromMessage(err.Error(), task.CallbackURL))
 		return
 	}
 
@@ -236,7 +236,7 @@ func (s *Server) executeTaskCallback(task db.Task, agentID string) {
 
 	req, err := http.NewRequest(method, task.CallbackURL, strings.NewReader(string(body)))
 	if err != nil {
-		slog.Error("Failed to create callback request", "task_id", task.ID, "url", task.CallbackURL, "error", err)
+		slog.Error("Failed to create callback request", "task_id", task.ID, "url", redactURLForLog(task.CallbackURL), "error", redactURLFromMessage(err.Error(), task.CallbackURL))
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
@@ -248,7 +248,7 @@ func (s *Server) executeTaskCallback(task db.Task, agentID string) {
 	// and carries the task result payload there.
 	resp, err := ssrfSafeClient(s.httpClient).Do(req)
 	if err != nil {
-		slog.Error("Callback request failed", "task_id", task.ID, "url", task.CallbackURL, "error", err)
+		slog.Error("Callback request failed", "task_id", task.ID, "url", redactURLForLog(task.CallbackURL), "error", redactURLFromMessage(err.Error(), task.CallbackURL))
 		return
 	}
 	defer resp.Body.Close()
@@ -259,6 +259,6 @@ func (s *Server) executeTaskCallback(task db.Task, agentID string) {
 		}
 		slog.Info("Task callback delivered", "task_id", task.ID, "url", task.CallbackURL, "status", resp.StatusCode)
 	} else {
-		slog.Warn("Task callback returned non-2xx", "task_id", task.ID, "url", task.CallbackURL, "status", resp.StatusCode)
+		slog.Warn("Task callback returned non-2xx", "task_id", task.ID, "url", redactURLForLog(task.CallbackURL), "status", resp.StatusCode)
 	}
 }
