@@ -102,6 +102,12 @@ by hand at least once; do not weaken one to make a change pass — fix the chang
   (`agent_status_events` did). The model is resolved from the scope line, its statement, the
   query destination variable, or the function's only table; a call it cannot resolve is
   **reported, not guessed**, and a deliberate exception carries `// check:tenant-scope-ok`.
+- `check:mitre-coverage` (`scripts/check-mitre-coverage.mjs`) — every task type named in
+  the ATT&CK coverage map (`attackTacticMap` in `handlers_mitre.go`) must be a **dispatchable
+  spec** in `pkg/protocol`; the map carries its own warning about "fantasy names ... which no
+  agent handler implements", and a comment cannot enforce that. It also rejects a malformed
+  technique id. Measured when added: 32 techniques, 28 mapped, 4 honestly uncovered, 0 unknown
+  types.
 - `check:docs` (`gen-command-reference.mjs --check` + `gen-capability-matrix.mjs --check`) —
   the generated docs must match their sources: the command reference, and the **generated
   task-inventory block** plus the version stamp in `docs/CAPABILITY_MATRIX.md`. CI runs these

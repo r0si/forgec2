@@ -38,6 +38,7 @@
     "check:command-separators": "node ../scripts/check-command-separators.mjs",
     "check:taskdocs": "node ../scripts/check-task-docs.mjs",
     "check:tenant-scope": "node ../scripts/check-tenant-scope.mjs",
+    "check:mitre-coverage": "node ../scripts/check-mitre-coverage.mjs",
     "check:docs": "node ../scripts/gen-command-reference.mjs --check && node ../scripts/gen-capability-matrix.mjs --check",
     "check:permissions": "node scripts/check-permissions.mjs",
     "check:bundle": "node scripts/check-bundle.mjs",
@@ -45,8 +46,8 @@
     "audit:layout": "node scripts/audit-layout.mjs",
     "gen:openapi": "openapi-typescript ../api/openapi.yaml -o src/lib/api-schema.d.ts",
     "gen:permissions": "node scripts/gen-permissions.mjs",
-    "check": "npx concurrently -n css,tokens,contrast,aria,i18n,paths,dialogs,openapi,perms,layout,webdist,bundle,readme,routeauth,ctxkeys,errsanitize,txqueries,cmdsep,taskdocs,scopes,docs \"npm:check:css\" \"npm:check:tokens\" \"npm:check:contrast\" \"npm:check:aria\" \"npm:check:i18n\" \"npm:check:paths\" \"npm:check:native-dialogs\" \"npm:check:openapi-types\" \"npm:check:permissions\" \"npm:check:layout\" \"npm:check:webdist\" \"npm:check:bundle\" \"npm:check:readme\" \"npm:check:route-auth\" \"npm:check:context-keys\" \"npm:check:error-sanitization\" \"npm:check:tx-queries\" \"npm:check:command-separators\" \"npm:check:taskdocs\" \"npm:check:tenant-scope\" \"npm:check:docs\"",
-    "check:pre": "npx concurrently -n css,tokens,i18n,paths,dialogs,openapi,perms,layout,readme,routeauth,ctxkeys,errsanitize,txqueries,cmdsep,taskdocs,scopes,docs \"npm:check:css\" \"npm:check:tokens\" \"npm:check:i18n\" \"npm:check:paths\" \"npm:check:native-dialogs\" \"npm:check:openapi-types\" \"npm:check:permissions\" \"npm:check:layout\" \"npm:check:readme\" \"npm:check:route-auth\" \"npm:check:context-keys\" \"npm:check:error-sanitization\" \"npm:check:tx-queries\" \"npm:check:command-separators\" \"npm:check:taskdocs\" \"npm:check:tenant-scope\" \"npm:check:docs\"",
+    "check": "npx concurrently -n css,tokens,contrast,aria,i18n,paths,dialogs,openapi,perms,layout,webdist,bundle,readme,routeauth,ctxkeys,errsanitize,txqueries,cmdsep,taskdocs,scopes,mitre,docs \"npm:check:css\" \"npm:check:tokens\" \"npm:check:contrast\" \"npm:check:aria\" \"npm:check:i18n\" \"npm:check:paths\" \"npm:check:native-dialogs\" \"npm:check:openapi-types\" \"npm:check:permissions\" \"npm:check:layout\" \"npm:check:webdist\" \"npm:check:bundle\" \"npm:check:readme\" \"npm:check:route-auth\" \"npm:check:context-keys\" \"npm:check:error-sanitization\" \"npm:check:tx-queries\" \"npm:check:command-separators\" \"npm:check:taskdocs\" \"npm:check:tenant-scope\" \"npm:check:mitre-coverage\" \"npm:check:docs\"",
+    "check:pre": "npx concurrently -n css,tokens,i18n,paths,dialogs,openapi,perms,layout,readme,routeauth,ctxkeys,errsanitize,txqueries,cmdsep,taskdocs,scopes,mitre,docs \"npm:check:css\" \"npm:check:tokens\" \"npm:check:i18n\" \"npm:check:paths\" \"npm:check:native-dialogs\" \"npm:check:openapi-types\" \"npm:check:permissions\" \"npm:check:layout\" \"npm:check:readme\" \"npm:check:route-auth\" \"npm:check:context-keys\" \"npm:check:error-sanitization\" \"npm:check:tx-queries\" \"npm:check:command-separators\" \"npm:check:taskdocs\" \"npm:check:tenant-scope\" \"npm:check:mitre-coverage\" \"npm:check:docs\"",
     "verify": "npm run typecheck && npm run lint && npm run test && npm run check",
     "check:audit": "node scripts/check-audit.mjs"
   },
