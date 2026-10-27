@@ -13242,6 +13242,8 @@ export interface operations {
             query?: {
                 /** @description Maximum number of the newest rows to export (default 50000, max 200000) */
                 limit?: number;
+                /** @description Export only rows with a greater id. Ids are monotonic, so this makes the export incremental: fetch the rows appended since the copy you already verified, and stitch the two together via prev_hash. */
+                since_id?: number;
             };
             header?: never;
             path?: never;

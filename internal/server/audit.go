@@ -231,9 +231,17 @@ func (s *Server) handleExportAuditChain(c *gin.Context) {
 	if limit <= 0 || limit > 200000 {
 		limit = 50000
 	}
+	// since_id makes the export incremental: an investigator who already holds a
+	// verified copy fetches only the rows appended since it, instead of pulling the
+	// whole table again. Ids are monotonic, so the anchor is simply "greater than".
+	sinceID := uint(atoiDefault(c.Query("since_id"), 0))
+
+	query := s.auditTenantScope(s.db.Model(&db.AuditLog{}), c)
+	if sinceID > 0 {
+		query = query.Where("id > ?", sinceID)
+	}
 	var rows []db.AuditLog
-	if err := s.auditTenantScope(s.db.Model(&db.AuditLog{}), c).
-		Order("id ASC").Limit(limit).Find(&rows).Error; err != nil {
+	if err := query.Order("id ASC").Limit(limit).Find(&rows).Error; err != nil {
 		respondError(c, http.StatusInternalServerError, "failed to read the audit chain")
 		return
 	}

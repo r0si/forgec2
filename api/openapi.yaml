@@ -2153,6 +2153,15 @@ paths:
           schema:
             type: integer
             default: 50000
+        - name: since_id
+          in: query
+          description: >-
+            Export only rows with a greater id. Ids are monotonic, so this makes
+            the export incremental: fetch the rows appended since the copy you
+            already verified, and stitch the two together via prev_hash.
+          schema:
+            type: integer
+            default: 0
       responses:
         '200':
           description: One JSON object per line, each with prev_hash and entry_hash
