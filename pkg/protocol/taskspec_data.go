@@ -29,6 +29,8 @@ func init() {
 			Parameters: []TaskParam{{Name: "command", Type: "int", Required: true, Description: "PID to resume"}}},
 		{Type: TaskTypeKillProc, Name: "Kill Process", Description: "Terminate a process by PID", Category: "execution",
 			Parameters: []TaskParam{{Name: "command", Type: "int", Required: true, Description: "PID to kill"}}},
+		{Type: TaskTypeAbort, Name: "Abort Task", Description: "Cancel a running or queued task by its task id", Category: "execution",
+			Parameters: []TaskParam{{Name: "command", Type: "int", Required: true, Description: "Task id to abort"}}},
 		{Type: TaskTypeWindowList, Name: "Window List", Description: "List visible top-level windows (HWND, PID, title)", Category: "discovery"},
 		{Type: TaskTypeWindowClose, Name: "Window Close", Description: "Close a window by HWND or title substring", Category: "execution",
 			Parameters: []TaskParam{{Name: "command", Type: "string", Required: true, Description: "HWND decimal or title substring"}}},

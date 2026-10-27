@@ -48,6 +48,10 @@ const (
 	TaskTypeSuspend          = "suspend"
 	TaskTypeResume           = "resume"
 	TaskTypeKillProc         = "killproc"
+	// TaskTypeAbort cancels a running or queued task on the implant. It was implemented and
+	// registered in the agent but had no spec, so it never appeared in the generated command
+	// reference or the capability matrix: an operator could not discover it.
+	TaskTypeAbort            = "abort"
 	TaskTypeWindowList       = "window_list"
 	TaskTypeWindowClose      = "window_close"
 	TaskTypeClipboardGet     = "clipboard_get"
@@ -288,6 +292,7 @@ func AllTaskTypes() []string {
 		TaskTypeSuspend,
 		TaskTypeResume,
 		TaskTypeKillProc,
+		TaskTypeAbort,
 		TaskTypeWindowList,
 		TaskTypeWindowClose,
 		TaskTypeClipboardGet,

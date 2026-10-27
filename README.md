@@ -1,6 +1,6 @@
 # ⚒️ ForgeC2
 
-**Self-hosted command and control that ships as a single binary.** <!--fact:tasks-->222<!--/fact--> implant tasks, 9 transports, an in-browser payload factory and an AI copilot — with signed releases and hot updates that roll back on failure.
+**Self-hosted command and control that ships as a single binary.** <!--fact:tasks-->223<!--/fact--> implant tasks, 9 transports, an in-browser payload factory and an AI copilot — with signed releases and hot updates that roll back on failure.
 
 [![CI](https://github.com/r0si/forgec2/actions/workflows/ci.yml/badge.svg)](https://github.com/r0si/forgec2/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/r0si/forgec2)](https://github.com/r0si/forgec2/releases)
@@ -83,7 +83,7 @@ also restart a running instance with `/health` probing and rollback.
 
 ## Implant capabilities
 
-<!--fact:tasks-->222<!--/fact--> task specs, defined once in a shared registry and consumed by both the teamserver and the agent:
+<!--fact:tasks-->223<!--/fact--> task specs, defined once in a shared registry and consumed by both the teamserver and the agent:
 
 - **Access** — shell, PowerShell, execute-assembly, BOF, PowerPick, PE/CLR loading, token steal/make/revert, credentials, mimikatz, kerberoast, DCSync
 - **Lateral** — WMI, WinRM, PsExec, pass-the-hash, pass-the-ticket, SMB/TCP relay, SOCKS5, port forwarding, NTLM relay

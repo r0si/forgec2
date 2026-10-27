@@ -3,16 +3,16 @@
 > **Generated** from `pkg/protocol/taskspec_data.go` by
 > `node scripts/gen-command-reference.mjs`. Do not edit by hand.
 
-- **Task types:** 222
-- **Constants in tasks.go:** 223
+- **Task types:** 223
+- **Constants in tasks.go:** 224
 - **Aliases:** 3
 - **Approval-gated:** 57
-- **Parameters (total):** 79
+- **Parameters (total):** 80
 - **Constants without specs:** shell_output (intentional: RESULT-type only, not dispatchable — see pkg/protocol/tasks.go)
 
 ## Categories
 
-- [Execution](#execution) (29)
+- [Execution](#execution) (30)
 - [Discovery](#discovery) (36)
 - [Collection](#collection) (18)
 - [Credential Access](#credential-access) (37)
@@ -27,6 +27,7 @@
 
 | Type | Name | Approval | Aliases | Parameters | Description |
 |------|------|----------|---------|------------|-------------|
+| `abort` | Abort Task | no | — | command:int* | Cancel a running or queued task by its task id |
 | `bof` | BOF | no | — | command:string* | Execute Beacon Object File |
 | `bof_infection` | BOF Infection | no | — | — | Download and execute BOF from server |
 | `chmod` | Change Mode | no | — | command:string*, data:string* | Change file mode bits (POSIX; on Windows only the read-only bit is mapped) |

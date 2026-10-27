@@ -35,9 +35,21 @@ if (registryFiles.length === 0) {
 }
 
 const handlers = new Set();
+// Three registration idioms exist, and this gate only knew the first one:
+//   taskHandlers["x"] = handleX          (most module registries)
+//   "x": handleX,                        (the core map literal in task_registry.go: 49 entries)
+//   RegisterTask(protocol.MustSpec("x"), handleX)
+// Missing the literal form left the gate blind to 49 handlers - 22% of the registry - so an
+// undocumented core command could never fail it.
 for (const file of registryFiles) {
   const src = readFileSync(join(AGENT_DIR, file), "utf8");
   for (const m of src.matchAll(/taskHandlers\["([a-z0-9_]+)"\]\s*=/g)) {
+    handlers.add(m[1]);
+  }
+  for (const m of src.matchAll(/^\s*"([a-z0-9_]+)":\s*[A-Za-z_]\w*,/gm)) {
+    handlers.add(m[1]);
+  }
+  for (const m of src.matchAll(/RegisterTask\(\s*protocol\.(?:MustSpec|Spec)\("([a-z0-9_]+)"/g)) {
     handlers.add(m[1]);
   }
 }

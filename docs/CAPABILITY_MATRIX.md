@@ -136,11 +136,11 @@ Rebuild implants after changing placement/header/timing fields — old agents ke
 
 > **Generated** from `pkg/protocol/taskspec_data.go` by `node scripts/gen-capability-matrix.mjs`. Do not edit inside these markers.
 
-- **Dispatchable task types:** 222 · **aliases:** 3 · **approval-gated:** 57
+- **Dispatchable task types:** 223 · **aliases:** 3 · **approval-gated:** 57
 
 | Category | Types |
 |----------|-------|
-| Execution (29) | `bof`, `bof_infection`, `chmod`, `clr_exec_assembly`, `clr_powershell`, `container_docker`, `container_k8s`, `download_url`, `execute_assembly`, `inject`, `inject_methods`, `interactive_shell_start`, `interactive_shell_stop`, `interactive_shell_write`, `killproc`, `mkdir`, `peloader`, `powerpick`, `reflectdll_inject`, `rename`, `resume`, `scp_upload`, `shell`, `shinject`, `shspawn`, `spawn`, `suspend`, `upload`, `window_close` |
+| Execution (30) | `abort`, `bof`, `bof_infection`, `chmod`, `clr_exec_assembly`, `clr_powershell`, `container_docker`, `container_k8s`, `download_url`, `execute_assembly`, `inject`, `inject_methods`, `interactive_shell_start`, `interactive_shell_stop`, `interactive_shell_write`, `killproc`, `mkdir`, `peloader`, `powerpick`, `reflectdll_inject`, `rename`, `resume`, `scp_upload`, `shell`, `shinject`, `shspawn`, `spawn`, `suspend`, `upload`, `window_close` |
 | Discovery (36) | `adcs_find`, `adcs_full_audit`, `av`, `cert_store_list`, `container_detect`, `drives`, `edr_status`, `file_hunt`, `file_scan`, `file_search`, `find`, `find_delegation`, `hostinfo`, `ldap_acl`, `ldap_computers`, `ldap_groups`, `ldap_query`, `ldap_spn`, `ldap_users`, `ls`, `net`, `netstat`, `portscan`, `ppl_check`, `process_tree`, `ps`, `reg_get`, `run_egress`, `sccm_recon`, `services`, `session_recon`, `sharphound`, `token_whoami`, `usb_enum`, `users`, `window_list` |
 | Collection (18) | `browser_history`, `clipboard_get`, `clipboard_set`, `cookie_export`, `download`, `file_thumb`, `keylogger_dump`, `keylogger_start`, `keylogger_stop`, `mic`, `read`, `remote_input`, `screen_trigger_start`, `screen_trigger_stop`, `screenshot`, `screenshot_window`, `webcam`, `wechat_history` |
 | Credential Access (37) | `adcs_esc1`, `adcs_esc2`, `adcs_esc3`, `adcs_esc4`, `adcs_esc5`, `adcs_esc6`, `adcs_esc7`, `adcs_esc8`, `adcs_request`, `asreproast`, `bronze_bit`, `browser_steal`, `cloud_steal`, `coerce_dfs`, `coerce_petitpotam`, `coerce_printerbug`, `constrained_deleg`, `cred_check`, `creds`, `dcsync`, `dcsync_machine`, `dpapi_blob`, `dpapi_browser`, `dpapi_masterkey`, `entra_prt`, `golden_ticket`, `kerberoast`, `mimikatz`, `ntlm_help`, `password_spray`, `rbcd`, `relay_ntlm_start`, `relay_ntlm_stop`, `shadow_creds`, `silver_ticket`, `vpn_creds`, `wifi_creds` |

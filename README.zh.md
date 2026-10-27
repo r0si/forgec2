@@ -1,6 +1,6 @@
 # ⚒️ ForgeC2
 
-**一个二进制装下的自托管命令与控制平台。** <!--fact:tasks-->222<!--/fact--> 个植入体任务、9 种传输、浏览器内的载荷工厂与 AI 副驾——发布产物签名可验证，热更新失败自动回滚。
+**一个二进制装下的自托管命令与控制平台。** <!--fact:tasks-->223<!--/fact--> 个植入体任务、9 种传输、浏览器内的载荷工厂与 AI 副驾——发布产物签名可验证，热更新失败自动回滚。
 
 [![CI](https://github.com/r0si/forgec2/actions/workflows/ci.yml/badge.svg)](https://github.com/r0si/forgec2/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/r0si/forgec2)](https://github.com/r0si/forgec2/releases)
@@ -82,7 +82,7 @@ bash scripts/deploy.sh --no-start
 
 ## 植入体能力
 
-<!--fact:tasks-->222<!--/fact--> 条任务规格，统一定义在共享注册表里，团队服务器与植入体共用同一份定义：
+<!--fact:tasks-->223<!--/fact--> 条任务规格，统一定义在共享注册表里，团队服务器与植入体共用同一份定义：
 
 - **立足** —— shell、PowerShell、execute-assembly、BOF、PowerPick、PE/CLR 加载、令牌窃取/伪造/还原、凭据、mimikatz、kerberoast、DCSync
 - **横向** —— WMI、WinRM、PsExec、Pass-the-Hash、Pass-the-Ticket、SMB/TCP 中继、SOCKS5、端口转发、NTLM relay

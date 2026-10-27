@@ -78,7 +78,10 @@ by hand at least once; do not weaken one to make a change pass — fix the chang
   `docs/COMMAND_REFERENCE.md`; an undocumented task type is a feature nobody can
   find. One direction only, deliberately: 53 documented types are handled by the
   core dispatcher or the C implant rather than by that registry, so demanding a
-  handler for every row would fail on legitimate entries.
+  handler for every row would fail on legitimate entries. It reads **three** registration
+  idioms — `taskHandlers["x"] = …`, the `"x": handleX,` map literal in `task_registry.go`,
+  and `RegisterTask(protocol.MustSpec("x"), …)`; knowing only the first left the gate blind
+  to **49** handlers, and `abort` was undocumented until that was fixed.
 - `check:tenant-scope` (`scripts/check-tenant-scope.mjs`) — a query scoped with
   `tenantScope`/`auditTenantScope` must target a model that **has a tenant column**; those
   helpers append `WHERE tenant_id = ?`, so scoping a table without one produced
