@@ -79,6 +79,13 @@ by hand at least once; do not weaken one to make a change pass — fix the chang
   find. One direction only, deliberately: 53 documented types are handled by the
   core dispatcher or the C implant rather than by that registry, so demanding a
   handler for every row would fail on legitimate entries.
+- `check:docs` (`gen-command-reference.mjs --check` + `gen-capability-matrix.mjs --check`) —
+  the generated docs must match their sources: the command reference, and the **generated
+  task-inventory block** plus the version stamp in `docs/CAPABILITY_MATRIX.md`. CI runs these
+  in a dedicated step; they were **not** in either local task list until now, so a stale doc
+  passed `npm run check` locally and only failed in CI. Scope worth knowing: the hand-written
+  per-OS tables in that file (Yes/No/Partial cells) are **not** verified — only the block
+  between the `BEGIN/END GENERATED TASK INVENTORY` markers and the `as of vX.Y.Z` stamp.
 - `TestSuccessEnvelope` / `TestErrorEnvelope` (Go) — ratchets over raw (non-envelope)
   JSON success and error responses, per file, failing in both directions: a new raw
   response, or a file that improved without lowering its number. Update the matching
