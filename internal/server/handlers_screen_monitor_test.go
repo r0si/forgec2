@@ -188,7 +188,7 @@ func TestScreenMonitorRejectsConcurrentOperations(t *testing.T) {
 	agent := seedImplant(t, database)
 	key := strings.ToLower(agent.ID)
 
-	srv.screenMonitorOps = map[string]string{key: "start"}
+	srv.screenMonitorOps = map[string]screenMonitorOp{key: {kind: "start", at: time.Now()}}
 	form := url.Values{"interval": {"5"}, "quality": {"medium"}}
 	w, c := newFormContext(http.MethodPost, "/", &form)
 	c.Params = gin.Params{{Key: "id", Value: agent.ID}}
@@ -203,7 +203,7 @@ func TestScreenMonitorRejectsConcurrentOperations(t *testing.T) {
 
 	// A stop against an in-flight stop is also refused.
 	srv.screenMonitorImplants[agent.ID] = time.Now()
-	srv.screenMonitorOps[key] = "stop"
+	srv.screenMonitorOps[key] = screenMonitorOp{kind: "stop", at: time.Now()}
 	w, c = newFormContext(http.MethodPost, "/", nil)
 	c.Params = gin.Params{{Key: "id", Value: agent.ID}}
 	srv.handleStopScreenMonitor(c)

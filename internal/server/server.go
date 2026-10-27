@@ -70,7 +70,7 @@ type Server struct {
 	// screenMonitorOps is the single-flight reservation for start/stop: DB
 	// writes (and plugin hooks) must not run while holding screenMonitorMu,
 	// or every frame ingest blocks behind an unrelated task insert.
-	screenMonitorOps map[string]string
+	screenMonitorOps map[string]screenMonitorOp
 	screenFrames     map[string]cachedScreenFrame
 	screenFrameMu    sync.RWMutex
 	// remoteInputLimiter throttles remote desktop input events per
@@ -423,7 +423,7 @@ func New(cfg *config.Config, database *gorm.DB) *Server { // config-lock: constr
 		tunEngine:             newTunEngine(),
 		startTime:             time.Now(),
 		screenMonitorImplants: make(map[string]time.Time),
-		screenMonitorOps:      make(map[string]string),
+		screenMonitorOps:      make(map[string]screenMonitorOp),
 		screenFrames:          make(map[string]cachedScreenFrame),
 		rportfwdListeners:     make(map[string]*rportfwdRelay),
 		lportfwdTargets:       make(map[string]*lportfwdTarget),

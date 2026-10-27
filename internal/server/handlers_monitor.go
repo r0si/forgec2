@@ -915,12 +915,11 @@ func (s *Server) handleStartScreenMonitor(c *gin.Context) {
 		respondError(c, http.StatusTooManyRequests, "screen monitor limit reached")
 		return
 	}
-	if op := s.screenMonitorOps[monitorKey]; op != "" {
+	if inFlight := s.reserveScreenMonitorOp(monitorKey, "start"); inFlight != "" {
 		s.screenMonitorMu.Unlock()
-		respondError(c, http.StatusConflict, "screen monitor "+op+" already in progress for this agent")
+		respondError(c, http.StatusConflict, "screen monitor "+inFlight+" already in progress for this agent")
 		return
 	}
-	s.screenMonitorOps[monitorKey] = "start"
 	s.screenMonitorMu.Unlock()
 
 	streamCmd := interval + "," + quality
@@ -955,6 +954,34 @@ func (s *Server) handleStartScreenMonitor(c *gin.Context) {
 	})
 }
 
+// screenMonitorOpTTL bounds a single-flight start/stop reservation. The handlers
+// clear their reservation on both the success and the error path, but a panic
+// inside issueAgentTask unwinds the handler and skips the clear - with no sweep
+// anywhere, that agent could never start or stop its stream again ("screen
+// monitor start already in progress" forever). A reservation now expires.
+// screenMonitorOp is a single-flight start/stop reservation.
+type screenMonitorOp struct {
+	kind string
+	at   time.Time
+}
+
+const screenMonitorOpTTL = 2 * time.Minute
+
+// reserveScreenMonitorOp records a start/stop reservation and reports the
+// operation already in flight, if any. An expired reservation is cleared first.
+// Callers must hold screenMonitorMu.
+func (s *Server) reserveScreenMonitorOp(key, kind string) string {
+	if op, ok := s.screenMonitorOps[key]; ok {
+		if time.Since(op.at) < screenMonitorOpTTL {
+			return op.kind
+		}
+		delete(s.screenMonitorOps, key)
+		slog.Warn("Cleared an expired screen monitor reservation", "agent_id", key, "op", op.kind)
+	}
+	s.screenMonitorOps[key] = screenMonitorOp{kind: kind, at: time.Now()}
+	return ""
+}
+
 // ensureScreenMonitorMapsLocked initializes the monitor maps for bare test
 // servers that construct Server literals. Callers must hold screenMonitorMu.
 func (s *Server) ensureScreenMonitorMapsLocked() {
@@ -962,7 +989,7 @@ func (s *Server) ensureScreenMonitorMapsLocked() {
 		s.screenMonitorImplants = make(map[string]time.Time)
 	}
 	if s.screenMonitorOps == nil {
-		s.screenMonitorOps = make(map[string]string)
+		s.screenMonitorOps = make(map[string]screenMonitorOp)
 	}
 }
 
@@ -994,12 +1021,11 @@ func (s *Server) handleStopScreenMonitor(c *gin.Context) {
 		})
 		return
 	}
-	if op := s.screenMonitorOps[monitorKey]; op != "" {
+	if inFlight := s.reserveScreenMonitorOp(monitorKey, "stop"); inFlight != "" {
 		s.screenMonitorMu.Unlock()
-		respondError(c, http.StatusConflict, "screen monitor "+op+" already in progress for this agent")
+		respondError(c, http.StatusConflict, "screen monitor "+inFlight+" already in progress for this agent")
 		return
 	}
-	s.screenMonitorOps[monitorKey] = "stop"
 	s.screenMonitorMu.Unlock()
 
 	stopTask := s.issueAgentTask(c, id, TaskSpec{Type: "screen_stream_stop"})
