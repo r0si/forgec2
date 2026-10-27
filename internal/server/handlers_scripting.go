@@ -180,8 +180,11 @@ func (s *Server) handleAPIExecuteScript(c *gin.Context) {
 		"credentials": []db.CredentialEntry{},
 	}
 
+	// TENANT SCOPE on all three globals: they are handed to the script as data. Before this,
+	// an admin scoped to one tenant still saw every tenant's agents, tasks and credentials -
+	// and the target-agent narrowing below was already scoped, which made the leak look fixed.
 	var agents []db.Implant
-	if err := s.db.Select("id, hostname, ip, os, status").Limit(100).Find(&agents).Error; err != nil {
+	if err := s.tenantScope(s.db.Select("id, hostname, ip, os, status"), c).Limit(100).Find(&agents).Error; err != nil {
 		slog.Error("Scripting: failed to query agents", "err", err)
 	}
 	if agents != nil {
@@ -189,7 +192,7 @@ func (s *Server) handleAPIExecuteScript(c *gin.Context) {
 	}
 
 	var tasks []db.Task
-	if err := s.db.Select("id, agent_id, type, command, status").Order("created_at desc").Limit(50).Find(&tasks).Error; err != nil {
+	if err := s.tenantScope(s.db.Select("id, agent_id, type, command, status"), c).Order("created_at desc").Limit(50).Find(&tasks).Error; err != nil {
 		slog.Error("Scripting: failed to query tasks", "err", err)
 	}
 	if tasks != nil {
@@ -197,7 +200,7 @@ func (s *Server) handleAPIExecuteScript(c *gin.Context) {
 	}
 
 	var creds []db.CredentialEntry
-	if err := s.db.Select("agent_id, domain, username, type, source").Limit(50).Find(&creds).Error; err != nil {
+	if err := s.tenantScope(s.db.Select("agent_id, domain, username, type, source"), c).Limit(50).Find(&creds).Error; err != nil {
 		slog.Error("Scripting: failed to query credentials", "err", err)
 	}
 	if creds != nil {
