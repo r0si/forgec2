@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"fmt"
+	"html"
 	"log/slog"
 	"net/smtp"
 	"strings"
@@ -87,11 +88,25 @@ func sendEmailWithRetry(cfg EmailConfig, msg []byte) error {
 	return fmt.Errorf("email delivery failed")
 }
 
+// sanitizeHeaderValue removes CR/LF so a value cannot end the header block or add one.
+// The Subject is built from the event type, and the addresses come from configuration, so
+// this is defence in depth rather than the main fix - but a header that can be split is
+// never worth leaving open.
+func sanitizeHeaderValue(v string) string {
+	if i := strings.IndexAny(v, "\r\n"); i >= 0 {
+		// Cut at the first line break instead of folding it: the tail is exactly what an
+		// attacker wanted appended (a Bcc, a Content-Type), and nothing legitimate puts a
+		// newline in a Subject or an address.
+		return strings.TrimSpace(v[:i])
+	}
+	return v
+}
+
 func buildMIMEMessage(from, to, subject, body string) []byte {
 	headers := map[string]string{
-		"From":         from,
-		"To":           to,
-		"Subject":      subject,
+		"From":         sanitizeHeaderValue(from),
+		"To":           sanitizeHeaderValue(to),
+		"Subject":      sanitizeHeaderValue(subject),
 		"MIME-Version": "1.0",
 		"Content-Type": "text/html; charset=\"UTF-8\"",
 	}
@@ -105,19 +120,25 @@ func buildMIMEMessage(from, to, subject, body string) []byte {
 }
 
 func formatEmailBody(evt Event) string {
+	// Every value below is interpolated into HTML. Hostname, IP and OS are reported by the
+	// IMPLANT, so an attacker who controls a beacon controls what the operator's mail client
+	// renders: unescaped, that is an HTML injection into a trusted alert mail (a plausible
+	// "click here to re-authenticate" link, or a tracking pixel that fires when the message
+	// is opened). Escape at the boundary.
+	esc := html.EscapeString
 	agentInfo := ""
 	if evt.AgentID != "" {
 		agentInfo = fmt.Sprintf(`
 <tr><td style="padding:8px;border-bottom:1px solid #ddd;color:#555;">Agent ID</td><td style="padding:8px;border-bottom:1px solid #ddd;font-weight:bold;">%s</td></tr>
 <tr><td style="padding:8px;border-bottom:1px solid #ddd;color:#555;">Hostname</td><td style="padding:8px;border-bottom:1px solid #ddd;font-weight:bold;">%s</td></tr>
-<tr><td style="padding:8px;border-bottom:1px solid #ddd;color:#555;">IP</td><td style="padding:8px;border-bottom:1px solid #ddd;font-weight:bold;">%s</td></tr>
+<tr><td style="padding:8px;border-bottom:1px solid #ddd;color:#555;">IP</td><td style="padding:8px;border-bottom:1px solid #ddd;color:#555;">%s</td></tr>
 <tr><td style="padding:8px;border-bottom:1px solid #ddd;color:#555;">OS</td><td style="padding:8px;border-bottom:1px solid #ddd;font-weight:bold;">%s</td></tr>
-`, evt.AgentID, evt.AgentHost, evt.AgentIP, evt.AgentOS)
+`, esc(evt.AgentID), esc(evt.AgentHost), esc(evt.AgentIP), esc(evt.AgentOS))
 	}
 	dataStr := ""
 	if len(evt.Data) > 0 {
 		d, _ := json.MarshalIndent(evt.Data, "", "  ")
-		dataStr = fmt.Sprintf("<pre style=\"background:#f5f5f5;padding:10px;border-radius:4px;font-size:12px;\">%s</pre>", string(d))
+		dataStr = fmt.Sprintf("<pre style=\"background:#f5f5f5;padding:10px;border-radius:4px;font-size:12px;\">%s</pre>", esc(string(d)))
 	}
 	return fmt.Sprintf(`<!DOCTYPE html>
 <html><head><meta charset="UTF-8"></head><body style="font-family:Arial,sans-serif;background:#f9f9f9;padding:20px;">
@@ -134,5 +155,5 @@ func formatEmailBody(evt Event) string {
 <div style="padding:15px 20px;background:#f5f5f5;border-radius:0 0 8px 8px;font-size:12px;color:#999;text-align:center;">
 ForgeC2 Security Platform
 </div>
-</div></body></html>`, evt.Type, evt.Type, evt.Timestamp.Format(time.RFC1123), agentInfo, dataStr)
+</div></body></html>`, esc(string(evt.Type)), esc(string(evt.Type)), esc(evt.Timestamp.Format(time.RFC1123)), agentInfo, dataStr)
 }
