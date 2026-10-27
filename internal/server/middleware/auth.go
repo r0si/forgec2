@@ -666,16 +666,26 @@ func RequireRole(allowedRoles ...string) gin.HandlerFunc {
 
 func RequirePermission(permissions ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Scoped keys are capability-bound: at least one required perm
-		// must be in the key's set. Checked BEFORE the admin shortcut so
-		// an admin owner's scoped key cannot escape its bounds. Legacy
+		// Scoped keys are capability-bound: at least one required perm must be in the
+		// key's set, and the key may never exceed its owner's CURRENT authority. The
+		// scope set is fixed at creation, so without the second check a key kept every
+		// capability it was born with even after its owner was demoted - the owner check
+		// in the API-key path only covers is_active, not role changes. Checked BEFORE the
+		// admin shortcut so an admin owner's scoped key cannot escape its bounds. Legacy
 		// full keys (nil set) fall through to role logic unchanged.
 		if set, isKey := apiKeyScopes(c); isKey && set != nil {
+			ownerRole := c.GetString("user_role")
 			for _, perm := range permissions {
-				if set[perm] {
+				if !set[perm] {
+					continue
+				}
+				if db.RoleHasPermission(ownerRole, perm) {
 					c.Next()
 					return
 				}
+				authFail(c, "Auth failed: API key exceeds its owner's permissions",
+					"path", c.Request.URL.Path, "perm", perm, "role", ownerRole)
+				return
 			}
 			respondError(c, http.StatusForbidden, "API key scope denied")
 			c.Abort()
