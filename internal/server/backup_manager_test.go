@@ -275,3 +275,48 @@ func TestBackupManagerLifecycle(t *testing.T) {
 		t.Fatal("an invalid schedule started the manager")
 	}
 }
+
+// TestCleanupRemovesStaleBackupTemps pins the crash-leftover sweep: a snapshot or
+// ".fbk.tmp" file abandoned by a crash is removed once it is older than an hour,
+// while a fresh one (a backup genuinely in flight) is left alone. Retention alone
+// only looks at ".fbk", so these used to accumulate forever.
+func TestCleanupRemovesStaleBackupTemps(t *testing.T) {
+	conn := backupTestDB(t)
+	backupDir := t.TempDir()
+	bm, err := NewBackupManager(conn, "", backupDir, strings.Repeat("ab", 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	old := time.Now().Add(-2 * time.Hour)
+	mk := func(name string, mod time.Time) string {
+		path := filepath.Join(backupDir, name)
+		if err := os.WriteFile(path, []byte("partial"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chtimes(path, mod, mod); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+
+	staleSnapshot := mk(".forgec2-snapshot-1700000000000000000.tmp", old)
+	staleOut := mk("forgec2_backup_20260101_000000.fbk.tmp", old)
+	freshOut := mk("forgec2_backup_20260101_000001.fbk.tmp", time.Now())
+	keep := mk("forgec2_backup_20260101_000002.fbk", time.Now())
+
+	bm.cleanupOldBackups()
+
+	if _, err := os.Stat(staleSnapshot); !os.IsNotExist(err) {
+		t.Error("a stale snapshot file survived")
+	}
+	if _, err := os.Stat(staleOut); !os.IsNotExist(err) {
+		t.Error("a stale .fbk.tmp survived")
+	}
+	if _, err := os.Stat(freshOut); err != nil {
+		t.Error("a fresh .fbk.tmp was removed (an in-flight backup)")
+	}
+	if _, err := os.Stat(keep); err != nil {
+		t.Error("a real backup was removed")
+	}
+}

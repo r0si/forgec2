@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"runtime/debug"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -381,6 +382,8 @@ func (bm *BackupManager) cleanupOldBackups() {
 		return
 	}
 
+	bm.removeStaleTempFiles(files)
+
 	keepCount := bm.retention()
 	var backupFiles []os.FileInfo
 
@@ -410,6 +413,37 @@ func (bm *BackupManager) cleanupOldBackups() {
 	}
 
 	slog.Info("Cleaned up old backups", "deleted", len(backupFiles)-keepCount, "remaining", keepCount)
+}
+
+// backupTempMaxAge bounds how long a half-written backup artefact may linger.
+// A crash (or a Stop during shutdown) can leave the VACUUM snapshot or the
+// ".fbk.tmp" output behind, and nothing else ever removes them: retention only
+// looks at ".fbk", so they accumulated until an operator noticed the disk. The
+// age gate keeps an in-flight backup safe.
+const backupTempMaxAge = time.Hour
+
+// removeStaleTempFiles deletes leftover snapshot/temp artefacts older than
+// backupTempMaxAge. Takes the directory listing so the caller reads it once.
+func (bm *BackupManager) removeStaleTempFiles(files []os.DirEntry) {
+	cutoff := time.Now().Add(-backupTempMaxAge)
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+		name := file.Name()
+		if !strings.HasSuffix(name, ".fbk.tmp") && !strings.HasPrefix(name, ".forgec2-snapshot-") {
+			continue
+		}
+		info, err := file.Info()
+		if err != nil || !info.ModTime().Before(cutoff) {
+			continue
+		}
+		if err := os.Remove(filepath.Join(bm.backupDir, name)); err != nil {
+			slog.Warn("Failed to remove stale backup temp file", "file", name, "error", err)
+			continue
+		}
+		slog.Info("Removed stale backup temp file", "file", name, "age", time.Since(info.ModTime()).Round(time.Minute))
+	}
 }
 
 func (bm *BackupManager) RotateKey(newKeyHex string) error {
