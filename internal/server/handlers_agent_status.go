@@ -16,6 +16,14 @@ func (s *Server) handleAgentStatusHistory(c *gin.Context) {
 		return
 	}
 
+	// agent_status_events has no tenant column: scoping the EVENTS query would add
+	// "WHERE tenant_id = ?" to a table that cannot support it - which answered 500 for every
+	// tenant-scoped operator ("no such column: tenant_id"). The agent carries the tenant, so
+	// verify ownership through it and then filter events by agent id.
+	if _, ok := s.getAgentOrFail(c, agentID); !ok {
+		return
+	}
+
 	rangeParam := c.DefaultQuery("range", "24h")
 	var startTime time.Time
 	switch rangeParam {
@@ -31,7 +39,6 @@ func (s *Server) handleAgentStatusHistory(c *gin.Context) {
 
 	var events []db.AgentStatusEvent
 	q := s.db.Where("agent_id = ? AND timestamp >= ?", agentID, startTime)
-	q = s.tenantScope(q, c)
 	// Fetch the newest N first (an unbounded Find would return a flapping
 	// agent's entire retention window), then restore the ascending order the
 	// API has always returned.
