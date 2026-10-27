@@ -2138,6 +2138,30 @@ paths:
                             type: integer
                           reason:
                             type: string
+  /audit/export:
+    get:
+      tags: [Audit]
+      summary: Export the audit chain
+      description: Stream the audit hash chain as newline-delimited JSON for offline verification
+      operationId: exportAuditChain
+      security:
+        - SessionCookie: []
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of the newest rows to export (default 50000, max 200000)
+          schema:
+            type: integer
+            default: 50000
+      responses:
+        '200':
+          description: One JSON object per line, each with prev_hash and entry_hash
+          content:
+            application/x-ndjson:
+              schema:
+                type: string
+        '503':
+          description: Database is not initialized
   /tasks:
     get:
       tags: [Tasks]

@@ -1210,6 +1210,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/audit/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export the audit chain
+         * @description Stream the audit hash chain as newline-delimited JSON for offline verification
+         */
+        get: operations["exportAuditChain"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks": {
         parameters: {
             query?: never;
@@ -13201,6 +13221,36 @@ export interface operations {
                         };
                     };
                 };
+            };
+        };
+    };
+    exportAuditChain: {
+        parameters: {
+            query?: {
+                /** @description Maximum number of the newest rows to export (default 50000, max 200000) */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One JSON object per line, each with prev_hash and entry_hash */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/x-ndjson": string;
+                };
+            };
+            /** @description Database is not initialized */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
