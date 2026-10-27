@@ -34,13 +34,13 @@ func TestIntegrationsAreTenantScoped(t *testing.T) {
 	seedAIUser(t, s, "admin1", 1)
 	seedAIUser(t, s, "admin2", 2)
 
-	foreign := db.WebhookConfig{Name: "foreign", URL: "https://example.test/hook", EventType: "alert", Method: "POST", Enabled: true, TenantID: 2}
+	foreign := db.WebhookConfig{Name: "foreign", URL: "https://203.0.113.9/hook", EventType: "alert", Method: "POST", Enabled: true, TenantID: 2}
 	if err := s.db.Create(&foreign).Error; err != nil {
 		t.Fatal(err)
 	}
 
 	// Create as a tenant-1 operator: the row must carry tenant 1.
-	c, w := integrationCtx(http.MethodPost, `{"type":"slack","name":"mine","url":"https://example.test/mine","event_type":"alert"}`, 1, nil)
+	c, w := integrationCtx(http.MethodPost, `{"type":"slack","name":"mine","url":"https://203.0.113.9/mine","event_type":"alert"}`, 1, nil)
 	s.handleIntegrationsCreate(c)
 	if w.Code != http.StatusOK && w.Code != http.StatusCreated {
 		t.Fatalf("create = %d %s", w.Code, w.Body.String())
@@ -91,7 +91,7 @@ func TestIntegrationsAreTenantScoped(t *testing.T) {
 	if err := s.db.Where("id = ?", foreign.ID).First(&still).Error; err != nil {
 		t.Fatal(err)
 	}
-	if still.URL != "https://example.test/hook" || still.Name != "foreign" {
+	if still.URL != "https://203.0.113.9/hook" || still.Name != "foreign" {
 		t.Fatalf("foreign integration was rewritten: url=%q name=%q", still.URL, still.Name)
 	}
 }

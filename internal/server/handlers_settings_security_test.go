@@ -28,7 +28,7 @@ func TestSettingsWebhooksRoundTrip(t *testing.T) {
 	}
 
 	// Save a target list and read it back.
-	body := `{"notifications":[{"type":"slack","url":"https://hooks.example.test/x"},{"type":"discord","url":"https://discord.example.test/y"}]}`
+	body := `{"notifications":[{"type":"slack","url":"https://hooks.203.0.113.9/x"},{"type":"discord","url":"https://discord.203.0.113.9/y"}]}`
 	c, w = missingAPICtx(http.MethodPost, "/api/settings/webhooks", body, nil)
 	s.handleSaveSettingsWebhooks(c)
 	if w.Code != http.StatusOK {
@@ -73,7 +73,7 @@ func TestTestSettingsWebhookBlocksSSRF(t *testing.T) {
 		"http://127.0.0.1:9/hook",
 		"http://10.0.0.1/hook",
 		"http://169.254.169.254/latest/meta-data/",
-		"ftp://example.test/hook",
+		"ftp://203.0.113.9/hook",
 	} {
 		c, w := missingAPICtx(http.MethodPost, "/api/settings/webhooks/test",
 			`{"type":"webhook","url":"`+target+`"}`, nil)

@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"path/filepath"
 	"regexp"
@@ -539,6 +540,51 @@ func validateFilePath(filePath, baseDir string) error {
 // uses validateWebhookURL unchanged (same pattern as releaseAssetsURLFmt).
 var webhookTargetValidator = validateWebhookURL
 
+// nonPublicHostError reports why host must not be dialled by an outbound
+// request, or nil when every address it denotes is public. It is shared by the
+// webhook validator and the scripting bridge so the address policy cannot drift
+// between them (it did: one copy ignored resolution failures).
+func nonPublicHostError(host string) error {
+	host = strings.Trim(strings.TrimSpace(host), "[]")
+	check := func(a netip.Addr) error {
+		a = a.Unmap()
+		if a.IsLoopback() || a.IsUnspecified() || a.IsPrivate() ||
+			a.IsLinkLocalUnicast() || a.IsLinkLocalMulticast() || a.IsMulticast() {
+			return fmt.Errorf("non-public address %s", a)
+		}
+		if a.Is4() {
+			b := a.As4()
+			if b[0] == 0 || (b[0] == 100 && b[1] >= 64 && b[1] <= 127) {
+				return fmt.Errorf("non-public address %s", a)
+			}
+		}
+		return nil
+	}
+	if addr, err := netip.ParseAddr(host); err == nil {
+		return check(addr)
+	}
+	if strings.EqualFold(host, "localhost") {
+		return fmt.Errorf("non-public address %s", host)
+	}
+	ips, err := net.LookupIP(host)
+	if err != nil {
+		return fmt.Errorf("cannot resolve %s: %w", host, err)
+	}
+	if len(ips) == 0 {
+		return fmt.Errorf("%s resolved to no addresses", host)
+	}
+	for _, ip := range ips {
+		a, ok := netip.AddrFromSlice(ip)
+		if !ok {
+			continue
+		}
+		if err := check(a); err != nil {
+			return fmt.Errorf("%s resolves to %w", host, err)
+		}
+	}
+	return nil
+}
+
 func validateWebhookURL(rawURL string) error {
 	u, err := url.Parse(rawURL)
 	if err != nil {
@@ -549,29 +595,11 @@ func validateWebhookURL(rawURL string) error {
 		return fmt.Errorf("URL has no hostname")
 	}
 
-	ip := net.ParseIP(host)
-	if ip != nil {
-		if ip.IsLoopback() || ip.IsUnspecified() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
-			return fmt.Errorf("webhook URL targets blocked IP: %s", host)
-		}
-		if ip.IsPrivate() {
-			return fmt.Errorf("webhook URL targets private IP: %s", host)
-		}
-	}
-
-	// DNS resolution check: resolve the hostname and verify no resolved IP is private
-	if ip == nil {
-		ips, err := net.LookupIP(host)
-		if err == nil {
-			for _, resolved := range ips {
-				if resolved.IsLoopback() || resolved.IsUnspecified() || resolved.IsLinkLocalUnicast() || resolved.IsLinkLocalMulticast() {
-					return fmt.Errorf("webhook URL hostname %s resolves to blocked IP: %s", host, resolved.String())
-				}
-				if resolved.IsPrivate() {
-					return fmt.Errorf("webhook URL hostname %s resolves to private IP: %s", host, resolved.String())
-				}
-			}
-		}
+	// Same address policy as validateExternalURL, including CGNAT and
+	// multicast, and a resolution FAILURE is an error rather than a pass: a
+	// host that cannot be resolved now must not be trusted when it later can.
+	if err := nonPublicHostError(host); err != nil {
+		return fmt.Errorf("webhook URL targets a non-public host: %w", err)
 	}
 
 	// Block known cloud metadata hostnames

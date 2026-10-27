@@ -17,7 +17,7 @@ func seedWebhook(t *testing.T, s *Server, name string, tenantID uint, eventType 
 	ensureExportCrypto(t, s)
 	wh := db.WebhookConfig{
 		Name:      name,
-		URL:       "https://hooks.example.com/" + name,
+		URL:       "https://203.0.113.9/" + name,
 		EventType: eventType,
 		Method:    "POST",
 		Headers:   `{"Authorization":"Bearer test-token"}`,
@@ -46,7 +46,7 @@ func TestWebhooksForEventScoped(t *testing.T) {
 	seedWebhook(t, s, "wh-own", 1, evt)
 	seedWebhook(t, s, "wh-foreign", 2, evt)
 	seedWebhook(t, s, "wh-legacy", 0, string(EventSchedule))
-	disabled := db.WebhookConfig{Name: "wh-off", URL: "https://hooks.example.com/off", EventType: evt, TenantID: 1}
+	disabled := db.WebhookConfig{Name: "wh-off", URL: "https://203.0.113.9/off", EventType: evt, TenantID: 1}
 	if err := s.db.Create(&disabled).Error; err != nil {
 		t.Fatalf("seed disabled: %v", err)
 	}
@@ -97,7 +97,7 @@ func TestWebhookCRUDScoped(t *testing.T) {
 		t.Fatalf("foreign webhook leaked into list")
 	}
 
-	body := `{"name":"wh-stamped","url":"https://hooks.example.com/new","event_type":"` + string(EventImplantCheckin) + `","tenant_id":2}`
+	body := `{"name":"wh-stamped","url":"https://203.0.113.9/new","event_type":"` + string(EventImplantCheckin) + `","tenant_id":2}`
 	c, w = webhookCtx(s, t, http.MethodPost, body)
 	s.handleCreateWebhook(c)
 	if w.Code != http.StatusOK {
