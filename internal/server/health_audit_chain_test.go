@@ -112,3 +112,47 @@ func TestReadyStillVerifiesImmediately(t *testing.T) {
 		t.Fatalf("/ready did not notice the tampering immediately: %s", w.Body.String())
 	}
 }
+
+// TestHealthDegradedPaths covers the branches the console relies on when startup
+// is partial: no database at all, and a database handle that cannot be pinged.
+func TestHealthDegradedPaths(t *testing.T) {
+	// A server without a database answers "degraded" instead of panicking.
+	bare := &Server{}
+	c, w := healthCtx()
+	bare.apiHealth(c)
+	if w.Code != http.StatusOK {
+		t.Fatalf("bare server health = %d", w.Code)
+	}
+	var out struct {
+		Status   string `json:"status"`
+		Database string `json:"database"`
+	}
+	unmarshalData(t, w.Body.Bytes(), &out)
+	if out.Status != "degraded" || out.Database != "unavailable" {
+		t.Fatalf("bare server health = %+v", out)
+	}
+	// A bare server must not report an audit chain it cannot check.
+	if containsAny(w.Body.String(), "audit_chain") {
+		t.Fatalf("a server without a database reported an audit chain: %s", w.Body.String())
+	}
+
+	// A closed pool pings with an error: the endpoint reports "unreachable"
+	// (or degrades) rather than 500ing.
+	s := mustTenantServer(t)
+	sqlDB, err := s.db.DB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := sqlDB.Close(); err != nil {
+		t.Fatalf("close pool: %v", err)
+	}
+	c, w = healthCtx()
+	s.apiHealth(c)
+	if w.Code != http.StatusOK {
+		t.Fatalf("closed pool health = %d (%s)", w.Code, w.Body.String())
+	}
+	unmarshalData(t, w.Body.Bytes(), &out)
+	if out.Status == "" {
+		t.Fatalf("no status was reported: %s", w.Body.String())
+	}
+}

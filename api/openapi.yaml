@@ -7457,6 +7457,10 @@ paths:
       responses:
         '200':
           description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
 
   /api/v1/task-types:
     get:
@@ -11798,6 +11802,27 @@ components:
           type: string
         uptime:
           type: string
+        database:
+          type: string
+          description: connected, unreachable or unavailable
+        backup:
+          type: object
+          description: Backup freshness (retain, age_seconds, last_success, last_failure, last_error)
+          additionalProperties: true
+        audit_chain:
+          type: object
+          description: >-
+            Result of the tamper-evident audit hash chain check the console polls.
+            Cached for 60 seconds; /ready verifies on every poll.
+          properties:
+            ok:
+              type: boolean
+            checked:
+              type: integer
+            first_bad_id:
+              type: integer
+            reason:
+              type: string
 
     ReadyResponse:
       type: object

@@ -10740,6 +10740,19 @@ export interface components {
             status: string;
             version?: string;
             uptime?: string;
+            /** @description connected, unreachable or unavailable */
+            database?: string;
+            /** @description Backup freshness (retain, age_seconds, last_success, last_failure, last_error) */
+            backup?: {
+                [key: string]: unknown;
+            };
+            /** @description Result of the tamper-evident audit hash chain check the console polls. Cached for 60 seconds; /ready verifies on every poll. */
+            audit_chain?: {
+                ok?: boolean;
+                checked?: number;
+                first_bad_id?: number;
+                reason?: string;
+            };
         };
         ReadyResponse: {
             /**
@@ -19820,7 +19833,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["HealthResponse"];
+                };
             };
         };
     };
