@@ -515,6 +515,21 @@ func (sm *SessionManager) SessionsLastUsed() map[string]time.Time {
 	return out
 }
 
+// SetSessionLastUsedForTest backdates one session's last-use time and reports
+// whether the session existed. The interval-aware sweep evicts only after
+// max(30m, 3x the agent interval), so a test cannot reach the eviction branch by
+// waiting; this is the narrow seam it uses instead.
+func (sm *SessionManager) SetSessionLastUsedForTest(agentID string, at time.Time) bool {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	sess, ok := sm.sessions[agentID]
+	if !ok || sess == nil {
+		return false
+	}
+	sess.LastUsed = at
+	return true
+}
+
 // DropSession removes one agent's session. Used by interval-aware sweeps.
 func (sm *SessionManager) DropSession(agentID string) {
 	sm.mu.Lock()
