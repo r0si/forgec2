@@ -12,6 +12,7 @@ import (
 	"io"
 	"log/slog"
 	"runtime"
+	"strings"
 	"sync"
 )
 
@@ -174,6 +175,14 @@ func DecryptLootState(s string) (string, LootState) {
 	prev := prevLootKey
 	lootKeyMu.RUnlock()
 	if key == nil {
+		return "", LootUndecryptable
+	}
+	// An ExtC2 ciphertext is NOT loot plaintext. Treating it as legacy plaintext
+	// was wrong in a damaging way: the vault plaintext sweep would seal it inside
+	// FC2ENC, and every later read would return the FC2EXT *string* instead of the
+	// secret. Refuse it instead, so the sweep reports an error rather than
+	// silently wrapping ciphertext.
+	if strings.HasPrefix(s, "FC2EXT:") {
 		return "", LootUndecryptable
 	}
 	const marker = "FC2ENC:"
