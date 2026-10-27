@@ -39,7 +39,7 @@ func SetupTestDB(t testing.TB) *gorm.DB {
 		&db.AgentGroup{}, &db.AgentGroupAssignment{}, &db.Workflow{}, &db.WorkflowStep{},
 		&db.ExecutionLog{}, &db.ChatMessage{},
 		&db.StagerToken{}, &db.Redirector{}, &db.AgentLock{},
-		&db.AIChatSession{}, &db.AIChatMessage{}, &db.ExtC2Channel{},
+		&db.AIChatSession{}, &db.AIChatMessage{}, &db.AIAttachment{}, &db.ExtC2Channel{},
 		&db.UserSession{}, &db.OpsecRule{},
 		&db.PasswordHistory{}, &db.APIKey{}, &db.Script{},
 		&db.RegSecret{}, &db.KillSwitch{}, &db.Tenant{}, &db.AgentStatusEvent{},
