@@ -1149,6 +1149,14 @@ func (c *Config) CopyFrom(src *Config) {
 	c.Listeners = src.Listeners
 	c.Roe = src.Roe
 	c.TLSFingerprint = src.TLSFingerprint
+	// These four were missing, so a hot reload reported success while these sections
+	// kept the values the process started with. Plugins was the dangerous one: the
+	// live plugin trust policy (trusted keys, require_signed, the sandbox limits) did
+	// not change when the operator edited it.
+	c.Plugins = src.Plugins
+	c.Backup = src.Backup
+	c.WebRTC = src.WebRTC
+	c.Protocol = src.Protocol
 }
 
 // SocksUser holds SOCKS5 username/password auth credentials.

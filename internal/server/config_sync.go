@@ -50,6 +50,13 @@ func reloadGroups() []reloadGroup {
 		{Token: "crypto.extc2_key", Mode: reloadHot, Apply: (*Server).syncCryptoKeys},
 		{Token: "crypto.csrf_key", Mode: reloadHot, Apply: (*Server).syncCSRFSecret},
 		{Token: "crypto.totp_key", Mode: reloadHot},
+		// Sections added to diffConfig when they were found missing from it: plugins is
+		// the security-relevant one (trust keys, require_signed), backup retention and
+		// schedule are read live, and the WebRTC/Protocol listeners bind at startup.
+		{Token: "plugins", Mode: reloadHot, Apply: (*Server).applyPluginTrust},
+		{Token: "backup", Mode: reloadHot},
+		{Token: "webrtc", Mode: reloadStatic},
+		{Token: "protocol", Mode: reloadStatic},
 		{Token: "crypto.update_signing_key", Mode: reloadHot},
 		{Token: "crypto.backup_key", Mode: reloadStatic},
 		{Token: "crypto.max_decrypted_payload_size", Mode: reloadHot},

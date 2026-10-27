@@ -294,11 +294,23 @@ func diffConfig(old, new *config.Config) (hotReloadable []string, staticOnly []s
 	if old.Crypto.RequireReleaseSignature != new.Crypto.RequireReleaseSignature {
 		hotReloadable = append(hotReloadable, "crypto.require_release_signature")
 	}
-	if old.Crypto.RequireReleaseSignature != new.Crypto.RequireReleaseSignature {
-		hotReloadable = append(hotReloadable, "crypto.require_release_signature")
-	}
 	if old.Crypto.BackupKey != new.Crypto.BackupKey {
 		staticOnly = append(staticOnly, "crypto.backup_key")
+	}
+	// Sections the hand-written list below never mentioned: a change to any of them
+	// was reported as "no values differ" and the reload was skipped. DeepEqual because
+	// these structs carry slices.
+	if !reflect.DeepEqual(old.Plugins, new.Plugins) {
+		hotReloadable = append(hotReloadable, "plugins")
+	}
+	if !reflect.DeepEqual(old.Backup, new.Backup) {
+		hotReloadable = append(hotReloadable, "backup")
+	}
+	if !reflect.DeepEqual(old.WebRTC, new.WebRTC) {
+		staticOnly = append(staticOnly, "webrtc")
+	}
+	if !reflect.DeepEqual(old.Protocol, new.Protocol) {
+		staticOnly = append(staticOnly, "protocol")
 	}
 	if old.Database.Driver != new.Database.Driver {
 		staticOnly = append(staticOnly, "database.driver")

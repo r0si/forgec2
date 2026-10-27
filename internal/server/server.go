@@ -690,12 +690,7 @@ func New(cfg *config.Config, database *gorm.DB) *Server { // config-lock: constr
 	// signing keys before anything becomes callable. Unsigned packages still
 	// load (with a warning) unless plugins.require_signed is set, so the
 	// bundled plugins keep working out of the box.
-	if keys, err := plugin.ParseTrustedPluginKeys(s.cfg.Plugins.TrustedKeys); err != nil {
-		slog.Error("Invalid plugins.trusted_keys; plugin signature verification is disabled", "err", err)
-	} else if len(keys) > 0 || s.cfg.Plugins.RequireSigned {
-		s.pluginManager.SetTrust(keys, s.cfg.Plugins.RequireSigned)
-		slog.Info("Plugin package trust enabled", "trusted_keys", len(keys), "require_signed", s.cfg.Plugins.RequireSigned)
-	}
+	s.applyPluginTrust()
 	if maxConc := s.cfg.Plugins.MaxConcurrent; maxConc > 0 {
 		s.pluginManager.SetMaxConcurrent(maxConc)
 	}
@@ -1011,4 +1006,30 @@ func (s *Server) SetupRoutes() { // config-lock: boot, before the listener serve
 	s.registerDashboardCharts(auth)
 	s.registerBOFRoutes(auth)
 	s.registerMiscRoutes(auth)
+}
+
+// applyPluginTrust installs the current plugin trust policy. It is the startup path
+// AND the hot-reload hook, so a reload that edits plugins.require_signed actually
+// takes effect instead of leaving the manager on the policy it started with.
+func (s *Server) applyPluginTrust() error {
+	if s.pluginManager == nil {
+		return nil
+	}
+	s.configMu.RLock()
+	trustedKeys := append([]string(nil), s.cfg.Plugins.TrustedKeys...)
+	requireSigned := s.cfg.Plugins.RequireSigned
+	s.configMu.RUnlock()
+
+	keys, err := plugin.ParseTrustedPluginKeys(trustedKeys)
+	if err != nil {
+		slog.Error("Invalid plugins.trusted_keys; plugin signature verification is disabled", "err", err)
+		return err
+	}
+	if len(keys) > 0 || requireSigned {
+		s.pluginManager.SetTrust(keys, requireSigned)
+		slog.Info("Plugin package trust enabled", "trusted_keys", len(keys), "require_signed", requireSigned)
+		return nil
+	}
+	s.pluginManager.SetTrust(nil, false)
+	return nil
 }
