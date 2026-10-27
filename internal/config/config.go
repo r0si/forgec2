@@ -1259,15 +1259,7 @@ func (c *Config) RUnlock() {
 }
 
 // Save persists the config (e.g. after setting password)
-func (c *Config) Save(path string) error {
-	c.mu.RLock()
-	out, err := yaml.Marshal(c)
-	c.mu.RUnlock()
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(path, out, 0600)
-}
+// Save is defined in save_preserve.go: it preserves keys this build does not know.
 
 // CopyFrom copies all exported fields from src into c with mutex protection.
 // Every top-level section must be listed here, otherwise hot-reload silently
