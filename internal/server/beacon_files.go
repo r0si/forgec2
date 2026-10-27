@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -98,46 +98,35 @@ func safeJoin(base, name string) string {
 	return target
 }
 
+// isPrivateIP reports whether an address must not be dialled by an outbound
+// fetch (the scripting HTTP bridge and the GeoIP lookup).
+//
+// It parses the address instead of matching string prefixes: prefixes missed
+// "0.0.0.0" (which connects to the local host on Linux), the IPv4-mapped
+// "::ffff:127.0.0.1", bracketed literals and the "::" unspecified address.
+// netip also unmaps the mapped forms, so IsLoopback/IsUnspecified/IsPrivate see
+// the real address.
 func isPrivateIP(ip string) bool {
-	if ip == "" || ip == "::1" {
+	host := strings.Trim(strings.TrimSpace(ip), "[]")
+	if host == "" || strings.EqualFold(host, "localhost") {
 		return true
 	}
-	if strings.HasPrefix(ip, "127.") || ip == "localhost" {
+	addr, err := netip.ParseAddr(host)
+	if err != nil {
+		// Not an IP literal (a bare hostname): the caller resolves it and
+		// re-checks every answer, so this is not the place to guess.
+		return false
+	}
+	addr = addr.Unmap()
+	if addr.IsLoopback() || addr.IsUnspecified() || addr.IsPrivate() ||
+		addr.IsLinkLocalUnicast() || addr.IsLinkLocalMulticast() || addr.IsMulticast() {
 		return true
 	}
-	if strings.HasPrefix(ip, "10.") {
-		return true
-	}
-	if strings.HasPrefix(ip, "192.168.") {
-		return true
-	}
-	if strings.HasPrefix(ip, "169.254.") {
-		return true
-	}
-	// 100.64.0.0/10 (CGNAT)
-	parsed := net.ParseIP(ip)
-	if parsed != nil && parsed.To4() != nil {
-		b := parsed.To4()
+	// 100.64.0.0/10 (CGNAT) is neither private nor loopback by the stdlib
+	// definition but must not be dialled either.
+	if addr.Is4() {
+		b := addr.As4()
 		if b[0] == 100 && (b[1]&0xC0) == 64 {
-			return true
-		}
-	}
-	// 172.16.0.0/12
-	if strings.HasPrefix(ip, "172.") {
-		parts := strings.SplitN(ip, ".", 3)
-		if len(parts) >= 2 {
-			if second, err := strconv.Atoi(parts[1]); err == nil && second >= 16 && second <= 31 {
-				return true
-			}
-		}
-	}
-	if parsed != nil {
-		// IPv6 link-local fe80::/10
-		if parsed.To4() == nil && parsed[0] == 0xfe && (parsed[1]&0xc0) == 0x80 {
-			return true
-		}
-		// IPv6 ULA fc00::/7
-		if parsed.To4() == nil && (parsed[0]&0xfe) == 0xfc {
 			return true
 		}
 	}
