@@ -228,7 +228,9 @@ func matchOne(field, op, value string, a db.Implant) bool {
 	case "domain":
 		actual = a.Domain
 	default:
-		actual = ""
+		// Fail closed: an unknown field used to compare "" against the value, so
+		// a rule with a typo (or equals:"" ) matched every agent in the fleet.
+		return false
 	}
 	actual = strings.ToLower(actual)
 	val := strings.ToLower(value)
