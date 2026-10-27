@@ -372,15 +372,17 @@ func InitDBWithDriver(driver, dsn, fallbackPath string, logLevel slog.Level, dbM
 	}
 
 	if isSQLite {
-		db.Exec("PRAGMA foreign_keys = ON;")
-		execMigration(db, "PRAGMA journal_mode = WAL;", "pragma_wal")
-		execMigration(db, "PRAGMA journal_size_limit = 67108864;", "pragma_journal_limit")
-		execMigration(db, "PRAGMA cache_size = -2000;", "pragma_cache")
-		execMigration(db, "PRAGMA temp_store = MEMORY;", "pragma_temp_store")
-		execMigration(db, "PRAGMA synchronous = NORMAL;", "pragma_sync")
-		execMigration(db, "PRAGMA busy_timeout = 5000;", "pragma_busy_timeout")
-		execMigration(db, "PRAGMA mmap_size = 268435456;", "pragma_mmap")
-		execMigration(db, "PRAGMA auto_vacuum = INCREMENTAL;", "pragma_auto_vacuum")
+		// foreign_keys is the integrity switch the schema depends on (cascades, orphan
+		// rejection): it was a bare Exec whose error was discarded.
+		execPragma(db, "PRAGMA foreign_keys = ON;", "pragma_foreign_keys")
+		execPragma(db, "PRAGMA journal_mode = WAL;", "pragma_wal")
+		execPragma(db, "PRAGMA journal_size_limit = 67108864;", "pragma_journal_limit")
+		execPragma(db, "PRAGMA cache_size = -2000;", "pragma_cache")
+		execPragma(db, "PRAGMA temp_store = MEMORY;", "pragma_temp_store")
+		execPragma(db, "PRAGMA synchronous = NORMAL;", "pragma_sync")
+		execPragma(db, "PRAGMA busy_timeout = 5000;", "pragma_busy_timeout")
+		execPragma(db, "PRAGMA mmap_size = 268435456;", "pragma_mmap")
+		execPragma(db, "PRAGMA auto_vacuum = INCREMENTAL;", "pragma_auto_vacuum")
 	}
 
 	return db, nil
