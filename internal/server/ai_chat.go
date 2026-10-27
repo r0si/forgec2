@@ -446,10 +446,12 @@ func agentIDsOf(tasks []db.Task) []string {
 // single query. A missing or unreadable row simply has no entry, which is what
 // the previous per-row lookup produced (hostname stayed "" on error).
 //
-// Tenant scope is deliberately not applied: the previous per-row SELECT had
-// none, and narrowing it here would silently blank hostnames for rows whose
-// task and agent tenants disagree. Tenant isolation of this endpoint is a
-// separate open question.
+// Tenant scope is deliberately not applied HERE, and the reason is not "the old
+// query did not either": the caller fills ids from a task list that is already
+// tenant-scoped (handleAIPendingTasks), so the ids are the caller's own. Narrowing this
+// lookup as well would blank the hostname on a row whose task and agent tenants disagree
+// - hiding a data problem instead of showing it. The endpoint-level isolation is pinned
+// by TestAIPendingTasksDoesNotLeakHostnames.
 func (s *Server) agentHostnamesByID(ids []string) map[string]string {
 	out := make(map[string]string, len(ids))
 	if len(ids) == 0 {
