@@ -3,14 +3,20 @@ package server
 import (
 	"net/http"
 
+	"github.com/forgec2/forgec2/internal/db"
+	"github.com/forgec2/forgec2/internal/server/middleware"
 	"github.com/gin-gonic/gin"
 )
 
 func (s *Server) registerDNSRoutes(auth *gin.RouterGroup) {
-	auth.GET("/dns", s.handleDNSPage)
-	auth.GET("/api/dns/status", s.handleDNSStatus)
-	auth.POST("/api/dns/start", s.handleDNSStart)
-	auth.POST("/api/dns/stop", s.handleDNSStop)
+	// These hang off the global auth group, which applies AuthRequired but NO permission
+	// check - so before this, any authenticated role (including a read-only one) could bind
+	// :53 and start or stop the DNS C2 listener. C2 infrastructure control belongs behind the
+	// listener permissions, like every other listener route.
+	auth.GET("/dns", middleware.RequirePermission(db.PermListenersRead), s.handleDNSPage)
+	auth.GET("/api/dns/status", middleware.RequirePermission(db.PermListenersRead), s.handleDNSStatus)
+	auth.POST("/api/dns/start", middleware.RequirePermission(db.PermListenersWrite), s.handleDNSStart)
+	auth.POST("/api/dns/stop", middleware.RequirePermission(db.PermListenersWrite), s.handleDNSStop)
 }
 
 func (s *Server) handleDNSPage(c *gin.Context) {

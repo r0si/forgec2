@@ -33,6 +33,17 @@ const ALLOWLIST = new Map([
   ["POST /logout", "self-service logout; AuthRequired protects it"],
   ["POST /lang/set", "public language preference; value must be in the supported-language list"],
   ["POST /phishing/l/:token", "phishing landing is deliberately public; per-token+IP rate limited"],
+  // Implant-facing endpoints. They authenticate the BEACON (registration secret / per-agent
+  // key / ExtC2 token inside the request), not an operator session, so a permission
+  // middleware would make them unusable. Each one rate-limits and body-limits before the
+  // decrypt hot path; the handlers reject unsigned envelopes.
+  ["POST /beacon", "implant beacon endpoint; authenticated by the beacon key, rate limited"],
+  ["POST /screen_frame", "implant screen frame; same beacon-key auth as /beacon"],
+  ["POST /generate_204", "malleable-profile beacon URI; beacon-key auth, rate limited"],
+  ["POST /th", "malleable-profile beacon URI; beacon-key auth, rate limited"],
+  ["POST /collect", "malleable-profile beacon URI; beacon-key auth, rate limited"],
+  ["POST /receive", "External C2 receive channel; ExtC2 token, not an operator session"],
+  ["POST /send", "External C2 send channel; ExtC2 token, not an operator session"],
 ]);
 
 const GATE_MARKERS = [
@@ -67,7 +78,11 @@ for (const f of sourceFiles) {
 }
 
 const routes = [];
-for (const f of files.filter((x) => x.startsWith("routes") && x.endsWith(".go"))) {
+// EVERY server file, not just routes*.go: mutating routes registered in server.go, api.go or a
+// handler_*.go register* function were invisible to this gate. That is how POST
+// /api/dns/start reached the global auth group (AuthRequired only) with no permission gate -
+// any authenticated role could bind the DNS listener.
+for (const f of files.filter((x) => x.endsWith(".go") && !x.endsWith("_test.go"))) {
   const src = fs.readFileSync(join(serverDir, f), "utf8");
   // Group receivers that apply an authorization middleware.
   const guarded = new Set();
