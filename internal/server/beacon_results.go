@@ -29,8 +29,14 @@ func (s *Server) vaultNoteError(op string, err error, taskID uint, agentID strin
 // encryptTaskFieldsOrBlank encrypts a task copy's Result/Error for storage.
 // Fail-closed: on vault failure the output is dropped and replaced with a
 // vault-error marker so secrets never land in the DB as plaintext.
+// encryptTaskFieldsFn is the vault call behind encryptTaskFieldsOrBlank. It is a
+// var so the fail-closed branch can be tested: InitLootEncryption deliberately
+// never clears an existing key (stored loot must stay decryptable), so a test
+// cannot make the real vault unavailable once the suite has initialised it.
+var encryptTaskFieldsFn = func(task *db.Task) error { return task.EncryptTaskFields() }
+
 func (s *Server) encryptTaskFieldsOrBlank(task *db.Task) error {
-	if err := task.EncryptTaskFields(); err != nil {
+	if err := encryptTaskFieldsFn(task); err != nil {
 		task.Result = ""
 		task.Error = "vault encryption unavailable"
 		s.vaultNoteError("encrypt-result", err, task.ID, task.AgentID)
