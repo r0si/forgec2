@@ -93,6 +93,14 @@ func (s *Server) handleScanTask(c *gin.Context) {
 		respondError(c, http.StatusBadRequest, "agent_id and target are required")
 		return
 	}
+	// The wire format is "<target>:<ports>" and the implant splits it on the FIRST
+	// colon (SplitN(command, ":", 2)), so an IPv6 literal such as 2001:db8::1 is
+	// read as target "2001" with a nonsense port list — the scan then hits the
+	// wrong host. Multi-target lists are comma separated and stay supported.
+	if strings.ContainsAny(target, ": \t\r\n") {
+		respondError(c, http.StatusBadRequest, "target must not contain ':' or whitespace: the implant splits <target>:<ports> on the first colon, so IPv6 literals are not supported")
+		return
+	}
 
 	// Parse port range or use top ports
 	var ports []int
