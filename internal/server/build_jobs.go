@@ -111,36 +111,44 @@ func (s *Server) cleanupBuildJobs() {
 	for {
 		select {
 		case <-ticker.C:
-			s.buildJobsMu.Lock()
-			cutoff := time.Now().Add(-1 * time.Hour)
-			for id, job := range s.buildJobs {
-				if job.Status != "building" && job.CompletedAt.Before(cutoff) {
-					if job.Output != "" {
-						if err := os.Remove(job.Output); err != nil {
-							slog.Error("Build jobs: failed to remove output file", "job_id", id, "err", err)
-						}
-					}
-					delete(s.buildJobs, id)
-				}
-			}
-			s.buildJobsMu.Unlock()
-
-			// Reap one-shot generated files (stager/one-liner outputs) that
-			// are not tracked as BuildJobs.
-			s.transientArtifactsMu.Lock()
-			for p, exp := range s.transientArtifacts {
-				if time.Now().After(exp) {
-					if err := os.Remove(p); err != nil && !os.IsNotExist(err) {
-						slog.Error("transient artifact cleanup failed", "path", p, "err", err)
-					}
-					delete(s.transientArtifacts, p)
-				}
-			}
-			s.transientArtifactsMu.Unlock()
+			s.sweepBuildJobsOnce()
 		case <-s.ctx.Done():
 			return
 		}
 	}
+}
+
+// sweepBuildJobsOnce runs one cleanup pass: finished build jobs older than an
+// hour are removed with their output files, then expired one-shot artifacts are
+// reaped. Split out of the ticker loop so a test can drive a pass without
+// waiting fifteen minutes.
+func (s *Server) sweepBuildJobsOnce() {
+	s.buildJobsMu.Lock()
+	cutoff := time.Now().Add(-1 * time.Hour)
+	for id, job := range s.buildJobs {
+		if job.Status != "building" && job.CompletedAt.Before(cutoff) {
+			if job.Output != "" {
+				if err := os.Remove(job.Output); err != nil {
+					slog.Error("Build jobs: failed to remove output file", "job_id", id, "err", err)
+				}
+			}
+			delete(s.buildJobs, id)
+		}
+	}
+	s.buildJobsMu.Unlock()
+
+	// Reap one-shot generated files (stager/one-liner outputs) that are not
+	// tracked as BuildJobs.
+	s.transientArtifactsMu.Lock()
+	for p, exp := range s.transientArtifacts {
+		if time.Now().After(exp) {
+			if err := os.Remove(p); err != nil && !os.IsNotExist(err) {
+				slog.Error("transient artifact cleanup failed", "path", p, "err", err)
+			}
+			delete(s.transientArtifacts, p)
+		}
+	}
+	s.transientArtifactsMu.Unlock()
 }
 
 // handleBuildStatus returns the current status of an async build.
