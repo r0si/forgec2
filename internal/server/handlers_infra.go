@@ -96,10 +96,18 @@ func (s *Server) handleACMECertProvision(c *gin.Context) {
 		return
 	}
 
-	dataDirRoot := s.rawDataDir()
-	dataDir := filepath.Join(dataDirRoot, "certs", safeDomain)
+	// The ACME client writes a PRIVATE KEY here, so this is a write target that must not
+	// depend on the caller's working directory: an empty server.data_dir used to resolve to
+	// the relative path "certs/<domain>", which is the same defect the payloads and uploads
+	// paths were fixed for - with worse contents.
+	dataDirRoot, err := s.certsRootDir()
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, sanitizeError(err, "Infrastructure data dir"))
+		return
+	}
+	dataDir := filepath.Join(dataDirRoot, safeDomain)
 	resolvedDir := filepath.Clean(dataDir)
-	baseDir := filepath.Clean(filepath.Join(dataDirRoot, "certs"))
+	baseDir := filepath.Clean(dataDirRoot)
 	if !strings.HasPrefix(resolvedDir, baseDir+string(os.PathSeparator)) && resolvedDir != baseDir {
 		respondError(c, http.StatusBadRequest, "invalid domain")
 		return

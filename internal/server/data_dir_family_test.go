@@ -22,6 +22,9 @@ func TestDataDirResolutionFamily(t *testing.T) {
 	if _, err := bare.uploadsRootDir(); err == nil {
 		t.Fatal("uploadsRootDir accepted an empty data_dir")
 	}
+	if _, err := bare.certsRootDir(); err == nil {
+		t.Fatal("certsRootDir accepted an empty data_dir: a TLS private key would be written relative to the cwd")
+	}
 
 	// Case 2: no data_dir -> the build output directory falls back to the conventional
 	// "data" tree instead of the current working directory.
@@ -48,5 +51,9 @@ func TestDataDirResolutionFamily(t *testing.T) {
 	}
 	if a := configured.extractAgentsDir(); a != filepath.Join(dir, "agents") {
 		t.Fatalf("agents dir = %q, want %q", a, filepath.Join(dir, "agents"))
+	}
+	c, err := configured.certsRootDir()
+	if err != nil || c != filepath.Join(dir, "certs") {
+		t.Fatalf("certsRootDir = %q, %v", c, err)
 	}
 }
