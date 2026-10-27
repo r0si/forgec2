@@ -186,6 +186,21 @@ func (s *Server) handlePersistence(c *gin.Context) {
 		return
 	}
 
+	// The persistence wire format is method|binary_path and the implant splits on
+	// '|'. Unvalidated, a '|' in either field shifts the path: a REMOVE would
+	// delete a different persistence entry than the operator picked. The same
+	// guard the inject/spawn paths already use.
+	if action == "add" || action == "remove" {
+		if err := validateCommandArg(method, MaxTechniqueLength, "method"); err != nil {
+			respondError(c, http.StatusBadRequest, err.Error())
+			return
+		}
+		if err := validateCommandArg(binaryPath, MaxCommandLength, "binary_path"); err != nil {
+			respondError(c, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
+
 	switch action {
 	case "add":
 		if method == "" {

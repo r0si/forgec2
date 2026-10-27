@@ -146,6 +146,18 @@ func (s *Server) handleUACBypass(c *gin.Context) {
 		return
 	}
 	payload := c.PostForm("payload")
+	// The wire format is method|payload and the implant splits on '|': an
+	// unvalidated '|' in either field shifts the payload, so the bypass would run
+	// a different command than the operator chose. Same guard the inject/spawn
+	// paths already use.
+	if err := validateCommandArg(method, MaxTechniqueLength, "method"); err != nil {
+		respondError(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := validateCommandArg(payload, MaxTargetLength, "payload"); err != nil {
+		respondError(c, http.StatusBadRequest, err.Error())
+		return
+	}
 	cmd := method + "|" + payload
 	task := s.issueAgentTask(c, id, TaskSpec{Type: "uac_bypass", Command: cmd})
 	if task == nil {
