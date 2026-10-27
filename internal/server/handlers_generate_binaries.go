@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -108,6 +109,22 @@ type binaryGenForm struct {
 
 // parseBinaryForm validates a binary generation request and returns the resolved form.
 // Returns (form, error) — on error the response has already been written.
+// validateIconBytes accepts only an ICO (00 00 01 00) or PNG (89 50 4E 47) icon.
+// The previous inline check was written as `len(data) >= 4 && !(ico) && !(png)`,
+// so a file shorter than four bytes skipped the magic test entirely and a
+// 1-byte "icon" was accepted.
+func validateIconBytes(data []byte) error {
+	if len(data) < 4 {
+		return errors.New("icon must be .ico (00 00 01 00) or .png")
+	}
+	isICO := data[0] == 0 && data[1] == 0 && data[2] == 1 && data[3] == 0
+	isPNG := data[0] == 0x89 && data[1] == 0x50 && data[2] == 0x4E && data[3] == 0x47
+	if !isICO && !isPNG {
+		return errors.New("icon must be .ico (00 00 01 00) or .png")
+	}
+	return nil
+}
+
 func (s *Server) parseBinaryForm(c *gin.Context) (*binaryGenForm, bool) {
 	var form binaryGenForm
 	if err := c.ShouldBind(&form); err != nil {
@@ -133,9 +150,9 @@ func (s *Server) parseBinaryForm(c *gin.Context) (*binaryGenForm, bool) {
 				return nil, false
 			}
 			data := buf[:n]
-			// Validate ICO/PNG magic before accepting
-			if len(data) >= 4 && !(data[0] == 0 && data[1] == 0 && data[2] == 1 && data[3] == 0) && !(data[0] == 0x89 && data[1] == 0x50 && data[2] == 0x4E && data[3] == 0x47) {
-				respondError(c, http.StatusBadRequest, "icon must be .ico (00 00 01 00) or .png")
+			// Validate ICO/PNG magic before accepting.
+			if verr := validateIconBytes(data); verr != nil {
+				respondError(c, http.StatusBadRequest, verr.Error())
 				return nil, false
 			}
 			form.IconB64 = base64.StdEncoding.EncodeToString(data)
