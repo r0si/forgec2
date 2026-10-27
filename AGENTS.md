@@ -59,6 +59,36 @@ weaken one to make a change pass — fix the change.
   response, or a file that improved without lowering its number. Update the matching
   `internal/server/envelope*_baseline.txt` in the same commit.
 
+## In-memory registries and eviction
+The server keeps several per-agent registries in memory. The recurring bug in this
+area is a registry that has a **writer but no reachable eviction** — the entry is
+only removed on a clean stop, so a crash, a panicking handler or a closed console
+leaves it behind. The visible damage is rarely memory: a stale entry keeps
+answering "still active" to code that gates real behaviour.
+
+Rules that came out of those defects:
+- **Evict on the read path**, not only in a sweep. `IsScreenMonitoring` expires a
+  stale entry when asked; do not assume the periodic cleanup will cover you.
+- `cleanupStaleMapEntries` is only reached from `runPeriodicCleanup`, whose ticker
+  is `PeriodicCleanupInterval` = **24h**. Anything that must be reclaimed sooner
+  needs its own timeout or a lazy check.
+- A single-flight reservation (a map entry that blocks a second operation) must
+  **expire**: the handler's cleanup is skipped when the handler panics.
+- A long-lived map entry that holds payload bytes (a cached frame, a queued tunnel
+  frame) must be dropped with the session that owns it.
+
+Current timeouts, and where they live:
+
+| registry | reclaim | value |
+|---|---|---|
+| `screenMonitorImplants` | lazy in `IsScreenMonitoring` + start-handler sweep | 2 min |
+| `screenFrames` | dropped with the expired monitor entry | — |
+| `screenMonitorOps` | expired by `reserveScreenMonitorOp` | 2 min |
+| `ntlmRelayStore` | sweep in `handleNTLMRelayStatus`, and `add` replaces per agent | 12 h |
+| backup snapshots / `.fbk.tmp` | `removeStaleTempFiles` in `cleanupOldBackups` | 1 h |
+| `socksRelayEngine` connections | `cleanupStaleSocks` ticker | 5 min |
+| `socksRelayEngine` control/rportfwd queues | cleared by `stopSession` | — |
+
 ## Testing
 Backend test suite via CI (`.github/workflows/ci.yml`):
 ```

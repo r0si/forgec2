@@ -206,6 +206,17 @@ func (e *socksRelayEngine) stopSession(s *Server, agentID string) error {
 	}
 	e.mu.Unlock()
 
+	// Drop the agent's queued frames with the session: the keys would otherwise
+	// stay in the maps (with a nil slice) for every agent that ever used a
+	// tunnel, and a re-used agent id would inherit stale close frames.
+	e.controlFramesMu.Lock()
+	delete(e.controlFrames, agentID)
+	e.controlFramesMu.Unlock()
+	e.rportfwdMu.Lock()
+	delete(e.rportfwdFrames, agentID)
+	delete(e.rportfwdBytes, agentID)
+	e.rportfwdMu.Unlock()
+
 	if err := s.db.Model(&db.SocksSession{}).Where("id = ?", sess.dbID).Updates(map[string]interface{}{
 		"status":     "stopped",
 		"updated_at": time.Now(),
