@@ -117,7 +117,7 @@ type TaskStats struct {
 // Implant represents a connected implant (agent)
 type Implant struct {
 	ID        string    `gorm:"primaryKey" json:"id"`
-	TenantID  uint      `gorm:"index" json:"tenant_id"` // multi-tenant isolation (0 = legacy/unscoped)
+	TenantID  uint      `gorm:"index;index:idx_implants_tenant_seen,priority:1" json:"tenant_id"` // multi-tenant isolation (0 = legacy/unscoped)
 	Hostname  string    `json:"hostname"`
 	Username  string    `json:"username"`
 	OS        string    `json:"os"`
@@ -128,7 +128,7 @@ type Implant struct {
 	City      string    `json:"city"`      // GeoIP city
 	Latitude  float64   `json:"latitude"`  // GeoIP latitude
 	Longitude float64   `json:"longitude"` // GeoIP longitude
-	LastSeen  time.Time `gorm:"index;index:idx_implants_status_seen,priority:2" json:"last_seen"`
+	LastSeen  time.Time `gorm:"index;index:idx_implants_status_seen,priority:2;index:idx_implants_tenant_seen,priority:2" json:"last_seen"`
 	Status    string    `gorm:"index;index:idx_implants_status_seen,priority:1" json:"status"` // online, offline
 	Trusted   bool      `gorm:"default:false" json:"trusted"`                                  // operator-approved agent
 	// Force-offline: server-side service denial. A blocked implant's check-ins
