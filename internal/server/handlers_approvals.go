@@ -58,8 +58,14 @@ func (s *Server) handleApproveTask(c *gin.Context) {
 	// Conditional flip, mirroring handleRejectTask/handleCancelTask: a stale
 	// read here let approve resurrect a task another operator had just
 	// rejected or cancelled (dangerous types would then execute).
+	// Expiry is enforced in the WHERE clause, not only by the 5-minute sweep:
+	// between the moment a prompt expires and the next sweep, an expired approval was
+	// still approvable - which defeats the reason the window exists (the world changed
+	// since creation, so a stale prompt must not be confirmable).
+	now := time.Now()
 	res := s.db.Model(&db.Task{}).
 		Where("id = ? AND agent_id = ? AND status IN ?", taskID, task.AgentID, []string{TaskStatusPendingApproval}).
+		Where("(approval_expires_at IS NULL OR approval_expires_at > ?)", now).
 		Updates(updates)
 	if res.Error != nil {
 		slog.Error("Failed to approve task", "task", taskID, "err", res.Error)
@@ -67,6 +73,15 @@ func (s *Server) handleApproveTask(c *gin.Context) {
 		return
 	}
 	if res.RowsAffected == 0 {
+		// Tell the operator WHICH refusal this is: an expired prompt needs a new task,
+		// a concurrent rejection needs a conversation.
+		if expired, ok := s.maybeCancelExpiredApproval(taskID, now); ok {
+			s.LogAuditRecord(c, "approve_task_expired", "agent_id", task.AgentID,
+				fmt.Sprintf("Task #%d (%s) approval window had expired", taskID, task.Type), false, nil)
+			s.broadcastTaskUpdate(expired.AgentID, expired)
+			respondError(c, http.StatusGone, "approval expired; create a new task")
+			return
+		}
 		respondError(c, http.StatusConflict, "task is no longer awaiting approval")
 		return
 	}
@@ -79,6 +94,33 @@ func (s *Server) handleApproveTask(c *gin.Context) {
 			taskID, task.Type, task.CreatedBy, approver, taskArgsHash(task)), true, nil)
 	s.broadcastTaskUpdate(task.AgentID, *task)
 	respond(c, gin.H{"message": "Task approved and queued for execution"})
+}
+
+// maybeCancelExpiredApproval reports whether the task was sitting in
+// pending_approval with an expiry in the past, and cancels it the same way the
+// sweeper does so a second approve attempt cannot resurrect it. The returned task
+// carries the agent id the caller needs for the broadcast.
+func (s *Server) maybeCancelExpiredApproval(taskID uint, now time.Time) (db.Task, bool) {
+	var task db.Task
+	if err := s.db.First(&task, taskID).Error; err != nil {
+		return db.Task{}, false
+	}
+	if task.Status != TaskStatusPendingApproval || task.ApprovalExpiresAt == nil || task.ApprovalExpiresAt.After(now) {
+		return db.Task{}, false
+	}
+	res := s.db.Model(&db.Task{}).
+		Where("id = ? AND status = ?", taskID, TaskStatusPendingApproval).
+		Updates(map[string]interface{}{
+			"status": "cancelled",
+			"error":  "approval expired without a second operator",
+		})
+	if res.Error != nil {
+		slog.Error("Failed to cancel an expired approval", "task", taskID, "err", res.Error)
+		return db.Task{}, false
+	}
+	task.Status = "cancelled"
+	task.Error = "approval expired without a second operator"
+	return task, true
 }
 
 // handleRejectTask cancels a pending_approval task so it never reaches the agent.
