@@ -158,3 +158,32 @@ func TestKillSwitchHMACPinsTokenBinding(t *testing.T) {
 		t.Fatal("an empty registration key produced a kill-switch key")
 	}
 }
+
+// TestDeriveSessionKey pins the per-session key: deterministic for the same
+// shared secret and agent, distinct across agents (so one agent cannot decrypt
+// another's session), 32 bytes, and nil for a missing shared secret.
+func TestDeriveSessionKey(t *testing.T) {
+	secret := []byte("x25519-shared-secret-bytes")
+	a := DeriveSessionKey(secret, "agent-a")
+	b := DeriveSessionKey(secret, "agent-b")
+	if len(a) != 32 || len(b) != 32 {
+		t.Fatalf("key lengths = %d, %d", len(a), len(b))
+	}
+	if !bytes.Equal(a, DeriveSessionKey(secret, "agent-a")) {
+		t.Fatal("derivation is not deterministic")
+	}
+	if bytes.Equal(a, b) {
+		t.Fatal("two agents share a session key")
+	}
+	if bytes.Equal(a, secret) {
+		t.Fatal("the session key equals the shared secret")
+	}
+	if got := DeriveSessionKey(nil, "agent-a"); got != nil {
+		t.Fatalf("empty secret produced %x", got)
+	}
+	// A different shared secret must not produce the same key.
+	other := DeriveSessionKey([]byte("a-different-shared-secret"), "agent-a")
+	if bytes.Equal(a, other) {
+		t.Fatal("two secrets produced the same session key")
+	}
+}
