@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -319,7 +321,80 @@ func (s *Server) verifyAuditChain(limit int) auditChainVerdict {
 		expectPrev = row.EntryHash
 		checked++
 	}
+	// The head check: the newest hash must match the last line of the anchor file.
+	// An attacker who rewrites every row (recomputing all hashes) keeps the table
+	// internally consistent, so only a copy outside it can catch that.
+	if head := s.auditAnchorHead(); head != "" && head != rows[len(rows)-1].EntryHash {
+		return auditChainVerdict{Checked: checked, Discontinuities: purgedBoundaries,
+			FirstBadID: rows[len(rows)-1].ID,
+			Reason:     "chain head does not match the anchor file (rows were rewritten or the table was replaced)"}
+	}
 	return auditChainVerdict{OK: true, Checked: checked, Discontinuities: purgedBoundaries}
+}
+
+// auditAnchorPath is the append-only file that records the chain head outside the
+// audit table. Empty when no data directory is configured (bare test servers).
+//
+// The path is resolved ONCE at startup (initAuditAnchor) rather than read from the
+// config here: the audit path runs from handlers that already hold configMu for
+// write (config saves audit themselves), and taking the read lock again deadlocks
+// an RWMutex that is not reentrant.
+func (s *Server) auditAnchorPath() string {
+	return s.auditAnchorFile
+}
+
+// initAuditAnchor resolves the anchor file path. Called before traffic starts.
+func (s *Server) initAuditAnchor() {
+	dir := s.rawDataDir()
+	if dir == "" {
+		s.auditAnchorFile = ""
+		return
+	}
+	s.auditAnchorFile = filepath.Join(dir, "audit-anchor.log")
+}
+
+// appendAuditAnchor records one chain head. Best-effort: an anchor write failure
+// must never block an audit insert (losing the alarm is better than losing the
+// entry), so it only logs.
+func (s *Server) appendAuditAnchor(head string, id uint) {
+	path := s.auditAnchorPath()
+	if path == "" || head == "" {
+		return
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		slog.Warn("Failed to create the audit anchor directory", "err", err)
+		return
+	}
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+	if err != nil {
+		slog.Warn("Failed to open the audit anchor file", "err", err)
+		return
+	}
+	defer f.Close()
+	if _, err := fmt.Fprintf(f, "%s %d %s\n", head, id, time.Now().UTC().Format(time.RFC3339)); err != nil {
+		slog.Warn("Failed to append to the audit anchor file", "err", err)
+	}
+}
+
+// auditAnchorHead returns the most recently recorded chain head, or "" when no
+// anchor exists yet (fresh install, or a deployment without a data directory).
+func (s *Server) auditAnchorHead() string {
+	path := s.auditAnchorPath()
+	if path == "" {
+		return ""
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		fields := strings.Fields(lines[i])
+		if len(fields) >= 1 && fields[0] != "" {
+			return fields[0]
+		}
+	}
+	return ""
 }
 
 // handleVerifyAuditChain reports whether the audit chain is intact. Read-only:
@@ -365,7 +440,7 @@ func (s *Server) persistAuditBatch(entries []db.AuditLog, prevHash string) error
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), auditWriteTimeout)
 	defer cancel()
-	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		lastHash := prevHash
 		if lastHash == "" {
 			var lastEntry db.AuditLog
@@ -380,6 +455,16 @@ func (s *Server) persistAuditBatch(entries []db.AuditLog, prevHash string) error
 		}
 		return tx.CreateInBatches(entries, 50).Error
 	})
+
+	// Anchor the new head outside the table once the batch is committed. Without
+	// this, an attacker with write access can recompute every hash and the table
+	// stays internally consistent; the anchor file is what they would also have to
+	// rewrite, and it is not covered by the DB backup.
+	if err == nil && len(entries) > 0 {
+		last := entries[len(entries)-1]
+		s.appendAuditAnchor(last.EntryHash, last.ID)
+	}
+	return err
 }
 
 // startAuditWorker launches the single async audit writer. Called from Run();

@@ -215,6 +215,9 @@ type Server struct {
 	// so /ready polls do not re-log the same finding every few seconds.
 	auditTamperMu sync.Mutex
 	auditTamperID uint
+	// auditAnchorFile records the chain head outside the audit table. Resolved at
+	// startup (initAuditAnchor) because the audit path must not take configMu.
+	auditAnchorFile string
 
 	// Backlog metric label hygiene: agents currently exported as per-agent
 	// gauge series, so drained agents can be pruned.

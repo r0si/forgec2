@@ -222,6 +222,7 @@ func (s *Server) Run() error {
 	}
 
 	// async audit writer: request paths enqueue, single worker persists
+	s.initAuditAnchor()
 	s.startAuditWorker()
 
 	// vault re-encrypt: normalize previous-key loot rows after rotation
