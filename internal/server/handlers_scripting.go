@@ -50,16 +50,7 @@ func (s *Server) handleScriptingPage(c *gin.Context) {
 // visible only to unscoped (tenant 0) operators - assigning ownership of a blank row to whoever
 // asked first would let any tenant claim it.
 func (s *Server) scriptScope(c *gin.Context) (*gorm.DB, bool) {
-	tid, ok := s.resolveTenant(c)
-	if !ok {
-		return nil, false
-	}
-	q := s.db.Model(&db.Script{})
-	if tid == 0 {
-		return q, true
-	}
-	users := s.db.Model(&db.User{}).Select("username").Where("tenant_id = ?", tid)
-	return q.Where("created_by IN (?)", users), true
+	return s.creatorScope(c, &db.Script{}, "created_by")
 }
 
 func (s *Server) listScriptsFromDB(c *gin.Context) ([]scripting.Script, error) {

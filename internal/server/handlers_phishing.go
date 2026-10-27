@@ -14,11 +14,24 @@ import (
 
 	"github.com/forgec2/forgec2/internal/db"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
+// phishingScope restricts the phishing tables to the caller's tenant through their creator
+// column. A template's landing page is where credentials get captured, so an unscoped edit is
+// the difference between "a foreign row is visible" and "a foreign row can be retargeted".
+func (s *Server) phishingScope(c *gin.Context, model any) (*gorm.DB, bool) {
+	return s.creatorScope(c, model, "created_by")
+}
+
 func (s *Server) handleAPIPhishingTemplates(c *gin.Context) {
+	scope, ok := s.phishingScope(c, &db.PhishingTemplate{})
+	if !ok {
+		respond(c, []db.PhishingTemplate{})
+		return
+	}
 	var templates []db.PhishingTemplate
-	if err := s.db.Order("created_at desc").Limit(200).Find(&templates).Error; err != nil {
+	if err := scope.Order("created_at desc").Limit(200).Find(&templates).Error; err != nil {
 		// An empty 200 here reads as "no templates configured".
 		handleQueryError(c, err, "Failed to list phishing templates")
 		return
@@ -27,8 +40,13 @@ func (s *Server) handleAPIPhishingTemplates(c *gin.Context) {
 }
 
 func (s *Server) handleAPIPhishingCampaigns(c *gin.Context) {
+	scope, ok := s.phishingScope(c, &db.PhishingCampaign{})
+	if !ok {
+		respond(c, []db.PhishingCampaign{})
+		return
+	}
 	var campaigns []db.PhishingCampaign
-	if err := s.db.Order("created_at desc").Limit(200).Find(&campaigns).Error; err != nil {
+	if err := scope.Order("created_at desc").Limit(200).Find(&campaigns).Error; err != nil {
 		// An empty 200 here reads as "no campaigns running".
 		handleQueryError(c, err, "Failed to list phishing campaigns")
 		return
@@ -120,7 +138,13 @@ func (s *Server) handleAPICreatePhishingTemplate(c *gin.Context) {
 func (s *Server) handleAPIUpdatePhishingTemplate(c *gin.Context) {
 	id := c.Param("id")
 	var tpl db.PhishingTemplate
-	if !s.findOrFail(c, &tpl, id, "template") {
+	scope, okScope := s.phishingScope(c, &db.PhishingTemplate{})
+	if !okScope {
+		respondError(c, http.StatusNotFound, "template not found")
+		return
+	}
+	if err := scope.Where("id = ?", id).First(&tpl).Error; err != nil {
+		respondError(c, http.StatusNotFound, "template not found")
 		return
 	}
 	var req struct {
@@ -163,7 +187,14 @@ func (s *Server) handleAPIUpdatePhishingTemplate(c *gin.Context) {
 
 func (s *Server) handleAPIDeletePhishingTemplate(c *gin.Context) {
 	id := c.Param("id")
-	if err := s.db.Delete(&db.PhishingTemplate{}, "id = ?", id).Error; err != nil {
+	// Scope the DELETE: a template holds the landing page, so deleting another tenant's row
+	// is destructive - and until this, reachable by id alone.
+	scope, ok := s.phishingScope(c, &db.PhishingTemplate{})
+	if !ok {
+		respondError(c, http.StatusNotFound, "template not found")
+		return
+	}
+	if err := scope.Where("id = ?", id).Delete(&db.PhishingTemplate{}).Error; err != nil {
 		respondError(c, http.StatusInternalServerError, "failed to delete phishing template")
 		return
 	}
@@ -346,7 +377,13 @@ func extractEmailAddr(from string) string {
 func (s *Server) handleAPILaunchPhishingCampaign(c *gin.Context) {
 	id := c.Param("id")
 	var camp db.PhishingCampaign
-	if !s.findOrFail(c, &camp, id, "campaign") {
+	campScope, okCamp := s.phishingScope(c, &db.PhishingCampaign{})
+	if !okCamp {
+		respondError(c, http.StatusNotFound, "campaign not found")
+		return
+	}
+	if err := campScope.Where("id = ?", id).First(&camp).Error; err != nil {
+		respondError(c, http.StatusNotFound, "campaign not found")
 		return
 	}
 
@@ -503,7 +540,13 @@ func (s *Server) runPhishingCampaign(campID uint, tpl db.PhishingTemplate, targe
 func (s *Server) handleAPIStopPhishingCampaign(c *gin.Context) {
 	id := c.Param("id")
 	var camp db.PhishingCampaign
-	if !s.findOrFail(c, &camp, id, "campaign") {
+	campScope, okCamp := s.phishingScope(c, &db.PhishingCampaign{})
+	if !okCamp {
+		respondError(c, http.StatusNotFound, "campaign not found")
+		return
+	}
+	if err := campScope.Where("id = ?", id).First(&camp).Error; err != nil {
+		respondError(c, http.StatusNotFound, "campaign not found")
 		return
 	}
 	camp.Status = "stopped"

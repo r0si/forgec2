@@ -109,16 +109,7 @@ func (s *Server) handleBOFUpload(c *gin.Context) {
 // could list, download, edit, delete and RUN another tenant's uploaded blob - and a BOF is an
 // executable the implant loads.
 func (s *Server) bofScope(c *gin.Context) (*gorm.DB, bool) {
-	tid, ok := s.resolveTenant(c)
-	if !ok {
-		return nil, false
-	}
-	q := s.db.Model(&db.BOFFile{})
-	if tid == 0 {
-		return q, true
-	}
-	users := s.db.Model(&db.User{}).Select("username").Where("tenant_id = ?", tid)
-	return q.Where("created_by IN (?)", users), true
+	return s.creatorScope(c, &db.BOFFile{}, "created_by")
 }
 
 // findVisibleBOF loads a BOF by id within the caller's scope; false answers 404 like a miss.

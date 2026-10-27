@@ -267,7 +267,9 @@ func TestLaunchPhishingCampaignValidationDoesNotWedge(t *testing.T) {
 	}
 
 	// No template: refused, and the campaign must stay launchable.
-	camp := db.PhishingCampaign{Name: "no-template", Status: "draft", SMTPHost: "127.0.0.1", SMTPPort: 25, TargetList: "a@example.test"}
+	// Owned by the admin: the launch now resolves the campaign through its creator, so a row
+	// with no owner is invisible to a tenant-scoped caller (and "admin" IS in tenant 1).
+	camp := db.PhishingCampaign{Name: "no-template", Status: "draft", SMTPHost: "127.0.0.1", SMTPPort: 25, TargetList: "a@example.test", CreatedBy: "admin"}
 	if err := s.db.Create(&camp).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -290,7 +292,7 @@ func TestLaunchPhishingCampaignValidationDoesNotWedge(t *testing.T) {
 	if err := s.db.Create(&tpl).Error; err != nil {
 		t.Fatal(err)
 	}
-	noTargets := db.PhishingCampaign{Name: "no-targets", Status: "draft", TemplateID: tpl.ID, SMTPHost: "127.0.0.1", TargetList: "not-an-email"}
+	noTargets := db.PhishingCampaign{Name: "no-targets", Status: "draft", TemplateID: tpl.ID, SMTPHost: "127.0.0.1", TargetList: "not-an-email", CreatedBy: "admin"}
 	if err := s.db.Create(&noTargets).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -302,7 +304,7 @@ func TestLaunchPhishingCampaignValidationDoesNotWedge(t *testing.T) {
 	}
 
 	// SMTP host missing.
-	noSMTP := db.PhishingCampaign{Name: "no-smtp", Status: "draft", TemplateID: tpl.ID, TargetList: "a@example.test"}
+	noSMTP := db.PhishingCampaign{Name: "no-smtp", Status: "draft", TemplateID: tpl.ID, TargetList: "a@example.test", CreatedBy: "admin"}
 	if err := s.db.Create(&noSMTP).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -314,11 +316,11 @@ func TestLaunchPhishingCampaignValidationDoesNotWedge(t *testing.T) {
 	}
 
 	// from_email missing on the template.
-	noFrom := db.PhishingTemplate{Name: "no-from", Subject: "s", Body: "b", Type: "text"}
+	noFrom := db.PhishingTemplate{Name: "no-from", Subject: "s", Body: "b", Type: "text", CreatedBy: "admin"}
 	if err := s.db.Create(&noFrom).Error; err != nil {
 		t.Fatal(err)
 	}
-	campNoFrom := db.PhishingCampaign{Name: "no-from-camp", Status: "draft", TemplateID: noFrom.ID, SMTPHost: "127.0.0.1", TargetList: "a@example.test"}
+	campNoFrom := db.PhishingCampaign{Name: "no-from-camp", Status: "draft", TemplateID: noFrom.ID, SMTPHost: "127.0.0.1", TargetList: "a@example.test", CreatedBy: "admin"}
 	if err := s.db.Create(&campNoFrom).Error; err != nil {
 		t.Fatal(err)
 	}
