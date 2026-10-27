@@ -39,7 +39,14 @@ func validateExternalURL(raw string) error {
 	if host == "" {
 		return errors.New("URL has no host")
 	}
-	// Port whitelist: allow 80/443 + common AI gateway ports, block DB/SSH.
+	// Port policy, which the test below pins exactly:
+	//   - the allowlist (80/443 and the common AI gateway ports) always passes;
+	//   - a handful of sensitive service ports (SSH, SMTP, the databases,
+	//     Redis, Memcached) is refused;
+	//   - privileged ports below 1024 are refused unless they are 80/443;
+	//   - every other port above 1024 is ALLOWED. It is not a default deny:
+	//     AI gateways legitimately listen on arbitrary high ports, so tightening
+	//     this to an allowlist would break working configurations.
 	if port := u.Port(); port != "" {
 		allowed := map[string]bool{"80": true, "443": true, "8000": true, "8080": true, "8443": true, "11434": true, "3000": true, "5000": true, "9000": true}
 		if !allowed[port] {
@@ -53,8 +60,6 @@ func validateExternalURL(raw string) error {
 			if blocked[p] {
 				return fmt.Errorf("blocked port %s", port)
 			}
-			// Default deny for non-allowlisted custom ports except 8000-9000 already handled;
-			// For AI providers allow any high port >1024 if not blocked, but log.
 			if p < 1024 && p != 80 && p != 443 {
 				return fmt.Errorf("blocked privileged port %s", port)
 			}
