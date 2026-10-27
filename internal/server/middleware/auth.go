@@ -206,6 +206,11 @@ type authCacheEntry struct {
 	expiresAt time.Time
 }
 
+// TenantIDContextKey carries the authenticated user's tenant from the auth middleware to
+// the request handlers, so tenant scoping does not need its own users lookup on every
+// request. The value is a uint; handlers treat a missing value as "look it up".
+const TenantIDContextKey = "tenant_id"
+
 // globalUserCache is shared by every AuthRequired instance (web UI, REST
 // API, misc routes) so a single invalidation covers all of them. Entries
 // are short-TTL replicas of the users table: disable/force-logout paths
@@ -432,6 +437,10 @@ func AuthRequired(database *gorm.DB) gin.HandlerFunc {
 						c.Set("user_id", user.ID)
 						c.Set("user", user.Username)
 						c.Set("user_role", user.Role)
+						// The tenant travels with the authenticated row so the server does
+						// not have to re-SELECT users on every scoped request. The handler
+						// side falls back to a lookup when this is absent.
+						c.Set(TenantIDContextKey, user.TenantID)
 						// nil = legacy full-access key; non-nil = capability
 						// set enforced by RequirePermission/RequireRole.
 						c.Set("api_key_scopes", db.KeyScopeSet(ak.Scopes))
@@ -503,6 +512,8 @@ func AuthRequired(database *gorm.DB) gin.HandlerFunc {
 			}
 			globalUserCacheMu.Unlock()
 		}
+
+		c.Set(TenantIDContextKey, user.TenantID)
 
 		// Force-logout check: if user's ForceLogoutAt > token IssuedAt, session was invalidated
 		if !user.ForceLogoutAt.IsZero() && claims.IssuedAt != nil {

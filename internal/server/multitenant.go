@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/forgec2/forgec2/internal/db"
+	"github.com/forgec2/forgec2/internal/server/middleware"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -41,6 +42,15 @@ func (s *Server) resolveTenant(c *gin.Context) (uint, bool) {
 }
 
 func (s *Server) lookupTenantID(c *gin.Context) (uint, bool) {
+	// The auth middleware already loaded the user row (and for sessions caches it for
+	// five minutes), so it hands the tenant over directly. Without this every scoped
+	// request on the single-writer database paid an extra
+	// "SELECT tenant_id FROM users WHERE username = ?".
+	if v, ok := c.Get(middleware.TenantIDContextKey); ok {
+		if tid, ok := v.(uint); ok {
+			return tid, true
+		}
+	}
 	if u, ok := c.Get("user"); ok {
 		if name, ok := u.(string); ok && name != "" {
 			var user db.User
