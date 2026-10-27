@@ -73,6 +73,12 @@ by hand at least once; do not weaken one to make a change pass — fix the chang
   password_spray re-targeted the domain, cred_check probed the wrong account **and
   bypassed the lockout fuse**, persistence removed a different entry, uac_bypass
   ran a different payload. In-memory key builders are allowlisted with a reason.
+- `check:task-docs` (`scripts/check-task-docs.mjs`) — every handler registered in
+  `internal/payload/agent`'s `taskHandlers` map must have a row in
+  `docs/COMMAND_REFERENCE.md`; an undocumented task type is a feature nobody can
+  find. One direction only, deliberately: 53 documented types are handled by the
+  core dispatcher or the C implant rather than by that registry, so demanding a
+  handler for every row would fail on legitimate entries.
 - `TestSuccessEnvelope` / `TestErrorEnvelope` (Go) — ratchets over raw (non-envelope)
   JSON success and error responses, per file, failing in both directions: a new raw
   response, or a file that improved without lowering its number. Update the matching
