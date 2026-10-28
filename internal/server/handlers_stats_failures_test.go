@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -139,6 +140,32 @@ func TestTaskFailureStats(t *testing.T) {
 	}
 	if !seenEngagement || !seenNone {
 		t.Fatalf("engagement buckets = %v, want the exercise and the unattributed hosts", bucketsByEngagement)
+	}
+
+	// "other: N" is a dead end; the signatures turn it into a lead. Two hosts report the same failure with different
+	// identifiers, which must collapse into one signature rather than two.
+	// Forward slashes on purpose: the path pattern handles both, and this keeps the fixture readable.
+	seed("a-1", "shell", "open /tmp/a/file.txt: denied by policy", 30*time.Minute, "failed")
+	seed("a-2", "shell", "open /tmp/b/file.txt: denied by policy", 40*time.Minute, "failed")
+	_, withSignatures := call("?since=7d")
+	signatures, _ := withSignatures["other_signatures"].([]interface{})
+	if len(signatures) == 0 {
+		t.Fatalf("no signatures for the unclassified errors: %v", withSignatures)
+	}
+	top, _ := signatures[0].(map[string]interface{})
+	if top["count"] != float64(3) {
+		// The two path-only variants plus the earlier "weird failure" sample are three distinct shapes; the two that differ
+		// only by path must have merged, so the largest bucket is 2.
+		if top["count"] != float64(2) {
+			t.Fatalf("top signature count = %v, want the two path-variants merged", top["count"])
+		}
+	}
+	// The identifiers are gone from the signature, which is what makes two hosts one problem.
+	signatureText, _ := top["signature"].(string)
+	for _, leak := range []string{"/tmp/a/", "/tmp/b/"} {
+		if strings.Contains(signatureText, leak) {
+			t.Fatalf("the signature still contains a per-host identifier: %q", signatureText)
+		}
 	}
 
 	// group_by=type groups the same rows differently.

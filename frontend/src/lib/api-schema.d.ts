@@ -27745,6 +27745,12 @@ export interface operations {
                                 sample?: string;
                                 distinct_types?: number;
                             }[];
+                            /** @description Present when `group_by=reason`: the errors nobody classified, grouped by their own normalised shape (paths, hex runs and digits collapsed). "other: 7" is a dead end; "3 of them say RPC server unavailable" is a lead. Capped at the top five shapes. */
+                            other_signatures?: {
+                                signature?: string;
+                                count?: number;
+                                sample?: string;
+                            }[];
                         };
                     };
                 };

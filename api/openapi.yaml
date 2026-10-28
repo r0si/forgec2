@@ -12991,6 +12991,18 @@ paths:
                             count: {type: integer}
                             sample: {type: string}
                             distinct_types: {type: integer}
+                      other_signatures:
+                        type: array
+                        description: >-
+                          Present when `group_by=reason`: the errors nobody classified, grouped by their own normalised
+                          shape (paths, hex runs and digits collapsed). "other: 7" is a dead end; "3 of them say RPC
+                          server unavailable" is a lead. Capped at the top five shapes.
+                        items:
+                          type: object
+                          properties:
+                            signature: {type: string}
+                            count: {type: integer}
+                            sample: {type: string}
         '400':
           description: Invalid since or group_by
   /api/stats/tasks/duration:

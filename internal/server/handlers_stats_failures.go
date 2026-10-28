@@ -2,6 +2,7 @@ package server
 
 import (
 	"net/http"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -25,6 +26,9 @@ import (
 const (
 	failureStatsSampleLimit = 5000
 	failureSampleMaxChars   = 160
+	// The signature list is a lead, not an inventory: the top few shapes are what an operator acts on.
+	failureSignatureLimit    = 5
+	failureSignatureMaxChars = 120
 )
 
 // failureReason is one classification rule.
@@ -159,7 +163,7 @@ func (s *Server) handleTaskFailureStats(c *gin.Context) {
 		return buckets[i].Key < buckets[j].Key
 	})
 
-	respond(c, gin.H{
+	payload := gin.H{
 		"since":     since,
 		"group_by":  groupBy,
 		"failed":    len(rows),
@@ -167,7 +171,13 @@ func (s *Server) handleTaskFailureStats(c *gin.Context) {
 		"buckets":   buckets,
 		"note": "reason codes are a starting point: first match wins, and unmatched errors are collected as 'other' " +
 			"with an example",
-	})
+	}
+	// "other: 7" is a dead end. Grouping the unclassified errors by their own shape turns it into a lead - "3 of them say
+	// RPC server unavailable" is a bug report, while "7 unknown errors" is a shrug.
+	if groupBy == "reason" {
+		payload["other_signatures"] = unclassifiedSignatures(rows)
+	}
+	respond(c, payload)
 }
 
 // failureAgentIDs collects the distinct agent ids of a sample, for the engagement lookup.
@@ -187,3 +197,73 @@ func failureAgentIDs(rows []struct {
 	}
 	return ids
 }
+
+// unclassifiedSignatures groups the errors nobody classified by their own normalised shape.
+//
+// Digits, hex runs and paths are collapsed before grouping, because the same failure from five hosts differs only in the
+// identifiers: "open C:\Users\a\file.txt: denied" and "open C:\Users\b\file.txt: denied" are one problem, and a report that
+// lists them separately helps nobody.
+func unclassifiedSignatures(rows []struct {
+	Type    string
+	AgentID string
+	Error   string
+}) []gin.H {
+	type signature struct {
+		Count  int
+		Sample string
+	}
+	bySignature := map[string]*signature{}
+	for _, row := range rows {
+		if classifyFailure(row.Error) != "other" {
+			continue
+		}
+		normalised := normaliseFailureText(row.Error)
+		if normalised == "" {
+			continue
+		}
+		entry, exists := bySignature[normalised]
+		if !exists {
+			entry = &signature{Sample: truncateString(strings.TrimSpace(row.Error), failureSampleMaxChars)}
+			bySignature[normalised] = entry
+		}
+		entry.Count++
+	}
+
+	out := make([]gin.H, 0, len(bySignature))
+	for normalised, entry := range bySignature {
+		out = append(out, gin.H{
+			"signature": normalised,
+			"count":     entry.Count,
+			"sample":    entry.Sample,
+		})
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		left, _ := out[i]["count"].(int)
+		right, _ := out[j]["count"].(int)
+		if left != right {
+			return left > right
+		}
+		return out[i]["signature"].(string) < out[j]["signature"].(string)
+	})
+	if len(out) > failureSignatureLimit {
+		out = out[:failureSignatureLimit]
+	}
+	return out
+}
+
+// normaliseFailureText collapses the parts of an error that differ between hosts but not between problems.
+func normaliseFailureText(text string) string {
+	lowered := strings.ToLower(strings.TrimSpace(text))
+	lowered = failurePathPattern.ReplaceAllString(lowered, "<path>")
+	lowered = failureHexPattern.ReplaceAllString(lowered, "<hex>")
+	lowered = failureDigitPattern.ReplaceAllString(lowered, "<n>")
+	// Whitespace runs are an artefact of removing the identifiers.
+	lowered = strings.Join(strings.Fields(lowered), " ")
+	return truncateString(lowered, failureSignatureMaxChars)
+}
+
+var (
+	failurePathPattern  = regexp.MustCompile(`[a-z]:\\\\[^\\s]*|/(?:[^\\s/]+/)+[^\\s/]*`)
+	failureHexPattern   = regexp.MustCompile(`\\b0x[0-9a-f]+\\b|\\b[0-9a-f]{8,}\\b`)
+	failureDigitPattern = regexp.MustCompile(`\\d+`)
+)
