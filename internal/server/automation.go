@@ -7,8 +7,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -359,6 +361,38 @@ func (s *Server) executeWebhook(params struct {
 		return
 	}
 	defer resp.Body.Close()
+	logWebhookResponse(params.URL, evt, resp)
+}
+
+// logWebhookResponse records what the receiver said.
+//
+// The status code was never inspected, so a webhook endpoint answering 500 or 404 was treated exactly
+// like a 200: the body - which is where a receiver puts "signature mismatch" or "unknown event" - went
+// unread. A rule pointing at a receiver that had moved or started rejecting was silently dead.
+func logWebhookResponse(targetURL string, evt Event, resp *http.Response) {
+	if resp == nil {
+		return
+	}
+	// A body is written by the receiver, so bound what is read before logging it.
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+
+	// The URL may carry a token in a query string, so only the host is logged.
+	host := targetURL
+	if u, err := url.Parse(targetURL); err == nil && u.Host != "" {
+		host = u.Host
+	}
+
+	fields := []any{
+		"host", host,
+		"event", string(evt.Type),
+		"status", resp.StatusCode,
+	}
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		slog.Debug("Automation: webhook delivered", fields...)
+		return
+	}
+	slog.Warn("Automation: webhook rejected by the receiver",
+		append(fields, "body", truncateString(strings.TrimSpace(string(body)), 200))...)
 }
 
 func (s *Server) loadAutomationRules() []AutomationRule {
