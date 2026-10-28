@@ -4101,6 +4101,42 @@ paths:
                             agents_expired: {type: integer}
                             ends_in_seconds: {type: integer}
 
+  /api/plugins/failures:
+    get:
+      tags: [Plugins]
+      summary: Packages on disk that could not be registered
+      description: >-
+        A package that fails to register is **silently absent**: it never appears in the plugin list, it cannot be run, and
+        the only trace was a startup warning - so an operator who installed a plugin and sees nothing assumes the console is
+        stale rather than that the manifest was rejected. This lists the rejected packages with the reason the manager
+        recorded and, where the reason is recognisable, a `hint` for the next step (re-stamp after signing, run
+        `cmd/plugin-check`, add the signing key). The list is the **rejected** set, not the installed set, and it is sorted by
+        name so successive polls can be compared. A server with no plugin directory reports `plugins_enabled: false`
+        instead of claiming zero failures for a directory it never scanned.
+      operationId: pluginLoadFailures
+      security: [{SessionCookie: []}]
+      responses:
+        '200':
+          description: Rejected packages, sorted by name
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  data:
+                    type: object
+                    properties:
+                      plugins_enabled: {type: boolean}
+                      count: {type: integer}
+                      failures:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            name: {type: string}
+                            reason: {type: string}
+                            hint: {type: string, description: Present only when the reason is recognisable}
   /api/plugins/index:
     get:
       tags: [Plugins]

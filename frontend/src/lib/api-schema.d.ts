@@ -2134,6 +2134,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/plugins/failures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Packages on disk that could not be registered
+         * @description A package that fails to register is **silently absent**: it never appears in the plugin list, it cannot be run, and the only trace was a startup warning - so an operator who installed a plugin and sees nothing assumes the console is stale rather than that the manifest was rejected. This lists the rejected packages with the reason the manager recorded and, where the reason is recognisable, a `hint` for the next step (re-stamp after signing, run `cmd/plugin-check`, add the signing key). The list is the **rejected** set, not the installed set, and it is sorted by name so successive polls can be compared. A server with no plugin directory reports `plugins_enabled: false` instead of claiming zero failures for a directory it never scanned.
+         */
+        get: operations["pluginLoadFailures"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/plugins/index": {
         parameters: {
             query?: never;
@@ -15558,6 +15578,38 @@ export interface operations {
                                 agents?: number;
                                 agents_expired?: number;
                                 ends_in_seconds?: number;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+    };
+    pluginLoadFailures: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Rejected packages, sorted by name */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        data?: {
+                            plugins_enabled?: boolean;
+                            count?: number;
+                            failures?: {
+                                name?: string;
+                                reason?: string;
+                                /** @description Present only when the reason is recognisable */
+                                hint?: string;
                             }[];
                         };
                     };

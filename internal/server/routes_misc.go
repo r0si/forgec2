@@ -99,6 +99,8 @@ func (s *Server) registerPluginRoutes(auth *gin.RouterGroup) {
 	// The installed set as a verifiable document (digest per package); registered before :id like the
 	// other static siblings.
 	pluginsRead.GET("/index", s.handlePluginIndex)
+	// Packages on disk that could not be registered: silently absent plugins are the "nothing happened" shape.
+	pluginsRead.GET("/failures", s.handlePluginLoadFailures)
 	pluginsRead.GET("/:id", s.handlePluginGet)
 	pluginsRead.GET("/:id/rating", s.handlePluginRating)
 	pluginsRead.GET("/:id/reviews", s.handlePluginReviews)
