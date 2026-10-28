@@ -98,10 +98,14 @@ func (s *Server) DispatchNotification(n *db.Notification) {
 			// Do not discard this: the row above is already persisted, so a delivery failure left the
 			// operator with a notification that exists in the console and never reached Discord,
 			// Telegram or their webhook, and nothing anywhere said so.
-			if err := s.sendNotificationRoute(route, n); err != nil {
+			sendErr := s.sendNotificationRoute(route, n)
+			// Counted as well as logged: a log nobody reads line by line cannot answer "is this route still working",
+			// and a route that has been failing for a week looks exactly like one that is fine.
+			recordNotificationDelivery(route.ID, sendErr)
+			if sendErr != nil {
 				slog.Error("Notification route delivery failed",
 					"route", route.Name, "channel", route.Channel, "title", n.Title,
-					"error", deliveryErrorText(err))
+					"error", deliveryErrorText(sendErr))
 			}
 		}(route)
 	}
@@ -157,7 +161,9 @@ func (s *Server) handleListNotificationRoutes(c *gin.Context) {
 	for i := range routes {
 		routes[i] = redactNotificationRoute(routes[i])
 	}
-	respond(c, gin.H{"routes": routes})
+	// Delivery counters travel with the list: "is this route still working" is not answerable from the configuration,
+	// and the fan-out logs each failure where nobody reads it line by line.
+	respond(c, gin.H{"routes": routes, "stats": notificationRouteStatsView(), "stats_since": "process start"})
 }
 
 func validNotificationChannel(ch string) bool {
@@ -404,6 +410,7 @@ func (s *Server) handleTestNotificationRoute(c *gin.Context) {
 	// The target is reported as a HOST, never the full URL: a Discord webhook path is a credential, which is why it is
 	// not echoed back by the list endpoint either.
 	sendErr := s.sendNotificationRoute(route, test)
+	recordNotificationDelivery(route.ID, sendErr)
 	result := gin.H{
 		"route_id":  route.ID,
 		"channel":   route.Channel,
