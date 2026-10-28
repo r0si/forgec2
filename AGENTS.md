@@ -168,6 +168,15 @@ by hand at least once; do not weaken one to make a change pass — fix the chang
   design — `wsReadPump`/`wsWritePump` handle their own errors, and the AI broker retry worker selects on
   `dst.done` so a racing unsubscribe cannot panic on a closed channel — which is why the rule is "no new
   ones", not "add recover to all 63".
+- `check:test-stdio` (`frontend/scripts/check-test-stdio.mjs`) — a **test** must not close a handle it does not own.
+  Round 254 found the flake that had been read as a product bug for many rounds: the log-rotation test's
+  cleanup closed every `io.Closer` sink of the fanout writer, and **`os.Stdout` implements `io.Closer`**.
+  Closing it cost the test binary its final `PASS` line, so `go test` reported `FAIL` **with no failing
+  test named** and verbose output that stopped mid-run — and it hid a real regression (a rerun answering
+  400 instead of 429) for several rounds. The gate flags a `for … range *.sinks` loop that calls
+  `Close()` without skipping `os.Stdout`/`os.Stderr` **inside the loop body** (the first version checked
+  the whole file and passed a reintroduced defect). Scope is stated on purpose: it catches the construct
+  that shipped, not every way to misuse a handle.
 - `check:docs` (`gen-command-reference.mjs --check` + `gen-capability-matrix.mjs --check`) —
   the generated docs must match their sources: the command reference, and the **generated
   task-inventory block** plus the version stamp in `docs/CAPABILITY_MATRIX.md`. CI runs these
