@@ -20,8 +20,9 @@ import (
 // name, event type, conditions, actions, cooldown - and what does not travel is anything the destination would have to
 // pretend to know.
 //
-// GET  /api/automation/rules/:id/export    -> {"rule": {...}}
-// POST /api/automation/rules/import        <- {"rule": {...}, "overwrite": false}
+// GET  /api/automation/rules/export      -> {"version":1,"count":N,"rules":[...]}
+// GET  /api/automation/rules/:id/export  -> {"rule": {...}}
+// POST /api/automation/rules/import      <- {"rule": {...}} or {"rules": [...], "overwrite": false}
 
 // portableRule is the export shape, and the import shape.
 type portableRule struct {
@@ -32,6 +33,37 @@ type portableRule struct {
 	Actions         []RuleAction    `json:"actions"`
 	CooldownSeconds int             `json:"cooldown_seconds,omitempty"`
 	Schedule        string          `json:"schedule,omitempty"`
+}
+
+// portableRuleSetVersion identifies the document shape, so a future change can be recognised rather than guessed at.
+const portableRuleSetVersion = 1
+
+// toPortable converts a live rule to the document shape.
+func toPortable(rule AutomationRule) portableRule {
+	enabled := rule.Enabled
+	return portableRule{
+		Name:            rule.Name,
+		EventType:       rule.EventType,
+		Enabled:         &enabled,
+		Conditions:      rule.Conditions,
+		Actions:         rule.Actions,
+		CooldownSeconds: rule.Cooldown,
+		Schedule:        rule.Schedule,
+	}
+}
+
+// handleExportAutomationRules returns the caller's whole rule set as one document.
+func (s *Server) handleExportAutomationRules(c *gin.Context) {
+	rules := s.loadAutomationRules()
+	tenantID := s.currentTenantID(c)
+	out := make([]portableRule, 0, len(rules))
+	for _, rule := range rules {
+		if rule.TenantID != 0 && rule.TenantID != tenantID {
+			continue
+		}
+		out = append(out, toPortable(rule))
+	}
+	respond(c, gin.H{"version": portableRuleSetVersion, "count": len(out), "rules": out})
 }
 
 // handleExportAutomationRule returns one rule in the portable shape.
@@ -49,79 +81,108 @@ func (s *Server) handleExportAutomationRule(c *gin.Context) {
 			respondError(c, http.StatusNotFound, "rule not found")
 			return
 		}
-		enabled := rule.Enabled
-		portable := portableRule{
-			Name:            rule.Name,
-			EventType:       rule.EventType,
-			Enabled:         &enabled,
-			Conditions:      rule.Conditions,
-			Actions:         rule.Actions,
-			CooldownSeconds: rule.Cooldown,
-			Schedule:        rule.Schedule,
-		}
-		respond(c, gin.H{"rule": portable})
+		respond(c, gin.H{"rule": toPortable(rule)})
 		return
 	}
 	respondError(c, http.StatusNotFound, "rule not found")
 }
 
-// handleImportAutomationRule creates a rule from a portable document.
+// handleImportAutomationRule creates rules from a portable document: one, or a whole set.
 func (s *Server) handleImportAutomationRule(c *gin.Context) {
 	var body struct {
-		Rule      portableRule `json:"rule"`
-		Overwrite bool         `json:"overwrite"`
+		Rule      *portableRule  `json:"rule"`
+		Rules     []portableRule `json:"rules"`
+		Overwrite bool           `json:"overwrite"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
-		respondError(c, http.StatusBadRequest, `invalid body: expected {"rule": {...}, "overwrite": false}`)
+		respondError(c, http.StatusBadRequest,
+			`invalid body: expected {"rule": {...}} or {"rules": [...], "overwrite": false}`)
 		return
 	}
-	rule := body.Rule
-	rule.Name = strings.TrimSpace(rule.Name)
-	if rule.Name == "" {
-		respondError(c, http.StatusBadRequest, "the rule needs a name")
+
+	// The set form: a partial success is the normal case, so the answer is per rule rather than a single status. A 409 for
+	// the whole document would hide the rules that did import.
+	if len(body.Rules) > 0 {
+		s.importRuleSet(c, body.Rules, body.Overwrite)
 		return
+	}
+
+	if body.Rule == nil {
+		respondError(c, http.StatusBadRequest, "provide rule or rules")
+		return
+	}
+	outcome := s.importOneRule(c, *body.Rule, body.Overwrite)
+	switch outcome.Status {
+	case "invalid":
+		respondError(c, http.StatusBadRequest, outcome.Reason)
+		return
+	case "conflict":
+		respondError(c, http.StatusConflict, outcome.Reason)
+		return
+	}
+	respond(c, gin.H{"rule_id": outcome.RuleID, "overwrote": outcome.Status == "replaced", "enabled": outcome.Enabled})
+}
+
+// ruleImportOutcome is what happened to one document.
+type ruleImportOutcome struct {
+	Name    string
+	Status  string // created | replaced | conflict | invalid
+	RuleID  string
+	Enabled bool
+	Reason  string
+}
+
+// importOneRule validates and writes a single portable rule.
+func (s *Server) importOneRule(c *gin.Context, rule portableRule, overwrite bool) ruleImportOutcome {
+	outcome := ruleImportOutcome{Name: strings.TrimSpace(rule.Name)}
+
+	if outcome.Name == "" {
+		outcome.Status, outcome.Reason = "invalid", "the rule needs a name"
+		return outcome
 	}
 	if strings.TrimSpace(rule.EventType) == "" {
-		respondError(c, http.StatusBadRequest, "the rule needs an event_type; a rule without one never fires")
-		return
+		outcome.Status, outcome.Reason = "invalid", "the rule needs an event_type; a rule without one never fires"
+		return outcome
 	}
 	if len(rule.Actions) == 0 {
-		respondError(c, http.StatusBadRequest, "the rule needs at least one action")
-		return
+		outcome.Status, outcome.Reason = "invalid", "the rule needs at least one action"
+		return outcome
 	}
 
 	enabled := true
 	if rule.Enabled != nil {
 		enabled = *rule.Enabled
 	}
+	outcome.Enabled = enabled
 	tenantID := s.currentTenantID(c)
 
 	// A name collision is refused unless the caller said overwrite: an import that silently replaces a rule the operator
 	// built by hand is worse than a rejection.
 	var existing db.AutomationRule
 	found := s.tenantScope(s.db.WithContext(s.ctx).Model(&db.AutomationRule{}), c).
-		Where("name = ?", rule.Name).First(&existing).Error == nil
-	if found && !body.Overwrite {
-		respondError(c, http.StatusConflict, fmt.Sprintf("a rule named %q already exists; pass overwrite to replace it", rule.Name))
-		return
+		Where("name = ?", outcome.Name).First(&existing).Error == nil
+	if found && !overwrite {
+		outcome.Status = "conflict"
+		outcome.Reason = fmt.Sprintf("a rule named %q already exists; pass overwrite to replace it", outcome.Name)
+		return outcome
 	}
 
 	// The id is derived from the name on first import and kept on overwrite, so importing the same document twice is
 	// idempotent rather than creating twins.
 	ruleID := existing.ID
 	if !found {
-		ruleID = "imported-" + slugifyRuleName(rule.Name)
+		ruleID = "imported-" + slugifyRuleName(outcome.Name)
 		// A slug is not unique: two names can normalise the same way, so fall back to a timestamp suffix rather than
 		// overwriting a rule the caller did not name.
 		var clash db.AutomationRule
 		if err := s.db.WithContext(s.ctx).First(&clash, "id = ?", ruleID).Error; err == nil {
-			ruleID = fmt.Sprintf("%s-%d", ruleID, time.Now().Unix())
+			ruleID = fmt.Sprintf("%s-%d", ruleID, time.Now().UnixNano())
 		}
 	}
 
 	toSave := AutomationRule{
 		ID:            ruleID,
-		Name:          rule.Name,
+		Name:          outcome.Name,
 		Enabled:       enabled,
 		EventType:     rule.EventType,
 		Conditions:    rule.Conditions,
@@ -133,24 +194,58 @@ func (s *Server) handleImportAutomationRule(c *gin.Context) {
 		RunCount:      existing.RunCount,
 	}
 	if err := s.saveAutomationRule(toSave); err != nil {
-		handleQueryError(c, err, "Failed to import the rule")
+		outcome.Status, outcome.Reason = "invalid", "failed to save"
+		return outcome
+	}
+
+	outcome.RuleID = ruleID
+	if found {
+		outcome.Status = "replaced"
+		s.LogAuditRecord(c, "automation_rule_import_overwrite", "automation", ruleID,
+			fmt.Sprintf("replaced rule %q from an imported document", outcome.Name), true, nil)
+		return outcome
+	}
+	outcome.Status = "created"
+	s.LogAuditRecord(c, "automation_rule_import", "automation", ruleID,
+		fmt.Sprintf("imported rule %q (%d condition(s), %d action(s))",
+			outcome.Name, len(rule.Conditions), len(rule.Actions)), true, nil)
+	return outcome
+}
+
+// importRuleSet imports a whole document, reporting per rule.
+func (s *Server) importRuleSet(c *gin.Context, rules []portableRule, overwrite bool) {
+	const maxRules = 200
+	if len(rules) > maxRules {
+		respondError(c, http.StatusBadRequest, fmt.Sprintf("too many rules (%d); the limit is %d", len(rules), maxRules))
 		return
 	}
 
-	action := "automation_rule_import"
-	detail := fmt.Sprintf("imported rule %q (%d condition(s), %d action(s))", rule.Name, len(rule.Conditions), len(rule.Actions))
-	if found {
-		action = "automation_rule_import_overwrite"
-		detail = fmt.Sprintf("replaced rule %q from an imported document", rule.Name)
+	type result struct {
+		Name   string `json:"name"`
+		Status string `json:"status"`
+		RuleID string `json:"rule_id,omitempty"`
+		Reason string `json:"reason,omitempty"`
 	}
-	s.LogAuditRecord(c, action, "automation", ruleID, detail, true, nil)
+	results := make([]result, 0, len(rules))
+	counts := map[string]int{"created": 0, "replaced": 0, "conflict": 0, "invalid": 0}
+	for _, rule := range rules {
+		outcome := s.importOneRule(c, rule, overwrite)
+		counts[outcome.Status]++
+		results = append(results, result{
+			Name: outcome.Name, Status: outcome.Status, RuleID: outcome.RuleID, Reason: outcome.Reason,
+		})
+	}
 
-	respond(c, gin.H{"rule_id": ruleID, "overwrote": found, "enabled": enabled})
+	s.LogAuditRecord(c, "automation_rule_import_set", "automation", "",
+		fmt.Sprintf("imported a rule set: %d created, %d replaced, %d conflict(s), %d invalid",
+			counts["created"], counts["replaced"], counts["conflict"], counts["invalid"]), true, nil)
+
+	respond(c, gin.H{"counts": counts, "results": results})
 }
 
 // slugifyRuleName builds a readable id fragment from a rule name.
 //
-// Whispace and punctuation become dashes, everything else is lowercased: the id has to be usable in a URL and legible in a
+// Whitespace and punctuation become dashes, everything else is lowercased: the id has to be usable in a URL and legible in a
 // log line, and readability matters more than reversibility here.
 func slugifyRuleName(name string) string {
 	lowered := strings.ToLower(strings.TrimSpace(name))

@@ -2551,6 +2551,33 @@ paths:
                       rule_id: {type: string}
         '400': {description: The id was given in the wrong shape}
         '404': {description: No such rule}
+  /api/automation/rules/export:
+    get:
+      tags: [Automation]
+      summary: Export the whole rule set
+      description: >-
+        The set form of the single-rule export: one document with `version`, `count` and `rules`, each in the **portable**
+        shape (no ids, timestamps or ownership). A version field exists so a future change to the document can be recognised
+        rather than guessed at, and the count lets a receiver notice a truncated file before importing it.
+      operationId: exportAutomationRules
+      security: [{SessionCookie: []}]
+      responses:
+        '200':
+          description: The caller's rule set as one document
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  data:
+                    type: object
+                    properties:
+                      version: {type: integer}
+                      count: {type: integer}
+                      rules:
+                        type: array
+                        items: {type: object}
   /api/automation/rules/{id}/export:
     get:
       tags: [Automation]
@@ -2613,8 +2640,14 @@ paths:
               type: object
               required: [rule]
               properties:
-                rule: {type: object, description: Same shape as the export}
-                overwrite: {type: boolean, description: Replace a rule with the same name}
+                rule: {type: object, description: One rule, same shape as the export}
+                rules:
+                  type: array
+                  description: >-
+                    A whole set. A partial success is the normal case for a bulk import, so the response is per rule
+                    (created/replaced/conflict/invalid with reasons) rather than one status for the document.
+                  items: {type: object}
+                overwrite: {type: boolean, description: Replace rules with the same name}
       responses:
         '200':
           description: The created or replaced rule

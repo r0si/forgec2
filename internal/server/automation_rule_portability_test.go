@@ -141,14 +141,91 @@ func TestAutomationRulePortability(t *testing.T) {
 		}
 	}
 
+	// 5b. The whole set exports and imports as one document, with a per-rule answer because a partial success is the
+	// normal case in a bulk import.
+	setCode, setData := callSet(s, http.MethodGet, "/export-set", 1, nil)
+	if setCode != http.StatusOK {
+		t.Fatalf("set export status = %d", setCode)
+	}
+	if setData["version"] != float64(1) {
+		t.Fatalf("set version = %v", setData["version"])
+	}
+	setRules, _ := setData["rules"].([]interface{})
+	if len(setRules) != 1 {
+		t.Fatalf("the set export carries %d rule(s), want this tenant's one", len(setRules))
+	}
+	if setData["count"] != float64(1) {
+		t.Fatalf("count = %v", setData["count"])
+	}
+
+	// Import the same set into the first tenant: one conflict (the source rule) and one creation.
+	importSet := []interface{}{setRules[0], map[string]interface{}{
+		"name": "Second rule", "event_type": string(EventTaskComplete),
+		"conditions": []interface{}{},
+		"actions":    []interface{}{map[string]interface{}{"type": "notify", "params": map[string]interface{}{"message": "x"}}},
+	}}
+	batchCode, batchData := callSet(s, http.MethodPost, "/import", 1, map[string]interface{}{"rules": importSet})
+	if batchCode != http.StatusOK {
+		t.Fatalf("batch import status = %d", batchCode)
+	}
+	counts, _ := batchData["counts"].(map[string]interface{})
+	if counts["conflict"] != float64(1) || counts["created"] != float64(1) || counts["replaced"] != float64(0) {
+		t.Fatalf("batch counts = %v, want one conflict (the existing rule) and one creation", counts)
+	}
+	results, _ := batchData["results"].([]interface{})
+	if len(results) != 2 {
+		t.Fatalf("batch results = %v", results)
+	}
+	// The conflict names why, so the operator can decide to re-run with overwrite.
+	for _, raw := range results {
+		entry, _ := raw.(map[string]interface{})
+		if entry["status"] == "conflict" && entry["reason"] == nil {
+			t.Fatalf("a conflict was reported without a reason: %v", entry)
+		}
+	}
+
 	// 6. Both directions are audited.
-	for _, action := range []string{"automation_rule_import", "automation_rule_import_overwrite"} {
+	// Two single imports (the tenant-2 import and the batch's "Second rule"), one overwrite, one batch summary.
+	for action, want := range map[string]int64{
+		"automation_rule_import":           2,
+		"automation_rule_import_overwrite": 1,
+		"automation_rule_import_set":       1,
+	} {
 		var n int64
 		if err := s.db.Model(&db.AuditLog{}).Where("action = ?", action).Count(&n).Error; err != nil {
 			t.Fatalf("count %s: %v", action, err)
 		}
-		if n != 1 {
-			t.Fatalf("%s rows = %d, want 1", action, n)
+		if n != want {
+			t.Fatalf("%s rows = %d, want %d", action, n, want)
 		}
 	}
+}
+
+// callSet drives the set-level handlers, which have no path parameter.
+func callSet(s *Server, method, path string, tenant uint, body interface{}) (int, map[string]interface{}) {
+	var reader *bytes.Reader
+	if body != nil {
+		raw, _ := json.Marshal(body)
+		reader = bytes.NewReader(raw)
+	} else {
+		reader = bytes.NewReader(nil)
+	}
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(method, path, reader)
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set("user", "op")
+	c.Set("user_role", db.RoleAdmin)
+	c.Set("user_id", uint(1))
+	c.Set(middleware.TenantIDContextKey, tenant)
+	if method == http.MethodGet {
+		s.handleExportAutomationRules(c)
+	} else {
+		s.handleImportAutomationRule(c)
+	}
+	var resp struct {
+		Data map[string]interface{} `json:"data"`
+	}
+	_ = json.Unmarshal(w.Body.Bytes(), &resp)
+	return w.Code, resp.Data
 }

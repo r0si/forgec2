@@ -51,6 +51,7 @@ func (s *Server) registerAutomationRoutes(auth *gin.RouterGroup) {
 		autoRead.GET("/automation", s.handleAutomationPage)
 		autoRead.GET("/api/automation/rules", s.handleListAutomationRules)
 		// Rules are configuration an operator rebuilds every exercise: export one in a portable shape.
+		autoRead.GET("/api/automation/rules/export", s.handleExportAutomationRules)
 		autoRead.GET("/api/automation/rules/:id/export", s.handleExportAutomationRule)
 		autoRead.GET("/api/webhooks", s.handleListWebhooks)
 		autoRead.GET("/bof_repo", func(c *gin.Context) {

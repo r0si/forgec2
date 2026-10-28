@@ -1410,6 +1410,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/automation/rules/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export the whole rule set
+         * @description The set form of the single-rule export: one document with `version`, `count` and `rules`, each in the **portable** shape (no ids, timestamps or ownership). A version field exists so a future change to the document can be recognised rather than guessed at, and the count lets a receiver notice a truncated file before importing it.
+         */
+        get: operations["exportAutomationRules"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/automation/rules/{id}/export": {
         parameters: {
             query?: never;
@@ -14184,6 +14204,33 @@ export interface operations {
             };
         };
     };
+    exportAutomationRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The caller's rule set as one document */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        data?: {
+                            version?: number;
+                            count?: number;
+                            rules?: Record<string, never>[];
+                        };
+                    };
+                };
+            };
+        };
+    };
     exportAutomationRule: {
         parameters: {
             query?: never;
@@ -14236,9 +14283,11 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    /** @description Same shape as the export */
+                    /** @description One rule */
                     rule: Record<string, never>;
-                    /** @description Replace a rule with the same name */
+                    /** @description A whole set. A partial success is the normal case for a bulk import, so the response is per rule (created/replaced/conflict/invalid with reasons) rather than one status for the document. */
+                    rules?: Record<string, never>[];
+                    /** @description Replace rules with the same name */
                     overwrite?: boolean;
                 };
             };
