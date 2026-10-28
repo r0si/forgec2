@@ -330,6 +330,37 @@ few-hundred-kB route chunk to re-leak and still pass. It is now 900 kB. **When a
 states a headroom, check that arithmetic against the current measurement.**
 
 ## Testing
+
+### A targeted `-run` is not a suite
+
+`go test -run 'TestTheThingIChanged'` answers one question: *"did I break what I was thinking about"*. It does **not** answer
+*"is the suite green"*, and the difference is not academic — in one session two red lights sat unread for **dozens of rounds**
+because every check was a targeted pattern:
+
+- `TestSuccessEnvelope` had been failing since a feature added `c.JSON` document exports without a baseline entry. The JSON
+  exports were correct; the ratchet needed the entry. Nobody saw it, because the only tests run were the ones named after the
+  change.
+- `TestHandleExportAuditChainStreamsVerifiableRows` asserted a filename **without** the timestamp that had been added on
+  purpose (two exports in a day must not collide). Again correct code, stale expectation, invisible to `-run`.
+
+Before saying a change is verified, run the **package** (`go test ./internal/server/` ≈ 130 s) and, at the end of a batch,
+the **suite** (`go test ./internal/... ./pkg/... ./cmd/...`). When a guard fails, first decide which side is wrong — all four
+of the cases above were stale expectations, not code.
+
+### Do not author Go source through the shell
+
+PowerShell here parses single quotes, backticks and `/` in ways that silently change what lands in the file. Two real defects
+came from it:
+
+- **Regex character classes.** Patterns written through a heredoc reached the source with `\s` spelled `\\s`, so the class
+  meant *"not a backslash and not the letter s"*. The end-to-end test still passed (its fixture used forward slashes); only a
+  **unit test on the normaliser** exposed it. Use `write`/`edit`, and keep regexes in a small file with a table test.
+- **CRLF.** `[IO.File]::WriteAllLines` emits CRLF, so one `AGENTS.md` edit produced a 478-line whitespace diff. Markdown and
+  Go are LF here; use `edit`, or normalise with `.Replace("`r`n", "`n")` before writing.
+
+The reliable pattern is: read the file, `edit` a literal (never a whole-file rewrite), then run `gofmt -l` and the package
+tests.
+
 Backend test suite via CI (`.github/workflows/ci.yml`):
 ```
 go test ./internal/config/... ./internal/crypto/... ./internal/db/... ./internal/malleable/... ./internal/obfuscation/... ./internal/payload/... ./internal/plugin/... ./internal/scripting/... ./internal/server/... ./pkg/... ./cmd/... -count=1 -timeout 8m -coverprofile=coverage.out
