@@ -43,6 +43,13 @@ func (s *Server) handleAgents(c *gin.Context) {
 	if osFilter != "" {
 		query = query.Where("LOWER(os) LIKE ? ESCAPE '\\'", "%"+escapeLike(osFilter)+"%")
 	}
+	// Engagement filter, shared with the JSON list so the two cannot drift.
+	if filtered, err := applyEngagementFilter(query, c); err != nil {
+		respondError(c, http.StatusBadRequest, err.Error())
+		return
+	} else {
+		query = filtered
+	}
 
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
@@ -537,6 +544,12 @@ func (s *Server) implantListQuery(c *gin.Context) *gorm.DB {
 	case "chained":
 		query = query.Where("parent_id != '' AND parent_id IS NOT NULL")
 	}
+	// Engagement filter, shared with the page handler so the two lists cannot drift. An invalid value is
+	// reported by the caller (the JSON list answers 400; the page falls back to no filter), which is why
+	// this returns the error instead of responding here.
+	if filtered, err := applyEngagementFilter(query, c); err == nil {
+		query = filtered
+	}
 	if tagID := c.Query("tag_id"); tagID != "" {
 		query = query.Joins("JOIN agent_tag_assignments ON agent_tag_assignments.implant_id = implants.id").
 			Where("agent_tag_assignments.agent_tag_id = ?", tagID)
@@ -660,6 +673,10 @@ func parseAgentListPage(c *gin.Context) (page, pageSize int) {
 // writeAgentListJSON is the single operator list contract for GET /api/agents
 // and GET /api/v1/agents: success + snake_case agents/data + pagination.
 func (s *Server) writeAgentListJSON(c *gin.Context) {
+	if err := validateEngagementQuery(c.Query("engagement")); err != nil {
+		respondError(c, http.StatusBadRequest, err.Error())
+		return
+	}
 	page, pageSize := parseAgentListPage(c)
 	query := s.implantListQuery(c)
 	var agents []db.Implant
