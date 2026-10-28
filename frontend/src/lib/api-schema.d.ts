@@ -14049,6 +14049,14 @@ export interface operations {
                                 enabled?: boolean;
                                 run_count?: number;
                                 last_triggered?: string | null;
+                                /**
+                                 * @description Whether the rules action DISPATCHES are landing. run_count counts firings, not successes, so a rule firing into a void looked identical to one that works.
+                                 * @enum {string}
+                                 */
+                                action_state?: "unused" | "dispatching" | "degraded" | "failing";
+                                actions_ok?: number;
+                                actions_failed?: number;
+                                last_action_error?: string;
                             }[];
                             findings?: {
                                 rule_id?: string;
@@ -14056,7 +14064,7 @@ export interface operations {
                                 /** @enum {string} */
                                 severity?: "error" | "warning";
                                 /** @enum {string} */
-                                code?: "unconditional_mutating_action" | "missing_agent" | "missing_script" | "missing_macro" | "duplicate_rule" | "never_fired" | "firing_often";
+                                code?: "unconditional_mutating_action" | "missing_agent" | "missing_script" | "missing_macro" | "duplicate_rule" | "never_fired" | "firing_often" | "action_failing";
                                 detail?: string;
                             }[];
                         };

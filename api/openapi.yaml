@@ -2561,6 +2561,15 @@ paths:
                             enabled: {type: boolean}
                             run_count: {type: integer}
                             last_triggered: {type: string, nullable: true}
+                            action_state:
+                              type: string
+                              enum: [unused, dispatching, degraded, failing]
+                              description: >-
+                                Whether the rules action DISPATCHES are landing. run_count counts firings, not successes,
+                                so a rule firing into a void looked identical to one that works.
+                            actions_ok: {type: integer}
+                            actions_failed: {type: integer}
+                            last_action_error: {type: string}
                       findings:
                         type: array
                         items:
@@ -2579,6 +2588,7 @@ paths:
                                 - duplicate_rule
                                 - never_fired
                                 - firing_often
+                                - action_failing
                             detail: {type: string}
   /api/automation/preview:
     post:

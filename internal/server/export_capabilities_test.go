@@ -198,6 +198,15 @@ func TestExportCapabilities(t *testing.T) {
 		t.Fatalf("the rate limit is not explained: %+v", resp.Data.DiagnosticRateLimit)
 	}
 
+	// 7d. The rule-set health report advertises what it now returns, so a client can read the action state without
+	// parsing the description.
+	specText := string(spec)
+	for _, field := range []string{"action_state", "actions_ok", "actions_failed", "last_action_error", "action_failing"} {
+		if !strings.Contains(specText, field) {
+			t.Fatalf("api/openapi.yaml does not document %q in the rule-set health report", field)
+		}
+	}
+
 	// 8. With a key configured the same entry reports it, so an operator can hand the expected key to the receiver.
 	seed := "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60"
 	t.Setenv(bundleSigningKeyEnv, seed)
