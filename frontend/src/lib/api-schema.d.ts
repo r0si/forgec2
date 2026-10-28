@@ -14926,6 +14926,14 @@ export interface operations {
                                 headers?: string[];
                                 notes?: string[];
                             };
+                            /** @description The endpoints that answer "what would happen" and execute nothing: the automation previews, the rule-set health report, the composed diagnosis and the notification delivery preview. Listed here because a client author who cannot enumerate them has to read the source. */
+                            diagnostics?: {
+                                path?: string;
+                                method?: string;
+                                answers?: string;
+                                body?: string[];
+                                notes?: string[];
+                            }[];
                             limits?: {
                                 task_export_rows?: number;
                                 audit_export_rows?: number;

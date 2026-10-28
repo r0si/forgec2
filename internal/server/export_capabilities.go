@@ -121,6 +121,51 @@ func (s *Server) handleExportCapabilities(c *gin.Context) {
 				"signing needs FORGEC2_BUNDLE_SIGNING_KEY (hex 32-byte Ed25519 seed); unsigned is honest, not silent",
 			},
 		},
+		// The diagnostics surface: endpoints that answer "what would happen" and execute nothing. They were added over
+		// several rounds and were only discoverable by reading the spec, which is the same problem the export half of
+		// this document exists to solve.
+		"diagnostics": []gin.H{
+			{
+				"path":    "/api/automation/rules/:id/preview",
+				"method":  "POST",
+				"answers": "why would THIS rule fire, or why did it not",
+				"body":    []string{"event_type", "data"},
+				"notes":   []string{"executes nothing; audited as automation_preview"},
+			},
+			{
+				"path":    "/api/automation/preview",
+				"method":  "POST",
+				"answers": "which rules of this tenant would fire for one event",
+				"body":    []string{"event_type", "data", "agent_*", "user"},
+				"notes": []string{
+					"rules for other event types and other tenants are omitted rather than listed as not firing",
+					"executes nothing; audited as automation_preview_batch",
+				},
+			},
+			{
+				"path":    "/api/automation/health",
+				"method":  "GET",
+				"answers": "which rules are unconditional, dangling or duplicated",
+				"notes": []string{
+					"read-only, no event needed",
+					"target lookups include tenant-0 rows, so legacy resources are not reported missing",
+				},
+			},
+			{
+				"path":    "/api/automation/diagnose",
+				"method":  "POST",
+				"answers": "what fires for this event AND who would be told",
+				"body":    []string{"event_type", "notification", "data", "agent_*", "user"},
+				"notes":   []string{"composes the two previews; executes nothing; audited as automation_diagnose"},
+			},
+			{
+				"path":    "/api/notification-routes/preview",
+				"method":  "POST",
+				"answers": "would this notification reach anyone, and which route rejects it",
+				"body":    []string{"title", "severity"},
+				"notes":   []string{"persists and delivers nothing; only successful previews are audited"},
+			},
+		},
 		"limits": gin.H{
 			"task_export_rows":   ExportTaskLimit,
 			"audit_export_rows":  200000,

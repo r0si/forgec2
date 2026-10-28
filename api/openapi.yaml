@@ -3502,6 +3502,24 @@ paths:
                           notes:
                             type: array
                             items: {type: string}
+                      diagnostics:
+                        type: array
+                        description: >-
+                          The endpoints that answer "what would happen" and execute nothing: the automation previews, the
+                          rule-set health report, the composed diagnosis and the notification delivery preview. Listed
+                          here because a client author who cannot enumerate them has to read the source.
+                        items:
+                          type: object
+                          properties:
+                            path: {type: string}
+                            method: {type: string}
+                            answers: {type: string}
+                            body:
+                              type: array
+                              items: {type: string}
+                            notes:
+                              type: array
+                              items: {type: string}
                       limits:
                         type: object
                         properties:

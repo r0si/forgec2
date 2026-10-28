@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/forgec2/forgec2/internal/db"
@@ -46,6 +48,12 @@ func TestExportCapabilities(t *testing.T) {
 				PublicKey  string   `json:"public_key"`
 				Notes      []string `json:"notes"`
 			} `json:"engagement_bundle"`
+			Diagnostics []struct {
+				Path    string   `json:"path"`
+				Method  string   `json:"method"`
+				Answers string   `json:"answers"`
+				Notes   []string `json:"notes"`
+			} `json:"diagnostics"`
 			Limits map[string]json.RawMessage `json:"limits"`
 		} `json:"data"`
 	}
@@ -132,6 +140,25 @@ func TestExportCapabilities(t *testing.T) {
 		t.Fatal("the bundle entry documents no constraints")
 	}
 
+	// 7b. The diagnostics surface is listed, and every entry is also in the API document: a capability that is not in
+	// the spec is one a client author will not find either.
+	if len(resp.Data.Diagnostics) == 0 {
+		t.Fatal("the diagnostics surface is empty")
+	}
+	spec, err := os.ReadFile("../../api/openapi.yaml")
+	if err != nil {
+		t.Fatalf("read the spec: %v", err)
+	}
+	for _, entry := range resp.Data.Diagnostics {
+		if entry.Path == "" || entry.Method == "" || entry.Answers == "" {
+			t.Fatalf("an incomplete diagnostics entry: %+v", entry)
+		}
+		// The capabilities document uses gin's ":id" spelling; the spec uses "{id}".
+		specPath := strings.ReplaceAll(entry.Path, ":id", "{id}")
+		if !strings.Contains(string(spec), specPath+":") {
+			t.Fatalf("%s is advertised as a diagnostic but is not in api/openapi.yaml", specPath)
+		}
+	}
 	// 8. With a key configured the same entry reports it, so an operator can hand the expected key to the receiver.
 	seed := "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60"
 	t.Setenv(bundleSigningKeyEnv, seed)
