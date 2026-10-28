@@ -3249,20 +3249,22 @@ paths:
           description: Already closed
   /api/engagements/expiry:
     get:
-      tags: [Agents]
+      tags: [Engagements]
       summary: Engagement deadlines across the fleet
       description: >-
         Summarises how the caller's fleet ages out: how many implants are already expired, how many
         expire within 24 hours or a week, how many have no deadline at all, and the earliest deadline
         overall. Reading this is how an operator notices that a deadline is about to stop work - the
         alternative is a 403 appearing one day with no warning. Tenant-scoped; the list is ordered by
-        deadline.
+        deadline, and each engagement carries its own roll-up (`agents`, `agents_expired`,
+        `ends_in_seconds`) because the deadline that stops work usually belongs to an exercise rather
+        than to one host.
       operationId: engagementExpiry
       security:
         - SessionCookie: []
       responses:
         '200':
-          description: Deadline buckets, the earliest deadline, and the bounded implants ordered by deadline
+          description: Deadline buckets, the earliest deadline, the bounded implants and a per-engagement roll-up
           content:
             application/json:
               schema:
@@ -3294,6 +3296,25 @@ paths:
                             hostname: {type: string}
                             expires_at: {type: string, format: date-time}
                             expired: {type: boolean}
+                      engagements:
+                        type: array
+                        description: One entry per engagement in the tenant, ordered by when it ends
+                        items:
+                          type: object
+                          properties:
+                            id: {type: integer}
+                            name: {type: string}
+                            state:
+                              type: string
+                              enum: [scheduled, active, ended, closed]
+                            starts_at: {type: string, format: date-time}
+                            ends_at: {type: string, format: date-time}
+                            closed_at: {type: string, format: date-time}
+                            active: {type: boolean}
+                            agents: {type: integer, description: Implants linked to this engagement}
+                            agents_expired: {type: integer}
+                            ends_in_seconds: {type: integer}
+
   /api/plugins/index:
     get:
       tags: [Plugins]

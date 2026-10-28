@@ -37,7 +37,9 @@ func (s *Server) handleEngagementExpiry(c *gin.Context) {
 
 	var agents []db.Implant
 	if err := s.tenantScope(s.db.WithContext(s.ctx).Model(&db.Implant{}), c).
-		Select("id, hostname, expires_at").
+		// engagement_id is projected because the per-engagement counts below need it; a projection that
+		// omits a column the aggregation reads has silently broken this package twice before.
+		Select("id, hostname, expires_at, engagement_id").
 		Order("expires_at asc").
 		Find(&agents).Error; err != nil {
 		handleQueryError(c, err, "Failed to summarise engagement deadlines")
@@ -96,6 +98,40 @@ func (s *Server) handleEngagementExpiry(c *gin.Context) {
 	}
 	if earliest != nil {
 		resp["earliest"] = *earliest
+	}
+
+	// Per-engagement roll-up: the deadline that stops work usually belongs to an exercise, so "how much
+	// time is left on it and how many hosts does it cover" is the question an operator asks - the
+	// per-host list alone does not answer it.
+	engagementCounts := make(map[uint]struct{ agents, expired int }, 8)
+	for _, agent := range agents {
+		if agent.EngagementID == nil {
+			continue
+		}
+		counts := engagementCounts[*agent.EngagementID]
+		counts.agents++
+		if agent.ExpiresAt != nil && now.After(*agent.ExpiresAt) {
+			counts.expired++
+		}
+		engagementCounts[*agent.EngagementID] = counts
+	}
+	var engagements []db.Engagement
+	if err := s.tenantScope(s.db.WithContext(s.ctx).Model(&db.Engagement{}), c).
+		Order("ends_at asc").Find(&engagements).Error; err == nil {
+		summaries := make([]gin.H, 0, len(engagements))
+		for _, engagement := range engagements {
+			view := engagementView(engagement, now)
+			counts := engagementCounts[engagement.ID]
+			view["agents"] = counts.agents
+			view["agents_expired"] = counts.expired
+			if now.Before(engagement.EndsAt) {
+				view["ends_in_seconds"] = int(engagement.EndsAt.Sub(now).Seconds())
+			} else {
+				view["ends_in_seconds"] = 0
+			}
+			summaries = append(summaries, view)
+		}
+		resp["engagements"] = summaries
 	}
 	respond(c, resp)
 }

@@ -1903,7 +1903,7 @@ export interface paths {
         };
         /**
          * Engagement deadlines across the fleet
-         * @description Summarises how the caller's fleet ages out: how many implants are already expired, how many expire within 24 hours or a week, how many have no deadline at all, and the earliest deadline overall. Reading this is how an operator notices that a deadline is about to stop work - the alternative is a 403 appearing one day with no warning. Tenant-scoped; the list is ordered by deadline.
+         * @description Summarises how the caller's fleet ages out: how many implants are already expired, how many expire within 24 hours or a week, how many have no deadline at all, and the earliest deadline overall. Reading this is how an operator notices that a deadline is about to stop work - the alternative is a 403 appearing one day with no warning. Tenant-scoped; the list is ordered by deadline, and each engagement carries its own roll-up (`agents`, `agents_expired`, `ends_in_seconds`) because the deadline that stops work usually belongs to an exercise rather than to one host.
          */
         get: operations["engagementExpiry"];
         put?: never;
@@ -14538,7 +14538,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Deadline buckets, the earliest deadline, and the bounded implants ordered by deadline */
+            /** @description Deadline buckets, the earliest deadline, the bounded implants and a per-engagement roll-up */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -14568,6 +14568,24 @@ export interface operations {
                                 /** Format: date-time */
                                 expires_at?: string;
                                 expired?: boolean;
+                            }[];
+                            /** @description One entry per engagement in the tenant, ordered by when it ends */
+                            engagements?: {
+                                id?: number;
+                                name?: string;
+                                /** @enum {string} */
+                                state?: "scheduled" | "active" | "ended" | "closed";
+                                /** Format: date-time */
+                                starts_at?: string;
+                                /** Format: date-time */
+                                ends_at?: string;
+                                /** Format: date-time */
+                                closed_at?: string;
+                                active?: boolean;
+                                /** @description Implants linked to this engagement */
+                                agents?: number;
+                                agents_expired?: number;
+                                ends_in_seconds?: number;
                             }[];
                         };
                     };
