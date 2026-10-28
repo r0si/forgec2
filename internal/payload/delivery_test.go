@@ -18,7 +18,10 @@ func TestBuildHTMLSmuggling(t *testing.T) {
 }
 
 func TestBuildURLShortcut(t *testing.T) {
-	b := BuildURLShortcut("https://c2.example/p")
+	b, err := BuildURLShortcut("https://c2.example/p")
+	if err != nil {
+		t.Fatalf("valid url refused: %v", err)
+	}
 	if !strings.Contains(string(b), "https://c2.example/p") {
 		t.Fatalf("got %q", b)
 	}

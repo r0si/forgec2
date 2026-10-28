@@ -26,6 +26,12 @@ func (s *Server) handleGenerateDelivery(c *gin.Context) {
 	}
 	format := strings.ToLower(strings.TrimSpace(req.Format))
 	filename := filepath.Base(req.Filename)
+	// A newline in a filename reaches the HTML download attribute and the ISO directory entry;
+	// keep these fields single-line and free of path separators before any builder sees them.
+	if strings.ContainsAny(filename, "\r\n\x00") || strings.ContainsAny(req.Command, "\x00") {
+		respondError(c, http.StatusBadRequest, "filename and command must be single-line text")
+		return
+	}
 
 	var (
 		out      []byte
@@ -51,7 +57,12 @@ func (s *Server) handleGenerateDelivery(c *gin.Context) {
 			respondError(c, http.StatusBadRequest, "url is required")
 			return
 		}
-		out = payload.BuildURLShortcut(req.URL)
+		built, err := payload.BuildURLShortcut(req.URL)
+		if err != nil {
+			respondError(c, http.StatusBadRequest, err.Error())
+			return
+		}
+		out = built
 		outName = "target.url"
 		mime = "application/internet-shortcut"
 	case "lnk":
