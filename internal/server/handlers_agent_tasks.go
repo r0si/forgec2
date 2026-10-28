@@ -176,7 +176,12 @@ func (s *Server) handleExportTasks(c *gin.Context) {
 	// Task ID is the last column on purpose: it is additive for anyone parsing the existing header,
 	// and without it a row could not be matched back to the task in the console - which is the first
 	// thing an analyst does with an export.
-	writer.Write([]string{"Time", "Agent", "Type", "Command", "Result", "Error", "Status", "Task ID"})
+	writer.Write([]string{"Time", "Agent", "Type", "Command", "Result", "Error", "Status", "Task ID", "Engagement"})
+
+	// Engagement names for the agents in this export, in one query. The column exists because the agent
+	// list can already be filtered by engagement: an export that cannot say which exercise a task belonged
+	// to would contradict the filter that selected it.
+	engagementNames := s.engagementNamesForTasks(c, tasks)
 
 	for _, t := range tasks {
 		agentName := ""
@@ -192,6 +197,7 @@ func (s *Server) handleExportTasks(c *gin.Context) {
 			csvSafe(truncateString(t.Error, CSVErrorTruncLen)),
 			t.Status,
 			strconv.FormatUint(uint64(t.ID), 10),
+			csvSafe(engagementNames[t.AgentID]),
 		})
 	}
 	writer.Flush()
@@ -241,4 +247,59 @@ func (s *Server) apiBulkTaskStatus(c *gin.Context) {
 		result[tasks[i].ID] = tasks[i]
 	}
 	respond(c, result)
+}
+
+// engagementNamesForTasks maps agent id -> engagement name for the agents in an export.
+//
+// One query for the agents and one for the names, rather than a join per row: the export is capped but the
+// per-row cost would still scale with the limit. A missing engagement (or an unreadable row) simply leaves
+// the cell empty, which is the honest value - the task genuinely belongs to no exercise.
+func (s *Server) engagementNamesForTasks(c *gin.Context, tasks []db.Task) map[string]string {
+	out := make(map[string]string, len(tasks))
+	ids := make([]string, 0, len(tasks))
+	seen := make(map[string]bool, len(tasks))
+	for _, task := range tasks {
+		if task.AgentID == "" || seen[task.AgentID] {
+			continue
+		}
+		seen[task.AgentID] = true
+		ids = append(ids, task.AgentID)
+	}
+	if len(ids) == 0 {
+		return out
+	}
+
+	var agents []db.Implant
+	if err := s.tenantScope(s.db.WithContext(s.ctx).Model(&db.Implant{}), c).
+		Select("id", "engagement_id").Where("id IN ?", ids).Find(&agents).Error; err != nil {
+		return out
+	}
+	engagementIDs := make([]uint, 0, len(agents))
+	for _, agent := range agents {
+		if agent.EngagementID != nil {
+			engagementIDs = append(engagementIDs, *agent.EngagementID)
+		}
+	}
+	if len(engagementIDs) == 0 {
+		return out
+	}
+
+	var engagements []db.Engagement
+	if err := s.tenantScope(s.db.WithContext(s.ctx).Model(&db.Engagement{}), c).
+		Select("id", "name").Where("id IN ?", engagementIDs).Find(&engagements).Error; err != nil {
+		return out
+	}
+	names := make(map[uint]string, len(engagements))
+	for _, engagement := range engagements {
+		names[engagement.ID] = engagement.Name
+	}
+	for _, agent := range agents {
+		if agent.EngagementID == nil {
+			continue
+		}
+		if name, ok := names[*agent.EngagementID]; ok {
+			out[agent.ID] = name
+		}
+	}
+	return out
 }

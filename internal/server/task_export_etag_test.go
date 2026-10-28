@@ -154,12 +154,16 @@ func TestTaskExportIsSentWhole(t *testing.T) {
 	if len(records) != 4 {
 		t.Fatalf("records = %d, want 4 (%v)", len(records), records)
 	}
-	if records[0][0] != "Time" || records[0][6] != "Status" || records[0][7] != "Task ID" {
+	if records[0][0] != "Time" || records[0][6] != "Status" || records[0][7] != "Task ID" || records[0][8] != "Engagement" {
 		t.Fatalf("header = %v", records[0])
 	}
 	for _, row := range records[1:] {
-		if len(row) != 8 {
-			t.Fatalf("row has %d fields, want 8: %v", len(row), row)
+		if len(row) != 9 {
+			t.Fatalf("row has %d fields, want 9: %v", len(row), row)
+		}
+		// The engagement cell is empty for an agent that belongs to no exercise, which is the honest value.
+		if row[8] != "" {
+			t.Fatalf("engagement = %q for an unlinked agent, want empty", row[8])
 		}
 		// The id column exists so a row can be matched back to the task it came from.
 		if _, err := strconv.ParseUint(row[7], 10, 64); err != nil {
