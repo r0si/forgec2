@@ -23,6 +23,9 @@ const ALLOW = new Map([]);
 // The DUPLICATE MARKER is the comparison idiom itself: stripping the weak-validator prefix. A file may
 // read the header (the static middleware does, then delegates) but it may not re-implement the compare.
 const HEADER = /strings\.TrimPrefix\([^)]*"W\/"\)/;
+// The RENDERER belongs to weakETag() too: building a `W/"..."` header value with a raw format string is
+// how a second sanitiser came to exist for a timestamp.
+const RENDERER = /`W\/"/;
 
 const problems = [];
 let readers = 0;
@@ -32,10 +35,17 @@ for (const entry of readdirSync(serverDir)) {
   if (entry === "etag.go") continue;
   if (ALLOW.has(entry)) continue;
   const source = readFileSync(join(serverDir, entry), "utf8");
-  if (!HEADER.test(source)) continue;
+  if (!HEADER.test(source) && !RENDERER.test(source)) continue;
   readers++;
-  const line = source.split("\n").findIndex((text) => HEADER.test(text)) + 1;
-  problems.push(`${entry}:${line} re-implements the ETag comparison; use etagMatches()/ifNoneMatch() from etag.go`);
+  const lines = source.split("\n");
+  const compareLine = lines.findIndex((text) => HEADER.test(text)) + 1;
+  if (compareLine > 0) {
+    problems.push(`${entry}:${compareLine} re-implements the ETag comparison; use etagMatches()/ifNoneMatch() from etag.go`);
+  }
+  const renderLine = lines.findIndex((text) => RENDERER.test(text)) + 1;
+  if (renderLine > 0) {
+    problems.push(`${entry}:${renderLine} builds an ETag header value itself; use weakETag() from etag.go`);
+  }
 }
 
 if (problems.length > 0) {

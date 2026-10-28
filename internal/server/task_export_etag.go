@@ -2,7 +2,6 @@ package server
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/forgec2/forgec2/internal/db"
 	"github.com/gin-gonic/gin"
@@ -28,21 +27,8 @@ func (s *Server) taskExportETag(c *gin.Context, limit int) string {
 		Scan(&newest).Error; err != nil {
 		return ""
 	}
-	return fmt.Sprintf(`W/"v1-%d-max=%d-upd=%s-limit=%d"`,
-		s.currentTenantID(c), newest.ID, sanitizeETagToken(newest.UpdatedAt), limit)
-}
-
-// sanitizeETagToken keeps a timestamp usable inside an opaque tag (no quotes, no spaces, no comma -
-// a comma would split the tag on the client side).
-func sanitizeETagToken(raw string) string {
-	var b strings.Builder
-	for _, r := range raw {
-		switch {
-		case r >= '0' && r <= '9', r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r == '-', r == ':', r == '.':
-			b.WriteRune(r)
-		default:
-			b.WriteByte('_')
-		}
-	}
-	return b.String()
+	// Passed through weakETag like every other tag: one renderer, one escaper. Building the header
+	// value with a raw format string meant a second sanitiser had to exist for the timestamp.
+	return weakETag(fmt.Sprintf("v1-%d-max=%d-upd=%s-limit=%d",
+		s.currentTenantID(c), newest.ID, newest.UpdatedAt, limit))
 }

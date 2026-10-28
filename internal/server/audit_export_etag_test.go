@@ -3,6 +3,7 @@ package server
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -115,5 +116,30 @@ func TestIfNoneMatchUnit(t *testing.T) {
 		if got := ifNoneMatch(c, tag); got != want {
 			t.Errorf("If-None-Match %q -> %v, want %v", header, got, want)
 		}
+	}
+}
+
+// TestWeakETagEscapesHeaderBreakers covers the single renderer: a tag value that contains a quote,
+// comma, space, backslash or control character must not produce an invalid header. Before the
+// consolidation there were two sanitisers and one of them did not handle control characters at all.
+func TestWeakETagEscapesHeaderBreakers(t *testing.T) {
+	nasty := "a\"b,c d\\e\nf\tg"
+	tag := weakETag(nasty)
+	if !strings.HasPrefix(tag, `W/"`) || !strings.HasSuffix(tag, `"`) {
+		t.Fatalf("tag = %q, not a quoted weak ETag", tag)
+	}
+	inner := tag[len(`W/"`) : len(tag)-1]
+	for _, bad := range []string{`"`, ",", " ", "\\", "\n", "\t", "\r"} {
+		if strings.Contains(inner, bad) {
+			t.Fatalf("tag %q still contains %q", tag, bad)
+		}
+	}
+	// The escaped form must still be a usable validator: the same body yields the same tag, so a client
+	// echoing it back matches.
+	if etagMatches(tag, tag) == false {
+		t.Fatalf("a tag cannot match itself: %q", tag)
+	}
+	if etagMatches(tag, weakETag("other")) {
+		t.Fatal("two different bodies matched")
 	}
 }

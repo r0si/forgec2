@@ -48,12 +48,20 @@ func ifNoneMatch(c *gin.Context, etag string) bool {
 	return etagMatches(strings.TrimSpace(c.GetHeader("If-None-Match")), etag)
 }
 
-// weakETag renders an opaque tag value as a weak ETag, escaping anything that would break the syntax (a
-// quote, a comma, a space) instead of emitting an invalid header.
+// weakETag renders an opaque tag value as a weak ETag, escaping anything that would break the syntax
+// instead of emitting an invalid header.
+//
+// This is the ONE renderer: rounds 3 to 7 built tags in three places and grew a second sanitiser
+// (`sanitizeETagToken`) for a timestamp, which is how a value can end up unescaped in exactly one of
+// them. Control characters are replaced too - a newline in a header value breaks the response, not just
+// the tag.
 func weakETag(body string) string {
 	clean := strings.Map(func(r rune) rune {
 		switch r {
 		case '"', ',', ' ', '\\':
+			return '_'
+		}
+		if r < 0x20 || r == 0x7f {
 			return '_'
 		}
 		return r
