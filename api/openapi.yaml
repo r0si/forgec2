@@ -12111,13 +12111,39 @@ paths:
   /api/notification-routes/{id}/test:
     post:
       tags: [Notifications]
-      summary: Send a test notification through the route
+      summary: Send one test notification through a route
+      description: >-
+        The button whose whole purpose is "tell me whether this route works", answering with the delivery outcome: the
+        channel, the target host (never the full URL - a Discord webhook path is a credential) and, on failure, the
+        reason from the sender. A bare "delivery failed" leaves an operator guessing between a wrong URL, a revoked
+        token and a blocked egress rule. A disabled route is refused with 409 rather than tested, since it is never used
+        in production; tests are rate-limited per route (10 s, Retry-After on 429) because a retrying script must not
+        become a flood against Discord, Telegram or a customer webhook; and every attempt that reaches the sender is
+        audited as notification_route_test with its outcome.
       operationId: testNotificationRoute
       security: [{SessionCookie: []}]
       parameters:
         - {name: id, in: path, required: true, schema: {type: integer}}
       responses:
-        '200': {description: Test delivery result}
+        '200':
+          description: The delivery outcome, with the reason when it failed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  data:
+                    type: object
+                    properties:
+                      route_id: {type: integer}
+                      channel: {type: string}
+                      target: {type: string, description: Host only; the path may hold a credential}
+                      delivered: {type: boolean}
+                      error: {type: string, description: The sender reason, present when delivered is false}
+        '404': {description: No such route}
+        '409': {description: The route is disabled}
+        '429': {description: This route was tested moments ago; see Retry-After}
   /siem/rules:
     get:
       tags: [SIEM]

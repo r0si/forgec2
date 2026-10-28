@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/forgec2/forgec2/internal/db"
@@ -385,9 +386,79 @@ func (s *Server) handleTestNotificationRoute(c *gin.Context) {
 		Message:  "If you can read this, the \"" + route.Name + "\" route works.",
 		Severity: "info",
 	}
-	if err := s.sendNotificationRoute(route, test); err != nil {
-		respondError(c, http.StatusBadGateway, "notification delivery failed")
+	// A disabled route is not tested: it is never used in production, so sending through it would report on a path
+	// that does not exist and could make an operator believe delivery works.
+	if !route.Enabled {
+		respondError(c, http.StatusConflict, "this route is disabled; enable it before testing")
 		return
 	}
-	respond(c, gin.H{})
+	// A test is an outbound side effect, so it is rate-limited per route: a script that retries must not turn into a
+	// flood against Discord, Telegram or a customer webhook.
+	if remaining, ok := s.notificationTestCooldown(route.ID); !ok {
+		c.Header("Retry-After", strconv.Itoa(int(remaining.Seconds())+1))
+		respondError(c, http.StatusTooManyRequests,
+			fmt.Sprintf("this route was tested moments ago; try again in %d seconds", int(remaining.Seconds())+1))
+		return
+	}
+
+	// The target is reported as a HOST, never the full URL: a Discord webhook path is a credential, which is why it is
+	// not echoed back by the list endpoint either.
+	sendErr := s.sendNotificationRoute(route, test)
+	result := gin.H{
+		"route_id":  route.ID,
+		"channel":   route.Channel,
+		"target":    notificationTargetHost(route.Target),
+		"delivered": sendErr == nil,
+	}
+	if sendErr != nil {
+		// 502, not 200: a failed test is a failure, and a client that only looks at the status must not read it as
+		// success. The REASON travels in the message - "delivery failed" alone leaves the operator guessing between a
+		// wrong URL, a revoked token and a blocked egress rule, which is the one thing this button exists to answer.
+		s.LogAuditRecord(c, "notification_route_test", "notification", fmt.Sprintf("%d", route.ID),
+			"test delivery to route "+route.Name+" failed: "+deliveryErrorText(sendErr), false, nil)
+		respondError(c, http.StatusBadGateway, "notification delivery failed: "+deliveryErrorText(sendErr))
+		return
+	}
+	s.LogAuditRecord(c, "notification_route_test", "notification", fmt.Sprintf("%d", route.ID),
+		"test delivery to route "+route.Name+" succeeded", true, nil)
+	respond(c, result)
+}
+
+// notificationTestAt and notificationTestMu hold the per-route test cooldown.
+var (
+	notificationTestMu sync.Mutex
+	notificationTestAt map[uint]time.Time
+)
+
+// notificationTestCooldown reserves the right to test one route, returning the wait when it is too soon.
+//
+// The registry is in-memory on purpose: a cooldown is a courtesy to the receiving service, not an audit fact, and it
+// resets with the process. It is bounded by the number of configured routes.
+func (s *Server) notificationTestCooldown(routeID uint) (time.Duration, bool) {
+	const window = 10 * time.Second
+
+	notificationTestMu.Lock()
+	defer notificationTestMu.Unlock()
+	if notificationTestAt == nil {
+		notificationTestAt = make(map[uint]time.Time)
+	}
+	now := time.Now()
+	if last, ok := notificationTestAt[routeID]; ok {
+		if elapsed := now.Sub(last); elapsed < window {
+			return window - elapsed, false
+		}
+	}
+	notificationTestAt[routeID] = now
+	return 0, true
+}
+
+// notificationTargetHost reduces a target to its host, so a test result can name where it went without echoing the
+// credential in the path.
+func notificationTargetHost(target string) string {
+	parsed, err := url.Parse(strings.TrimSpace(target))
+	if err != nil || parsed.Host == "" {
+		// Telegram targets are chat ids, not URLs: they are not credentials, so they are shown as-is.
+		return strings.TrimSpace(target)
+	}
+	return parsed.Host
 }

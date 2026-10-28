@@ -10267,7 +10267,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Send a test notification through the route */
+        /**
+         * Send one test notification through a route
+         * @description The button whose whole purpose is "tell me whether this route works", answering with the delivery outcome: the channel, the target host (never the full URL - a Discord webhook path is a credential) and, on failure, the reason from the sender. A bare "delivery failed" leaves an operator guessing between a wrong URL, a revoked token and a blocked egress rule. A disabled route is refused with 409 rather than tested, since it is never used in production; tests are rate-limited per route (10 s, Retry-After on 429) because a retrying script must not become a flood against Discord, Telegram or a customer webhook; and every attempt that reaches the sender is audited as notification_route_test with its outcome.
+         */
         post: operations["testNotificationRoute"];
         delete?: never;
         options?: never;
@@ -26330,8 +26333,42 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Test delivery result */
+            /** @description The delivery outcome, with the reason when it failed */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        data?: {
+                            route_id?: number;
+                            channel?: string;
+                            /** @description Host only; the path may hold a credential */
+                            target?: string;
+                            delivered?: boolean;
+                            /** @description The sender reason */
+                            error?: string;
+                        };
+                    };
+                };
+            };
+            /** @description No such route */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The route is disabled */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description This route was tested moments ago; see Retry-After */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };
