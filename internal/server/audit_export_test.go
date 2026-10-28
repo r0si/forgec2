@@ -36,8 +36,10 @@ func TestHandleExportAuditChainStreamsVerifiableRows(t *testing.T) {
 	if ct := w.Header().Get("Content-Type"); !strings.Contains(ct, "ndjson") {
 		t.Fatalf("content type = %q", ct)
 	}
-	if cd := w.Header().Get("Content-Disposition"); !strings.Contains(cd, "forgec2-audit-chain.ndjson") {
-		t.Fatalf("disposition = %q", cd)
+	// The filename carries a timestamp on purpose: two exports in one day must not overwrite each other in a browser.
+	// Assert the prefix and the extension rather than the whole name, so the test is about the contract and not the clock.
+	if cd := w.Header().Get("Content-Disposition"); !strings.Contains(cd, "forgec2-audit-chain") || !strings.Contains(cd, ".ndjson") {
+		t.Fatalf("disposition = %q, want forgec2-audit-chain*.ndjson", cd)
 	}
 
 	var rows []auditChainExportRow
