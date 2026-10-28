@@ -58,7 +58,7 @@ export const NAV_SECTIONS: NavSectionDef[] = [
     items: [
       { href: "/payload-generator", labelKey: "nav.generate", icon: Boxes, perms: ["agents.read"] },
       { href: "/infrastructure", labelKey: "nav.infrastructure", icon: Server },
-      { href: "/dns", labelKey: "nav.dns", icon: Network },
+      { href: "/dns", labelKey: "nav.dns", icon: Network, perms: ["listeners.read"] },
       { href: "/domain-fronting", labelKey: "nav.domain_fronting", icon: Cloud, perms: ["agents.read"] },
     ],
   },
@@ -89,7 +89,7 @@ export const NAV_SECTIONS: NavSectionDef[] = [
       { href: "/attack", labelKey: "nav.attack", icon: Shield, perms: ["campaigns.read"] },
       { href: "/campaign", labelKey: "nav.campaign", icon: Crosshair, perms: ["campaigns.read"] },
       { href: "/chat", labelKey: "nav.chat", icon: MessageSquare, layout: "workspace", perms: ["agents.read"] },
-      { href: "/ai", labelKey: "nav.ai", icon: Bot, layout: "workspace", perms: ["settings.read"] },
+      { href: "/ai", labelKey: "nav.ai", icon: Bot, layout: "workspace", perms: ["settings.read", "ai.use", "agents.read"] },
     ],
   },
   {

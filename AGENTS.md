@@ -129,6 +129,18 @@ by hand at least once; do not weaken one to make a change pass — fix the chang
   same fix and each time reachable by any operator who guessed an id. The gate knows the table →
   helper mapping, accepts any approved scope helper (including the `findVisible*` wrappers) and
   documents its known gap: `agent_groups` has neither a tenant nor a creator column yet.
+- `check:nav-perms` (`frontend/scripts/check-nav-perms.mjs`) — a sidebar entry must not be gated by a
+  permission its page's API does not check. The nav hides entries with `perms` the operator lacks
+  ("any-of"); the keys are typed, so a typo is a compile error, but **nothing compared them to the
+  backend**, and two entries disagreed: `/dns` had no perms at all while every `/api/dns/*` route
+  requires `listeners.read`, and `/ai` required `settings.read` while its page handler and
+  `/api/ai/runs` require `ai.use`. The built-in `user` role carries all three, so only **custom-role**
+  deployments saw it — a page that answers 403 everywhere, or a page you can use but cannot reach. The
+  gate parses route groups (`X.Use(RequirePermission(db.PermFoo))` plus inline overrides) and compares
+  the first path segment; it **only** compares nav items whose `/api/<segment>` GET routes agree on one
+  permission set, so 17 of 44 are checked and the rest are counted, not guessed. It resolves `PermFoo`
+  to its string through `internal/db/models.go` after a CamelCase guess turned `PermAIUse` into
+  `AIUse` and produced a false mismatch.
 - `check:docs` (`gen-command-reference.mjs --check` + `gen-capability-matrix.mjs --check`) —
   the generated docs must match their sources: the command reference, and the **generated
   task-inventory block** plus the version stamp in `docs/CAPABILITY_MATRIX.md`. CI runs these
