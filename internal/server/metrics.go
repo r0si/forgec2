@@ -35,6 +35,12 @@ type MetricsCollector struct {
 	BackupAgeSeconds     prometheus.Gauge
 	BackupFailuresTotal  prometheus.Counter
 	BackupSuccessTotal   prometheus.Counter
+	// StatsCache* make the statistics cache observable: a hit rate near zero means the TTL is too
+	// short for how the console polls, and a climbing eviction count means the key space is bigger
+	// than the 256-entry cap.
+	StatsCacheHitsTotal      prometheus.Counter
+	StatsCacheMissesTotal    prometheus.Counter
+	StatsCacheEvictionsTotal prometheus.Counter
 	// BeaconRateLimitedTotal counts beacon requests rejected with 429. A
 	// sustained climb means either an attack or a NAT/fleet sharing one IP
 	// that needs rate_limit.beacon raised.
@@ -148,6 +154,18 @@ func NewMetricsCollector(s *Server) *MetricsCollector {
 			Name: "forgec2_backup_failures_total",
 			Help: "Total failed backup attempts (scheduled or manual).",
 		}),
+		StatsCacheHitsTotal: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "forgec2_stats_cache_hits_total",
+			Help: "Statistics reads served from the short-TTL cache instead of the database.",
+		}),
+		StatsCacheMissesTotal: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "forgec2_stats_cache_misses_total",
+			Help: "Statistics reads that had to query the database.",
+		}),
+		StatsCacheEvictionsTotal: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "forgec2_stats_cache_evictions_total",
+			Help: "Times the statistics cache hit its entry cap and was emptied.",
+		}),
 		BackupSuccessTotal: prometheus.NewCounter(prometheus.CounterOpts{
 			Name: "forgec2_backup_success_total",
 			Help: "Total successful encrypted database backups.",
@@ -193,6 +211,9 @@ func (mc *MetricsCollector) Register(reg prometheus.Registerer) {
 		mc.BackupAgeSeconds,
 		mc.BackupFailuresTotal,
 		mc.BackupSuccessTotal,
+		mc.StatsCacheHitsTotal,
+		mc.StatsCacheMissesTotal,
+		mc.StatsCacheEvictionsTotal,
 		mc.BeaconRateLimitedTotal,
 		mc.BeaconProtocolRejectedTotal,
 		mc.BeaconProtocolDeprecatedTotal,

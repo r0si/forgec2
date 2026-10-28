@@ -49,8 +49,14 @@ func (s *Server) handleTaskDurationStats(c *gin.Context) {
 	// (BenchmarkDurationStatsWindow) and the console polls while an operator watches the page.
 	cacheKey := durationStatsCacheKey(s.currentTenantID(c), since, filterType, groupBy, bucket)
 	if payload, hit := s.statsCache().get(cacheKey); hit {
+		if s.metrics != nil {
+			s.metrics.StatsCacheHitsTotal.Inc()
+		}
 		respond(c, payload)
 		return
+	}
+	if s.metrics != nil && cacheKey != "" {
+		s.metrics.StatsCacheMissesTotal.Inc()
 	}
 
 	window, ok := parseStatsWindow(since)

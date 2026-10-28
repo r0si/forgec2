@@ -28,6 +28,8 @@ type durationStatsCacheEntry struct {
 type durationStatsCache struct {
 	mu      sync.Mutex
 	entries map[string]durationStatsCacheEntry
+	// metrics is optional: a cache with no collector still works, it just cannot be observed.
+	metrics *MetricsCollector
 }
 
 const durationStatsCacheMaxEntries = 256
@@ -42,7 +44,12 @@ func (s *Server) statsCache() *durationStatsCache {
 		if s.durationStatsCache == nil {
 			s.durationStatsCache = newDurationStatsCache()
 		}
+		s.durationStatsCache.metrics = s.metrics
 	})
+	if s.durationStatsCache.metrics == nil && s.metrics != nil {
+		// A collector attached after the cache was created still gets the counters.
+		s.durationStatsCache.setMetrics(s.metrics)
+	}
 	return s.durationStatsCache
 }
 
@@ -85,6 +92,9 @@ func (c *durationStatsCache) put(key string, payload gin.H) {
 		// Full of fresh entries: drop everything rather than evict one, so the bound is exact and
 		// there is no eviction policy to get subtly wrong.
 		c.entries = make(map[string]durationStatsCacheEntry, 32)
+		if c.metrics != nil {
+			c.metrics.StatsCacheEvictionsTotal.Inc()
+		}
 	}
 	c.entries[key] = durationStatsCacheEntry{payload: payload, expires: now.Add(durationStatsCacheTTL)}
 }
@@ -98,4 +108,11 @@ func durationStatsCacheKey(tenantID uint, since, filterType, groupBy, bucket str
 	return strings.Join([]string{
 		strconv.FormatUint(uint64(tenantID), 10), since, filterType, groupBy, bucket,
 	}, "|")
+}
+
+// setMetrics attaches the collector after the fact (a test that installs metrics on an existing server).
+func (c *durationStatsCache) setMetrics(m *MetricsCollector) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.metrics = m
 }

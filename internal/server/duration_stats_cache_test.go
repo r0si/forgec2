@@ -4,8 +4,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
+
+	promtestutil "github.com/prometheus/client_golang/prometheus/testutil"
 
 	"github.com/forgec2/forgec2/internal/db"
 	"github.com/forgec2/forgec2/internal/server/middleware"
@@ -84,5 +87,53 @@ func TestTaskDurationStatsCache(t *testing.T) {
 	durationStatsCacheTTL = 0
 	if got := call("?since=24h", 1); got != 2 {
 		t.Fatalf("sampled = %d after expiry; want 2", got)
+	}
+}
+
+// TestStatsCacheCountersIsExposed proves the cache is observable: a hit rate near zero means the TTL is
+// wrong for how the console polls, and an eviction count means the key space outgrew the cap. Without
+// these counters the cache is a guess.
+func TestStatsCacheCountersIsExposed(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	s := mustTenantServer(t)
+	s.metrics = NewMetricsCollector(s)
+	s.durationStatsCache = nil
+	s.durationStatsCacheOnce = sync.Once{}
+
+	previousTTL := durationStatsCacheTTL
+	durationStatsCacheTTL = time.Minute
+	t.Cleanup(func() { durationStatsCacheTTL = previousTTL })
+
+	base := time.Now().Add(-time.Hour)
+	if err := s.db.Create(&db.Task{
+		AgentID: "a-1", TenantID: 1, Type: "shell", Command: "x", Status: "completed",
+		CreatedAt: base, UpdatedAt: base.Add(100 * time.Millisecond),
+	}).Error; err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	call := func() {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest(http.MethodGet, "/api/stats/tasks/duration?since=24h", nil)
+		c.Set("user", "op")
+		c.Set("user_role", db.RoleAdmin)
+		c.Set("user_id", uint(1))
+		c.Set(middleware.TenantIDContextKey, uint(1))
+		s.handleTaskDurationStats(c)
+	}
+
+	call() // miss
+	call() // hit
+	call() // hit
+
+	if got := promtestutil.ToFloat64(s.metrics.StatsCacheMissesTotal); got != 1 {
+		t.Fatalf("misses = %v, want 1", got)
+	}
+	if got := promtestutil.ToFloat64(s.metrics.StatsCacheHitsTotal); got != 2 {
+		t.Fatalf("hits = %v, want 2", got)
+	}
+	if got := promtestutil.ToFloat64(s.metrics.StatsCacheEvictionsTotal); got != 0 {
+		t.Fatalf("evictions = %v, want 0", got)
 	}
 }
