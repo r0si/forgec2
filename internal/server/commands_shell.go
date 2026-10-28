@@ -291,6 +291,11 @@ func (s *Server) handleGetTaskStatus(c *gin.Context) {
 	if task.Status == "failed" && strings.TrimSpace(task.Error) != "" {
 		payload["failure_reason"] = classifyFailure(task.Error)
 	}
+	// A task that ran more than once says so here: the retry is automatic, and the operator reading one task needs to know
+	// that the result they are looking at is the second attempt rather than the first.
+	if task.RetryCount > 0 {
+		payload["retry_count"] = task.RetryCount
+	}
 	respond(c, payload)
 }
 

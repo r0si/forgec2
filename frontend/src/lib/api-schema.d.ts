@@ -1299,7 +1299,7 @@ export interface paths {
         };
         /**
          * Get task details
-         * @description Detailed information about one task. A failed task with a message additionally carries `failure_reason`, the same code vocabulary the failure report groups by (`timeout`, `access_denied`, `defender`, `not_found`, `network`, `dns`, `tls`, `unsupported`, `disk`, `cancelled`, `other`), so a client can label a task without shipping its own copy of the classification rules.
+         * @description Detailed information about one task. A failed task with a message additionally carries `failure_reason`, the same code vocabulary the failure report groups by (`timeout`, `access_denied`, `defender`, `not_found`, `network`, `dns`, `tls`, `unsupported`, `disk`, `cancelled`, `other`), so a client can label a task without shipping its own copy of the classification rules. A task that ran more than once also carries `retry_count`, because an automatic retry makes the result a second attempt and nothing else in the document says so.
          */
         get: operations["getTaskDetails"];
         put?: never;
@@ -13950,7 +13950,7 @@ export interface operations {
                 engagement?: string;
                 /** @description csv (default) or json. The JSON variant carries the same rows, the same redaction and the same column truncation, so a script and a spreadsheet never disagree about what a cell held; the format is part of the ETag, so a revalidated CSV cannot answer a JSON request with 304. */
                 format?: "csv" | "json";
-                /** @description Comma-separated columns, in the order wanted: time, agent, type, command, result, error, status, task_id, engagement, agent_id. Three presets cover the common requests: `minimal` (task_id, agent, type, status), `default` (the historical set, format-aware) and `full` (every column, including agent_id). A preset must be the whole value - `minimal,time` is a 400 rather than a guess - and an unknown name is a 400 naming the valid fields and presets. Absent means the default, and the resolved selection is part of the ETag because two column sets are two documents. */
+                /** @description Comma-separated columns, in the order wanted: time, agent, type, command, result, error, status, task_id, engagement, agent_id, retry_count. Three presets cover the common requests: `minimal` (task_id, agent, type, status), `default` (the historical set, format-aware) and `full` (every column, including agent_id). A preset must be the whole value - `minimal,time` is a 400 rather than a guess - and an unknown name is a 400 naming the valid fields and presets. Absent means the default, and the resolved selection is part of the ETag because two column sets are two documents. */
                 fields?: string;
             };
             header?: never;

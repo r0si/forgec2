@@ -49,6 +49,11 @@ var exportFields = []exportField{
 	// agent_id is selectable but not part of the default set: the CSV has always shown the hostname, and a
 	// caller that wants to join on the id can now ask for it without losing the human-readable column.
 	{name: "agent_id", header: "Agent ID", value: func(t db.Task, _, _ string) string { return t.AgentID }},
+	// retry_count is selectable but not in the default set, for the same reason as agent_id: the CSV has shown nine columns
+	// since before automatic retries existed, and a consumer parsing it should not gain a column it did not ask for.
+	{name: "retry_count", header: "Retries", numeric: true, value: func(t db.Task, _, _ string) string {
+		return itoaTaskID(uint(t.RetryCount))
+	}},
 }
 
 // exportMinimalFields is the "just the outcome" preset: identifiers plus what happened.
@@ -138,7 +143,7 @@ func fieldsByName(names []string) []exportField {
 func defaultExportFields(format string) []exportField {
 	out := make([]exportField, 0, len(exportFields))
 	for _, field := range exportFields {
-		if field.name == "agent_id" && format != "json" {
+		if (field.name == "agent_id" || field.name == "retry_count") && format != "json" {
 			continue
 		}
 		out = append(out, field)
