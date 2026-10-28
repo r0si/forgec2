@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"net/http"
 	"strings"
 	"sync"
@@ -331,6 +332,24 @@ func (d *DiscordExternalC2) processMessage(content string) {
 	}
 }
 
+// Discord rate-limit bounds. retry_after comes from the server; a missing or absurd value must not
+// turn into an unbounded sleep.
+const (
+	discordRetryDefault = time.Second
+	discordRetryMax     = 5 * time.Minute
+)
+
+func discordRetryDelay(retryAfterSeconds float64) time.Duration {
+	if retryAfterSeconds <= 0 || math.IsNaN(retryAfterSeconds) || math.IsInf(retryAfterSeconds, 0) {
+		return discordRetryDefault
+	}
+	wait := time.Duration(retryAfterSeconds * float64(time.Second))
+	if wait > discordRetryMax {
+		return discordRetryMax
+	}
+	return wait
+}
+
 func (d *DiscordExternalC2) sendRESTMessage(content string) {
 	maxRetries := 3
 	for attempt := 0; attempt < maxRetries; attempt++ {
@@ -358,14 +377,21 @@ func (d *DiscordExternalC2) sendRESTMessage(content string) {
 			var rl struct {
 				RetryAfter float64 `json:"retry_after"`
 			}
+			wait := discordRetryDelay(0)
 			if json.NewDecoder(resp.Body).Decode(&rl) == nil {
-				resp.Body.Close()
-				time.Sleep(time.Duration(rl.RetryAfter*1000) * time.Millisecond)
-				continue
+				wait = discordRetryDelay(rl.RetryAfter)
+			} else {
+				slog.Warn("Discord 429 rate limit but failed to decode retry_after, using default 1s")
 			}
 			resp.Body.Close()
-			slog.Warn("Discord 429 rate limit but failed to decode retry_after, using default 1s")
-			time.Sleep(time.Second)
+			// Wait on the stop channel rather than time.Sleep: retry_after is server-controlled and
+			// used to be honoured without a bound, so one absurd value could pin this sender for the
+			// life of the process, and a shutdown could not interrupt it either.
+			select {
+			case <-d.stopCh:
+				return
+			case <-time.After(wait):
+			}
 			continue
 		}
 
