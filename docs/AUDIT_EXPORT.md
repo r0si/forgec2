@@ -71,6 +71,9 @@ A purge deletes rows by design, so the id sequence legitimately has gaps. Three 
 - A **filtered** export (`since`, `until`, `user`, `action`, `agent_id`) is a **selection**, not a contiguous chain: the
   response says so in `X-Audit-Export-Filtered` and a `Warning` header. Verify the **unfiltered** export when the
   question is "is the chain intact"; verify a filtered one when the question is "what happened in this window".
+  The verifier repeats that distinction when the file carries it: the `format=json` document does, the newline-delimited
+  one does not, because **headers are not part of a file**. For NDJSON it reports the selection as **unknown** and says a
+  gap could be either a selection or a purge — verify the unfiltered export before drawing a conclusion.
 
 ## Incremental verification
 

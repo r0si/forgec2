@@ -45,7 +45,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "verify-audit: %v\n", err)
 		os.Exit(2)
 	}
-	rows, err := parse(raw)
+	rows, meta, err := parse(raw)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "verify-audit: %v\n", err)
 		os.Exit(2)
@@ -56,6 +56,8 @@ func main() {
 	}
 
 	verdict := auditchain.Verify(rows)
+	verdict.SelectionKnown = meta.Known
+	verdict.Filtered = meta.Filtered
 	if *quiet {
 		// nothing: the exit code is the answer
 	} else if *asJSON {
@@ -66,7 +68,7 @@ func main() {
 		}
 		fmt.Println(string(encoded))
 	} else {
-		printVerdict(verdict)
+		printVerdict(verdict, meta)
 	}
 
 	os.Exit(exitCode(verdict, len(rows), *minRows))
@@ -84,23 +86,40 @@ func exitCode(verdict auditchain.Verdict, rows, minRows int) int {
 	return 0
 }
 
+// exportMeta is what the file itself says about the export.
+//
+// Only the single-document format carries it: the newline-delimited export puts `filtered`/`truncated` in RESPONSE
+// HEADERS, and a file loses headers. A verifier that cannot tell "the whole chain" from "a selection" must say so
+// rather than imply the stronger claim, which is why Known exists.
+type exportMeta struct {
+	Known     bool
+	Filtered  bool
+	Truncated bool
+	Format    string
+}
+
 // parse accepts both export shapes: newline-delimited rows (the default) and one document with a `rows` array.
-func parse(raw []byte) ([]auditchain.Row, error) {
+func parse(raw []byte) ([]auditchain.Row, exportMeta, error) {
 	trimmed := bytes.TrimSpace(raw)
 	if len(trimmed) == 0 {
-		return nil, fmt.Errorf("the file is empty")
+		return nil, exportMeta{}, fmt.Errorf("the file is empty")
 	}
 	if trimmed[0] == '{' {
 		// Could still be one NDJSON row: try the document shape first, then fall back.
 		var document struct {
-			Rows []auditchain.Row `json:"rows"`
+			Rows      []auditchain.Row `json:"rows"`
+			Filtered  bool             `json:"filtered"`
+			Truncated bool             `json:"truncated"`
+			Format    string           `json:"format"`
 		}
 		if err := json.Unmarshal(trimmed, &document); err == nil && document.Rows != nil {
-			return document.Rows, nil
+			return document.Rows, exportMeta{
+				Known: true, Filtered: document.Filtered, Truncated: document.Truncated, Format: document.Format,
+			}, nil
 		}
 		var single auditchain.Row
 		if err := json.Unmarshal(trimmed, &single); err == nil && single.ID != 0 {
-			return []auditchain.Row{single}, nil
+			return []auditchain.Row{single}, exportMeta{Format: "ndjson"}, nil
 		}
 	}
 
@@ -115,18 +134,18 @@ func parse(raw []byte) ([]auditchain.Row, error) {
 		}
 		var row auditchain.Row
 		if err := json.Unmarshal(line, &row); err != nil {
-			return nil, fmt.Errorf("a line is not an audit row: %w", err)
+			return nil, exportMeta{}, fmt.Errorf("a line is not an audit row: %w", err)
 		}
 		rows = append(rows, row)
 	}
 	if err := scanner.Err(); err != nil {
-		return nil, err
+		return nil, exportMeta{}, err
 	}
-	return rows, nil
+	return rows, exportMeta{Format: "ndjson"}, nil
 }
 
 // printVerdict writes the human-readable answer, including what the tool cannot prove.
-func printVerdict(verdict auditchain.Verdict) {
+func printVerdict(verdict auditchain.Verdict, meta exportMeta) {
 	verdictText := "OK"
 	if !verdict.OK {
 		verdictText = "FAILED"
@@ -135,6 +154,17 @@ func printVerdict(verdict auditchain.Verdict) {
 		verdictText, verdict.Checked, len(verdict.Problems), verdict.Discontinuities)
 	for _, problem := range verdict.Problems {
 		fmt.Printf("     row %d: %s\n", problem.ID, problem.Problem)
+	}
+	if meta.Known {
+		if meta.Filtered {
+			fmt.Printf("     note: this export says it is a FILTERED SELECTION, not a contiguous chain\\n")
+		}
+		if meta.Truncated {
+			fmt.Printf("     note: this export says it was TRUNCATED; rows are missing from the end\\n")
+		}
+	} else if verdict.Discontinuities > 0 {
+		fmt.Printf("     note: this file carries no filter metadata (the export keeps it in headers), so a gap could be\\n" +
+			"           a selection or a purge - verify the unfiltered export before drawing a conclusion\\n")
 	}
 	if verdict.Discontinuities > 0 {
 		fmt.Printf("     note: an id gap is what a purge leaves behind (it writes an audit_purge marker row)\n")

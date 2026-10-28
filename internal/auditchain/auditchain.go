@@ -66,6 +66,11 @@ type Verdict struct {
 	Discontinuities int `json:"discontinuities"`
 	// Reason summarises the first failure for a one-line answer.
 	Reason string `json:"reason,omitempty"`
+	// SelectionKnown reports whether the file itself said whether it is a filtered selection. The newline-delimited
+	// export keeps that in response headers, which a file does not have, so "unknown" is a real answer here.
+	SelectionKnown bool `json:"selection_known"`
+	// Filtered reports the file's own admission that the rows are a selection rather than the whole chain.
+	Filtered bool `json:"filtered"`
 }
 
 // Verify walks the rows in id order and checks every digest and every link.
