@@ -26,8 +26,12 @@ import (
 
 func main() {
 	asJSON := flag.Bool("json", false, "print the verdict as JSON")
+	quiet := flag.Bool("quiet", false, "print nothing; rely on the exit code")
+	// A truncated download and a log with nothing in it both look like "no problems found" to a naive verifier, and
+	// both are exactly what an attacker with write access would prefer. A floor makes that failure loud.
+	minRows := flag.Int("min-rows", 1, "fail when the file holds fewer rows than this; guards against verifying a truncated export")
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "usage: verify-audit [-json] <audit.ndjson|audit.json>\n")
+		fmt.Fprintf(os.Stderr, "usage: verify-audit [-json] [-quiet] [-min-rows N] <audit.ndjson|audit.json>\n")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -52,7 +56,9 @@ func main() {
 	}
 
 	verdict := auditchain.Verify(rows)
-	if *asJSON {
+	if *quiet {
+		// nothing: the exit code is the answer
+	} else if *asJSON {
 		encoded, err := json.MarshalIndent(verdict, "", "  ")
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "verify-audit: %v\n", err)
@@ -62,9 +68,20 @@ func main() {
 	} else {
 		printVerdict(verdict)
 	}
-	if !verdict.OK {
-		os.Exit(1)
+
+	os.Exit(exitCode(verdict, len(rows), *minRows))
+}
+
+// exitCode turns a verdict into the process result.
+//
+// Exit 1 means the chain does not check out OR the file holds fewer rows than the caller requires: a caller that asked
+// for at least a thousand rows got a truncated download, and telling them "OK" because the rows that did arrive are
+// consistent would be the wrong answer twice over. Exit 2 is reserved for "this file is not an audit export".
+func exitCode(verdict auditchain.Verdict, rows, minRows int) int {
+	if !verdict.OK || rows < minRows {
+		return 1
 	}
+	return 0
 }
 
 // parse accepts both export shapes: newline-delimited rows (the default) and one document with a `rows` array.

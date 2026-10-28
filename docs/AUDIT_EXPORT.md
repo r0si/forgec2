@@ -29,8 +29,19 @@ go run ./cmd/verify-audit audit.ndjson          # human-readable verdict
 go run ./cmd/verify-audit audit.json -json      # machine-readable
 ```
 
-Exit codes: `0` every digest and link checks out, `1` a row was edited or a link was broken, `2` the file could not be
-read. The verifier walks the rows in **id order**, not file order, because file order can be reversed.
+Exit codes: `0` every digest and link checks out, `1` a row was edited, a link was broken, **or the file holds fewer
+rows than `-min-rows`**, `2` the file could not be read. The verifier walks the rows in **id order**, not file order,
+because file order can be reversed.
+
+For a pipeline:
+
+```
+go run ./cmd/verify-audit audit.ndjson -min-rows 1000 -quiet
+```
+
+`-min-rows` exists because a **truncated download** and an **emptied log** both look like "no problems found" to a naive
+verifier — and both are what an attacker with write access would prefer. Set it to the number of rows you expect; `-quiet`
+prints nothing and leaves the answer to the exit code.
 
 ## What this proves, and what it does not
 
