@@ -8,7 +8,7 @@
 # >=24.15). Vite 7 itself only needs 20.19: require(esm) must be enabled by
 # default, otherwise loading the ESM-only @vitejs/plugin-react fails with
 # ERR_REQUIRE_ESM. The pinned builder image below is newer than the floor.
-FROM node:26.12-alpine@sha256:6f08a523443ddedf52941874c203475b0ad503e859ad70cb26ab8be9a517dbd5 AS frontend-builder
+FROM node:26.12-alpine@sha256:40cd011b55415bc894e45b02fdd5a5dfde056921b7d23a64c74f80497af48797 AS frontend-builder
 WORKDIR /build/frontend
 COPY frontend/package*.json ./
 RUN npm ci
