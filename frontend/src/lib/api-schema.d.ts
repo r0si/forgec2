@@ -1410,6 +1410,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/automation/rules/{id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export one rule in a portable shape
+         * @description A rule set is configuration an operator rebuilds every exercise, and retyping conditions is where a mistyped `contains` lives on as a rule that simply never matches. The export is deliberately **portable**: it carries the rule's meaning - name, event type, conditions, actions, cooldown, schedule - and **not** the database id, timestamps, run counts or tenant, which a destination could only pretend to know. Another tenant's rule is a 404, not a redacted document.
+         */
+        get: operations["exportAutomationRule"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/automation/rules/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create a rule from a portable document
+         * @description The receiving half of the export. The id is derived from the name on first import and **kept on overwrite**, so importing the same document twice is idempotent rather than creating twins. A name collision is refused with **409** unless `overwrite` is set, because an import that silently replaces a rule the operator built by hand is worse than a rejection. Documents without a name, an event type or at least one action are **400**: a rule without an event type never fires, and one without actions does nothing when it does. Both outcomes are audited (`automation_rule_import`, `automation_rule_import_overwrite`).
+         */
+        post: operations["importAutomationRule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/automation/health": {
         parameters: {
             query?: never;
@@ -14137,6 +14177,98 @@ export interface operations {
             };
             /** @description No such rule */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    exportAutomationRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The portable rule */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        data?: {
+                            rule?: {
+                                name?: string;
+                                event_type?: string;
+                                enabled?: boolean;
+                                conditions?: Record<string, never>[];
+                                actions?: Record<string, never>[];
+                                cooldown_seconds?: number;
+                                schedule?: string;
+                            };
+                        };
+                    };
+                };
+            };
+            /** @description No such rule in the caller's tenant */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    importAutomationRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Same shape as the export */
+                    rule: Record<string, never>;
+                    /** @description Replace a rule with the same name */
+                    overwrite?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description The created or replaced rule */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        data?: {
+                            rule_id?: string;
+                            overwrote?: boolean;
+                            enabled?: boolean;
+                        };
+                    };
+                };
+            };
+            /** @description Missing name */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description A rule with that name already exists and overwrite was not set */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -50,6 +50,8 @@ func (s *Server) registerAutomationRoutes(auth *gin.RouterGroup) {
 	{
 		autoRead.GET("/automation", s.handleAutomationPage)
 		autoRead.GET("/api/automation/rules", s.handleListAutomationRules)
+		// Rules are configuration an operator rebuilds every exercise: export one in a portable shape.
+		autoRead.GET("/api/automation/rules/:id/export", s.handleExportAutomationRule)
 		autoRead.GET("/api/webhooks", s.handleListWebhooks)
 		autoRead.GET("/bof_repo", func(c *gin.Context) {
 			s.renderPageOrJSON(c, gin.H{"Title": "BOF Repository", "ActiveNav": "bof_repo"})
@@ -71,6 +73,8 @@ func (s *Server) registerAutomationRoutes(auth *gin.RouterGroup) {
 	autoWrite.Use(middleware.RequirePermission(db.PermAutomationWrite))
 	{
 		autoWrite.POST("/api/automation/rules", s.handleSaveAutomationRule)
+		// Import the same document on another deployment; a name collision is refused unless overwrite is set.
+		autoWrite.POST("/api/automation/rules/import", s.handleImportAutomationRule)
 		// Clearing a rule's action counters: a fixed rule must not keep an error-level finding forever.
 		autoWrite.POST("/api/automation/action-stats/reset", s.handleResetAutomationActionStats)
 		autoWrite.PUT("/api/automation/rules/:id", s.handleUpdateAutomationRule)

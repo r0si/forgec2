@@ -2551,6 +2551,88 @@ paths:
                       rule_id: {type: string}
         '400': {description: The id was given in the wrong shape}
         '404': {description: No such rule}
+  /api/automation/rules/{id}/export:
+    get:
+      tags: [Automation]
+      summary: Export one rule in a portable shape
+      description: >-
+        A rule set is configuration an operator rebuilds every exercise, and retyping conditions is where a mistyped
+        `contains` lives on as a rule that simply never matches. The export is deliberately **portable**: it carries the
+        rule's meaning - name, event type, conditions, actions, cooldown, schedule - and **not** the database id, timestamps,
+        run counts or tenant, which a destination could only pretend to know. Another tenant's rule is a 404, not a redacted
+        document.
+      operationId: exportAutomationRule
+      security: [{SessionCookie: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200':
+          description: The portable rule
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  data:
+                    type: object
+                    properties:
+                      rule:
+                        type: object
+                        properties:
+                          name: {type: string}
+                          event_type: {type: string}
+                          enabled: {type: boolean}
+                          conditions: {type: array, items: {type: object}}
+                          actions: {type: array, items: {type: object}}
+                          cooldown_seconds: {type: integer}
+                          schedule: {type: string}
+        '404': {description: No such rule in the caller's tenant}
+
+  /api/automation/rules/import:
+    post:
+      tags: [Automation]
+      summary: Create a rule from a portable document
+      description: >-
+        The receiving half of the export. The id is derived from the name on first import and **kept on overwrite**, so
+        importing the same document twice is idempotent rather than creating twins. A name collision is refused with **409**
+        unless `overwrite` is set, because an import that silently replaces a rule the operator built by hand is worse than a
+        rejection. Documents without a name, an event type or at least one action are **400**: a rule without an event type
+        never fires, and one without actions does nothing when it does. Both outcomes are audited
+        (`automation_rule_import`, `automation_rule_import_overwrite`).
+      operationId: importAutomationRule
+      security: [{SessionCookie: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rule]
+              properties:
+                rule: {type: object, description: Same shape as the export}
+                overwrite: {type: boolean, description: Replace a rule with the same name}
+      responses:
+        '200':
+          description: The created or replaced rule
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  data:
+                    type: object
+                    properties:
+                      rule_id: {type: string}
+                      overwrote: {type: boolean}
+                      enabled: {type: boolean}
+        '400': {description: Missing name, missing event type, no actions, or a malformed body}
+        '409': {description: A rule with that name already exists and overwrite was not set}
+
   /api/automation/health:
     get:
       tags: [Automation]
