@@ -165,7 +165,15 @@ func (s *Server) handleExportTasks(c *gin.Context) {
 		respondError(c, http.StatusBadRequest, `invalid format (expected "csv" or "json")`)
 		return
 	}
-	exportETag := s.taskExportETag(c, limit, format)
+	// Column selection, shared by both formats and part of the ETag: two column sets are two documents.
+	fields, fieldErr := selectExportFields(c.Query("fields"), format)
+	if fieldErr != "" {
+		respondError(c, http.StatusBadRequest, fieldErr)
+		return
+	}
+	// NUL joins the two parts of the tag: the same reason the automation grouping key uses it, and it keeps the
+	// command-separator gate honest about what a pipe in this package is for.
+	exportETag := s.taskExportETag(c, limit, format+"\x00"+exportFieldsTag(fields))
 	if exportETag != "" {
 		c.Header("ETag", exportETag)
 		c.Header("Cache-Control", "private, no-cache")
@@ -216,7 +224,11 @@ func (s *Server) handleExportTasks(c *gin.Context) {
 	// Task ID is the last column on purpose: it is additive for anyone parsing the existing header,
 	// and without it a row could not be matched back to the task in the console - which is the first
 	// thing an analyst does with an export.
-	writer.Write([]string{"Time", "Agent", "Type", "Command", "Result", "Error", "Status", "Task ID", "Engagement"})
+	headers := make([]string, 0, len(fields))
+	for _, field := range fields {
+		headers = append(headers, field.header)
+	}
+	writer.Write(headers)
 
 	// Engagement names for the agents in this export, in one query. The column exists because the agent
 	// list can already be filtered by engagement: an export that cannot say which exercise a task belonged
@@ -228,17 +240,13 @@ func (s *Server) handleExportTasks(c *gin.Context) {
 		if t.Agent.Hostname != "" {
 			agentName = t.Agent.Hostname
 		}
-		writer.Write([]string{
-			t.CreatedAt.Format("2006-01-02 15:04:05"),
-			agentName,
-			t.Type,
-			csvSafe(t.Command),
-			csvSafe(truncateString(redactSensitiveResultForAuxiliary(t.Type, t.Result), CSVResultTruncLen)),
-			csvSafe(truncateString(t.Error, CSVErrorTruncLen)),
-			t.Status,
-			strconv.FormatUint(uint64(t.ID), 10),
-			csvSafe(engagementNames[t.AgentID]),
-		})
+		// The row comes from the selected fields, in the caller order, so the header and the data cannot drift
+		// apart when a column is added to the catalogue. Each field value already carries its own escaping.
+		row := make([]string, 0, len(fields))
+		for _, field := range fields {
+			row = append(row, field.value(t, agentName, engagementNames[t.AgentID]))
+		}
+		writer.Write(row)
 	}
 	writer.Flush()
 	if err := writer.Error(); err != nil {
@@ -269,18 +277,17 @@ func (s *Server) handleExportTasks(c *gin.Context) {
 			if t.Agent.Hostname != "" {
 				agentName = t.Agent.Hostname
 			}
-			rows = append(rows, gin.H{
-				"time":       t.CreatedAt.Format("2006-01-02 15:04:05"),
-				"agent":      agentName,
-				"agent_id":   t.AgentID,
-				"type":       t.Type,
-				"command":    t.Command,
-				"result":     redactSensitiveResultForAuxiliary(t.Type, truncateString(t.Result, CSVResultTruncLen)),
-				"error":      truncateString(t.Error, CSVErrorTruncLen),
-				"status":     t.Status,
-				"task_id":    t.ID,
-				"engagement": engagementNames[t.AgentID],
-			})
+			// Same selection, same order, same values as the CSV: the two formats must not describe the export
+			// differently.
+			row := make(gin.H, len(fields))
+			for _, field := range fields {
+				if field.name == "task_id" {
+					row[field.name] = t.ID
+					continue
+				}
+				row[field.name] = field.value(t, agentName, engagementNames[t.AgentID])
+			}
+			rows = append(rows, row)
 		}
 		c.Header("Content-Type", "application/json; charset=utf-8")
 		c.Header("Content-Disposition", `attachment; filename="forgec2_tasks_`+time.Now().Format("2006-01-02_150405")+`.json"`)

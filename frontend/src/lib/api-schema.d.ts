@@ -13707,6 +13707,8 @@ export interface operations {
                 engagement?: string;
                 /** @description csv (default) or json. The JSON variant carries the same rows, the same redaction and the same column truncation, so a script and a spreadsheet never disagree about what a cell held; the format is part of the ETag, so a revalidated CSV cannot answer a JSON request with 304. */
                 format?: "csv" | "json";
+                /** @description Comma-separated columns, in the order wanted: time, agent, type, command, result, error, status, task_id, engagement, agent_id. Absent means the historical CSV set (everything but agent_id) or, for JSON, that set plus agent_id. An unknown name is a 400 naming the valid ones, and the selection is part of the ETag because two column sets are two documents. */
+                fields?: string;
             };
             header?: never;
             path?: never;
