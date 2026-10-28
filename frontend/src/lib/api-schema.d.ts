@@ -1930,6 +1930,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/exports/capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What the download endpoints accept
+         * @description Machine-readable description of the export and download surface: the formats each endpoint serves, the parameters it honours, the row and byte caps it enforces, the selectable columns and presets (task export only), the response headers that carry meaning, and the constraints a client cannot infer - notably that the audit export offers **no column projection**, because offline verification needs every field the entry hash covers. The values are derived from the code that enforces them, so the document cannot drift from the behaviour without a test failing.
+         */
+        get: operations["exportCapabilities"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/engagements": {
         parameters: {
             query?: never;
@@ -11593,6 +11613,24 @@ export interface components {
             /** Format: date-time */
             updated_at?: string;
         };
+        /** @description One endpoint of the export/download surface. */
+        ExportCapabilities: {
+            path?: string;
+            formats?: string[];
+            parameters?: string[];
+            /** @description Row cap the handler enforces (0 = unbounded) */
+            max_rows?: number;
+            /** @description Byte cap a buffered export enforces (0 = none) */
+            max_bytes?: number;
+            /** @description Selectable columns, when the endpoint supports projection */
+            fields?: string[];
+            /** @description Preset name to the columns it expands to (an empty list means "all") */
+            presets?: Record<string, never>;
+            headers?: string[];
+            supports_ranges?: boolean;
+            /** @description Constraints a client cannot infer from the shape alone */
+            notes?: string[];
+        };
         /** @description A time-boxed engagement above the tenant. */
         Engagement: {
             id?: number;
@@ -14811,6 +14849,40 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    exportCapabilities: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Per-endpoint capabilities plus the shared limits */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        data?: {
+                            task_export?: components["schemas"]["ExportCapabilities"];
+                            audit_export?: components["schemas"]["ExportCapabilities"];
+                            task_output_download?: components["schemas"]["ExportCapabilities"];
+                            plugins_index?: components["schemas"]["ExportCapabilities"];
+                            limits?: {
+                                task_export_rows?: number;
+                                audit_export_rows?: number;
+                                audit_export_bytes?: number;
+                                stats_sample_rows?: number;
+                            };
+                        };
+                    };
+                };
             };
         };
     };

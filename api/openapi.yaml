@@ -3454,6 +3454,43 @@ paths:
           description: Neither expires_at nor clear, or expires_at is not RFC3339
         '404':
           description: No such agent in the caller's tenant
+  /api/exports/capabilities:
+    get:
+      tags: [Exports]
+      summary: What the download endpoints accept
+      description: >-
+        Machine-readable description of the export and download surface: the formats each endpoint serves, the
+        parameters it honours, the row and byte caps it enforces, the selectable columns and presets (task export
+        only), the response headers that carry meaning, and the constraints a client cannot infer - notably that the
+        audit export offers **no column projection**, because offline verification needs every field the entry hash
+        covers. The values are derived from the code that enforces them, so the document cannot drift from the
+        behaviour without a test failing.
+      operationId: exportCapabilities
+      security:
+        - SessionCookie: []
+      responses:
+        '200':
+          description: Per-endpoint capabilities plus the shared limits
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  data:
+                    type: object
+                    properties:
+                      task_export: {$ref: '#/components/schemas/ExportCapabilities'}
+                      audit_export: {$ref: '#/components/schemas/ExportCapabilities'}
+                      task_output_download: {$ref: '#/components/schemas/ExportCapabilities'}
+                      plugins_index: {$ref: '#/components/schemas/ExportCapabilities'}
+                      limits:
+                        type: object
+                        properties:
+                          task_export_rows: {type: integer}
+                          audit_export_rows: {type: integer}
+                          audit_export_bytes: {type: integer}
+                          stats_sample_rows: {type: integer}
   /api/engagements:
     get:
       tags: [Engagements]
@@ -13686,6 +13723,34 @@ components:
           type: string
           format: date-time
 
+    ExportCapabilities:
+      type: object
+      description: One endpoint of the export/download surface.
+      properties:
+        path: {type: string}
+        formats:
+          type: array
+          items: {type: string}
+        parameters:
+          type: array
+          items: {type: string}
+        max_rows: {type: integer, description: Row cap the handler enforces (0 = unbounded)}
+        max_bytes: {type: integer, description: Byte cap a buffered export enforces (0 = none)}
+        fields:
+          type: array
+          description: Selectable columns, when the endpoint supports projection
+          items: {type: string}
+        presets:
+          type: object
+          description: Preset name to the columns it expands to (an empty list means "all")
+        headers:
+          type: array
+          items: {type: string}
+        supports_ranges: {type: boolean}
+        notes:
+          type: array
+          description: Constraints a client cannot infer from the shape alone
+          items: {type: string}
     Engagement:
       type: object
       description: A time-boxed engagement above the tenant.

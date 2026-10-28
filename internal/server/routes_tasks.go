@@ -12,6 +12,8 @@ func (s *Server) registerTaskRoutes(auth *gin.RouterGroup) {
 	{
 		tasksRead.GET("/tasks", s.handleTaskHistory)
 		tasksRead.GET("/tasks/export", s.handleExportTasks)
+		// What the download surface accepts, derived from the code that enforces it.
+		tasksRead.GET("/api/exports/capabilities", s.handleExportCapabilities)
 		tasksRead.GET("/tasks/:taskId", s.handleGetTaskStatus)
 		// A file is what an operator wants for a large result; the JSON detail stays for the UI.
 		tasksRead.GET("/tasks/:taskId/output", s.handleDownloadTaskOutput)
