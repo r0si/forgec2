@@ -105,8 +105,15 @@ func ssrfSafeClient(base *http.Client) *http.Client {
 	if base == nil {
 		base = http.DefaultClient
 	}
+	// A zero Timeout means "wait forever": http.DefaultClient (the nil fallback) has none, and so
+	// does any hand-built client. Every other outbound path in the tree sets one, so the fallback
+	// inherits the same short bound rather than turning a blackholed host into a stuck goroutine.
+	timeout := base.Timeout
+	if timeout <= 0 {
+		timeout = HTTPClientShortTimeout
+	}
 	c := &http.Client{
-		Timeout:   base.Timeout,
+		Timeout:   timeout,
 		Transport: base.Transport,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			if len(via) >= 5 {
