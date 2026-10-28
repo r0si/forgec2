@@ -1894,6 +1894,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/engagements/{id}/summary/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download an engagement summary as a document
+         * @description The same summary the JSON endpoint returns, rendered for a reader who was not there: Markdown by default (window, fleet covered, task outcomes, audited actions as a table) or the raw JSON with `format=json`. Buffered before anything is written, so a partial download is never something that still opens. Tenant-scoped; another tenant's engagement is a 404.
+         */
+        get: operations["exportEngagementSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/engagements/{id}/summary": {
         parameters: {
             query?: never;
@@ -14542,6 +14562,46 @@ export interface operations {
             };
             /** @description Already closed */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    exportEngagementSummary: {
+        parameters: {
+            query?: {
+                /** @description Markdown (default) or json */
+                format?: "markdown" | "json";
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Markdown or JSON document, filename carries the id and a timestamp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/markdown": string;
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Unknown format */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such engagement in the caller's tenant */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

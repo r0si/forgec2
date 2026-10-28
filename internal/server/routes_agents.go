@@ -20,6 +20,8 @@ func (s *Server) registerAgentRoutes(auth *gin.RouterGroup) {
 		agentsRead.GET("/api/engagements", s.handleListEngagements)
 		// "What did this exercise actually do" - a read-only roll-up over its own window.
 		agentsRead.GET("/api/engagements/:id/summary", s.handleEngagementSummary)
+		// The same summary as a document a reader can paste into a report.
+		agentsRead.GET("/api/engagements/:id/summary/export", s.handleEngagementSummaryExport)
 		agentsRead.GET("/agents/:id", s.handleAgentDetail)
 		agentsRead.GET("/agents/:id/shell", s.handleShellPage)
 		agentsRead.GET("/agents/:id/files", s.handleFileBrowserPage)

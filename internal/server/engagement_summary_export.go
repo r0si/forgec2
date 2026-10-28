@@ -1,0 +1,180 @@
+package server
+
+import (
+	"bytes"
+	"fmt"
+	"net/http"
+	"sort"
+	"strings"
+	"time"
+
+	"github.com/forgec2/forgec2/internal/db"
+	"github.com/gin-gonic/gin"
+)
+
+// Markdown export of an engagement summary.
+//
+// The JSON summary answers a machine; a report has to answer a person who was not there, and the usual
+// destination is a document rather than an API client. The export reuses the same computation as the JSON
+// endpoint (engagementSummaryPayload) so the two can never describe the same exercise differently, and it is
+// buffered before anything is written - the same rule the CSV and audit exports follow, because a truncated
+// document that still opens is worse than an error.
+//
+// GET /api/engagements/:id/summary/export?format=markdown|json
+
+// handleEngagementSummaryExport writes the summary as a downloadable document.
+func (s *Server) handleEngagementSummaryExport(c *gin.Context) {
+	data, engagement, ok := s.buildEngagementSummary(c)
+	if !ok {
+		return
+	}
+
+	format := strings.ToLower(strings.TrimSpace(c.DefaultQuery("format", "markdown")))
+	stamp := time.Now().UTC().Format("2006-01-02_150405")
+	switch format {
+	case "json":
+		c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="engagement-%d_%s.json"`, engagement.ID, stamp))
+		respond(c, data)
+	case "markdown", "md":
+		var body bytes.Buffer
+		writeEngagementMarkdown(&body, data)
+		c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="engagement-%d_%s.md"`, engagement.ID, stamp))
+		c.Data(http.StatusOK, "text/markdown; charset=utf-8", body.Bytes())
+	default:
+		respondError(c, http.StatusBadRequest, `invalid format (expected "markdown" or "json")`)
+	}
+}
+
+// writeEngagementMarkdown renders the summary a reader can paste into a report.
+func writeEngagementMarkdown(body *bytes.Buffer, data gin.H) {
+	engagement, _ := data["engagement"].(gin.H)
+	window, _ := data["window"].(gin.H)
+	agents, _ := data["agents"].(engagementSummaryAgentCounts)
+	tasks, _ := data["tasks"].(db.TaskStats)
+	actions, _ := data["actions"].([]engagementActionCount)
+
+	name, _ := engagement["name"].(string)
+	fmt.Fprintf(body, "# Engagement: %s\n\n", name)
+	if notes, _ := engagement["notes"].(string); notes != "" {
+		fmt.Fprintf(body, "%s\n\n", notes)
+	}
+	fmt.Fprintf(body, "- Window: %v -> %v (%s)\n", window["starts_at"], window["ends_at"], windowState(window))
+	if created, _ := engagement["created_by"].(string); created != "" {
+		fmt.Fprintf(body, "- Created by: %s\n", created)
+	}
+	fmt.Fprintf(body, "- Fleet covered: %d host(s), %d online, %d past their deadline\n\n", agents.Total, agents.Online, agents.Expired)
+
+	total := tasks.Pending + tasks.Running + tasks.Completed + tasks.Failed
+	fmt.Fprintf(body, "## Tasks inside the window\n\n%d task(s): %d completed, %d failed, %d pending, %d running\n\n",
+		total, tasks.Completed, tasks.Failed, tasks.Pending, tasks.Running)
+
+	fmt.Fprintf(body, "## Audited actions\n\n")
+	if len(actions) == 0 {
+		fmt.Fprintf(body, "_No audited actions were recorded inside the window._\n")
+		return
+	}
+	sort.SliceStable(actions, func(i, j int) bool {
+		if actions[i].Count == actions[j].Count {
+			return actions[i].Action < actions[j].Action
+		}
+		return actions[i].Count > actions[j].Count
+	})
+	fmt.Fprintf(body, "| Action | Count |\n|---|---|\n")
+	for _, action := range actions {
+		fmt.Fprintf(body, "| `%s` | %d |\n", action.Action, action.Count)
+	}
+}
+
+// windowState words the window the way a reader needs it, rather than as a boolean.
+func windowState(window gin.H) string {
+	if open, _ := window["open"].(bool); open {
+		return "still open"
+	}
+	return "closed"
+}
+
+// buildEngagementSummary computes the summary for one engagement, answering 404 itself when it cannot.
+func (s *Server) buildEngagementSummary(c *gin.Context) (gin.H, db.Engagement, bool) {
+	var engagement db.Engagement
+	var zero db.Engagement
+	id := strings.TrimSpace(c.Param("id"))
+	lookup := s.tenantScope(s.db.WithContext(s.ctx).Model(&db.Engagement{}), c)
+	if err := lookup.Where("id = ?", id).First(&engagement).Error; err != nil {
+		respondError(c, http.StatusNotFound, "engagement not found")
+		return nil, zero, false
+	}
+
+	now := time.Now().UTC()
+	windowEnd := engagement.EndsAt
+	if engagement.ClosedAt != nil && engagement.ClosedAt.Before(windowEnd) {
+		windowEnd = *engagement.ClosedAt
+	}
+	if now.Before(windowEnd) {
+		windowEnd = now
+	}
+
+	var agents []db.Implant
+	if err := s.tenantScope(s.db.WithContext(s.ctx).Model(&db.Implant{}), c).
+		Where("engagement_id = ?", engagement.ID).
+		Select("id, status, last_seen, expires_at").
+		Find(&agents).Error; err != nil {
+		handleQueryError(c, err, "Failed to summarise the engagement fleet")
+		return nil, zero, false
+	}
+	counts := engagementSummaryAgentCounts{Total: len(agents)}
+	agentIDs := make([]string, 0, len(agents))
+	offlineCutoff := now.Add(-s.offlineThreshold())
+	for _, agent := range agents {
+		agentIDs = append(agentIDs, agent.ID)
+		if agent.LastSeen.After(offlineCutoff) {
+			counts.Online++
+		}
+		if agent.ExpiresAt != nil && now.After(*agent.ExpiresAt) {
+			counts.Expired++
+		}
+	}
+
+	tasks := db.TaskStats{}
+	if len(agentIDs) > 0 {
+		var rows []struct {
+			Status string
+			Count  int
+		}
+		if err := s.db.WithContext(s.ctx).Model(&db.Task{}).
+			Select("status, COUNT(*) AS count").
+			Where("agent_id IN ?", agentIDs).
+			Where("created_at >= ? AND created_at <= ?", engagement.StartsAt, windowEnd).
+			Group("status").
+			Scan(&rows).Error; err != nil {
+			handleQueryError(c, err, "Failed to summarise engagement tasks")
+			return nil, zero, false
+		}
+		for _, row := range rows {
+			switch row.Status {
+			case "pending":
+				tasks.Pending += row.Count
+			case "running":
+				tasks.Running += row.Count
+			case "completed":
+				tasks.Completed += row.Count
+			case "failed":
+				tasks.Failed += row.Count
+			}
+		}
+	}
+
+	var actionRows []engagementActionCount
+	if err := s.db.WithContext(s.ctx).Model(&db.AuditLog{}).
+		Select("action, COUNT(*) AS count").
+		Where("tenant_id = ? OR tenant_id = 0", s.currentTenantID(c)).
+		Where("created_at >= ? AND created_at <= ?", engagement.StartsAt, windowEnd).
+		Group("action").
+		Order("count DESC, action ASC").
+		Limit(25).
+		Scan(&actionRows).Error; err != nil {
+		handleQueryError(c, err, "Failed to summarise engagement actions")
+		return nil, zero, false
+	}
+
+	return engagementSummaryPayload(engagement, now, windowEnd, counts, tasks, actionRows), engagement, true
+}

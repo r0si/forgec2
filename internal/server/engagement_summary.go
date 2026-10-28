@@ -1,9 +1,6 @@
 package server
 
 import (
-	"net/http"
-	"sort"
-	"strings"
 	"time"
 
 	"github.com/forgec2/forgec2/internal/db"
@@ -30,115 +27,36 @@ type engagementSummaryAgentCounts struct {
 	Expired int `json:"expired"`
 }
 
-// handleEngagementSummary answers what happened inside one engagement's window.
+// handleEngagementSummary answers what happened inside one engagement window.
 func (s *Server) handleEngagementSummary(c *gin.Context) {
-	id := strings.TrimSpace(c.Param("id"))
-	var engagement db.Engagement
-	lookup := s.tenantScope(s.db.WithContext(s.ctx).Model(&db.Engagement{}), c)
-	if err := lookup.Where("id = ?", id).First(&engagement).Error; err != nil {
-		respondError(c, http.StatusNotFound, "engagement not found")
+	data, _, ok := s.buildEngagementSummary(c)
+	if !ok {
 		return
 	}
+	respond(c, data)
+}
 
-	now := time.Now().UTC()
-	windowEnd := engagement.EndsAt
-	if engagement.ClosedAt != nil && engagement.ClosedAt.Before(windowEnd) {
-		windowEnd = *engagement.ClosedAt
+// engagementSummaryPayload is the one place the summary shape is built, shared by the JSON endpoint and the
+// Markdown export so the two cannot describe the same exercise differently.
+func engagementSummaryPayload(engagement db.Engagement, now, windowEnd time.Time, agents engagementSummaryAgentCounts, tasks db.TaskStats, actions []engagementActionCount) gin.H {
+	if actions == nil {
+		actions = []engagementActionCount{}
 	}
-	if now.Before(windowEnd) {
-		windowEnd = now
-	}
-
-	// The fleet this engagement covered.
-	var agents []db.Implant
-	if err := s.tenantScope(s.db.WithContext(s.ctx).Model(&db.Implant{}), c).
-		Where("engagement_id = ?", engagement.ID).
-		Select("id, status, last_seen, expires_at").
-		Find(&agents).Error; err != nil {
-		handleQueryError(c, err, "Failed to summarise the engagement fleet")
-		return
-	}
-	counts := engagementSummaryAgentCounts{Total: len(agents)}
-	agentIDs := make([]string, 0, len(agents))
-	offlineCutoff := now.Add(-s.offlineThreshold())
-	for _, agent := range agents {
-		agentIDs = append(agentIDs, agent.ID)
-		if agent.LastSeen.After(offlineCutoff) {
-			counts.Online++
-		}
-		if agent.ExpiresAt != nil && now.After(*agent.ExpiresAt) {
-			counts.Expired++
-		}
-	}
-
-	// Tasks are counted only for this engagement's agents, and only inside the window: a task created
-	// before the exercise opened belongs to whatever came before it.
-	tasks := db.TaskStats{}
-	if len(agentIDs) > 0 {
-		var rows []struct {
-			Status string
-			Count  int
-		}
-		if err := s.db.WithContext(s.ctx).Model(&db.Task{}).
-			Select("status, COUNT(*) AS count").
-			Where("agent_id IN ?", agentIDs).
-			Where("created_at >= ? AND created_at <= ?", engagement.StartsAt, windowEnd).
-			Group("status").
-			Scan(&rows).Error; err != nil {
-			handleQueryError(c, err, "Failed to summarise engagement tasks")
-			return
-		}
-		for _, row := range rows {
-			switch row.Status {
-			case "pending":
-				tasks.Pending += row.Count
-			case "running":
-				tasks.Running += row.Count
-			case "completed":
-				tasks.Completed += row.Count
-			case "failed":
-				tasks.Failed += row.Count
-			}
-		}
-	}
-
-	// Audited actions inside the window, highest count first. This is the "what did we do" list: it needs
-	// no interpretation and it is already tamper-evident.
-	type actionCount struct {
-		Action string `json:"action"`
-		Count  int    `json:"count"`
-	}
-	var actionRows []actionCount
-	if err := s.db.WithContext(s.ctx).Model(&db.AuditLog{}).
-		Select("action, COUNT(*) AS count").
-		Where("tenant_id = ? OR tenant_id = 0", s.currentTenantID(c)).
-		Where("created_at >= ? AND created_at <= ?", engagement.StartsAt, windowEnd).
-		Group("action").
-		Order("count DESC, action ASC").
-		Limit(25).
-		Scan(&actionRows).Error; err != nil {
-		handleQueryError(c, err, "Failed to summarise engagement actions")
-		return
-	}
-	sort.SliceStable(actionRows, func(i, j int) bool {
-		if actionRows[i].Count == actionRows[j].Count {
-			return actionRows[i].Action < actionRows[j].Action
-		}
-		return actionRows[i].Count > actionRows[j].Count
-	})
-	if actionRows == nil {
-		actionRows = []actionCount{}
-	}
-
-	respond(c, gin.H{
+	return gin.H{
 		"engagement": engagementView(engagement, now),
 		"window": gin.H{
 			"starts_at": engagement.StartsAt.UTC().Format(time.RFC3339),
 			"ends_at":   windowEnd.UTC().Format(time.RFC3339),
 			"open":      now.Before(windowEnd),
 		},
-		"agents":  counts,
+		"agents":  agents,
 		"tasks":   tasks,
-		"actions": actionRows,
-	})
+		"actions": actions,
+	}
+}
+
+// engagementActionCount is one audited action and how often it happened.
+type engagementActionCount struct {
+	Action string `json:"action"`
+	Count  int    `json:"count"`
 }

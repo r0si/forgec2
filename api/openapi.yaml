@@ -3247,6 +3247,40 @@ paths:
           description: No such engagement in the caller's tenant
         '409':
           description: Already closed
+  /api/engagements/{id}/summary/export:
+    get:
+      tags: [Engagements]
+      summary: Download an engagement summary as a document
+      description: >-
+        The same summary the JSON endpoint returns, rendered for a reader who was not there: Markdown by
+        default (window, fleet covered, task outcomes, audited actions as a table) or the raw JSON with
+        `format=json`. Buffered before anything is written, so a partial download is never something that
+        still opens. Tenant-scoped; another tenant's engagement is a 404.
+      operationId: exportEngagementSummary
+      security:
+        - SessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: integer}
+        - name: format
+          in: query
+          description: Markdown (default) or json
+          schema: {type: string, enum: [markdown, json], default: markdown}
+      responses:
+        '200':
+          description: Markdown or JSON document, filename carries the id and a timestamp
+          content:
+            text/markdown:
+              schema: {type: string}
+            application/json:
+              schema:
+                type: object
+        '400':
+          description: Unknown format
+        '404':
+          description: No such engagement in the caller's tenant
   /api/engagements/{id}/summary:
     get:
       tags: [Engagements]
