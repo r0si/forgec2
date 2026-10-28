@@ -1370,6 +1370,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/automation/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Static health of the automation rule set
+         * @description The checks no per-event preview can reach, derived from stored data. Three findings are reported: `unconditional_mutating_action` (a rule with no conditions whose action changes state - it fires on every event of its type; a notify-only rule of the same shape is not reported, because it is noisy rather than dangerous), `missing_agent` / `missing_script` / `missing_macro` (an action targeting a resource that no longer exists, which would log a failure on every firing, forever), and `duplicate_rule` (two rules with the same event, conditions and actions, so the actions run twice). Target lookups include tenant-0 rows, because legacy and globally-shared resources are real targets and crying wolf is how a health check gets ignored. Read-only: nothing is modified and no action runs.
+         */
+        get: operations["automationHealth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/automation/preview": {
         parameters: {
             query?: never;
@@ -13768,6 +13788,44 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+        };
+    };
+    automationHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Findings, errors first, plus summary counts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        data?: {
+                            summary?: {
+                                rules?: number;
+                                errors?: number;
+                                warnings?: number;
+                            };
+                            findings?: {
+                                rule_id?: string;
+                                rule_name?: string;
+                                /** @enum {string} */
+                                severity?: "error" | "warning";
+                                /** @enum {string} */
+                                code?: "unconditional_mutating_action" | "missing_agent" | "missing_script" | "missing_macro" | "duplicate_rule";
+                                detail?: string;
+                            }[];
+                        };
+                    };
+                };
+            };
         };
     };
     previewAutomationBatch: {

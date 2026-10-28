@@ -2392,6 +2392,52 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
+  /api/automation/health:
+    get:
+      tags: [Automation]
+      summary: Static health of the automation rule set
+      description: >-
+        The checks no per-event preview can reach, derived from stored data. Three findings are reported:
+        `unconditional_mutating_action` (a rule with no conditions whose action changes state - it fires on
+        every event of its type; a notify-only rule of the same shape is not reported, because it is noisy
+        rather than dangerous), `missing_agent` / `missing_script` / `missing_macro` (an action targeting a
+        resource that no longer exists, which would log a failure on every firing, forever), and
+        `duplicate_rule` (two rules with the same event, conditions and actions, so the actions run twice).
+        Target lookups include tenant-0 rows, because legacy and globally-shared resources are real targets
+        and crying wolf is how a health check gets ignored. Read-only: nothing is modified and no action runs.
+      operationId: automationHealth
+      security:
+        - SessionCookie: []
+      responses:
+        '200':
+          description: Findings, errors first, plus summary counts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  data:
+                    type: object
+                    properties:
+                      summary:
+                        type: object
+                        properties:
+                          rules: {type: integer}
+                          errors: {type: integer}
+                          warnings: {type: integer}
+                      findings:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            rule_id: {type: string}
+                            rule_name: {type: string}
+                            severity: {type: string, enum: [error, warning]}
+                            code:
+                              type: string
+                              enum: [unconditional_mutating_action, missing_agent, missing_script, missing_macro, duplicate_rule]
+                            detail: {type: string}
   /api/automation/preview:
     post:
       tags: [Automation]

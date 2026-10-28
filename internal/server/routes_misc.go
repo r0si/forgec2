@@ -49,6 +49,8 @@ func (s *Server) registerAutomationRoutes(auth *gin.RouterGroup) {
 	{
 		autoRead.GET("/automation", s.handleAutomationPage)
 		autoRead.GET("/api/automation/rules", s.handleListAutomationRules)
+		// Static health of the rule set: unconditional mutating actions, dangling targets, duplicates.
+		autoRead.GET("/api/automation/health", s.handleAutomationHealth)
 		autoRead.GET("/api/webhooks", s.handleListWebhooks)
 		autoRead.GET("/bof_repo", func(c *gin.Context) {
 			s.renderPageOrJSON(c, gin.H{"Title": "BOF Repository", "ActiveNav": "bof_repo"})
