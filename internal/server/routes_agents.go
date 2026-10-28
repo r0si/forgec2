@@ -17,6 +17,7 @@ func (s *Server) registerAgentRoutes(auth *gin.RouterGroup) {
 		// The engagement deadlines made enforceable last round, made visible.
 		// Full /api path: the group prefix here is "/", and the coverage guard only compares /api paths.
 		agentsRead.GET("/api/engagements/expiry", s.handleEngagementExpiry)
+		agentsRead.GET("/api/engagements", s.handleListEngagements)
 		agentsRead.GET("/agents/:id", s.handleAgentDetail)
 		agentsRead.GET("/agents/:id/shell", s.handleShellPage)
 		agentsRead.GET("/agents/:id/files", s.handleFileBrowserPage)
@@ -63,6 +64,10 @@ func (s *Server) registerAgentRoutes(auth *gin.RouterGroup) {
 		// The engagement deadline is enforceable since round 17; this is how an operator extends or
 		// clears it without rebuilding the implant.
 		agentsWrite.POST("/api/agents/:id/expiry", s.handleSetAgentExpiry)
+		// Engagements are the time-boxed container above the tenant; creating and closing one changes
+		// the scope of the exercise, so they sit on the write group.
+		agentsWrite.POST("/api/engagements", s.handleCreateEngagement)
+		agentsWrite.POST("/api/engagements/:id/close", s.handleCloseEngagement)
 		agentsWrite.POST("/agents/:id/tasks/:taskId/cancel", s.handleCancelTask)
 		agentsWrite.POST("/agents/:id/task/:taskId/rerun", s.handleRerunTask)
 		agentsWrite.POST("/api/agents/:id/tasks/rerun-failed", s.handleRerunFailedTasks)

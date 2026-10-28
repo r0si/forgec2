@@ -209,6 +209,30 @@ type RegSecret struct {
 	// ExpiresAt optionally bounds how long this secret may be used, and is inherited by every implant
 	// built from it. nil means reusable indefinitely (the historic behaviour).
 	ExpiresAt *time.Time `gorm:"index" json:"expires_at,omitempty"`
+	// EngagementID optionally ties a secret (and therefore every implant built from it) to one
+	// engagement, which is the time-boxed container above a tenant: the tenant isolates data, the
+	// engagement bounds when the work is allowed to happen.
+	EngagementID *uint `gorm:"index" json:"engagement_id,omitempty"`
+}
+
+// Engagement is a time-boxed piece of work above the tenant: the scope of an exercise rather than of a
+// customer. A tenant isolates data; an engagement bounds WHEN work may happen and gives the deadline that
+// rounds 17-20 made enforceable a natural home, so an operator records the exercise once instead of
+// setting a deadline per implant.
+type Engagement struct {
+	ID        uint      `gorm:"primaryKey" json:"id"`
+	TenantID  uint      `gorm:"index;index:idx_engagements_tenant_name,priority:1" json:"tenant_id"`
+	Name      string    `gorm:"size:128;not null;index:idx_engagements_tenant_name,priority:2" json:"name"`
+	Notes     string    `gorm:"size:1024" json:"notes,omitempty"`
+	CreatedBy string    `gorm:"size:64" json:"created_by,omitempty"`
+	StartsAt  time.Time `gorm:"index" json:"starts_at"`
+	EndsAt    time.Time `gorm:"index" json:"ends_at"`
+	// ClosedAt records an early end. The engagement's deadline still applies (closing does not extend
+	// it), which is why it is a separate column rather than a rewrite of EndsAt: the original agreed
+	// window stays auditable.
+	ClosedAt  *time.Time `json:"closed_at,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
 }
 
 // KillSwitch is the fleet-wide kill-switch broadcast state (singleton row,

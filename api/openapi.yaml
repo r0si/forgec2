@@ -3146,6 +3146,107 @@ paths:
           description: Neither expires_at nor clear, or expires_at is not RFC3339
         '404':
           description: No such agent in the caller's tenant
+  /api/engagements:
+    get:
+      tags: [Engagements]
+      summary: List the tenant's engagements
+      description: >-
+        Engagements are the time-boxed container above the tenant: a tenant isolates data, an engagement
+        bounds when work may happen. Each entry carries a derived `state` (scheduled, active, ended,
+        closed) so a caller does not have to compare timestamps itself. Tenant-scoped; newest window
+        first.
+      operationId: listEngagements
+      security:
+        - SessionCookie: []
+      responses:
+        '200':
+          description: Engagements ordered by start, newest first
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  data:
+                    type: object
+                    properties:
+                      count: {type: integer}
+                      engagements:
+                        type: array
+                        items: {$ref: '#/components/schemas/Engagement'}
+    post:
+      tags: [Engagements]
+      summary: Create an engagement
+      description: >-
+        Refuses a window that overlaps another OPEN engagement in the same tenant (409): two simultaneous
+        exercises against one customer is almost always a mistake, and it is better refused at creation
+        than discovered when two teams task the same host. Closed engagements are history and never block
+        a new one.
+      operationId: createEngagement
+      security:
+        - SessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, starts_at, ends_at]
+              properties:
+                name: {type: string, maxLength: 128}
+                notes: {type: string, maxLength: 1024}
+                starts_at: {type: string, format: date-time}
+                ends_at: {type: string, format: date-time}
+      responses:
+        '200':
+          description: The created engagement, with its derived state
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  data:
+                    type: object
+                    properties:
+                      engagement: {$ref: '#/components/schemas/Engagement'}
+        '400':
+          description: Missing name, unparseable timestamps, or ends_at not after starts_at
+        '409':
+          description: The window overlaps an existing open engagement for this tenant
+  /api/engagements/{id}/close:
+    post:
+      tags: [Engagements]
+      summary: End an engagement early
+      description: >-
+        Sets closed_at without rewriting the agreed window: closing early is a decision, and the original
+        dates stay auditable. Closing an already-closed engagement is a 409; another tenant's engagement
+        is a 404.
+      operationId: closeEngagement
+      security:
+        - SessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: The engagement with state "closed"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  data:
+                    type: object
+                    properties:
+                      engagement: {$ref: '#/components/schemas/Engagement'}
+        '404':
+          description: No such engagement in the caller's tenant
+        '409':
+          description: Already closed
   /api/engagements/expiry:
     get:
       tags: [Agents]
@@ -13096,6 +13197,22 @@ components:
           type: string
           format: date-time
 
+    Engagement:
+      type: object
+      description: A time-boxed engagement above the tenant.
+      properties:
+        id: {type: integer}
+        name: {type: string}
+        notes: {type: string}
+        created_by: {type: string}
+        starts_at: {type: string, format: date-time}
+        ends_at: {type: string, format: date-time}
+        closed_at: {type: string, format: date-time}
+        state:
+          type: string
+          enum: [scheduled, active, ended, closed]
+          description: Derived from the timestamps, not stored
+        active: {type: boolean}
     PluginIndexDifference:
       type: object
       description: One difference between an index document and the installation.

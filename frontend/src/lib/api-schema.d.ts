@@ -1850,6 +1850,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/engagements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the tenant's engagements
+         * @description Engagements are the time-boxed container above the tenant: a tenant isolates data, an engagement bounds when work may happen. Each entry carries a derived `state` (scheduled, active, ended, closed) so a caller does not have to compare timestamps itself. Tenant-scoped; newest window first.
+         */
+        get: operations["listEngagements"];
+        put?: never;
+        /**
+         * Create an engagement
+         * @description Refuses a window that overlaps another OPEN engagement in the same tenant (409): two simultaneous exercises against one customer is almost always a mistake, and it is better refused at creation than discovered when two teams task the same host. Closed engagements are history and never block a new one.
+         */
+        post: operations["createEngagement"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/engagements/{id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * End an engagement early
+         * @description Sets closed_at without rewriting the agreed window: closing early is a decision, and the original dates stay auditable. Closing an already-closed engagement is a 409; another tenant's engagement is a 404.
+         */
+        post: operations["closeEngagement"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/engagements/expiry": {
         parameters: {
             query?: never;
@@ -11409,6 +11453,25 @@ export interface components {
             /** Format: date-time */
             updated_at?: string;
         };
+        /** @description A time-boxed engagement above the tenant. */
+        Engagement: {
+            id?: number;
+            name?: string;
+            notes?: string;
+            created_by?: string;
+            /** Format: date-time */
+            starts_at?: string;
+            /** Format: date-time */
+            ends_at?: string;
+            /** Format: date-time */
+            closed_at?: string;
+            /**
+             * @description Derived from the timestamps, not stored
+             * @enum {string}
+             */
+            state?: "scheduled" | "active" | "ended" | "closed";
+            active?: boolean;
+        };
         /** @description One difference between an index document and the installation. */
         PluginIndexDifference: {
             name?: string;
@@ -14342,6 +14405,123 @@ export interface operations {
             };
             /** @description No such agent in the caller's tenant */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listEngagements: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Engagements ordered by start, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        data?: {
+                            count?: number;
+                            engagements?: components["schemas"]["Engagement"][];
+                        };
+                    };
+                };
+            };
+        };
+    };
+    createEngagement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                    notes?: string;
+                    /** Format: date-time */
+                    starts_at: string;
+                    /** Format: date-time */
+                    ends_at: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The created engagement, with its derived state */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        data?: {
+                            engagement?: components["schemas"]["Engagement"];
+                        };
+                    };
+                };
+            };
+            /** @description Missing name, unparseable timestamps, or ends_at not after starts_at */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The window overlaps an existing open engagement for this tenant */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    closeEngagement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The engagement with state "closed" */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        data?: {
+                            engagement?: components["schemas"]["Engagement"];
+                        };
+                    };
+                };
+            };
+            /** @description No such engagement in the caller's tenant */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Already closed */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
