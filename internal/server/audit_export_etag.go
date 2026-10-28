@@ -33,7 +33,7 @@ func (s *Server) auditExportETag(c *gin.Context, sinceID uint, limit int, filter
 	}
 	if filtered {
 		parts = append(parts, "filtered="+strings.Join([]string{
-			c.Query("user"), c.Query("action"), c.Query("agent_id"), c.Query("since"),
+			c.Query("user"), c.Query("action"), c.Query("agent_id"), c.Query("since"), c.Query("until"),
 		}, ","))
 	}
 	return weakETag(strings.Join(parts, "-"))

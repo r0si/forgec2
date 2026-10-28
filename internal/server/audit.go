@@ -270,6 +270,30 @@ func (s *Server) handleExportAuditChain(c *gin.Context) {
 		query = query.Where("created_at >= ?", comparableLocalTime(at))
 		filtered = true
 	}
+	// until bounds the other side, with the same spellings and the same parser the task export uses: an
+	// investigation often wants "the night of the incident", not "everything after it".
+	var untilBound time.Time
+	hasUntil := false
+	if rawUntil := strings.TrimSpace(c.Query("until")); rawUntil != "" {
+		at, ok := parseTimeBound(rawUntil, time.Now())
+		if !ok {
+			respondError(c, http.StatusBadRequest, formatTimeBoundError("until"))
+			return
+		}
+		untilBound, hasUntil = at, true
+		query = query.Where("created_at <= ?", comparableLocalTime(at))
+		filtered = true
+	}
+	if hasUntil {
+		// A window that ends before it starts selects nothing, and answering an empty file would look like "no
+		// audit rows that night" - so it is refused instead.
+		if rawSince := strings.TrimSpace(c.Query("since")); rawSince != "" {
+			if sinceAt, ok := parseTimeBound(rawSince, time.Now()); ok && sinceAt.After(untilBound) {
+				respondError(c, http.StatusBadRequest, "since must not be after until")
+				return
+			}
+		}
+	}
 	var rows []db.AuditLog
 	if err := query.Order("id ASC").Limit(limit).Find(&rows).Error; err != nil {
 		respondError(c, http.StatusInternalServerError, "failed to read the audit chain")

@@ -2162,6 +2162,18 @@ paths:
           schema:
             type: integer
             default: 0
+        - name: since
+          in: query
+          description: >-
+            Lower time bound, from the same parser the task export uses (relative 24h/7d or an RFC3339
+            instant). Duration bounds are measured backwards from now; an RFC3339 value is an absolute
+            instant. A time bound makes the export a SELECTION, so the response carries the
+            `X-Audit-Export-Filtered` warning.
+          schema: {type: string}
+        - name: until
+          in: query
+          description: Upper time bound, same spellings as since; must not precede it
+          schema: {type: string}
       responses:
         '200':
           description: One JSON object per line, each with prev_hash and entry_hash

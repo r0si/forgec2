@@ -13617,6 +13617,10 @@ export interface operations {
                 limit?: number;
                 /** @description Export only rows with a greater id. Ids are monotonic, so this makes the export incremental: fetch the rows appended since the copy you already verified, and stitch the two together via prev_hash. */
                 since_id?: number;
+                /** @description Lower time bound, from the same parser the task export uses (relative 24h/7d or an RFC3339 instant). Duration bounds are measured backwards from now; an RFC3339 value is an absolute instant. A time bound makes the export a SELECTION, so the response carries the `X-Audit-Export-Filtered` warning. */
+                since?: string;
+                /** @description Upper time bound, same spellings as since; must not precede it */
+                until?: string;
             };
             header?: never;
             path?: never;
