@@ -186,10 +186,30 @@ func (s *Server) executeAction(action RuleAction, evt Event) {
 			// Tenant flows through the event (P0-2 fills evt.TenantID at
 			// fire time): scripts inherit exactly the firing tenant's reach.
 			caller := scripting.Caller{Username: "automation", Role: db.RoleUser, TenantID: evt.TenantID}
-			if params.ScriptID != "" {
-				engine.Execute(params.ScriptID, context, caller)
-			} else if params.Code != "" {
-				engine.ExecuteCode(params.Code, context, caller)
+			// Capture the outcome. These results used to be discarded, so an automation script
+			// that failed on every event - a typo, a permission the automation role does not have,
+			// a timeout - left no trace anywhere: the rule "ran", the event was consumed, and the
+			// only symptom was whatever the script was supposed to do not happening.
+			started := time.Now()
+			var res scripting.ExecutionResult
+			switch {
+			case params.ScriptID != "":
+				res = engine.Execute(params.ScriptID, context, caller)
+			case params.Code != "":
+				res = engine.ExecuteCode(params.Code, context, caller)
+			}
+			fields := []any{
+				"script_id", params.ScriptID,
+				"event", string(evt.Type),
+				"agent_id", evt.AgentID,
+				"tenant_id", evt.TenantID,
+				"duration_ms", time.Since(started).Milliseconds(),
+			}
+			if res.Success {
+				slog.Debug("Automation: script ran", fields...)
+			} else {
+				slog.Warn("Automation: script failed",
+					append(fields, "error", truncateString(res.Error, 300))...)
 			}
 		}
 	case ActionCreateTask:
