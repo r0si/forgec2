@@ -348,6 +348,41 @@ Plugins (command/hook/report; interpreters python, python3, powershell, pwsh, ba
 - Contract reference for humans and agents: `docs/PLUGIN_AUTHORING.md` + `docs/schemas/plugin-manifest.schema.json`; tier guarantees/quotas: `docs/PLUGIN_TIERS.md`; WASM ABI v1 sample: `examples/wasm/hello-report`.
 - Never hand-edit `digest`/`signature`: stamp with `PLUGIN_SIGNING_KEY=<seed> go run ./cmd/sign-plugin <dir>` (`-gen` to create a key). Native tiers run as real child processes; only `wasm` is sandboxed.
 
+## AI plugin authoring
+
+The assistant can own a plugin end to end, and the four tools are the whole surface:
+
+| tool | permission | risk | what it does |
+|---|---|---|---|
+| `create_plugin` | `plugins.write` | write (approval) | writes `manifest.yaml` + entry, validates, registers; **never runs** it |
+| `run_plugin` | `plugins.execute` | write (approval) | runs a **command** plugin through `Manager.ExecuteCommand` |
+| `update_plugin` | `plugins.write` | write (approval) | rewrites the entry of an **assistant-authored** package, patch-bumps the version, re-registers |
+| `delete_plugin` | `plugins.delete` | destructive (approval) | unregisters: unload + record + package directory |
+
+Rules that make this safe, and the reasons they exist:
+
+- **The ABI is one JSON object on stdout** — read the input JSON from stdin, then print
+  `{"success":true,"output":"..."}` or `{"success":false,"error":"..."}`. Plain text is a **parse
+  error, not a result**, which is why both tool descriptions and the default system prompt state it;
+  the first version of the prompt only said "write your result to stdout" and every generated plugin
+  failed with `failed to parse plugin result`.
+- **Writing is not running.** `create_plugin` and `update_plugin` never execute the package; running
+  needs `plugins.execute` and (in the console) a human clicking Run. Generated code is code, and code
+  is reviewed before it runs.
+- **A model may only modify or delete its own output** (`author == "forgec2-ai"`). The installed set is
+  the operator's inventory and a model cannot see what depends on an entry it did not write.
+- **`Manager.Unregister` deletes the package directory and the DB record**, so an in-place update reads
+  the old files into memory first, then unregisters, recreates, registers, and recreates the record
+  (`FirstOrCreate`, not `Update`). Writing new files first and unregistering second leaves `Register`
+  loading a manifest whose files were just removed — that shipped once and showed up as `plugin failed`
+  only when the updated plugin was run.
+- **A failed call removes only what it created.** A duplicate name is refused *before* the directory is
+  created; otherwise the cleanup path deletes the plugin that already exists (this also shipped once).
+
+`TestAICreatePluginTool`, `TestAIRunPluginTool`, `TestAIUpdatePluginTool`, `TestAIDeletePluginTool` and
+`TestDefaultPromptTeachesPluginAuthoring` pin these; the last one exists because the prompt is part of
+the feature — tools the model does not know about are tools it will not use.
+
 ## Reset Password
 CLI tool: `go run ./cmd/reset-password -db data/db/forgec2.db -user <user> -pass <newpass>`
 Or build: `go build -o reset-password.exe ./cmd/reset-password`

@@ -31,7 +31,13 @@ Useful starting tools:
 - list_credentials (no plaintext), query_ioc, get_alerts
 - get_coverage_gaps / query_bloodhound: what to do next
 - queue_collection: screenshot/ps/netstat/av/users/drives/services/beacon_now (typed, quieter than freeform shell)
-- execute_command / set_sleep: only after the operator asks`
+- execute_command / set_sleep: only after the operator asks
+
+Writing plugins:
+- create_plugin writes a package (manifest + entry file) and registers it; run_plugin checks it actually works; update_plugin iterates on YOUR plugin with a patch bump; delete_plugin removes it.
+- Plugin ABI: read the JSON input on stdin, then print exactly ONE JSON object to stdout - {"success":true,"output":"..."} or {"success":false,"error":"..."}. Anything else on stdout is a parse error, not a result.
+- ALWAYS run a plugin you just wrote, and fix it with update_plugin before telling the operator it works. Delete experiments you no longer need instead of leaving them in the console.
+- Only packages the assistant authored can be updated or deleted; a plugin the operator wrote is theirs - point them at the Plugins page instead of rewriting it.`
 
 func effectiveAISystemPrompt(configured string) string {
 	if strings.TrimSpace(configured) != "" {
