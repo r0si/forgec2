@@ -3750,6 +3750,10 @@ paths:
           description: Missing name, unparseable timestamps, or ends_at not after starts_at
         '409':
           description: The window overlaps an existing open engagement for this tenant
+  # closing also accepts {"stamp_agents": true}, which writes the closing instant onto every member host so the deadline
+  # lives on the agent as well as on the exercise. Dispatch already refuses tasks after a close, so this is defence in
+  # depth for an operator reading the agent list; it is opt-in because a close is bookkeeping and must not silently write
+  # forty agent rows.
   /api/engagements/{id}/close:
     post:
       tags: [Engagements]

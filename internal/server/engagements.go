@@ -150,7 +150,31 @@ func (s *Server) handleCloseEngagement(c *gin.Context) {
 	s.LogAuditRecord(c, "engagement_close", "engagement", fmt.Sprintf("%d", engagement.ID),
 		fmt.Sprintf("engagement %q closed early (agreed window ended %s)", engagement.Name,
 			engagement.EndsAt.Format(time.RFC3339)), true, nil)
-	respond(c, gin.H{"engagement": engagementView(engagement, now)})
+
+	// Opt-in: stamp the closing instant onto every member host, so the deadline lives on the AGENT as well as on the
+	// exercise. Dispatch already refuses tasks once an engagement is closed, so this is defence in depth - but it is the
+	// difference between "this host is done because its exercise is" and "this host is done", which is what an operator
+	// reading the agent list needs. Opt-in rather than default: a close is a bookkeeping decision and must not silently
+	// write 40 agent rows.
+	var req struct {
+		StampAgents bool `json:"stamp_agents"`
+	}
+	_ = c.ShouldBindJSON(&req) // an absent body is the normal case
+	stamped := 0
+	if req.StampAgents {
+		result := s.db.WithContext(s.ctx).Model(&db.Implant{}).
+			Where("engagement_id = ?", engagement.ID).
+			Update("expires_at", now)
+		if result.Error != nil {
+			handleQueryError(c, result.Error, "Failed to stamp the agent deadlines")
+			return
+		}
+		stamped = int(result.RowsAffected)
+		s.LogAuditRecord(c, "engagement_close_stamp", "engagement", fmt.Sprintf("%d", engagement.ID),
+			fmt.Sprintf("stamped the close of %q onto %d member host(s)", engagement.Name, stamped), true, nil)
+	}
+
+	respond(c, gin.H{"engagement": engagementView(engagement, now), "stamped_agents": stamped})
 }
 
 // engagementView renders an engagement with the state a caller would otherwise compute by hand.
