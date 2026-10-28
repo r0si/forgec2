@@ -127,6 +127,19 @@ func (s *Server) validateTaskCreationWithAgent(c *gin.Context, agentID, taskType
 		return fmt.Errorf("blocked by adaptive opsec: %s is not allowed on a critical-threat host", taskType)
 	}
 
+	// Engagement deadline: an implant built from a secret with an expiry must stop accepting work when
+	// that deadline passes. Enforced here, at the single creation gate every path goes through, so a
+	// handler, a bulk action, an automation rule and a script cannot disagree about it.
+	if agent := s.agentForExpiryCheck(agentID, preloadedAgent); agent != nil {
+		if s.agentExpired(*agent) {
+			slog.Warn("Task refused: agent engagement expired", "agent_id", agentID, "task_type", taskType, "expires_at", agent.ExpiresAt)
+			s.LogAuditRecord(nil, "agent_expired_block", "agent", agentID,
+				fmt.Sprintf("refused %s: engagement deadline passed (%s)", taskType, agent.ExpiresAt.UTC().Format(time.RFC3339)), false, nil)
+			return fmt.Errorf("agent expired: the engagement deadline for this implant passed at %s",
+				agent.ExpiresAt.UTC().Format(time.RFC3339))
+		}
+	}
+
 	// Soft-lock: if another operator is actively viewing this agent, reject
 	// the task to prevent conflicting concurrent commands.
 	if callerUserID != 0 && s.operatorSessions != nil {
@@ -1166,7 +1179,8 @@ func clientErrorStatus(err error) (int, bool) {
 	case strings.Contains(msg, "requires a chrome-tagged agent"),
 		strings.Contains(msg, "is not supported on chrome extension agents"),
 		strings.Contains(msg, "lportfwd is disabled"),
-		strings.Contains(msg, "blocked by adaptive opsec"):
+		strings.Contains(msg, "blocked by adaptive opsec"),
+		strings.Contains(msg, "agent expired"):
 		return http.StatusForbidden, true
 	case strings.Contains(msg, "unknown task type"),
 		strings.Contains(msg, "requires 'command' parameter"),
@@ -1177,4 +1191,23 @@ func clientErrorStatus(err error) (int, bool) {
 		return http.StatusBadRequest, true
 	}
 	return 0, false
+}
+
+// agentForExpiryCheck returns the agent row used to evaluate the engagement deadline, reusing an
+// already-loaded row when the caller has one.
+func (s *Server) agentForExpiryCheck(agentID string, preloaded *db.Implant) *db.Implant {
+	if preloaded != nil {
+		return preloaded
+	}
+	var agent db.Implant
+	if err := s.db.Select("id", "expires_at").Where("id = ?", agentID).First(&agent).Error; err != nil {
+		return nil
+	}
+	return &agent
+}
+
+// agentExpired reports whether the engagement deadline has passed. A nil deadline is unbounded, which
+// keeps every existing installation behaving exactly as before.
+func (s *Server) agentExpired(agent db.Implant) bool {
+	return agent.ExpiresAt != nil && !agent.ExpiresAt.IsZero() && time.Now().After(*agent.ExpiresAt)
 }

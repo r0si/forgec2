@@ -138,9 +138,14 @@ type Implant struct {
 	// locked out until explicitly unblocked.
 	Blocked       bool   `gorm:"default:false;index" json:"blocked"`
 	BlockedReason string `gorm:"size:255;default:''" json:"blocked_reason,omitempty"`
-	Notes         string `json:"notes"`
-	Tags          string `json:"tags"` // comma separated
-	ListenerID    uint   `json:"listener_id"`
+	// ExpiresAt is the engagement deadline this implant inherited from the registration secret it was
+	// built with. Once it passes, task creation is refused and every refusal is audited: a deadline
+	// that exists only on the operator calendar is not a control. nil means unbounded (legacy builds
+	// and deliberately unlimited ones).
+	ExpiresAt  *time.Time `gorm:"index" json:"expires_at,omitempty"`
+	Notes      string     `json:"notes"`
+	Tags       string     `json:"tags"` // comma separated
+	ListenerID uint       `json:"listener_id"`
 	// Multi-hop Proxy Chain (ParentAgentID is the next-hop toward C2, distinct from P2P parent_id)
 	ParentAgentID string `gorm:"size:36;default:''" json:"parent_agent_id,omitempty"`
 	// P2P Beacon Chaining
@@ -201,6 +206,9 @@ type RegSecret struct {
 	// such an agent still lands in the default tenant).
 	TenantID  uint      `gorm:"index" json:"tenant_id"`
 	CreatedAt time.Time `json:"created_at"`
+	// ExpiresAt optionally bounds how long this secret may be used, and is inherited by every implant
+	// built from it. nil means reusable indefinitely (the historic behaviour).
+	ExpiresAt *time.Time `gorm:"index" json:"expires_at,omitempty"`
 }
 
 // KillSwitch is the fleet-wide kill-switch broadcast state (singleton row,
