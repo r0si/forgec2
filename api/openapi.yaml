@@ -3092,6 +3092,55 @@ paths:
                         type: array
                         items:
                           $ref: '#/components/schemas/Task'
+  /api/plugins/index:
+    get:
+      tags: [Plugins]
+      summary: The installed plugin set as a verifiable index document
+      description: >-
+        One machine-readable document describing every installed plugin: name, version, type,
+        interpreter, entry, parameter names, whether it is signed, whether the package is currently
+        loaded, and the package DIGEST computed with the same function the trust policy uses
+        (plugin.PackageDigest). The digest is what makes the index verifiable rather than descriptive -
+        a receiver can recompute it and compare. A record whose package directory is missing is
+        reported with `loaded: false` and no digest instead of a fabricated one. The list is sorted by
+        name, so two deployments can be diffed.
+      operationId: pluginIndex
+      security:
+        - SessionCookie: []
+      responses:
+        '200':
+          description: Sorted plugin index with per-package digests
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  data:
+                    type: object
+                    properties:
+                      count: {type: integer}
+                      plugins:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            name: {type: string}
+                            version: {type: string}
+                            type: {type: string}
+                            description: {type: string}
+                            author: {type: string}
+                            category: {type: string}
+                            interpreter: {type: string}
+                            entry: {type: string}
+                            params:
+                              type: array
+                              items: {type: string}
+                            digest:
+                              type: string
+                              description: '"sha256:..." computed by plugin.PackageDigest; empty when the package is missing'
+                            signed: {type: boolean}
+                            loaded: {type: boolean}
   /api/plugins:
     get:
       tags: [Plugins]

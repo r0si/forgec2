@@ -76,6 +76,9 @@ func (s *Server) registerPluginRoutes(auth *gin.RouterGroup) {
 	pluginsRead.Use(middleware.RequirePermission(db.PermPluginsRead))
 	pluginsRead.GET("", s.handlePluginList)
 	pluginsRead.GET("/update-summary", s.handlePluginUpdateSummary)
+	// The installed set as a verifiable document (digest per package); registered before :id like the
+	// other static siblings.
+	pluginsRead.GET("/index", s.handlePluginIndex)
 	pluginsRead.GET("/:id", s.handlePluginGet)
 	pluginsRead.GET("/:id/rating", s.handlePluginRating)
 	pluginsRead.GET("/:id/reviews", s.handlePluginReviews)

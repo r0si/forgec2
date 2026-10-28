@@ -1830,6 +1830,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/plugins/index": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The installed plugin set as a verifiable index document
+         * @description One machine-readable document describing every installed plugin: name, version, type, interpreter, entry, parameter names, whether it is signed, whether the package is currently loaded, and the package DIGEST computed with the same function the trust policy uses (plugin.PackageDigest). The digest is what makes the index verifiable rather than descriptive - a receiver can recompute it and compare. A record whose package directory is missing is reported with `loaded: false` and no digest instead of a fabricated one. The list is sorted by name, so two deployments can be diffed.
+         */
+        get: operations["pluginIndex"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/plugins": {
         parameters: {
             query?: never;
@@ -14195,6 +14215,46 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["SuccessResponse"] & {
                         data: components["schemas"]["Task"][];
+                    };
+                };
+            };
+        };
+    };
+    pluginIndex: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sorted plugin index with per-package digests */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        data?: {
+                            count?: number;
+                            plugins?: {
+                                name?: string;
+                                version?: string;
+                                type?: string;
+                                description?: string;
+                                author?: string;
+                                category?: string;
+                                interpreter?: string;
+                                entry?: string;
+                                params?: string[];
+                                /** @description "sha256:..." computed by plugin.PackageDigest; empty when the package is missing */
+                                digest?: string;
+                                signed?: boolean;
+                                loaded?: boolean;
+                            }[];
+                        };
                     };
                 };
             };
