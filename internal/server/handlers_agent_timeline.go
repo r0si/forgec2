@@ -1,9 +1,14 @@
 package server
 
 import (
+	"bytes"
+	"encoding/csv"
+	"fmt"
+	"net/http"
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/forgec2/forgec2/internal/db"
@@ -150,6 +155,34 @@ func (s *Server) handleAgentTimeline(c *gin.Context) {
 	sort.Slice(events, func(i, j int) bool { return events[i].Time.After(events[j].Time) })
 	if len(events) > limit {
 		events = events[:limit]
+	}
+
+	// ?format=csv turns the same feed into a file: every other list in the console can be taken away, and the timeline is
+	// the one an analyst reads in order - which is exactly what a spreadsheet is good at.
+	if strings.EqualFold(strings.TrimSpace(c.Query("format")), "csv") {
+		var buf bytes.Buffer
+		writer := csv.NewWriter(&buf)
+		writer.Write([]string{"Time", "Kind", "Type", "Title", "Detail", "Status", "Ref ID"})
+		for _, event := range events {
+			writer.Write([]string{
+				event.Time.Format("2006-01-02 15:04:05"),
+				event.Kind,
+				event.Type,
+				csvSafe(event.Title),
+				csvSafe(event.Detail),
+				event.Status,
+				strconv.FormatUint(uint64(event.RefID), 10),
+			})
+		}
+		writer.Flush()
+		if err := writer.Error(); err != nil {
+			handleQueryError(c, err, "Failed to encode the timeline")
+			return
+		}
+		name := fmt.Sprintf("agent-%s-timeline_%s.csv", sanitizeFilenamePart(id), time.Now().Format("2006-01-02_150405"))
+		c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, name))
+		c.Data(http.StatusOK, "text/csv; charset=utf-8", buf.Bytes())
+		return
 	}
 
 	respond(c, gin.H{"events": events})
