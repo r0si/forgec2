@@ -281,6 +281,18 @@ func (s *Server) handleExportAuditChain(c *gin.Context) {
 		return
 	}
 
+	// Revalidation, not caching: an investigator who re-fetches the same export should get 304 instead
+	// of another few megabytes. The tag is derived from the newest audit id, which every append bumps -
+	// including the audit_purge marker a purge writes - so it changes whenever the export could have.
+	etag := s.auditExportETag(c, sinceID, limit, filtered)
+	c.Header("ETag", etag)
+	c.Header("Cache-Control", "private, no-cache")
+	if auditExportNotModified(c, etag) {
+		// AbortWithStatus rather than Status: the 304 must be written before gin flushes any body.
+		c.AbortWithStatus(http.StatusNotModified)
+		return
+	}
+
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	for i := range rows {
