@@ -4,6 +4,8 @@ import (
 	"encoding/csv"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -152,12 +154,20 @@ func TestTaskExportIsSentWhole(t *testing.T) {
 	if len(records) != 4 {
 		t.Fatalf("records = %d, want 4 (%v)", len(records), records)
 	}
-	if records[0][0] != "Time" || records[0][6] != "Status" {
+	if records[0][0] != "Time" || records[0][6] != "Status" || records[0][7] != "Task ID" {
 		t.Fatalf("header = %v", records[0])
 	}
 	for _, row := range records[1:] {
-		if len(row) != 7 {
-			t.Fatalf("row has %d fields, want 7: %v", len(row), row)
+		if len(row) != 8 {
+			t.Fatalf("row has %d fields, want 8: %v", len(row), row)
 		}
+		// The id column exists so a row can be matched back to the task it came from.
+		if _, err := strconv.ParseUint(row[7], 10, 64); err != nil {
+			t.Fatalf("Task ID = %q, not a number", row[7])
+		}
+	}
+	// The filename carries a time, so two exports in one day do not overwrite each other.
+	if cd := w.Header().Get("Content-Disposition"); !regexp.MustCompile(`forgec2_tasks_[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{6}\.csv`).MatchString(cd) {
+		t.Fatalf("Content-Disposition = %q, want a timestamped filename", cd)
 	}
 }

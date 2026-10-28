@@ -173,7 +173,10 @@ func (s *Server) handleExportTasks(c *gin.Context) {
 	// because the recipient cannot tell it is short.
 	var buf bytes.Buffer
 	writer := csv.NewWriter(&buf)
-	writer.Write([]string{"Time", "Agent", "Type", "Command", "Result", "Error", "Status"})
+	// Task ID is the last column on purpose: it is additive for anyone parsing the existing header,
+	// and without it a row could not be matched back to the task in the console - which is the first
+	// thing an analyst does with an export.
+	writer.Write([]string{"Time", "Agent", "Type", "Command", "Result", "Error", "Status", "Task ID"})
 
 	for _, t := range tasks {
 		agentName := ""
@@ -188,6 +191,7 @@ func (s *Server) handleExportTasks(c *gin.Context) {
 			csvSafe(truncateString(redactSensitiveResultForAuxiliary(t.Type, t.Result), CSVResultTruncLen)),
 			csvSafe(truncateString(t.Error, CSVErrorTruncLen)),
 			t.Status,
+			strconv.FormatUint(uint64(t.ID), 10),
 		})
 	}
 	writer.Flush()
@@ -202,7 +206,8 @@ func (s *Server) handleExportTasks(c *gin.Context) {
 
 	s.LogAuditRecord(c, "task_export", "task", "", fmt.Sprintf("tasks exported as CSV (limit %d)", limit), true, nil)
 	c.Header("Content-Type", "text/csv; charset=utf-8")
-	c.Header("Content-Disposition", `attachment; filename="forgec2_tasks_`+time.Now().Format("2006-01-02")+`.csv"`)
+	// The timestamp keeps two exports from the same day from overwriting each other in the browser.
+	c.Header("Content-Disposition", `attachment; filename="forgec2_tasks_`+time.Now().Format("2006-01-02_150405")+`.csv"`)
 	c.Data(http.StatusOK, "text/csv; charset=utf-8", buf.Bytes())
 }
 
