@@ -5,26 +5,27 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"testing"
 
 	"github.com/forgec2/forgec2/internal/config"
 	"github.com/forgec2/forgec2/internal/crypto"
 	"github.com/forgec2/forgec2/internal/testutil"
+	"gopkg.in/yaml.v3"
 )
 
-// TestDocumentedAPIRoutesAreInTheSpec is the other direction from TestFrontendAPIPathsExist: the
-// console's calls are checked against the router, and this checks the router against the published
-// API contract.
+// OpenAPI coverage: the published contract must describe what the server actually serves, and it must
+// be usable - a path present but without an operationId or responses tells a codegen tool nothing.
 //
-// It exists because three endpoints added in this batch were code-only. `check:openapi-types` compares
-// the generated types to the spec, so it stays green when a route is missing from the spec entirely -
-// the gate cannot see what the spec never mentions. An API consumer reading api/openapi.yaml simply
-// could not discover them.
+// Two checks, both from the real router:
+//   - every /api route the router registers appears in api/openapi.yaml (the gap that let three
+//     endpoints stay code-only, invisible to check:openapi-types because that gate compares generated
+//     types to the spec - it cannot see a route the spec never mentions);
+//   - every documented operation has an operationId and at least one response, which is the minimum
+//     for a client generator or a reader to do anything with it.
 //
-// Scope, stated on purpose: only routes registered under /api are checked, and the allowlist below
-// records the ones that are deliberately undocumented. The list is shrink-only - when a route gains a
-// spec entry, delete its line here.
+// The allowlist is shrink-only: when a route gains a spec entry, delete its line.
 func TestDocumentedAPIRoutesAreInTheSpec(t *testing.T) {
 	database := testutil.SetupTestDB(t)
 	cfg := config.DefaultConfig()
@@ -36,7 +37,7 @@ func TestDocumentedAPIRoutesAreInTheSpec(t *testing.T) {
 	s := New(cfg, database)
 	s.SetupRoutes()
 
-	specPaths := readSpecPaths(t)
+	spec := readSpec(t)
 
 	// Routes that are intentionally not in the published spec, each with the reason.
 	undocumented := map[string]string{
@@ -52,8 +53,8 @@ func TestDocumentedAPIRoutesAreInTheSpec(t *testing.T) {
 		"/api/v1/register":   "beacon-facing, versioned alias",
 		"/api/v1/download":   "beacon-facing, versioned alias",
 		"/api/v1/upload":     "beacon-facing, versioned alias",
-		"/api/login":         "documented separately as /login in the spec",
-		"/api/logout":        "documented separately as /logout in the spec",
+		"/api/login":         "documented as /login in the spec",
+		"/api/logout":        "documented as /logout in the spec",
 		"/api/ws":            "WebSocket upgrade; the spec covers the REST surface",
 		"/api/ws/operator":   "WebSocket upgrade; the spec covers the REST surface",
 		"/api/phishing/l/:t": "token-bearing public landing page, not part of the authenticated API",
@@ -75,7 +76,7 @@ func TestDocumentedAPIRoutesAreInTheSpec(t *testing.T) {
 			continue
 		}
 		seen[path] = true
-		if !specPaths[path] {
+		if !spec.has(path) {
 			missing = append(missing, path)
 		}
 	}
@@ -85,49 +86,125 @@ func TestDocumentedAPIRoutesAreInTheSpec(t *testing.T) {
 	if len(seen) < 50 {
 		t.Fatalf("only %d /api paths reached the comparison; the router or the spec parser broke", len(seen))
 	}
-	if len(missing) > 0 {
-		for _, path := range missing {
-			t.Errorf("%s is registered but not in api/openapi.yaml (add it there, or record why it is undocumented)", path)
-		}
-		t.Logf("%d of the registered /api paths are missing from the spec", len(missing))
+	for _, path := range missing {
+		t.Errorf("%s is registered but not in api/openapi.yaml (add it there, or record why it is undocumented)", path)
 	}
-	t.Logf("checked %d distinct /api paths against %d documented paths", len(seen)+len(undocumented), len(specPaths))
+	t.Logf("checked %d distinct /api paths against %d documented paths", len(seen)+len(undocumented), spec.pathCount)
+
+	// The operations themselves must be describable.
+	var incomplete []string
+	for _, path := range spec.sortedPaths() {
+		for _, op := range spec.operations[path] {
+			if op.ID == "" {
+				incomplete = append(incomplete, path+" "+op.Method+" has no operationId")
+			}
+			if op.Responses == 0 {
+				incomplete = append(incomplete, path+" "+op.Method+" has no responses")
+			}
+		}
+	}
+	for _, problem := range incomplete {
+		t.Errorf("%s; a documented operation without it cannot be used by a client generator", problem)
+	}
+	if len(incomplete) == 0 {
+		t.Logf("all %d documented operations carry an operationId and at least one response", spec.operationCount())
+	}
 }
 
-var specPathLine = regexp.MustCompile(`^  (/[^:]+):\s*$`)
+// specOperation is one documented method of one path.
+type specOperation struct {
+	Method    string
+	ID        string
+	Responses int
+}
 
-// readSpecPaths returns the documented paths, normalised so `/agents/{id}` and `/agents/:id` compare
-// equal.
-func readSpecPaths(t *testing.T) map[string]bool {
+// specDocument is the parsed spec, normalised for comparison with gin's route strings.
+type specDocument struct {
+	operations map[string][]specOperation
+	// pathCount is the number of paths in the document. operations is keyed by BOTH the plain and the
+	// /api-prefixed spelling, so its size is not the documented path count - reporting it as one would
+	// be a misleading number.
+	pathCount int
+}
+
+func (d specDocument) has(path string) bool {
+	return len(d.operations[path]) > 0
+}
+
+func (d specDocument) count() int { return len(d.operations) }
+
+func (d specDocument) operationCount() int {
+	total := 0
+	for _, ops := range d.operations {
+		total += len(ops)
+	}
+	return total
+}
+
+func (d specDocument) sortedPaths() []string {
+	paths := make([]string, 0, len(d.operations))
+	for path := range d.operations {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	return paths
+}
+
+// readSpec parses api/openapi.yaml with a real YAML parser.
+//
+// The first version scanned for `^  /path:` lines, which forced hand-rolled normalisation and produced
+// 25 false "missing route" reports: the spec is inconsistent about the /api prefix and writes
+// parameters as {id} where gin reports :id. Parsing the document lets both spellings be registered
+// deliberately instead of by regex accident, and lets the operations themselves be inspected.
+func readSpec(t *testing.T) specDocument {
 	t.Helper()
 	raw, err := os.ReadFile(filepath.Join("..", "..", "api", "openapi.yaml"))
 	if err != nil {
 		t.Fatalf("read api/openapi.yaml: %v", err)
 	}
-	paths := make(map[string]bool, 2048)
-	for _, line := range strings.Split(string(raw), "\n") {
-		match := specPathLine.FindStringSubmatch(line)
-		if match == nil {
-			continue
-		}
-		documented := match[1]
-		// The spec is inconsistent about the /api prefix (some entries carry it, most do not), and it
-		// writes parameters as {id} where the router reports :id. Both spellings are registered so a
-		// route is only reported missing when neither form exists - otherwise this check would report
-		// its own normalisation as drift, which is exactly what the first measurement did.
-		for _, candidate := range []string{documented, "/api" + documented} {
-			paths[normaliseAPIPath(candidate)] = true
-			paths[normaliseAPIPath(braceParamsToWildcard(candidate))] = true
+	var doc struct {
+		Paths map[string]map[string]interface{} `yaml:"paths"`
+	}
+	if err := yaml.Unmarshal(raw, &doc); err != nil {
+		t.Fatalf("parse api/openapi.yaml: %v", err)
+	}
+	if len(doc.Paths) < 100 {
+		t.Fatalf("parsed only %d paths; the spec parser broke", len(doc.Paths))
+	}
+
+	spec := specDocument{
+		operations: make(map[string][]specOperation, len(doc.Paths)*2),
+		pathCount:  len(doc.Paths),
+	}
+	for path, methods := range doc.Paths {
+		for method, body := range methods {
+			switch strings.ToLower(method) {
+			case "get", "post", "put", "patch", "delete", "head", "options":
+			default:
+				continue
+			}
+			op := specOperation{Method: strings.ToUpper(method)}
+			if fields, ok := body.(map[string]interface{}); ok {
+				if id, ok := fields["operationId"].(string); ok {
+					op.ID = id
+				}
+				if responses, ok := fields["responses"].(map[string]interface{}); ok {
+					op.Responses = len(responses)
+				}
+			}
+			for _, candidate := range []string{path, "/api" + path} {
+				normalised := normaliseAPIPath(braceParamsToWildcard(candidate))
+				spec.operations[normalised] = append(spec.operations[normalised], op)
+			}
 		}
 	}
-	if len(paths) < 100 {
-		t.Fatalf("parsed only %d documented paths; the extractor broke", len(paths))
-	}
-	return paths
+	return spec
 }
+
+var braceParams = regexp.MustCompile(`\{[^}]*\}`)
 
 // braceParamsToWildcard rewrites OpenAPI `{id}` parameters to `*`, matching normaliseAPIPath's handling
 // of gin's `:id`.
 func braceParamsToWildcard(path string) string {
-	return regexp.MustCompile(`\{[^}]*\}`).ReplaceAllString(path, "*")
+	return braceParams.ReplaceAllString(path, "*")
 }
