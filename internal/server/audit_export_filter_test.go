@@ -178,3 +178,61 @@ func TestAuditExportReportsTruncation(t *testing.T) {
 		t.Fatalf("Content-Disposition = %q", cd)
 	}
 }
+
+// TestAuditExportStopsAtTheByteCap covers the memory bound: the export buffers its whole body, so a
+// large ?limit= must not be able to ask for an unbounded allocation. Rows stop at the cap and the
+// response reports truncation, exactly like the row limit does.
+func TestAuditExportStopsAtTheByteCap(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	s := mustTenantServer(t)
+
+	for i := 0; i < 20; i++ {
+		if err := s.db.Create(&db.AuditLog{
+			User: "alice", Action: "login", TenantID: 1, Success: true,
+			Details:   "padding padding padding padding padding padding",
+			CreatedAt: time.Now().Add(-time.Duration(i) * time.Minute), PrevHash: "p", EntryHash: "e",
+		}).Error; err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+	}
+
+	previous := auditExportMaxBytes
+	auditExportMaxBytes = 200 // a couple of rows at most
+	t.Cleanup(func() { auditExportMaxBytes = previous })
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/audit/export", nil)
+	c.Set("user", "admin")
+	c.Set("user_role", db.RoleAdmin)
+	c.Set("user_id", uint(1))
+	c.Set(middleware.TenantIDContextKey, uint(1))
+	s.handleExportAuditChain(c)
+
+	if got := w.Header().Get("X-Audit-Export-Truncated"); got != "true" {
+		t.Fatalf("truncated = %q, want true with a 200-byte cap over 20 rows", got)
+	}
+	lines := 0
+	for _, line := range strings.Split(strings.TrimSpace(w.Body.String()), "\n") {
+		if line != "" {
+			lines++
+		}
+	}
+	if lines == 0 {
+		t.Fatal("the byte cap produced no rows at all")
+	}
+	if lines >= 20 {
+		t.Fatalf("the byte cap did not stop the export (%d lines)", lines)
+	}
+	// Every line that WAS emitted must still be a complete JSON row - a half-written row would make
+	// the export unverifiable.
+	for _, line := range strings.Split(strings.TrimSpace(w.Body.String()), "\n") {
+		if line == "" {
+			continue
+		}
+		var row auditChainExportRow
+		if err := json.Unmarshal([]byte(line), &row); err != nil {
+			t.Fatalf("a truncated export contains an incomplete row: %v (%q)", err, line)
+		}
+	}
+}

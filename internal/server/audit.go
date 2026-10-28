@@ -293,9 +293,20 @@ func (s *Server) handleExportAuditChain(c *gin.Context) {
 		return
 	}
 
+	// The export is buffered so a 200 is always a complete, self-consistent document - which means the
+	// buffer is the memory bound. ?limit= allows 200000 rows and a row carries details, error text and
+	// two hashes, so without a byte cap one request could ask the single-writer box for hundreds of
+	// megabytes. Rows stop being appended at the cap and the response says it was truncated, which is
+	// the same honesty rule the row-count header follows.
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
+	byteLimited := false
 	for i := range rows {
+		if buf.Len() >= auditExportMaxBytes {
+			byteLimited = true
+			rows = rows[:i]
+			break
+		}
 		row := auditChainExportRow{
 			ID: rows[i].ID, TenantID: rows[i].TenantID, User: rows[i].User,
 			Action: rows[i].Action, Resource: rows[i].Resource, AgentID: rows[i].AgentID,
@@ -314,7 +325,7 @@ func (s *Server) handleExportAuditChain(c *gin.Context) {
 	c.Header("X-Audit-Export-Rows", strconv.Itoa(len(rows)))
 	// Silent truncation is the failure mode worth preventing here: a limited export looks exactly like
 	// a complete one, and an investigator verifying a chain would not know part of it was left behind.
-	if len(rows) >= limit {
+	if len(rows) >= limit || byteLimited {
 		c.Header("X-Audit-Export-Truncated", "true")
 	} else {
 		c.Header("X-Audit-Export-Truncated", "false")
@@ -960,3 +971,7 @@ func (s *Server) LogConfigChange(c *gin.Context, field, oldValue, newValue strin
 		RiskLevel: "high",
 	})
 }
+
+// auditExportMaxBytes bounds how much of the chain one response may hold in memory. A variable so a
+// test can drive the cap without generating a 64 MiB table.
+var auditExportMaxBytes = 64 << 20
