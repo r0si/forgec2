@@ -106,30 +106,43 @@ func NewScriptEngine() *ScriptEngine {
 	}
 	// Dormant template VM (no e.vm call sites): keep its captured caller at
 	// the lowest privilege so a future wiring cannot inherit admin reach.
-	e.registerAPI(vm, Caller{Username: "system", Role: "user"}, newExecBudget(scriptMaxBridgeMutations))
+	e.registerAPI(vm, Caller{Username: "system", Role: "user"}, newExecBudget())
 	return e
 }
 
-// execBudget counts mutating bridge calls in ONE execution.
+// execBudget counts bridge calls in ONE execution, split by side.
 //
 // Every sendTask call inserts a task row and an audit row, and the database has a single writer, so
 // a script that loops over sendTask - or an event-bound script firing on every matching event - was
-// a write-amplification primitive. The budget makes the loop fail instead of filling the table.
+// a write-amplification primitive. Reads are cheaper but still pin that one connection and allocate
+// result sets, so they get their own, larger bound.
 type execBudget struct {
 	mu    sync.Mutex
-	used  int
-	limit int
+	wrote int
+	read  int
 }
 
-func newExecBudget(limit int) *execBudget { return &execBudget{limit: limit} }
+func newExecBudget() *execBudget { return &execBudget{} }
 
-func (b *execBudget) spend() error {
+// spendWrite bounds the calls that create rows (task + audit per sendTask).
+func (b *execBudget) spendWrite() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if b.used >= b.limit {
-		return fmt.Errorf("script exceeded the mutating bridge call limit (%d); send fewer tasks per execution", b.limit)
+	if b.wrote >= scriptMaxBridgeMutations {
+		return fmt.Errorf("script exceeded the mutating bridge call limit (%d); send fewer tasks per execution", scriptMaxBridgeMutations)
 	}
-	b.used++
+	b.wrote++
+	return nil
+}
+
+// spendRead bounds the read side (query and sleep).
+func (b *execBudget) spendRead() error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.read >= scriptMaxBridgeQueries {
+		return fmt.Errorf("script exceeded the bridge query limit (%d); narrow the query or run it once", scriptMaxBridgeQueries)
+	}
+	b.read++
 	return nil
 }
 
@@ -169,7 +182,7 @@ func (e *ScriptEngine) registerAPI(vm *goja.Runtime, caller Caller, budget *exec
 			panic(vm.NewGoError(errors.New("script bridge is not available")))
 		}
 		// See execBudget: this is the mutating call that a loop turns into table growth.
-		if err := budget.spend(); err != nil {
+		if err := budget.spendWrite(); err != nil {
 			panic(vm.NewGoError(err))
 		}
 		agentID := call.Argument(0).String()
@@ -258,6 +271,9 @@ func (e *ScriptEngine) registerAPI(vm *goja.Runtime, caller Caller, budget *exec
 				args[k] = obj.Get(k).Export()
 			}
 		}
+		if err := budget.spendRead(); err != nil {
+			panic(vm.NewGoError(err))
+		}
 		result, err := bridge.Query(caller, kind, args)
 		if err != nil {
 			panic(vm.NewGoError(err))
@@ -272,8 +288,16 @@ func (e *ScriptEngine) registerAPI(vm *goja.Runtime, caller Caller, budget *exec
 	})
 
 	setAPIOn(vm, "sleep", func(call goja.FunctionCall) goja.Value {
+		// Capped and budgeted: a Go-side sleep cannot be interrupted, so a 60s sleep kept the VM
+		// goroutine alive long after the caller had been told the script timed out.
 		ms := call.Argument(0).ToInteger()
-		if ms > 0 && ms <= 60000 {
+		if ms > scriptMaxSleepMillis {
+			ms = scriptMaxSleepMillis
+		}
+		if ms > 0 {
+			if err := budget.spendRead(); err != nil {
+				panic(vm.NewGoError(err))
+			}
 			time.Sleep(time.Duration(ms) * time.Millisecond)
 		}
 		return goja.Undefined()
@@ -446,7 +470,7 @@ func (e *ScriptEngine) executeScript(code string, scriptCtx map[string]interface
 		setAPIOn(vm, k, v)
 	}
 
-	budget := newExecBudget(scriptMaxBridgeMutations)
+	budget := newExecBudget()
 	e.registerAPI(vm, caller, budget)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -507,4 +531,10 @@ const (
 	scriptMaxOutputBytes   = 1 << 20
 	// scriptMaxBridgeMutations bounds one execution's writes (task + audit row per sendTask).
 	scriptMaxBridgeMutations = 500
+	// scriptMaxBridgeQueries bounds read-side calls (query and sleep) per execution.
+	scriptMaxBridgeQueries = 5000
+	// scriptMaxSleepMillis caps one sleep. The execution timeout is 30s and a Go sleep cannot be
+	// interrupted, so a 60s sleep kept the VM goroutine alive long after the caller was told the
+	// script timed out.
+	scriptMaxSleepMillis = 5000
 )
