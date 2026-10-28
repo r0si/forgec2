@@ -114,7 +114,7 @@ func TestEngagementBundle(t *testing.T) {
 		}
 		members[file.Name] = content
 	}
-	for _, name := range []string{"summary.md", "timeline.md", "tasks.csv", "audit.ndjson", "agents.json", "credentials.json", "iocs.json", "plugins.json"} {
+	for _, name := range []string{"summary.md", "timeline.md", "tasks.csv", "audit.ndjson", "agents.json", "credentials.json", "iocs.json", "plugins.json", "MANIFEST.json"} {
 		if _, ok := members[name]; !ok {
 			t.Fatalf("the bundle is missing %s (has %v)", name, keysOf(members))
 		}
@@ -204,6 +204,51 @@ func TestEngagementBundle(t *testing.T) {
 	}
 	if !strings.Contains(iocs.Note, "day count") {
 		t.Fatalf("iocs.json does not state its bound: %q", iocs.Note)
+	}
+
+	// MANIFEST.json describes exactly the members that are present - both directions, so a member cannot be added
+	// without appearing in the manifest, nor listed without existing.
+	var manifest struct {
+		Engagement struct {
+			ID   uint   `json:"id"`
+			Name string `json:"name"`
+		} `json:"engagement"`
+		GeneratedAt string `json:"generated_at"`
+		Members     []struct {
+			Name        string `json:"name"`
+			Purpose     string `json:"purpose"`
+			Source      string `json:"source"`
+			Sensitivity string `json:"sensitivity"`
+		} `json:"members"`
+	}
+	if err := json.Unmarshal(members["MANIFEST.json"], &manifest); err != nil {
+		t.Fatalf("MANIFEST.json: %v (%s)", err, string(members["MANIFEST.json"]))
+	}
+	if manifest.Engagement.ID != engagement.ID || manifest.Engagement.Name != "DMZ exercise" || manifest.GeneratedAt == "" {
+		t.Fatalf("manifest header = %+v", manifest.Engagement)
+	}
+	listed := map[string]bool{}
+	for _, entry := range manifest.Members {
+		listed[entry.Name] = true
+		if entry.Purpose == "" || entry.Source == "" || entry.Sensitivity == "" {
+			t.Fatalf("manifest entry %q is incomplete: %+v", entry.Name, entry)
+		}
+		if entry.Name == "credentials.json" && !strings.Contains(entry.Sensitivity, "metadata only") {
+			t.Fatalf("credentials.json is not described as metadata only: %+v", entry)
+		}
+		if entry.Name == "audit.ndjson" && !strings.Contains(entry.Sensitivity, "verifiable") {
+			t.Fatalf("audit.ndjson is not described as verifiable: %+v", entry)
+		}
+	}
+	for name := range members {
+		if !listed[name] {
+			t.Fatalf("%s is in the archive but not in MANIFEST.json (%v)", name, listed)
+		}
+	}
+	for name := range listed {
+		if _, ok := members[name]; !ok {
+			t.Fatalf("MANIFEST.json lists %s, which is not in the archive", name)
+		}
 	}
 
 	// The handover is audited.

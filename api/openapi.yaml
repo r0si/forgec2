@@ -3711,7 +3711,7 @@ paths:
           schema: {type: integer}
       responses:
         '200':
-          description: application/zip with summary.md, timeline.md, tasks.csv, audit.ndjson, agents.json, credentials.json, iocs.json and plugins.json
+          description: application/zip with summary.md, timeline.md, tasks.csv, audit.ndjson, agents.json, credentials.json, iocs.json, plugins.json and MANIFEST.json
           content:
             application/zip:
               schema: {type: string, format: binary}

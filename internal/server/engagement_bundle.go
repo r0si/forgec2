@@ -60,12 +60,16 @@ func (s *Server) handleEngagementBundle(c *gin.Context) {
 	}
 
 	var buf bytes.Buffer
+	// written records the members that were actually added; MANIFEST.json is generated from it.
+	var written []string
 	archive := zip.NewWriter(&buf)
 	add := func(name string, write func(*zip.Writer) error) bool {
 		if err := write(archive); err != nil {
 			slog.Error("Failed to build an engagement bundle member", "engagement_id", engagement.ID, "member", name, "err", err)
 			return false
 		}
+		// Remember what actually made it in, so MANIFEST.json describes the archive rather than the intent.
+		written = append(written, name)
 		return true
 	}
 	fail := func() {
@@ -281,6 +285,18 @@ func (s *Server) handleEngagementBundle(c *gin.Context) {
 		enc := json.NewEncoder(f)
 		enc.SetIndent("", "  ")
 		return enc.Encode(s.buildPluginIndex(c))
+	}) {
+		fail()
+		return
+	}
+
+	// MANIFEST.json - the package describes itself: what each member is, where it came from, how it may be shared. It
+	// is written last, from the list of members that actually made it into the archive.
+	if !add("MANIFEST.json", func(_ *zip.Writer) error {
+		// The manifest lists the members written so far PLUS itself: it is being added right now, and a package that
+		// does not mention its own manifest is a package whose receiver wonders what he is holding.
+		members := append(append([]string{}, written...), "MANIFEST.json")
+		return writeBundleManifest(archive, engagement, windowEnd, now, members)
 	}) {
 		fail()
 		return
