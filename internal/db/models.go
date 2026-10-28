@@ -1078,14 +1078,14 @@ func (SavedView) TableName() string { return "saved_views" }
 // agent Y"). Unlike AutomationRule this is one-shot and operator-facing.
 type OneShotTask struct {
 	ID         uint       `gorm:"primaryKey" json:"id"`
-	AgentID    string     `gorm:"index;size:36" json:"agent_id"`
+	AgentID    string     `gorm:"index;index:idx_one_shot_agent_created,priority:1;size:36" json:"agent_id"`
 	Type       string     `gorm:"size:50;default:'shell'" json:"type"`
 	Command    string     `gorm:"type:text" json:"command"`
 	RunAt      time.Time  `gorm:"index" json:"run_at"`
 	Status     string     `gorm:"size:16;default:'pending'" json:"status"` // pending, dispatching, done, cancelled, error
 	TaskID     uint       `json:"task_id"`
 	CreatedBy  string     `gorm:"size:100" json:"created_by"`
-	CreatedAt  time.Time  `json:"created_at"`
+	CreatedAt  time.Time  `gorm:"index:idx_one_shot_agent_created,priority:2" json:"created_at"`
 	FinishedAt *time.Time `json:"finished_at,omitempty"`
 }
 
