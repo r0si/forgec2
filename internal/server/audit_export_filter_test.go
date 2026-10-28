@@ -134,3 +134,47 @@ func TestAuditExportFilters(t *testing.T) {
 		t.Fatalf("since_id was treated as a filter: %q", got.Header().Get("X-Audit-Export-Filtered"))
 	}
 }
+
+// TestAuditExportReportsTruncation covers the silent-truncation case for the chain export: a limited
+// export looks identical to a complete one, and an investigator verifying the chain would not know part
+// of it was left behind.
+func TestAuditExportReportsTruncation(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	s := mustTenantServer(t)
+
+	for i := 0; i < 3; i++ {
+		if err := s.db.Create(&db.AuditLog{
+			User: "alice", Action: "login", TenantID: 1, Success: true,
+			CreatedAt: time.Now().Add(-time.Duration(i) * time.Minute), PrevHash: "p", EntryHash: "e",
+		}).Error; err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+	}
+
+	call := func(query string) *httptest.ResponseRecorder {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest(http.MethodGet, "/api/audit/export"+query, nil)
+		c.Set("user", "admin")
+		c.Set("user_role", db.RoleAdmin)
+		c.Set("user_id", uint(1))
+		c.Set(middleware.TenantIDContextKey, uint(1))
+		s.handleExportAuditChain(c)
+		return w
+	}
+
+	if got := call("").Header().Get("X-Audit-Export-Truncated"); got != "false" {
+		t.Fatalf("unlimited export reported truncated=%q", got)
+	}
+	limited := call("?limit=2")
+	if got := limited.Header().Get("X-Audit-Export-Truncated"); got != "true" {
+		t.Fatalf("limit=2 of 3 rows reported truncated=%q", got)
+	}
+	if got := limited.Header().Get("X-Audit-Export-Rows"); got != "2" {
+		t.Fatalf("rows = %q, want 2", got)
+	}
+	// The audit filename gained a timestamp too, so repeated downloads do not overwrite each other.
+	if cd := limited.Header().Get("Content-Disposition"); !strings.Contains(cd, "_2026-") && !strings.Contains(cd, "forgec2-audit-chain_") {
+		t.Fatalf("Content-Disposition = %q", cd)
+	}
+}

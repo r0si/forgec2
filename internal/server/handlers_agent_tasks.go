@@ -205,6 +205,12 @@ func (s *Server) handleExportTasks(c *gin.Context) {
 	}
 
 	s.LogAuditRecord(c, "task_export", "task", "", fmt.Sprintf("tasks exported as CSV (limit %d)", limit), true, nil)
+	// A capped export looks exactly like a complete one, so say when it was cut short.
+	if len(tasks) >= limit {
+		c.Header("X-Task-Export-Truncated", "true")
+	} else {
+		c.Header("X-Task-Export-Truncated", "false")
+	}
 	c.Header("Content-Type", "text/csv; charset=utf-8")
 	// The timestamp keeps two exports from the same day from overwriting each other in the browser.
 	c.Header("Content-Disposition", `attachment; filename="forgec2_tasks_`+time.Now().Format("2006-01-02_150405")+`.csv"`)

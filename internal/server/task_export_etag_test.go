@@ -166,8 +166,50 @@ func TestTaskExportIsSentWhole(t *testing.T) {
 			t.Fatalf("Task ID = %q, not a number", row[7])
 		}
 	}
+	// Three tasks and the default cap: nothing was left behind, and the export says so.
+	if got := w.Header().Get("X-Task-Export-Truncated"); got != "false" {
+		t.Fatalf("X-Task-Export-Truncated = %q, want false", got)
+	}
 	// The filename carries a time, so two exports in one day do not overwrite each other.
 	if cd := w.Header().Get("Content-Disposition"); !regexp.MustCompile(`forgec2_tasks_[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{6}\.csv`).MatchString(cd) {
 		t.Fatalf("Content-Disposition = %q, want a timestamped filename", cd)
+	}
+}
+
+// TestTaskExportReportsTruncation covers the silent-truncation case: with a cap that cuts the answer,
+// the response has to say so. A partial CSV is indistinguishable from a complete one otherwise.
+func TestTaskExportReportsTruncation(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	s := mustTenantServer(t)
+
+	now := time.Now()
+	for i := 0; i < 3; i++ {
+		if err := s.db.Create(&db.Task{
+			AgentID: "a-1", TenantID: 1, Type: "shell", Command: "whoami",
+			Status: "completed", CreatedAt: now.Add(-time.Duration(i) * time.Minute),
+			UpdatedAt: now.Add(-time.Duration(i) * time.Minute),
+		}).Error; err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+	}
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/tasks/export?limit=1", nil)
+	c.Set("user", "admin")
+	c.Set("user_role", db.RoleAdmin)
+	c.Set("user_id", uint(1))
+	c.Set(middleware.TenantIDContextKey, uint(1))
+	s.handleExportTasks(c)
+
+	if got := w.Header().Get("X-Task-Export-Truncated"); got != "true" {
+		t.Fatalf("X-Task-Export-Truncated = %q, want true (limit=1 of 3 tasks)", got)
+	}
+	records, err := csv.NewReader(strings.NewReader(w.Body.String())).ReadAll()
+	if err != nil {
+		t.Fatalf("csv: %v", err)
+	}
+	if len(records) != 2 {
+		t.Fatalf("records = %d, want header + 1 row", len(records))
 	}
 }

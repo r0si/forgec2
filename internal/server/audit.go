@@ -308,10 +308,19 @@ func (s *Server) handleExportAuditChain(c *gin.Context) {
 			return
 		}
 	}
-	name := "forgec2-audit-chain.ndjson"
+	// Same timestamp convention as the task export: two downloads in a day must not overwrite each
+	// other in the browser.
+	name := "forgec2-audit-chain_" + time.Now().Format("2006-01-02_150405") + ".ndjson"
 	c.Header("X-Audit-Export-Rows", strconv.Itoa(len(rows)))
+	// Silent truncation is the failure mode worth preventing here: a limited export looks exactly like
+	// a complete one, and an investigator verifying a chain would not know part of it was left behind.
+	if len(rows) >= limit {
+		c.Header("X-Audit-Export-Truncated", "true")
+	} else {
+		c.Header("X-Audit-Export-Truncated", "false")
+	}
 	if filtered {
-		name = "forgec2-audit-chain-filtered.ndjson"
+		name = "forgec2-audit-chain_filtered_" + time.Now().Format("2006-01-02_150405") + ".ndjson"
 		c.Header("X-Audit-Export-Filtered", "true")
 		// 199 is the "miscellaneous warning" class; the text is what a human reads.
 		c.Header("Warning", `199 - "filtered export: rows are a selection, not a contiguous hash chain; verify the unfiltered export"`)
