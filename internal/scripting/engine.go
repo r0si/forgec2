@@ -93,6 +93,11 @@ func init() {
 
 func NewScriptEngine() *ScriptEngine {
 	vm := goja.New()
+	// goja ships maxCallStackSize = math.MaxInt32, i.e. NO depth limit: an unbounded-recursion
+	// script overflows the GO stack, which is a fatal runtime error that recover() cannot catch -
+	// the whole server dies. Scripts can also be bound to events, so a saved one would crash the
+	// process on every matching event. This makes deep recursion a catchable JS error instead.
+	vm.SetMaxCallStackSize(scriptMaxCallStackSize)
 	newScriptRegistry().Enable(vm)
 	console.Enable(vm)
 
@@ -293,6 +298,11 @@ func (e *ScriptEngine) reparseEvents(s *LoadedScript) error {
 	// require("console")) parsed fine when executed but was REJECTED here with
 	// "ReferenceError: console is not defined", so it could never be saved.
 	vm := goja.New()
+	// goja ships maxCallStackSize = math.MaxInt32, i.e. NO depth limit: an unbounded-recursion
+	// script overflows the GO stack, which is a fatal runtime error that recover() cannot catch -
+	// the whole server dies. Scripts can also be bound to events, so a saved one would crash the
+	// process on every matching event. This makes deep recursion a catchable JS error instead.
+	vm.SetMaxCallStackSize(scriptMaxCallStackSize)
 	newScriptRegistry().Enable(vm)
 	console.Enable(vm)
 	events := make(map[string]bool)
@@ -397,6 +407,11 @@ func (e *ScriptEngine) executeScript(code string, scriptCtx map[string]interface
 		return ExecutionResult{Success: false, Error: err.Error()}
 	}
 	vm := goja.New()
+	// goja ships maxCallStackSize = math.MaxInt32, i.e. NO depth limit: an unbounded-recursion
+	// script overflows the GO stack, which is a fatal runtime error that recover() cannot catch -
+	// the whole server dies. Scripts can also be bound to events, so a saved one would crash the
+	// process on every matching event. This makes deep recursion a catchable JS error instead.
+	vm.SetMaxCallStackSize(scriptMaxCallStackSize)
 	newScriptRegistry().Enable(vm)
 	console.Enable(vm)
 
@@ -428,8 +443,14 @@ func (e *ScriptEngine) executeScript(code string, scriptCtx map[string]interface
 			return
 		}
 		if v != nil {
+			// Cap the rendered result: a script can return an arbitrarily large string, and it
+			// travels straight into an HTTP response.
+			output := v.String()
+			if len(output) > scriptMaxOutputBytes {
+				output = output[:scriptMaxOutputBytes] + "\n[output truncated]"
+			}
 			select {
-			case done <- ExecutionResult{Success: true, Output: v.String()}:
+			case done <- ExecutionResult{Success: true, Output: output}:
 			default:
 			}
 		} else {
@@ -451,3 +472,9 @@ func (e *ScriptEngine) executeScript(code string, scriptCtx map[string]interface
 		return ExecutionResult{Success: false, Error: "script execution timeout (30s)"}
 	}
 }
+
+// Limits for a scripted execution. See executeScript for why the stack bound is load-bearing.
+const (
+	scriptMaxCallStackSize = 4096
+	scriptMaxOutputBytes   = 1 << 20
+)
