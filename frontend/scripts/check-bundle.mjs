@@ -36,11 +36,12 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const TOTAL_LIMIT_BYTES = 5.5 * 1024 * 1024;
-// Tightened from 1200 KiB after batches S/T held the critical path at 968 kB:
-// the old ~230 kB slack would let a single mid-size page (100+ kB) stop being
-// lazy and still pass. ~122 kB remains — enough for ordinary entry/vendor
-// growth, still tripping the 100s-of-kB route re-leak this budget exists for.
-const CRITICAL_PATH_LIMIT_BYTES = 1090 * 1024;
+// Tightened from 1200 KiB after batches S/T held the critical path at 968 kB, which left ~122 kB.
+// Re-measured 2026-10-28: the critical path is down to 798 kB, so that same 1090 kB limit now left
+// 292 kB - enough for a 200 kB route chunk to start leaking again and still pass, which is exactly
+// the regression this budget exists to catch. Set to 900 kB: ~100 kB of ordinary entry/vendor
+// headroom, and a re-leak of a few hundred kB trips it.
+const CRITICAL_PATH_LIMIT_BYTES = 900 * 1024;
 const staticDir = join(fileURLToPath(new URL(".", import.meta.url)), "..", "out");
 
 function walk(dir, out) {

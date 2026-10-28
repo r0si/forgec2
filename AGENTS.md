@@ -250,11 +250,17 @@ Both sides carry a coverage floor, and **a floor that is never raised stops guar
 |---|---|---|---|
 | Go | **51.5%** | 52.8% (was 50 at a 50.4 measurement — a 2.8-point regression would have passed) | `.github/workflows/ci.yml` "Coverage floor" |
 | frontend | **33.5%** | 34.84% statements / 23 313 | `frontend/scripts/check-coverage.mjs` (override with `COVERAGE_FLOOR`) |
+| first-paint bundle | **900 kB** | 798 kB critical path (4.54 MB total under a 5.5 MB cap) | `frontend/scripts/check-bundle.mjs` |
 
 Raise a floor in the same change that adds tests; lower it only as part of that change, never to make
 a regression pass. ~1 point of headroom is deliberate: it absorbs ordinary page work while a large
 new component shipping without tests still trips the check. The frontend floor had drifted 18 points
 below the measured figure, which meant roughly half the suite could be deleted unnoticed.
+
+The **bundle budget is the same kind of ratchet**: it sat at 1090 kB while the critical path fell to
+798 kB, so the "~122 kB of headroom" its comment promised had quietly become 292 kB — enough for a
+few-hundred-kB route chunk to re-leak and still pass. It is now 900 kB. **When a budget's comment
+states a headroom, check that arithmetic against the current measurement.**
 
 ## Testing
 Backend test suite via CI (`.github/workflows/ci.yml`):
