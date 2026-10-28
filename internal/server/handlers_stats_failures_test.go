@@ -168,6 +168,29 @@ func TestTaskFailureStats(t *testing.T) {
 		}
 	}
 
+	// Retried tasks are counted separately: many of them means the LINK is flaky, which a list of reasons cannot show because
+	// each retried task ended up somewhere else in the report.
+	if data["retried"] != float64(0) {
+		t.Fatalf("retried = %v before any retry was seeded", data["retried"])
+	}
+	retriedTask := db.Task{
+		AgentID: "a-1", TenantID: 1, Type: "ps", Command: "ps", Status: "completed",
+		CreatedAt: now.Add(-20 * time.Minute), UpdatedAt: now.Add(-20 * time.Minute), RetryCount: 1,
+	}
+	if err := s.db.Create(&retriedTask).Error; err != nil {
+		t.Fatalf("seed retried task: %v", err)
+	}
+	if err := s.db.Model(&db.Task{}).Where("id = ?", retriedTask.ID).Update("retry_count", 1).Error; err != nil {
+		t.Fatalf("set retry count: %v", err)
+	}
+	_, withRetries := call("?since=7d")
+	if withRetries["retried"] != float64(1) {
+		t.Fatalf("retried = %v, want the one re-issued task", withRetries["retried"])
+	}
+	if note, _ := withRetries["retry_note"].(string); note == "" {
+		t.Fatalf("the report does not explain the retry count: %v", withRetries)
+	}
+
 	// group_by=type groups the same rows differently.
 	_, byType := call("?since=7d&group_by=type")
 	typeBuckets, _ := byType["buckets"].([]interface{})

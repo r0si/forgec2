@@ -27979,6 +27979,10 @@ export interface operations {
                             since?: string;
                             group_by?: string;
                             failed?: number;
+                            /** @description Tasks in the window that ran more than once because an automatic retry re-issued a failed read-only enumeration. A window with many retries points at the LINK rather than the task - and it is invisible in a list of reasons, because every retried task ended up somewhere else in the report. */
+                            retried?: number;
+                            /** @description One sentence explaining the retry count */
+                            retry_note?: string;
                             truncated?: boolean;
                             note?: string;
                             buckets?: {

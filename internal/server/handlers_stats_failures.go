@@ -159,12 +159,29 @@ func (s *Server) handleTaskFailureStats(c *gin.Context) {
 		return buckets[i].Key < buckets[j].Key
 	})
 
+	// How often did an automatic retry paper over a failure? A window with many retries is a window with a flaky link, and
+	// that is invisible in a list of reasons: every retried task ended up succeeding or failing elsewhere.
+	var retried int64
+	if err := s.tenantScope(s.db.WithContext(s.ctx).Model(&db.Task{}), c).
+		Where("retry_count > 0").
+		Where("updated_at >= ?", cutoff).
+		Count(&retried).Error; err != nil {
+		retried = 0 // a report without the count is still useful; failing the whole answer for it is not
+	}
+
 	payload := gin.H{
 		"since":     since,
 		"group_by":  groupBy,
 		"failed":    len(rows),
 		"truncated": len(rows) >= failureStatsSampleLimit,
-		"buckets":   buckets,
+		"retried":   retried,
+		"retry_note": func() string {
+			if retried == 0 {
+				return "no failures were re-issued automatically in this window"
+			}
+			return "these tasks ran more than once: an automatic retry papered over a failure, which points at the link rather than the task"
+		}(),
+		"buckets": buckets,
 		"note": "reason codes are a starting point: first match wins, and unmatched errors are collected as 'other' " +
 			"with an example",
 	}
