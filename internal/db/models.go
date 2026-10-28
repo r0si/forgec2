@@ -1400,8 +1400,8 @@ type PhishingTemplate struct {
 	FromName  string    `gorm:"size:255" json:"from_name"`
 	FromEmail string    `gorm:"size:255" json:"from_email"`
 	Type      string    `gorm:"size:50;default:html" json:"type"`
-	CreatedBy string    `gorm:"size:255" json:"created_by"`
-	CreatedAt time.Time `json:"created_at"`
+	CreatedBy string    `gorm:"size:255;index:idx_phishing_templates_creator_time,priority:1" json:"created_by"`
+	CreatedAt time.Time `gorm:"index:idx_phishing_templates_creator_time,priority:2" json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
@@ -1421,8 +1421,8 @@ type PhishingCampaign struct {
 	FailedCount int       `json:"failed_count"`
 	OpenCount   int       `json:"open_count"`
 	CredCount   int       `json:"cred_count"`
-	CreatedBy   string    `gorm:"size:255" json:"created_by"`
-	CreatedAt   time.Time `json:"created_at"`
+	CreatedBy   string    `gorm:"size:255;index:idx_phishing_campaigns_creator_time,priority:1" json:"created_by"`
+	CreatedAt   time.Time `gorm:"index:idx_phishing_campaigns_creator_time,priority:2" json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
@@ -1552,8 +1552,8 @@ type Workflow struct {
 	ScopeType   string         `gorm:"size:20;default:'all'" json:"scope_type"` // "all", "tags", "groups", "agents"
 	ScopeIDs    string         `gorm:"type:text" json:"scope_ids"`              // JSON array of IDs
 	Steps       []WorkflowStep `gorm:"foreignKey:WorkflowID" json:"steps,omitempty"`
-	CreatedBy   string         `gorm:"size:100" json:"created_by"`
-	CreatedAt   time.Time      `json:"created_at"`
+	CreatedBy   string         `gorm:"size:100;index:idx_workflows_creator_time,priority:1" json:"created_by"`
+	CreatedAt   time.Time      `gorm:"index:idx_workflows_creator_time,priority:2" json:"created_at"`
 	UpdatedAt   time.Time      `json:"updated_at"`
 }
 
@@ -1874,8 +1874,8 @@ type Script struct {
 	Enabled     bool      `gorm:"default:true" json:"enabled"`
 	RunCount    int       `gorm:"default:0" json:"run_count"`
 	LastRun     time.Time `json:"last_run"`
-	CreatedBy   string    `gorm:"size:64" json:"created_by"`
-	CreatedAt   time.Time `json:"created_at"`
+	CreatedBy   string    `gorm:"size:64;index:idx_scripts_creator_time,priority:1" json:"created_by"`
+	CreatedAt   time.Time `gorm:"index:idx_scripts_creator_time,priority:2" json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
