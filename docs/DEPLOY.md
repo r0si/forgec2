@@ -250,6 +250,26 @@ reports it too). The `linux/amd64` build asserts this in CI and fails the
 release if the tag didn't make it in. Custom `FORGEC2_PORT` is honored by
 both the server and the container healthcheck.
 
+## Monitoring what the server says about itself
+
+`GET /health` is liveness and `GET /ready` is readiness, but `/ready` also carries warnings a monitor should act on. Two of
+them are about things that keep working while being useless, which is why they are listed explicitly:
+
+| Check | Warning when | What to do |
+|---|---|---|
+| `notification_delivery` | a route has **never delivered** since the process started | send a test from the console; the response now says *why* it failed |
+| `automation_actions` | a rule's actions have **never landed** | the rule-set health report names the rule and the last dispatch error |
+| `audit_chain` | the chain does not verify in the ready window | treat as an incident: `docs/AUDIT_EXPORT.md` explains what it can and cannot prove |
+
+Both delivery checks use "never delivered", not "anything failed": one failure after a hundred successes is a blip, and a
+probe that warns on blips gets muted. Neither makes the server **unready** - the process is fine, the notification path is
+not - so `status` stays `ok` and the condition travels in `warnings`.
+
+Alerting on `warnings` being non-empty is the intended integration; alerting on the status code alone will miss all three.
+
+A counter that has been fixed can be cleared, which is what removes the warning: `POST /api/notification-routes/stats/reset`
+and `POST /api/automation/action-stats/reset` (both audited), discoverable at runtime in `/api/exports/capabilities`.
+
 ## Troubleshooting
 
 | Symptom | Cause / fix |
