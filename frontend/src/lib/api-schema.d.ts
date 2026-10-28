@@ -2034,6 +2034,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/engagements/{id}/bundle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One zip that hands over the whole exercise
+         * @description Ending an engagement means delivering it, and collecting the evidence by hand is four downloads and a spreadsheet - with the audit part the step that gets skipped, which is exactly the part an after-action reviewer needs. This assembles `summary.md` (the same document the summary export renders), `tasks.csv` (the default export columns, the engagement's hosts, rows inside its window), `audit.ndjson` (every hashed field of the window, verifiable offline), `agents.json` and `plugins.json` into one archive. Refused with 413 rather than truncated when it would exceed the bundle cap, because a half-delivered bundle is a handover that silently lacks evidence. Tenant-scoped: another tenant's engagement is a 404. The handover is audited as `engagement_bundle`.
+         */
+        get: operations["engagementBundle"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/engagements/expiry": {
         parameters: {
             query?: never;
@@ -15096,6 +15116,42 @@ export interface operations {
             };
             /** @description No such engagement in the caller's tenant */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    engagementBundle: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description application/zip with summary.md, tasks.csv, audit.ndjson, agents.json and plugins.json */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/zip": string;
+                };
+            };
+            /** @description No such engagement in the caller's tenant */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The bundle would exceed the size cap; export the parts separately */
+            413: {
                 headers: {
                     [name: string]: unknown;
                 };

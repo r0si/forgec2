@@ -22,6 +22,8 @@ func (s *Server) registerAgentRoutes(auth *gin.RouterGroup) {
 		agentsRead.GET("/api/engagements/:id/summary", s.handleEngagementSummary)
 		// The same summary as a document a reader can paste into a report.
 		agentsRead.GET("/api/engagements/:id/summary/export", s.handleEngagementSummaryExport)
+		// One download that hands over the whole exercise: summary, tasks, audit window, agents and plugins.
+		agentsRead.GET("/api/engagements/:id/bundle", s.handleEngagementBundle)
 		agentsRead.GET("/agents/:id", s.handleAgentDetail)
 		agentsRead.GET("/agents/:id/shell", s.handleShellPage)
 		agentsRead.GET("/agents/:id/files", s.handleFileBrowserPage)
