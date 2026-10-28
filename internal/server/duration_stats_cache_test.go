@@ -137,3 +137,36 @@ func TestStatsCacheCountersIsExposed(t *testing.T) {
 		t.Fatalf("evictions = %v, want 0", got)
 	}
 }
+
+// TestDurationStatsQueryKeyCoversEveryField is the reason durationStatsQuery exists: adding a parameter
+// must not be able to leave the cache key behind. Each field alone must change the key, so a request
+// that differs only in that parameter can never be served another request's cached answer.
+func TestDurationStatsQueryKeyCoversEveryField(t *testing.T) {
+	previousTTL := durationStatsCacheTTL
+	durationStatsCacheTTL = time.Minute
+	t.Cleanup(func() { durationStatsCacheTTL = previousTTL })
+
+	base := durationStatsQuery{Tenant: 1, Since: "24h", Type: "shell", GroupBy: "type", Bucket: ""}
+	variants := map[string]durationStatsQuery{
+		"tenant":   {Tenant: 2, Since: "24h", Type: "shell", GroupBy: "type", Bucket: ""},
+		"since":    {Tenant: 1, Since: "12h", Type: "shell", GroupBy: "type", Bucket: ""},
+		"type":     {Tenant: 1, Since: "24h", Type: "screenshot", GroupBy: "type", Bucket: ""},
+		"group_by": {Tenant: 1, Since: "24h", Type: "shell", GroupBy: "agent", Bucket: ""},
+		"bucket":   {Tenant: 1, Since: "24h", Type: "shell", GroupBy: "type", Bucket: "hour"},
+	}
+	baseKey := base.key()
+	if baseKey == "" {
+		t.Fatal("the cache key is empty with a positive TTL")
+	}
+	for name, variant := range variants {
+		if got := variant.key(); got == baseKey {
+			t.Errorf("%s does not change the cache key (%q) - a request differing only in it would be served the wrong answer", name, got)
+		}
+	}
+
+	// With caching disabled there is no key at all, so nothing is stored or read.
+	durationStatsCacheTTL = 0
+	if got := base.key(); got != "" {
+		t.Fatalf("a disabled TTL produced key %q", got)
+	}
+}

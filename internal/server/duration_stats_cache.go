@@ -1,13 +1,41 @@
 package server
 
 import (
-	"strconv"
-	"strings"
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
 )
+
+// durationStatsQuery is the whole identity of a statistics request.
+//
+// It exists so that ADDING A PARAMETER CANNOT FORGET THE CACHE KEY. The first version of the cache
+// built its key from a hand-written list of arguments, which is the kind of thing that goes wrong in
+// silence: a new parameter would shape the query but not the key, and callers would receive another
+// query's answer. Here every field is part of the key by construction (the key is the struct printed),
+// so the only way to add a parameter is to add a field - and then it is in the key.
+type durationStatsQuery struct {
+	Tenant  uint
+	Since   string
+	Type    string
+	GroupBy string
+	Bucket  string
+}
+
+// key renders the cache identity. fmt prints every field, including any added later.
+func (q durationStatsQuery) key() string {
+	if durationStatsCacheTTL <= 0 {
+		return ""
+	}
+	return fmt.Sprintf("%+v", q)
+}
+
+// durationStatsCacheEntry is one cached payload.
+type durationStatsCacheEntry struct {
+	payload gin.H
+	expires time.Time
+}
 
 // durationStatsCache keeps the computed statistics for a few seconds.
 //
@@ -17,14 +45,8 @@ import (
 // decision as a fresh one - so repeat calls inside the window are answered without touching the
 // database.
 //
-// Bounded and tenant-keyed on purpose: the key includes every request parameter and the tenant, so one
-// operator's scoped view can never be served to another, and the entry count is capped so a dealer of
-// random parameters cannot grow the map without limit.
-type durationStatsCacheEntry struct {
-	payload gin.H
-	expires time.Time
-}
-
+// Bounded on purpose: the entry count is capped so a dealer of random parameters cannot grow the map
+// without limit.
 type durationStatsCache struct {
 	mu      sync.Mutex
 	entries map[string]durationStatsCacheEntry
@@ -55,6 +77,13 @@ func (s *Server) statsCache() *durationStatsCache {
 
 func newDurationStatsCache() *durationStatsCache {
 	return &durationStatsCache{entries: make(map[string]durationStatsCacheEntry, 32)}
+}
+
+// setMetrics attaches the collector after the fact (a test that installs metrics on an existing server).
+func (c *durationStatsCache) setMetrics(m *MetricsCollector) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.metrics = m
 }
 
 // get returns a cached payload when it is still fresh.
@@ -97,22 +126,4 @@ func (c *durationStatsCache) put(key string, payload gin.H) {
 		}
 	}
 	c.entries[key] = durationStatsCacheEntry{payload: payload, expires: now.Add(durationStatsCacheTTL)}
-}
-
-// durationStatsCacheKey builds the identity of a request: the tenant plus every parameter that changes
-// the answer.
-func durationStatsCacheKey(tenantID uint, since, filterType, groupBy, bucket string) string {
-	if durationStatsCacheTTL <= 0 {
-		return ""
-	}
-	return strings.Join([]string{
-		strconv.FormatUint(uint64(tenantID), 10), since, filterType, groupBy, bucket,
-	}, "|")
-}
-
-// setMetrics attaches the collector after the fact (a test that installs metrics on an existing server).
-func (c *durationStatsCache) setMetrics(m *MetricsCollector) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.metrics = m
 }

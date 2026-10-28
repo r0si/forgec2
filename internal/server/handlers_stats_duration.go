@@ -41,13 +41,19 @@ type taskDurationStat struct {
 // duration syntax the UI already uses elsewhere ("1h", "24h", "7d", "30d"), and the reply is scoped to
 // the caller's tenant.
 func (s *Server) handleTaskDurationStats(c *gin.Context) {
-	since := c.DefaultQuery("since", "24h")
-	filterType := c.Query("type")
-	groupBy := c.DefaultQuery("group_by", "type")
-	bucket := c.Query("bucket")
+	// One struct holds the whole identity of the request, so a parameter that shapes the query is also
+	// part of the cache key (see durationStatsQuery).
+	request := durationStatsQuery{
+		Tenant:  s.currentTenantID(c),
+		Since:   c.DefaultQuery("since", "24h"),
+		Type:    c.Query("type"),
+		GroupBy: c.DefaultQuery("group_by", "type"),
+		Bucket:  c.Query("bucket"),
+	}
+	since, filterType, groupBy, bucket := request.Since, request.Type, request.GroupBy, request.Bucket
 	// Serve a fresh copy when one exists: the read costs ~28 ms per call for a 5000-row window
 	// (BenchmarkDurationStatsWindow) and the console polls while an operator watches the page.
-	cacheKey := durationStatsCacheKey(s.currentTenantID(c), since, filterType, groupBy, bucket)
+	cacheKey := request.key()
 	if payload, hit := s.statsCache().get(cacheKey); hit {
 		if s.metrics != nil {
 			s.metrics.StatsCacheHitsTotal.Inc()
