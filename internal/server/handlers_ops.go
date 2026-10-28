@@ -90,6 +90,11 @@ func (s *Server) handleReadyCheck(c *gin.Context) {
 		if failingRoutes > 0 {
 			warnings = append(warnings, fmt.Sprintf("%d notification route(s) are failing", failingRoutes))
 		}
+		loadedPlugins, rejectedPlugins := s.pluginRejectionSummary()
+		checks["plugins"] = fmt.Sprintf("%d loaded, %d rejected", loadedPlugins, rejectedPlugins)
+		if rejectedPlugins > 0 {
+			warnings = append(warnings, fmt.Sprintf("%d plugin package(s) were rejected at load; see /api/plugins/failures", rejectedPlugins))
+		}
 		failingRules := automationActionFailingCount()
 		checks["automation_actions"] = fmt.Sprintf("%d rule(s) whose actions never landed", failingRules)
 		s.noteObservabilityWarning("automation_actions", "automation rule actions are not landing", failingRules)

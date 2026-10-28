@@ -32,7 +32,7 @@ func TestDeployGuideDocumentsReadyWarnings(t *testing.T) {
 	}
 
 	// 1. Every check the probe writes is named there.
-	for _, check := range []string{"notification_delivery", "automation_actions", "audit_chain"} {
+	for _, check := range []string{"notification_delivery", "automation_actions", "plugins", "audit_chain"} {
 		if !strings.Contains(section, check) {
 			t.Fatalf("the monitoring section does not name the %s check", check)
 		}

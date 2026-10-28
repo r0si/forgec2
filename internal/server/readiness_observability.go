@@ -86,3 +86,14 @@ func resetObservabilityWarnings() {
 	defer observabilityWarningMu.Unlock()
 	observabilityWarningLast = map[string]int{}
 }
+
+// pluginRejectionSummary reports how many discovered packages were rejected, and how many loaded.
+//
+// A rejected package is silently absent from the console, so the probe is the only place a monitor can notice that an
+// installation half-succeeded. It is a warning rather than an unready state: the server is fine, the plugin is not.
+func (s *Server) pluginRejectionSummary() (loaded, rejected int) {
+	if s == nil || s.pluginManager == nil {
+		return 0, 0
+	}
+	return len(s.pluginManager.List()), len(s.pluginManager.LoadFailures())
+}

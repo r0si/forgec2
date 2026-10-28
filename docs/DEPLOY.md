@@ -259,6 +259,7 @@ them are about things that keep working while being useless, which is why they a
 |---|---|---|
 | `notification_delivery` | a route has **never delivered** since the process started | send a test from the console; the response now says *why* it failed |
 | `automation_actions` | a rule's actions have **never landed** | the rule-set health report names the rule and the last dispatch error |
+| `plugins` | one or more packages were **rejected at load** | `GET /api/plugins/failures` names them and suggests the next step |
 | `audit_chain` | the chain does not verify in the ready window | treat as an incident: `docs/AUDIT_EXPORT.md` explains what it can and cannot prove |
 
 Both delivery checks use "never delivered", not "anything failed": one failure after a hundred successes is a blip, and a

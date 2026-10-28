@@ -3,11 +3,16 @@ package server
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/forgec2/forgec2/internal/db"
+	"github.com/forgec2/forgec2/internal/plugin"
 	"github.com/forgec2/forgec2/internal/server/middleware"
 	"github.com/gin-gonic/gin"
 )
@@ -47,9 +52,36 @@ func TestReadyReportsDeliveryAndActionHealth(t *testing.T) {
 	if checks["notification_delivery"] == nil || checks["automation_actions"] == nil {
 		t.Fatalf("the readiness checks do not include delivery and action health: %v", checks)
 	}
+	if checks["plugins"] == nil {
+		t.Fatalf("the readiness checks do not include the plugin count: %v", checks)
+	}
 	if payload["warnings"] != nil {
 		t.Fatalf("a healthy server reported warnings: %v", payload["warnings"])
 	}
+
+	// 1b. A rejected plugin package is a warning: it is silently absent from the console otherwise.
+	dir := t.TempDir()
+	bad := filepath.Join(dir, "bad")
+	if err := os.MkdirAll(bad, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(bad, "manifest.yaml"), []byte("name: bad\n\tversion: 1.0.0\n"), 0o644); err != nil {
+		t.Fatalf("write manifest: %v", err)
+	}
+	s.pluginManager = plugin.NewManager(s.db)
+	if err := s.pluginManager.LoadFromDisk(dir); err != nil {
+		t.Fatalf("load plugins: %v", err)
+	}
+	payload = ready()
+	warningsAfterPlugin, _ := payload["warnings"].([]interface{})
+	if len(warningsAfterPlugin) != 1 || !containsFold(fmt.Sprint(warningsAfterPlugin[0]), "rejected") {
+		t.Fatalf("a rejected package did not raise a warning: %v", payload["warnings"])
+	}
+	checks, _ = payload["checks"].(map[string]interface{})
+	if got, _ := checks["plugins"].(string); !strings.Contains(got, "1 rejected") {
+		t.Fatalf("the plugin check does not report the rejection: %q", got)
+	}
+	s.pluginManager = nil
 
 	// 2. A route that has only failed, and a rule whose actions have only failed: warnings.
 	recordNotificationDelivery(11, errors.New("post: 500"))
