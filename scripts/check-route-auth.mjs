@@ -58,10 +58,28 @@ const GATE_MARKERS = [
   // check - /emergency-stop armed the kill switch for ANY authenticated role that knew its own
   // password. Identity resolution is not a gate.
   "isAdmin",
+];
+
+// Helpers that RESOLVE or SCOPE but do not authorize. They must never appear in GATE_MARKERS: a
+// handler whose only "gate" was one of them would pass this check while any authenticated role
+// could run it. Measured when they were dropped from the list: 402 mutating routes still pass,
+// so nothing depended on them - the previous list was overstating what those routes check.
+const SCOPING_ONLY = [
+  "currentUserID",
   "tenantScope",
+  "auditTenantScope",
+  "aiTenantScope",
   "findTenantOrFail",
   "getAgentOrFail",
+  "findOrFail",
 ];
+
+for (const marker of SCOPING_ONLY) {
+  if (GATE_MARKERS.includes(marker)) {
+    console.error(`route-auth: "${marker}" scopes or resolves but does not authorize; it cannot count as a gate.`);
+    process.exit(1);
+  }
+}
 
 const files = fs.readdirSync(serverDir);
 const sourceFiles = files.filter((f) => f.endsWith(".go") && !f.endsWith("_test.go"));

@@ -60,7 +60,12 @@ by hand at least once; do not weaken one to make a change pass — fix the chang
   implant-facing endpoints that authenticate a beacon instead of a session. It scans **every**
   server file, not just `routes*.go`: mutating routes registered in `server.go`, `api.go` or a
   `handler_*.go` `register*` function were invisible, and `POST /api/dns/start` (which starts a
-  listener on :53) sat on the global auth group with no permission check because of it.
+  listener on :53) sat on the global auth group with no permission check because of it. Its
+  GATE_MARKERS are **only** authorizers: `currentUserID` (identity resolution) and the scoping
+  helpers (`tenantScope`, `findTenantOrFail`, `getAgentOrFail`) were removed after
+  `/emergency-stop` turned out to pass on identity alone, and the script now refuses to accept any
+  of them as a gate — proven non-load-bearing, since all 402 mutating routes still pass without
+  them.
 - `check:context-keys` (`scripts/check-context-keys.mjs`) — a gin context key read
   with `c.Get*` must be written by production code; test-only setters do not count, and `const`
   key names are resolved. "`c.Get*`" means **every context accessor**, not just `Get`,
