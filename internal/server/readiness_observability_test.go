@@ -52,6 +52,9 @@ func TestReadyReportsDeliveryAndActionHealth(t *testing.T) {
 	if checks["notification_delivery"] == nil || checks["automation_actions"] == nil {
 		t.Fatalf("the readiness checks do not include delivery and action health: %v", checks)
 	}
+	if checks["auto_retries"] == nil {
+		t.Fatalf("the readiness checks do not include the auto-retry count: %v", checks)
+	}
 	if checks["plugins"] == nil {
 		t.Fatalf("the readiness checks do not include the plugin count: %v", checks)
 	}
@@ -82,6 +85,28 @@ func TestReadyReportsDeliveryAndActionHealth(t *testing.T) {
 		t.Fatalf("the plugin check does not report the rejection: %q", got)
 	}
 	s.pluginManager = nil
+
+	// 1c. A BURST of automatic retries is a link-health warning; one retry is the feature working, not an alarm.
+	resetAutoRetryCounter()
+	recordAutoRetry()
+	if payload := ready(); payload["warnings"] != nil {
+		t.Fatalf("a single retry raised a warning: %v", payload["warnings"])
+	}
+	for i := 1; i < autoRetryReadyWarningThreshold; i++ {
+		recordAutoRetry()
+	}
+	payload = ready()
+	warningsAfterRetries, _ := payload["warnings"].([]interface{})
+	foundRetryWarning := false
+	for _, raw := range warningsAfterRetries {
+		if strings.Contains(strings.ToLower(fmt.Sprint(raw)), "re-issued") {
+			foundRetryWarning = true
+		}
+	}
+	if !foundRetryWarning {
+		t.Fatalf("a burst of retries did not raise a warning: %v", payload["warnings"])
+	}
+	resetAutoRetryCounter()
 
 	// 2. A route that has only failed, and a rule whose actions have only failed: warnings.
 	recordNotificationDelivery(11, errors.New("post: 500"))

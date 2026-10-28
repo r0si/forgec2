@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/forgec2/forgec2/internal/db"
 	"github.com/gin-gonic/gin"
@@ -94,6 +95,18 @@ func (s *Server) handleReadyCheck(c *gin.Context) {
 		checks["plugins"] = fmt.Sprintf("%d loaded, %d rejected", loadedPlugins, rejectedPlugins)
 		if rejectedPlugins > 0 {
 			warnings = append(warnings, fmt.Sprintf("%d plugin package(s) were rejected at load; see /api/plugins/failures", rejectedPlugins))
+		}
+		// Automatic retries are a link-health signal: a burst means enumerations are timing out, which the failure report can
+		// only show as ordinary reasons. Counted in memory, so a frequent poll costs nothing.
+		retries, lastRetry := autoRetrySnapshot()
+		retrySummary := fmt.Sprintf("%d since process start", retries)
+		if !lastRetry.IsZero() {
+			retrySummary += ", last " + lastRetry.UTC().Format(time.RFC3339)
+		}
+		checks["auto_retries"] = retrySummary
+		if retries >= autoRetryReadyWarningThreshold {
+			warnings = append(warnings,
+				fmt.Sprintf("%d task(s) were re-issued automatically; enumerations are timing out on this link", retries))
 		}
 		failingRules := automationActionFailingCount()
 		checks["automation_actions"] = fmt.Sprintf("%d rule(s) whose actions never landed", failingRules)

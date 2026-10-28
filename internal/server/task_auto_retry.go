@@ -2,6 +2,8 @@ package server
 
 import (
 	"fmt"
+	"sync"
+	"time"
 
 	"github.com/forgec2/forgec2/internal/db"
 	"strings"
@@ -73,6 +75,7 @@ func (s *Server) maybeAutoRetryTask(taskID uint, agentID, taskType, command, she
 		return 0, false
 	}
 
+	recordAutoRetry()
 	s.LogAuditRecord(nil, "task_auto_retry", "task", fmt.Sprintf("%d", id),
 		fmt.Sprintf("re-issued failed read-only task %q (attempt %d) for agent %s", taskType, retryCount+1, agentID),
 		true, nil)
@@ -109,4 +112,37 @@ func (s *Server) createRetryTask(retry *dbTaskRetry) (uint, error) {
 		return task.ID, nil // the task exists; a miscounted attempt is not worth failing the result path over
 	}
 	return task.ID, nil
+}
+
+// autoRetryCount and autoRetryLastAt track automatic retries since process start.
+//
+// A readiness probe cannot count them from the database without a query per poll, and the number that matters operationally is
+// "are we retrying a lot right now" - which the in-memory rate answers. It resets with the process, like the delivery counters.
+var (
+	autoRetryMu     sync.Mutex
+	autoRetryCount  int
+	autoRetryLastAt time.Time
+)
+
+// recordAutoRetry bumps the counter.
+func recordAutoRetry() {
+	autoRetryMu.Lock()
+	defer autoRetryMu.Unlock()
+	autoRetryCount++
+	autoRetryLastAt = time.Now()
+}
+
+// autoRetrySnapshot returns the counters for the readiness probe.
+func autoRetrySnapshot() (int, time.Time) {
+	autoRetryMu.Lock()
+	defer autoRetryMu.Unlock()
+	return autoRetryCount, autoRetryLastAt
+}
+
+// resetAutoRetryCounter clears the counters. Tests use it.
+func resetAutoRetryCounter() {
+	autoRetryMu.Lock()
+	defer autoRetryMu.Unlock()
+	autoRetryCount = 0
+	autoRetryLastAt = time.Time{}
 }

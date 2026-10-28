@@ -97,3 +97,9 @@ func (s *Server) pluginRejectionSummary() (loaded, rejected int) {
 	}
 	return len(s.pluginManager.List()), len(s.pluginManager.LoadFailures())
 }
+
+// autoRetryReadyWarningThreshold is when automatic retries stop being background noise.
+//
+// Deliberately generous: one retry is the feature working. Twenty before the first probe alert means the link, not the task, is
+// the problem - and a warning that fires on the first retry would be noise an operator mutes.
+const autoRetryReadyWarningThreshold = 20
