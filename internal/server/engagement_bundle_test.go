@@ -158,7 +158,7 @@ func TestEngagementBundle(t *testing.T) {
 	}
 	// The task line shows the command and outcome, not the result text: the timeline is a narrative, and the
 	// result belongs in tasks.csv where it is not flattened into one cell.
-	for _, want := range []string{"| Time (UTC) | Kind | Detail |", "whoami", "task_create"} {
+	for _, want := range []string{"## What went wrong", "| Time (UTC) | Kind | Detail |", "whoami", "task_create"} {
 		if !strings.Contains(timeline, want) {
 			t.Fatalf("timeline.md is missing %q:\n%s", want, timeline)
 		}

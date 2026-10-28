@@ -416,6 +416,22 @@ func buildEngagementTimeline(engagement db.Engagement, tasks []db.Task, auditRow
 		body.WriteString("_No audited actions or tasks were recorded inside the window._\n")
 		return body.Bytes()
 	}
+
+	// The failures come FIRST. A reviewer opening the narrative wants to know what went wrong before reading five hundred
+	// rows in order, and the summary is already computed for failures.json - one grouping, two renderings.
+	if failures := buildEngagementFailures(tasks); failures.FailedTasks > 0 {
+		body.WriteString("## What went wrong\n\n")
+		body.WriteString("| Failures | Hosts | Shape |\n|---|---|---|\n")
+		for i, shape := range failures.Shapes {
+			if i >= 5 {
+				break
+			}
+			fmt.Fprintf(&body, "| %d | %d | %s |\n", shape.Count, shape.Agents,
+				strings.ReplaceAll(shape.Signature, "|", "\u00a6"))
+		}
+		body.WriteString("\nFull detail in `failures.json`.\n\n")
+	}
+
 	fmt.Fprintf(&body, "| Time (UTC) | Kind | Detail |\n|---|---|---|\n")
 	shown := 0
 	for _, item := range entries {
