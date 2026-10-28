@@ -28,7 +28,7 @@ import (
 func MemberNames() []string {
 	return []string{
 		"summary.md", "timeline.md", "tasks.csv", "audit.ndjson",
-		"agents.json", "credentials.json", "iocs.json", "plugins.json",
+		"agents.json", "credentials.json", "iocs.json", "failures.json", "plugins.json",
 	}
 }
 

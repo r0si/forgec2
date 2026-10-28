@@ -4051,7 +4051,7 @@ paths:
         '200':
           description: >-
             application/zip with summary.md, timeline.md, tasks.csv, audit.ndjson, agents.json, credentials.json,
-            iocs.json, plugins.json and MANIFEST.json. The response announces transport-level facts so a script does not
+            iocs.json, failures.json, plugins.json and MANIFEST.json. The response announces transport-level facts so a script
             have to unzip to learn them.
           headers:
             X-Bundle-SHA256:

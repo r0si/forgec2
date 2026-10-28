@@ -52,6 +52,9 @@ func describeBundleMember(name string) bundleMemberDescription {
 	case "iocs.json":
 		return describe("indicators extracted from the engagement hosts",
 			"/api/iocs/export (same extractor)", "bound is a day count spanning the engagement, not the exact window")
+	case "failures.json":
+		return describe("the failures of the window grouped by shape, with reason codes and the hosts affected",
+			"/api/stats/failures/signatures (same normalisation)", "shareable: it carries error text, not secrets")
 	case "MANIFEST.json":
 		return describe("this file", "generated", "shareable")
 	default:

@@ -15610,7 +15610,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description application/zip with summary.md, timeline.md, tasks.csv, audit.ndjson, agents.json, credentials.json, iocs.json, plugins.json and MANIFEST.json. The response announces transport-level facts so a script does not have to unzip to learn them. */
+            /** @description application/zip with summary.md, timeline.md, tasks.csv, audit.ndjson, agents.json, credentials.json, iocs.json, failures.json, plugins.json and MANIFEST.json. The response announces transport-level facts so a script have to unzip to learn them. */
             200: {
                 headers: {
                     /** @description SHA-256 of the archive itself, comparable before it is opened */

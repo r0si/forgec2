@@ -50,6 +50,13 @@ func TestEngagementBundle(t *testing.T) {
 	}).Error; err != nil {
 		t.Fatalf("seed task: %v", err)
 	}
+	// A failed task inside the window, so failures.json has something to group.
+	if err := s.db.Create(&db.Task{
+		AgentID: "a-1", TenantID: 1, Type: "ps", Command: "ps", Status: "failed",
+		Error: "context deadline exceeded", CreatedAt: now.Add(-110 * time.Minute), UpdatedAt: now.Add(-110 * time.Minute),
+	}).Error; err != nil {
+		t.Fatalf("seed failed task: %v", err)
+	}
 	// A credential with a real secret in it: the bundle must describe it without carrying the secret. The vault
 	// refuses a plaintext store, so the fixture initialises loot encryption the same way production does.
 	crypto.InitLootEncryption("0000000000000000000000000000000000000000000000000000000000000000")
@@ -105,8 +112,8 @@ func TestEngagementBundle(t *testing.T) {
 	if got := w.Header().Get("X-Bundle-SHA256"); got != hex.EncodeToString(archiveSum[:]) {
 		t.Fatalf("X-Bundle-SHA256 = %q, want the digest of the body", got)
 	}
-	if got := w.Header().Get("X-Bundle-Members"); got != "9" {
-		t.Fatalf("X-Bundle-Members = %q, want 9", got)
+	if got := w.Header().Get("X-Bundle-Members"); got != "10" {
+		t.Fatalf("X-Bundle-Members = %q, want 10", got)
 	}
 	if got := w.Header().Get("X-Bundle-Signed"); got != "false" {
 		t.Fatalf("X-Bundle-Signed = %q, want false without a configured key", got)
@@ -133,7 +140,7 @@ func TestEngagementBundle(t *testing.T) {
 		}
 		members[file.Name] = content
 	}
-	for _, name := range []string{"summary.md", "timeline.md", "tasks.csv", "audit.ndjson", "agents.json", "credentials.json", "iocs.json", "plugins.json", "MANIFEST.json"} {
+	for _, name := range []string{"summary.md", "timeline.md", "tasks.csv", "audit.ndjson", "agents.json", "credentials.json", "iocs.json", "failures.json", "plugins.json", "MANIFEST.json"} {
 		if _, ok := members[name]; !ok {
 			t.Fatalf("the bundle is missing %s (has %v)", name, keysOf(members))
 		}
@@ -172,11 +179,16 @@ func TestEngagementBundle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("tasks.csv: %v", err)
 	}
-	if len(records) != 2 {
-		t.Fatalf("tasks.csv rows = %d, want header + 1 (the in-window task)", len(records))
+	// Header plus the two in-window tasks: the completed one and the failed one seeded for failures.json.
+	if len(records) != 3 {
+		t.Fatalf("tasks.csv rows = %d, want header + 2 (the in-window tasks)", len(records))
 	}
-	if !strings.Contains(strings.Join(records[1], ","), "inside-window") {
-		t.Fatalf("tasks.csv row = %v, want the in-window task", records[1])
+	joinedRows := ""
+	for _, row := range records[1:] {
+		joinedRows += strings.Join(row, ",") + "\n"
+	}
+	if !strings.Contains(joinedRows, "inside-window") {
+		t.Fatalf("tasks.csv rows = %v, want the completed in-window task", records[1:])
 	}
 
 	// audit.ndjson holds the in-window row with both hashes, so it can be verified offline.
@@ -207,6 +219,30 @@ func TestEngagementBundle(t *testing.T) {
 		if strings.Contains(credentialsBody, secret) {
 			t.Fatalf("the bundle carries secret material (%q): %s", secret, credentialsBody)
 		}
+	}
+
+	// failures.json groups the window's failures by shape, with the reason codes and the hosts affected - the same
+	// normalisation the live signature view uses, so the reviewer can compare the package with what the console said.
+	var failures struct {
+		FailedTasks int `json:"failed_tasks"`
+		Shapes      []struct {
+			Signature string   `json:"signature"`
+			Count     int      `json:"count"`
+			Agents    int      `json:"agents_affected"`
+			Reasons   []string `json:"reasons"`
+		} `json:"shapes"`
+	}
+	if err := json.Unmarshal(members["failures.json"], &failures); err != nil {
+		t.Fatalf("failures.json: %v (%s)", err, string(members["failures.json"]))
+	}
+	if failures.FailedTasks == 0 || len(failures.Shapes) == 0 {
+		t.Fatalf("failures.json is empty: %s", string(members["failures.json"]))
+	}
+	if !containsFold(failures.Shapes[0].Signature, "deadline") {
+		t.Fatalf("the shape does not describe the failure: %+v", failures.Shapes[0])
+	}
+	if failures.Shapes[0].Agents != 1 || len(failures.Shapes[0].Reasons) == 0 {
+		t.Fatalf("the shape carries no host count or reason: %+v", failures.Shapes[0])
 	}
 
 	// iocs.json parses and says which bound it used, because its bound is looser than the other members.

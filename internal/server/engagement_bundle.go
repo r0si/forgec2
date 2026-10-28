@@ -261,6 +261,15 @@ func (s *Server) handleEngagementBundle(c *gin.Context) {
 		fail()
 		return
 	}
+	// failures.json - the exercise's failures grouped by SHAPE, using the same normalisation as the live signature view, so a
+	// reviewer reads "eleven hosts timed out on the same scan" instead of eleven rows that happen to look similar.
+	if len(agentIDs) > 0 && !add("failures.json", func(w bundleWriter) error {
+		return writeJSONMember(w, "failures.json", buildEngagementFailures(windowTasks))
+	}) {
+		fail()
+		return
+	}
+
 	// iocs.json - the indicators extracted from the engagement hosts, using the same extractor as the IOC export so
 	// the bundle and the export cannot disagree about what counts as an indicator.
 	if !add("iocs.json", func(w bundleWriter) error {

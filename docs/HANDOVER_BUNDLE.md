@@ -18,6 +18,7 @@ after-action reviewer needs.
 | `agents.json` | The hosts the engagement covered. | shareable |
 | `credentials.json` | Credentials found: **metadata only**, no passwords or hashes. | metadata only by design; retrieve secrets in the console where access is audited |
 | `iocs.json` | Indicators extracted from the engagement hosts. | bound is a day count spanning the engagement, not the exact window |
+| `failures.json` | The window's failures grouped by **shape** (paths, ids and digits collapsed), with reason codes and the hosts affected. | shareable: error text, not secrets |
 | `plugins.json` | The plugin set the work depended on, with package digests. | shareable |
 | `MANIFEST.json` | The package describing itself: purpose, source, sensitivity and SHA-256 for every member. | shareable |
 
