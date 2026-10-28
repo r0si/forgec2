@@ -58,6 +58,7 @@ func (s *Server) registerAgentRoutes(auth *gin.RouterGroup) {
 		agentsWrite.POST("/agents/:id/note", s.handleUpdateNote)
 		agentsWrite.POST("/agents/:id/tasks/:taskId/cancel", s.handleCancelTask)
 		agentsWrite.POST("/agents/:id/task/:taskId/rerun", s.handleRerunTask)
+		agentsWrite.POST("/api/agents/:id/tasks/rerun-failed", s.handleRerunFailedTasks)
 		agentsWrite.POST("/agents/batch", s.handleBatchCommand)
 		agentsWrite.POST("/agents/bulk/task", s.handleBatchCommand)
 		agentsWrite.GET("/agents/bulk/results", s.handleBulkResults)

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/forgec2/forgec2/internal/db"
@@ -181,11 +180,7 @@ func (s *Server) handleRerunTask(c *gin.Context) {
 		return
 	}
 
-	// Don't allow rerun of control/monitoring tasks
-	noRerun := map[string]bool{
-		"kill_agent": true, "screen_stream_start": true, "screen_stream_stop": true,
-	}
-	if noRerun[original.Type] {
+	if noRerunTaskTypes[original.Type] {
 		respondError(c, http.StatusBadRequest, "cannot rerun this task type")
 		return
 	}
@@ -194,13 +189,9 @@ func (s *Server) handleRerunTask(c *gin.Context) {
 	// soft-lock gate applies, like every other creation path). The original
 	// idempotency key carries over: rerunning a live keyed task returns the
 	// live row instead of stacking a duplicate.
-	opts := callerOpts(c)
-	if key := strings.TrimSpace(original.IdempotencyKey); key != "" {
-		opts = append(opts, WithIdempotencyKey(key))
-	}
-	newTask, err := s.createTask(agentID, original.Type, original.Command, original.Shell, original.Path, original.Data, original.Offset, original.Size, opts...)
-	if err != nil {
-		respondTaskError(c, err)
+	newTask, reason := s.rerunTaskAsNew(c, agentID, &original)
+	if newTask == nil {
+		respondError(c, http.StatusBadRequest, reason)
 		return
 	}
 
