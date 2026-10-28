@@ -16,7 +16,7 @@ import (
 // being created - which is exactly when the CSV's most interesting columns change.
 //
 // Weak on purpose: equal tags mean "equivalent for the reader", not byte-identical.
-func (s *Server) taskExportETag(c *gin.Context, limit int) string {
+func (s *Server) taskExportETag(c *gin.Context, limit int, format string) string {
 	var newest struct {
 		ID        uint
 		UpdatedAt string
@@ -29,6 +29,8 @@ func (s *Server) taskExportETag(c *gin.Context, limit int) string {
 	}
 	// Passed through weakETag like every other tag: one renderer, one escaper. Building the header
 	// value with a raw format string meant a second sanitiser had to exist for the timestamp.
-	return weakETag(fmt.Sprintf("v1-%d-max=%d-upd=%s-limit=%d",
-		s.currentTenantID(c), newest.ID, newest.UpdatedAt, limit))
+	// The format is part of the tag: the CSV and the JSON of the same rows are different documents, and a
+	// client that revalidated the CSV must not be told 304 when it asks for the JSON.
+	return weakETag(fmt.Sprintf("v1-%d-max=%d-upd=%s-limit=%d-fmt=%s",
+		s.currentTenantID(c), newest.ID, newest.UpdatedAt, limit, format))
 }

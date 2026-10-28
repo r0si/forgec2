@@ -160,7 +160,12 @@ func (s *Server) handleExportTasks(c *gin.Context) {
 	}
 	// Revalidation before the query: a client that already holds this export gets a bodiless 304 and
 	// costs neither side the read.
-	exportETag := s.taskExportETag(c, limit)
+	format := strings.ToLower(strings.TrimSpace(c.DefaultQuery("format", "csv")))
+	if format != "csv" && format != "json" {
+		respondError(c, http.StatusBadRequest, `invalid format (expected "csv" or "json")`)
+		return
+	}
+	exportETag := s.taskExportETag(c, limit, format)
 	if exportETag != "" {
 		c.Header("ETag", exportETag)
 		c.Header("Cache-Control", "private, no-cache")
@@ -255,6 +260,38 @@ func (s *Server) handleExportTasks(c *gin.Context) {
 	c.Header("Content-Type", "text/csv; charset=utf-8")
 	// The timestamp keeps two exports from the same day from overwriting each other in the browser.
 	c.Header("Content-Disposition", `attachment; filename="forgec2_tasks_`+time.Now().Format("2006-01-02_150405")+`.csv"`)
+	if format == "json" {
+		// The same rows, the same redaction and the same truncation as the CSV, so a script does not have to
+		// parse a spreadsheet to read them and two consumers cannot disagree about what a cell contained.
+		rows := make([]gin.H, 0, len(tasks))
+		for _, t := range tasks {
+			agentName := ""
+			if t.Agent.Hostname != "" {
+				agentName = t.Agent.Hostname
+			}
+			rows = append(rows, gin.H{
+				"time":       t.CreatedAt.Format("2006-01-02 15:04:05"),
+				"agent":      agentName,
+				"agent_id":   t.AgentID,
+				"type":       t.Type,
+				"command":    t.Command,
+				"result":     redactSensitiveResultForAuxiliary(t.Type, truncateString(t.Result, CSVResultTruncLen)),
+				"error":      truncateString(t.Error, CSVErrorTruncLen),
+				"status":     t.Status,
+				"task_id":    t.ID,
+				"engagement": engagementNames[t.AgentID],
+			})
+		}
+		c.Header("Content-Type", "application/json; charset=utf-8")
+		c.Header("Content-Disposition", `attachment; filename="forgec2_tasks_`+time.Now().Format("2006-01-02_150405")+`.json"`)
+		c.JSON(http.StatusOK, gin.H{
+			"count":     len(rows),
+			"truncated": len(tasks) >= limit,
+			"format":    "json",
+			"tasks":     rows,
+		})
+		return
+	}
 	c.Data(http.StatusOK, "text/csv; charset=utf-8", buf.Bytes())
 }
 

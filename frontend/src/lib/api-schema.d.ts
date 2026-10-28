@@ -13705,6 +13705,8 @@ export interface operations {
                 until?: string;
                 /** @description Engagement id, or "none" for agents in no exercise */
                 engagement?: string;
+                /** @description csv (default) or json. The JSON variant carries the same rows, the same redaction and the same column truncation, so a script and a spreadsheet never disagree about what a cell held; the format is part of the ETag, so a revalidated CSV cannot answer a JSON request with 304. */
+                format?: "csv" | "json";
             };
             header?: never;
             path?: never;
