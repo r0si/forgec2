@@ -175,29 +175,31 @@ func (s *Server) buildSituationSnapshot() string {
 // ── Sensitive command guard ───────────────────────────────────────────────
 
 var sensitiveCommandKeywords = map[string]bool{
-	"mimikatz":        true,
-	"secretsdump":     true,
-	"dcsync":          true,
-	"kerberoast":      true,
-	"psexec":          true,
-	"wce":             true,
-	"bloodhound":      true,
-	"sharphound":      true,
-	"sekurlsa":        true,
-	"lsass":           true,
-	"sam":             true,
-	"wdigest":         true,
-	"ntdsutil":        true,
-	"comsvcs":         true,
-	"rubeus":          true,
-	"sharpkatz":       true,
-	"kiwi":            true,
-	"invoke-mimikatz": true,
-	"ntds":            true,
-	"shadowcopy":      true,
-	"shadow copy":     true,
-	"procdump":        true,
+	// Credential dumping.
+	"mimikatz": true, "secretsdump": true, "dcsync": true, "kerberoast": true, "psexec": true,
+	"wce": true, "bloodhound": true, "sharphound": true, "sekurlsa": true, "lsass": true,
+	"sam": true, "wdigest": true, "ntdsutil": true, "comsvcs": true, "rubeus": true,
+	"sharpkatz": true, "kiwi": true, "invoke mimikatz": true, "ntds": true, "shadowcopy": true,
+	"procdump": true, "vssadmin": true,
+	// Account and privilege changes. These are the commands a "run my shell command" tool reaches
+	// for when it wants to turn access into persistence.
+	"net user": true, "net localgroup": true, "net group": true, "useradd": true, "usermod": true,
+	"passwd": true, "chpasswd": true, "dsadd": true, "dsmod": true,
+	// Persistence and defence evasion.
+	"schtasks": true, "sc create": true, "reg add": true, "bcdedit": true, "wevtutil": true,
+	"auditpol": true, "new service": true, "register scheduledtask": true,
+	// Impact: destructive or availability-affecting.
+	"cipher": true, "format": true, "diskpart": true, "shutdown": true, "vssadmin delete": true,
+	"rm rf": true, "del f": true, "rd s": true,
+	// Remote-execution and LOLBin delivery shims.
+	"certutil": true, "bitsadmin": true, "mshta": true, "rundll32": true, "regsvr32": true,
+	"wmic": true, "msiexec": true,
 }
+
+// Phrases are matched against the NORMALISED text, so a multi-word key must be spelled the way
+// normalisation leaves it: "rm -rf" has to be "rm rf", because "-" becomes a space. (A key with a
+// hyphen would never match, which is how "rm -rf /var/log" slipped through.)
+func sensitivePhrase(key string) bool { return len(strings.Fields(key)) > 1 }
 
 func isSensitiveCommand(cmd string) bool {
 	// Normalize: lower, replace punctuation with space, collapse spaces
@@ -207,8 +209,23 @@ func isSensitiveCommand(cmd string) bool {
 	norm := repl.Replace(lower)
 	// Remove extra spaces
 	norm = strings.Join(strings.Fields(norm), " ")
+	// Match on TOKENS, not substrings: the previous strings.Contains pass made "sam" match "same",
+	// "sample" and "samsung", so benign commands were sent to approval - and it still missed every
+	// administrative or destructive command that was not a credential dumper (net user /add,
+	// schtasks /create, wevtutil cl, ...), which is exactly what the flag was meant to catch.
+	tokens := make(map[string]bool)
+	for _, token := range strings.Fields(norm) {
+		tokens[token] = true
+	}
+	padded := " " + norm + " "
 	for kw := range sensitiveCommandKeywords {
-		if strings.Contains(norm, kw) || strings.Contains(lower, kw) {
+		if sensitivePhrase(kw) {
+			if strings.Contains(padded, " "+kw+" ") {
+				return true
+			}
+			continue
+		}
+		if tokens[kw] {
 			return true
 		}
 	}
