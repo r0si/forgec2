@@ -155,6 +155,12 @@ by hand at least once; do not weaken one to make a change pass — fix the chang
   once the free tier is exhausted, and the decoder turned both into empty fields with no explanation.
   The gate requires a `StatusCode` check within 45 lines of any `http.Client.Do` /
   `http.Get/Post/Head/PostForm`; 13 such calls currently comply, and the allowlist is empty.
+- `check:guarded-clients` (`frontend/scripts/check-guarded-clients.mjs`) — the outbound-client guard has
+  exactly **one** implementation. `ssrfSafeClient` and `aiSSRFClient` were the same construct written
+  twice and rounds 232/233 fixed the zero-timeout hole **one copy at a time**; both now call
+  `guardedClient(base, fallbackTimeout, validate)`. The gate fails if `Timeout: base.Timeout` or
+  `base = http.DefaultClient` appears outside `guarded_client.go`, so a future copy cannot reintroduce
+  the half-fixed state.
 - `check:docs` (`gen-command-reference.mjs --check` + `gen-capability-matrix.mjs --check`) —
   the generated docs must match their sources: the command reference, and the **generated
   task-inventory block** plus the version stamp in `docs/CAPABILITY_MATRIX.md`. CI runs these

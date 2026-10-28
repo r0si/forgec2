@@ -99,30 +99,11 @@ func validateExternalURL(raw string) error {
 	return nil
 }
 
-// ssrfSafeClient returns an HTTP client that validates every redirect hop
-// before following it, so a public fetch cannot pivot into internal targets.
+// ssrfSafeClient returns an HTTP client that validates every redirect hop before following it, so
+// a public fetch cannot pivot into internal targets. The shared guardedClient supplies the redirect
+// cap and the timeout fallback.
 func ssrfSafeClient(base *http.Client) *http.Client {
-	if base == nil {
-		base = http.DefaultClient
-	}
-	// A zero Timeout means "wait forever": http.DefaultClient (the nil fallback) has none, and so
-	// does any hand-built client. Every other outbound path in the tree sets one, so the fallback
-	// inherits the same short bound rather than turning a blackholed host into a stuck goroutine.
-	timeout := base.Timeout
-	if timeout <= 0 {
-		timeout = HTTPClientShortTimeout
-	}
-	c := &http.Client{
-		Timeout:   timeout,
-		Transport: base.Transport,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) >= 5 {
-				return errors.New("too many redirects")
-			}
-			return validateExternalURL(req.URL.String())
-		},
-	}
-	return c
+	return guardedClient(base, HTTPClientShortTimeout, validateExternalURL)
 }
 
 func (s *Server) handleAutomationPage(c *gin.Context) {

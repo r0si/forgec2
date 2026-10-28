@@ -179,24 +179,7 @@ func aiAllowlistHint(u *url.URL) string {
 // as a springboard: a redirect to a non-allowlisted private address is still
 // refused.
 func (s *Server) aiSSRFClient(base *http.Client) *http.Client {
-	if base == nil {
-		base = http.DefaultClient
-	}
-	// Same hole ssrfSafeClient had (round 232): a zero Timeout means "wait forever", and the nil
-	// fallback is http.DefaultClient, which has none. AI endpoints are slow, so the fallback is the
-	// LONG bound rather than the short one - but it is a bound.
-	timeout := base.Timeout
-	if timeout <= 0 {
-		timeout = HTTPClientLongTimeout
-	}
-	return &http.Client{
-		Timeout:   timeout,
-		Transport: base.Transport,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) >= 5 {
-				return errors.New("too many redirects")
-			}
-			return s.validateAIEndpoint(req.URL.String())
-		},
-	}
+	// One shared constructor: this used to be a hand-rolled copy of ssrfSafeClient that missed the
+	// timeout guard. AI calls are slow, so the fallback is the long bound - but it is a bound.
+	return guardedClient(base, HTTPClientLongTimeout, s.validateAIEndpoint)
 }
