@@ -30,8 +30,13 @@ func (w *hashingBundleWriter) Create(name string) (io.Writer, error) {
 	if err != nil {
 		return nil, err
 	}
-	h := &memberHasher{inner: file, hash: sha256.New(), name: name, owner: w}
-	return h, nil
+	// Record the digest of the EMPTY file up front: a member that legitimately ends up with no bytes (an
+	// audit.ndjson for a window with no actions) must still publish a digest, or a receiver cannot distinguish
+	// "empty" from "unverifiable".
+	empty := sha256.New()
+	w.digests[name] = hex.EncodeToString(empty.Sum(nil))
+	w.bytes[name] = 0
+	return &memberHasher{inner: file, hash: sha256.New(), name: name, owner: w}, nil
 }
 
 // memberHasher feeds the bytes to both the archive and the digest.

@@ -311,3 +311,155 @@ func keysOf(m map[string][]byte) []string {
 	}
 	return out
 }
+
+// TestEngagementBundleVerify covers the receiving side: an uploaded bundle is checked against its own manifest.
+//
+// The property worth pinning is that it detects damage while being honest about what it cannot detect: the digests are
+// unkeyed and the manifest travels inside the archive, so a wholesale rebuild verifies.
+func TestEngagementBundleVerify(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	s := mustTenantServer(t)
+
+	now := time.Now().Truncate(time.Second)
+	engagement := db.Engagement{TenantID: 1, Name: "DMZ exercise", StartsAt: now.Add(-2 * time.Hour), EndsAt: now.Add(-time.Hour)}
+	if err := s.db.Create(&engagement).Error; err != nil {
+		t.Fatalf("seed engagement: %v", err)
+	}
+	if err := s.db.Create(&db.Implant{
+		ID: "a-1", TenantID: 1, Hostname: "web-01", Status: "online", LastSeen: now, EngagementID: &engagement.ID,
+	}).Error; err != nil {
+		t.Fatalf("seed agent: %v", err)
+	}
+
+	// Produce a real bundle through the handler, so the fixture is never a hand-built zip.
+	buildRecorder := httptest.NewRecorder()
+	buildCtx, _ := gin.CreateTestContext(buildRecorder)
+	buildCtx.Request = httptest.NewRequest(http.MethodGet, "/api/engagements/1/bundle", nil)
+	buildCtx.Params = gin.Params{{Key: "id", Value: itoaUint(engagement.ID)}}
+	buildCtx.Set("user", "op")
+	buildCtx.Set("user_role", db.RoleAdmin)
+	buildCtx.Set("user_id", uint(1))
+	buildCtx.Set(middleware.TenantIDContextKey, uint(1))
+	s.handleEngagementBundle(buildCtx)
+	if buildRecorder.Code != http.StatusOK {
+		t.Fatalf("building the bundle failed: %d (%s)", buildRecorder.Code, buildRecorder.Body.String())
+	}
+	archiveBytes := buildRecorder.Body.Bytes()
+
+	verify := func(body []byte) (int, map[string]interface{}) {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest(http.MethodPost, "/api/engagements/1/bundle/verify", bytes.NewReader(body))
+		c.Request.Header.Set("Content-Type", "application/zip")
+		c.Params = gin.Params{{Key: "id", Value: itoaUint(engagement.ID)}}
+		c.Set("user", "op")
+		c.Set("user_role", db.RoleAdmin)
+		c.Set("user_id", uint(1))
+		c.Set(middleware.TenantIDContextKey, uint(1))
+		s.handleVerifyEngagementBundle(c)
+		var resp struct {
+			Data map[string]interface{} `json:"data"`
+		}
+		_ = json.Unmarshal(w.Body.Bytes(), &resp)
+		return w.Code, resp.Data
+	}
+
+	// 1. The bundle verifies against its own manifest.
+	code, data := verify(archiveBytes)
+	if code != http.StatusOK {
+		t.Fatalf("verify status = %d", code)
+	}
+	if data["ok"] != true {
+		t.Fatalf("a freshly built bundle did not verify: %v", data)
+	}
+	checked, _ := data["checked"].(float64)
+	verified, _ := data["verified"].(float64)
+	if checked == 0 || verified != checked-1 { // every member but MANIFEST.json
+		t.Fatalf("checked = %v, verified = %v", data["checked"], data["verified"])
+	}
+	// It says what it cannot prove.
+	if note, _ := data["note"].(string); !strings.Contains(note, "unkeyed") {
+		t.Fatalf("the response does not state the limitation: %q", note)
+	}
+
+	// 2. A single flipped byte inside a member is detected.
+	corrupted := corruptZipMember(t, archiveBytes, "tasks.csv")
+	code, data = verify(corrupted)
+	if code != http.StatusOK {
+		t.Fatalf("verify status = %d", code)
+	}
+	if data["ok"] != false {
+		t.Fatalf("a corrupted bundle verified: %v", data)
+	}
+	problems, _ := data["mismatched"].([]interface{})
+	if len(problems) == 0 {
+		t.Fatalf("no problem was reported for the corrupted member: %v", data)
+	}
+
+	// 3. A zip without a manifest cannot be verified against anything.
+	code, _ = verify(makeZip(t, map[string]string{"notes.txt": "hello"}))
+	if code != http.StatusBadRequest {
+		t.Fatalf("a zip without MANIFEST.json = %d, want 400", code)
+	}
+
+	// 4. A body that is not a zip is refused rather than parsed.
+	if code, _ := verify([]byte("not a zip at all")); code != http.StatusBadRequest {
+		t.Fatalf("a non-zip body = %d, want 400", code)
+	}
+}
+
+// corruptZipMember rewrites one member with different bytes, leaving the rest of the archive intact.
+func corruptZipMember(t *testing.T, raw []byte, victim string) []byte {
+	t.Helper()
+	reader, err := zip.NewReader(bytes.NewReader(raw), int64(len(raw)))
+	if err != nil {
+		t.Fatalf("open archive: %v", err)
+	}
+	var buf bytes.Buffer
+	writer := zip.NewWriter(&buf)
+	for _, file := range reader.File {
+		content := []byte("replaced")
+		if file.Name != victim {
+			handle, err := file.Open()
+			if err != nil {
+				t.Fatalf("open %s: %v", file.Name, err)
+			}
+			content, err = io.ReadAll(handle)
+			_ = handle.Close()
+			if err != nil {
+				t.Fatalf("read %s: %v", file.Name, err)
+			}
+		}
+		out, err := writer.Create(file.Name)
+		if err != nil {
+			t.Fatalf("create %s: %v", file.Name, err)
+		}
+		if _, err := out.Write(content); err != nil {
+			t.Fatalf("write %s: %v", file.Name, err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close archive: %v", err)
+	}
+	return buf.Bytes()
+}
+
+// makeZip builds a small archive for the negative cases.
+func makeZip(t *testing.T, files map[string]string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	writer := zip.NewWriter(&buf)
+	for name, content := range files {
+		out, err := writer.Create(name)
+		if err != nil {
+			t.Fatalf("create %s: %v", name, err)
+		}
+		if _, err := out.Write([]byte(content)); err != nil {
+			t.Fatalf("write %s: %v", name, err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+	return buf.Bytes()
+}

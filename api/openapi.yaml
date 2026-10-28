@@ -3719,6 +3719,77 @@ paths:
           description: No such engagement in the caller's tenant
         '413':
           description: The bundle would exceed the size cap; export the parts separately
+  /api/engagements/{id}/bundle/verify:
+    post:
+      tags: [Engagements]
+      summary: Check an uploaded bundle against its own manifest
+      description: >-
+        The receiving side of a handover. A bundle travels - emailed, copied, re-zipped, sometimes transcoded by a mail
+        gateway - and `MANIFEST.json` publishes a SHA-256 per member, so this re-computes them from the uploaded archive
+        and reports what is intact, what changed, what is missing, what arrived unlisted, and which members published no
+        digest (`MANIFEST.json` itself, by construction). **What it proves and what it does not:** the digests are
+        **unkeyed** and the manifest travels **inside** the archive, so a deliberate rebuild of every member and every
+        digest verifies. Like the audit chain, this detects damage and partial edits, not an adversary who redoes the
+        whole package; the response says so in a `note` rather than implying more.
+      operationId: verifyEngagementBundle
+      security:
+        - SessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The engagement the bundle belongs to (must be visible to the caller)
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          application/zip:
+            schema: {type: string, format: binary}
+      responses:
+        '200':
+          description: The verdict, with per-member problems
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  data:
+                    type: object
+                    properties:
+                      ok: {type: boolean, description: True when nothing mismatched, was missing or arrived unlisted}
+                      checked: {type: integer}
+                      verified: {type: integer}
+                      mismatched:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            name: {type: string}
+                            problem: {type: string}
+                      unverifiable:
+                        type: array
+                        description: Members with no published digest
+                        items:
+                          type: object
+                          properties:
+                            name: {type: string}
+                            problem: {type: string}
+                      extra:
+                        type: array
+                        description: Members present in the archive but not listed in the manifest
+                        items: {type: string}
+                      engagement:
+                        type: object
+                        properties:
+                          id: {type: integer}
+                          name: {type: string}
+                      generated_at: {type: string}
+                      note: {type: string, description: The stated limitation of an unkeyed, self-contained manifest}
+        '400':
+          description: Empty or non-zip body, missing MANIFEST.json, or a manifest that is not valid JSON
+        '404':
+          description: No such engagement in the caller's tenant
   /api/engagements/expiry:
     get:
       tags: [Engagements]

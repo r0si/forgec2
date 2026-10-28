@@ -2054,6 +2054,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/engagements/{id}/bundle/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check an uploaded bundle against its own manifest
+         * @description The receiving side of a handover. A bundle travels - emailed, copied, re-zipped, sometimes transcoded by a mail gateway - and `MANIFEST.json` publishes a SHA-256 per member, so this re-computes them from the uploaded archive and reports what is intact, what changed, what is missing, what arrived unlisted, and which members published no digest (`MANIFEST.json` itself, by construction). **What it proves and what it does not:** the digests are **unkeyed** and the manifest travels **inside** the archive, so a deliberate rebuild of every member and every digest verifies. Like the audit chain, this detects damage and partial edits, not an adversary who redoes the whole package; the response says so in a `note` rather than implying more.
+         */
+        post: operations["verifyEngagementBundle"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/engagements/expiry": {
         parameters: {
             query?: never;
@@ -15152,6 +15172,73 @@ export interface operations {
             };
             /** @description The bundle would exceed the size cap; export the parts separately */
             413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    verifyEngagementBundle: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The engagement the bundle belongs to (must be visible to the caller) */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/zip": string;
+            };
+        };
+        responses: {
+            /** @description The verdict, with per-member problems */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        data?: {
+                            /** @description True when nothing mismatched */
+                            ok?: boolean;
+                            checked?: number;
+                            verified?: number;
+                            mismatched?: {
+                                name?: string;
+                                problem?: string;
+                            }[];
+                            /** @description Members with no published digest */
+                            unverifiable?: {
+                                name?: string;
+                                problem?: string;
+                            }[];
+                            /** @description Members present in the archive but not listed in the manifest */
+                            extra?: string[];
+                            engagement?: {
+                                id?: number;
+                                name?: string;
+                            };
+                            generated_at?: string;
+                            /** @description The stated limitation of an unkeyed */
+                            note?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Empty or non-zip body, missing MANIFEST.json, or a manifest that is not valid JSON */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such engagement in the caller's tenant */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
