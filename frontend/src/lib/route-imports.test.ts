@@ -27,6 +27,9 @@ describe("ROUTE_PAGE_IMPORTS", () => {
     }
   });
 
+  // 30s: this imports EVERY page module, and under the full parallel suite the dynamic imports pull
+  // the large vendor chunks too, which blows the 5s default. It passed in isolation (1-2s) and timed
+  // out in `npm run test` - a flaky guard is worse than none.
   it("maps every id to a lazy loader that returns a promise", async () => {
     for (const [id, load] of Object.entries(ROUTE_PAGE_IMPORTS)) {
       expect(typeof load, id).toBe("function");
@@ -34,7 +37,7 @@ describe("ROUTE_PAGE_IMPORTS", () => {
       expect(mod, id).toBeTruthy();
       expect("default" in mod, `${id} has no default export`).toBe(true);
     }
-  });
+  }, 30_000);
 });
 
 describe("sidebar navigation", () => {
