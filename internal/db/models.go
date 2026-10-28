@@ -430,18 +430,18 @@ func (t *Task) EncryptTaskFields() error {
 // AuditLog represents a security audit log entry
 type AuditLog struct {
 	ID        uint      `gorm:"primaryKey" json:"id"`
-	User      string    `json:"user"`                      // username or "system"
-	Action    string    `gorm:"index" json:"action"`       // action type: login, logout, command, delete, etc.
-	Resource  string    `json:"resource"`                  // affected resource
-	AgentID   string    `gorm:"index" json:"agent_id"`     // related agent ID if applicable
-	TenantID  uint      `gorm:"index" json:"tenant_id"`    // owning tenant; 0 = legacy/unscoped (visible to all)
-	IP        string    `json:"ip"`                        // client IP address
-	Success   bool      `json:"success"`                   // whether the action succeeded
-	Error     string    `json:"error"`                     // error message if failed
-	Details   string    `json:"details"`                   // additional details
-	PrevHash  string    `gorm:"size:64" json:"prev_hash"`  // SHA-256 of the previous audit entry (append-only hash chain)
-	EntryHash string    `gorm:"size:64" json:"entry_hash"` // SHA-256 hash of this entry (covers all fields)
-	CreatedAt time.Time `gorm:"index" json:"created_at"`
+	User      string    `json:"user"`                                                          // username or "system"
+	Action    string    `gorm:"index;index:idx_audit_action_time,priority:1" json:"action"`    // action type: login, logout, command, delete, etc.
+	Resource  string    `json:"resource"`                                                      // affected resource
+	AgentID   string    `gorm:"index" json:"agent_id"`                                         // related agent ID if applicable
+	TenantID  uint      `gorm:"index;index:idx_audit_tenant_time,priority:1" json:"tenant_id"` // owning tenant; 0 = legacy/unscoped (visible to all)
+	IP        string    `json:"ip"`                                                            // client IP address
+	Success   bool      `json:"success"`                                                       // whether the action succeeded
+	Error     string    `json:"error"`                                                         // error message if failed
+	Details   string    `json:"details"`                                                       // additional details
+	PrevHash  string    `gorm:"size:64" json:"prev_hash"`                                      // SHA-256 of the previous audit entry (append-only hash chain)
+	EntryHash string    `gorm:"size:64" json:"entry_hash"`                                     // SHA-256 hash of this entry (covers all fields)
+	CreatedAt time.Time `gorm:"index;index:idx_audit_action_time,priority:2;index:idx_audit_tenant_time,priority:2" json:"created_at"`
 }
 
 // Listener represents a C2 listener profile for agents to connect to.
@@ -1509,8 +1509,8 @@ type Notification struct {
 	AgentID   string    `gorm:"size:36;index" json:"agent_id"`
 	TaskID    uint      `json:"task_id,omitempty"`
 	Severity  string    `gorm:"size:20;default:'info'" json:"severity"`
-	Read      bool      `gorm:"default:false;index" json:"read"`
-	CreatedAt time.Time `json:"created_at"`
+	Read      bool      `gorm:"default:false;index;index:idx_notif_read_time,priority:1" json:"read"`
+	CreatedAt time.Time `gorm:"index:idx_notif_read_time,priority:2" json:"created_at"`
 }
 
 func (Notification) TableName() string { return "notifications" }
