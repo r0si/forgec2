@@ -3,7 +3,9 @@ package server
 import (
 	"archive/zip"
 	"bytes"
+	"crypto/sha256"
 	"encoding/csv"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -219,6 +221,8 @@ func TestEngagementBundle(t *testing.T) {
 			Purpose     string `json:"purpose"`
 			Source      string `json:"source"`
 			Sensitivity string `json:"sensitivity"`
+			SHA256      string `json:"sha256"`
+			Bytes       int    `json:"bytes"`
 		} `json:"members"`
 	}
 	if err := json.Unmarshal(members["MANIFEST.json"], &manifest); err != nil {
@@ -238,6 +242,30 @@ func TestEngagementBundle(t *testing.T) {
 		}
 		if entry.Name == "audit.ndjson" && !strings.Contains(entry.Sensitivity, "verifiable") {
 			t.Fatalf("audit.ndjson is not described as verifiable: %+v", entry)
+		}
+	}
+	// Every member except the manifest carries the digest of the bytes that were written, and that digest is the
+	// digest of what the receiver actually unzips - that is the whole point of publishing it.
+	for _, entry := range manifest.Members {
+		content, present := members[entry.Name]
+		if !present {
+			continue // the reverse check below reports it
+		}
+		if entry.Name == "MANIFEST.json" {
+			if entry.SHA256 != "" {
+				t.Fatalf("MANIFEST.json claims a digest of itself: %q", entry.SHA256)
+			}
+			continue
+		}
+		if entry.SHA256 == "" || entry.Bytes == 0 {
+			t.Fatalf("%s has no digest in the manifest: %+v", entry.Name, entry)
+		}
+		if entry.Bytes != len(content) {
+			t.Fatalf("%s byte count = %d, the archive holds %d", entry.Name, entry.Bytes, len(content))
+		}
+		sum := sha256.Sum256(content)
+		if got := hex.EncodeToString(sum[:]); got != entry.SHA256 {
+			t.Fatalf("%s digest = %q, manifest says %q", entry.Name, got, entry.SHA256)
 		}
 	}
 	for name := range members {

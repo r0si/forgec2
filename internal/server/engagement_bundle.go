@@ -63,8 +63,11 @@ func (s *Server) handleEngagementBundle(c *gin.Context) {
 	// written records the members that were actually added; MANIFEST.json is generated from it.
 	var written []string
 	archive := zip.NewWriter(&buf)
-	add := func(name string, write func(*zip.Writer) error) bool {
-		if err := write(archive); err != nil {
+	// recorder hashes every member as it is written, so the manifest can carry a digest a receiver can check after
+	// the bundle has travelled.
+	recorder := &hashingBundleWriter{inner: archive, digests: map[string]string{}, bytes: map[string]int{}}
+	add := func(name string, write func(bundleWriter) error) bool {
+		if err := write(recorder); err != nil {
 			slog.Error("Failed to build an engagement bundle member", "engagement_id", engagement.ID, "member", name, "err", err)
 			return false
 		}
@@ -80,7 +83,7 @@ func (s *Server) handleEngagementBundle(c *gin.Context) {
 	// summary.md - the human-facing document.
 	var markdown bytes.Buffer
 	writeEngagementMarkdown(&markdown, summary)
-	if !add("summary.md", func(w *zip.Writer) error {
+	if !add("summary.md", func(w bundleWriter) error {
 		f, err := w.Create("summary.md")
 		if err != nil {
 			return err
@@ -108,7 +111,7 @@ func (s *Server) handleEngagementBundle(c *gin.Context) {
 	}
 
 	// tasks.csv - the same columns the export offers, in the default order.
-	if len(agentIDs) > 0 && !add("tasks.csv", func(w *zip.Writer) error {
+	if len(agentIDs) > 0 && !add("tasks.csv", func(w bundleWriter) error {
 		tasks := windowTasks
 		f, err := w.Create("tasks.csv")
 		if err != nil {
@@ -146,7 +149,7 @@ func (s *Server) handleEngagementBundle(c *gin.Context) {
 	}
 
 	// timeline.md - the exercise as a chronological narrative, for someone who will not open a spreadsheet.
-	if !add("timeline.md", func(w *zip.Writer) error {
+	if !add("timeline.md", func(w bundleWriter) error {
 		f, err := w.Create("timeline.md")
 		if err != nil {
 			return err
@@ -159,7 +162,7 @@ func (s *Server) handleEngagementBundle(c *gin.Context) {
 	}
 
 	// audit.ndjson - the verification-relevant rows of the window, with every hashed field.
-	if !add("audit.ndjson", func(w *zip.Writer) error {
+	if !add("audit.ndjson", func(w bundleWriter) error {
 		rows := windowAudit
 		f, err := w.Create("audit.ndjson")
 		if err != nil {
@@ -185,7 +188,7 @@ func (s *Server) handleEngagementBundle(c *gin.Context) {
 	}
 
 	// agents.json and plugins.json - what the exercise covered and what it depended on.
-	if !add("agents.json", func(w *zip.Writer) error {
+	if !add("agents.json", func(w bundleWriter) error {
 		f, err := w.Create("agents.json")
 		if err != nil {
 			return err
@@ -200,7 +203,7 @@ func (s *Server) handleEngagementBundle(c *gin.Context) {
 	// credentials.json - METADATA ONLY. A handover bundle leaves the console: it gets emailed, put on a share, attached
 	// to a report. Shipping passwords and hashes in it would move live secrets out of the system that audits their use,
 	// so the file records what was found and where, and says where the secrets live instead.
-	if !add("credentials.json", func(w *zip.Writer) error {
+	if !add("credentials.json", func(w bundleWriter) error {
 		var credentials []db.CredentialEntry
 		if len(agentIDs) > 0 {
 			if err := s.tenantScope(s.db.WithContext(s.ctx).Model(&db.CredentialEntry{}), c).
@@ -246,7 +249,7 @@ func (s *Server) handleEngagementBundle(c *gin.Context) {
 	}
 	// iocs.json - the indicators extracted from the engagement hosts, using the same extractor as the IOC export so
 	// the bundle and the export cannot disagree about what counts as an indicator.
-	if !add("iocs.json", func(w *zip.Writer) error {
+	if !add("iocs.json", func(w bundleWriter) error {
 		scope := s.db.Model(&db.Implant{}).Select("id").Where("engagement_id = ?", engagement.ID)
 		// The extractor takes a day count rather than a window: give it the span of the engagement, rounded up, and
 		// say so in the file, because a reader deserves to know this bound is looser than the others.
@@ -277,7 +280,7 @@ func (s *Server) handleEngagementBundle(c *gin.Context) {
 		fail()
 		return
 	}
-	if !add("plugins.json", func(w *zip.Writer) error {
+	if !add("plugins.json", func(w bundleWriter) error {
 		f, err := w.Create("plugins.json")
 		if err != nil {
 			return err
@@ -292,11 +295,11 @@ func (s *Server) handleEngagementBundle(c *gin.Context) {
 
 	// MANIFEST.json - the package describes itself: what each member is, where it came from, how it may be shared. It
 	// is written last, from the list of members that actually made it into the archive.
-	if !add("MANIFEST.json", func(_ *zip.Writer) error {
+	if !add("MANIFEST.json", func(_ bundleWriter) error {
 		// The manifest lists the members written so far PLUS itself: it is being added right now, and a package that
 		// does not mention its own manifest is a package whose receiver wonders what he is holding.
 		members := append(append([]string{}, written...), "MANIFEST.json")
-		return writeBundleManifest(archive, engagement, windowEnd, now, members)
+		return writeBundleManifest(archive, recorder, engagement, windowEnd, now, members)
 	}) {
 		fail()
 		return

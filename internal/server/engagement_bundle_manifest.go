@@ -1,7 +1,6 @@
 package server
 
 import (
-	"archive/zip"
 	"encoding/json"
 	"time"
 
@@ -15,6 +14,10 @@ type bundleMemberDescription struct {
 	Purpose     string `json:"purpose"`
 	Source      string `json:"source"`
 	Sensitivity string `json:"sensitivity"`
+	// SHA256 is the digest of the member as it was written into the archive, so a receiver can prove that the file
+	// survived email, a copy and a re-zip.
+	SHA256 string `json:"sha256,omitempty"`
+	Bytes  int    `json:"bytes,omitempty"`
 }
 
 // describeBundleMember answers, for each archive member, what it is, where it came from and how it may be shared.
@@ -23,42 +26,54 @@ type bundleMemberDescription struct {
 // to know that audit.ndjson is the verifiable record, that credentials.json deliberately carries no secrets, and that
 // iocs.json is bounded differently from the rest. An unknown member is described honestly rather than guessed at.
 func describeBundleMember(name string) bundleMemberDescription {
+	describe := func(purpose, source, sensitivity string) bundleMemberDescription {
+		return bundleMemberDescription{
+			Name: name, Purpose: purpose, Source: source, Sensitivity: sensitivity,
+		}
+	}
 	switch name {
 	case "summary.md":
-		return bundleMemberDescription{name, "the exercise in one page: window, fleet, outcomes, audited actions",
-			"/api/engagements/:id/summary/export", "shareable"}
+		return describe("the exercise in one page: window, fleet, outcomes, audited actions",
+			"/api/engagements/:id/summary/export", "shareable")
 	case "timeline.md":
-		return bundleMemberDescription{name, "audited actions and task outcomes interleaved by time",
-			"derived from audit.ndjson and tasks.csv", "shareable"}
+		return describe("audited actions and task outcomes interleaved by time",
+			"derived from audit.ndjson and tasks.csv", "shareable")
 	case "tasks.csv":
-		return bundleMemberDescription{name, "the tasks of the engagement hosts inside the window",
-			"/api/tasks/export (default columns)", "contains collected output: review before sharing"}
+		return describe("the tasks of the engagement hosts inside the window",
+			"/api/tasks/export (default columns)", "contains collected output: review before sharing")
 	case "audit.ndjson":
-		return bundleMemberDescription{name, "the audited actions of the window, with both hashes",
-			"/api/audit/export", "verifiable offline; share in full so a gap is never mistaken for a filter"}
+		return describe("the audited actions of the window, with both hashes",
+			"/api/audit/export", "verifiable offline; share in full so a gap is never mistaken for a filter")
 	case "agents.json":
-		return bundleMemberDescription{name, "the hosts the engagement covered", "implants table", "shareable"}
+		return describe("the hosts the engagement covered", "implants table", "shareable")
 	case "credentials.json":
-		return bundleMemberDescription{name, "credentials found: METADATA ONLY, no passwords or hashes",
-			"credential store", "metadata only by design; retrieve secrets in the console where access is audited"}
+		return describe("credentials found: METADATA ONLY, no passwords or hashes",
+			"credential store", "metadata only by design; retrieve secrets in the console where access is audited")
 	case "iocs.json":
-		return bundleMemberDescription{name, "indicators extracted from the engagement hosts",
-			"/api/iocs/export (same extractor)", "bound is a day count spanning the engagement, not the exact window"}
+		return describe("indicators extracted from the engagement hosts",
+			"/api/iocs/export (same extractor)", "bound is a day count spanning the engagement, not the exact window")
 	case "MANIFEST.json":
-		return bundleMemberDescription{name, "this file", "generated", "shareable"}
+		return describe("this file", "generated", "shareable")
 	default:
-		return bundleMemberDescription{name, "undescribed member", "unknown", "review before sharing"}
+		return describe("undescribed member", "unknown", "review before sharing")
 	}
 }
 
 // writeBundleManifest emits MANIFEST.json from the list of members that made it into the archive.
 //
 // It is generated from that list rather than from a hand-written catalogue, so a member cannot be added without
-// appearing here - and the test asserts the two directions agree.
-func writeBundleManifest(archive *zip.Writer, engagement db.Engagement, windowEnd, now time.Time, written []string) error {
+// appearing here - and the test asserts the two directions agree. Each entry carries the digest the recorder captured
+// while the member was written, so the manifest describes what shipped rather than what was intended.
+func writeBundleManifest(archive bundleWriter, recorder *hashingBundleWriter, engagement db.Engagement,
+	windowEnd, now time.Time, written []string) error {
 	members := make([]bundleMemberDescription, 0, len(written))
 	for _, name := range written {
-		members = append(members, describeBundleMember(name))
+		description := describeBundleMember(name)
+		if digest, size := recorder.digestOf(name); digest != "" {
+			description.SHA256 = digest
+			description.Bytes = size
+		}
+		members = append(members, description)
 	}
 	return writeJSONMember(archive, "MANIFEST.json", gin.H{
 		"engagement": gin.H{
@@ -70,12 +85,13 @@ func writeBundleManifest(archive *zip.Writer, engagement db.Engagement, windowEn
 		},
 		"generated_at": now.Format(time.RFC3339),
 		"members":      members,
-		"note":         "each member names its source and its sensitivity; credentials.json is metadata only by design",
+		"note": "each member names its source and its sensitivity; the sha256 is of the member exactly as written, " +
+			"and MANIFEST.json is the only file without one (it cannot contain its own digest)",
 	})
 }
 
 // writeJSONMember encodes value as an indented JSON member of the archive.
-func writeJSONMember(archive *zip.Writer, name string, value interface{}) error {
+func writeJSONMember(archive bundleWriter, name string, value interface{}) error {
 	f, err := archive.Create(name)
 	if err != nil {
 		return err
