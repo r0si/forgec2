@@ -23,6 +23,8 @@ type taskDurationStat struct {
 	P50Ms  float64 `json:"p50_ms"`
 	P95Ms  float64 `json:"p95_ms"`
 	MaxMs  float64 `json:"max_ms"`
+	// Hostname is filled only when group_by=agent, so a caller can show a name instead of an id.
+	Hostname string `json:"hostname,omitempty"`
 }
 
 // handleTaskDurationStats answers "which task types are getting slow" from the task history.
@@ -41,7 +43,7 @@ func (s *Server) handleTaskDurationStats(c *gin.Context) {
 	}
 
 	query := s.tenantScope(s.db.Model(&db.Task{}), c).
-		Select("type, created_at, updated_at").
+		Select("type, agent_id, created_at, updated_at").
 		Where("status IN ?", []string{"completed", "failed"}).
 		Where("created_at >= ?", time.Now().Add(-window)).
 		Where("updated_at > created_at")
@@ -55,17 +57,32 @@ func (s *Server) handleTaskDurationStats(c *gin.Context) {
 		return
 	}
 
-	byType := make(map[string][]float64, 8)
+	// group_by=type answers "which command is slow"; group_by=agent answers "which beacon is slow".
+	// Both are the same question asked of a different key, so the aggregation is shared.
+	groupBy := c.DefaultQuery("group_by", "type")
+	if groupBy != "type" && groupBy != "agent" {
+		respondError(c, http.StatusBadRequest, "invalid group_by (expected type or agent)")
+		return
+	}
+	key := func(row db.Task) string {
+		if groupBy == "agent" {
+			return row.AgentID
+		}
+		return row.Type
+	}
+
+	byKey := make(map[string][]float64, 8)
 	for _, row := range rows {
 		if row.UpdatedAt.IsZero() || row.CreatedAt.IsZero() || !row.UpdatedAt.After(row.CreatedAt) {
 			continue
 		}
-		byType[row.Type] = append(byType[row.Type], float64(row.UpdatedAt.Sub(row.CreatedAt).Milliseconds()))
+		k := key(row)
+		byKey[k] = append(byKey[k], float64(row.UpdatedAt.Sub(row.CreatedAt).Milliseconds()))
 	}
 
-	stats := make([]taskDurationStat, 0, len(byType))
-	for taskType, samples := range byType {
-		stats = append(stats, summariseTaskDurations(taskType, samples))
+	stats := make([]taskDurationStat, 0, len(byKey))
+	for k, samples := range byKey {
+		stats = append(stats, summariseTaskDurations(k, samples))
 	}
 	// Slowest p95 first: the endpoint exists to point at the problem type.
 	sort.Slice(stats, func(i, j int) bool {
@@ -75,12 +92,20 @@ func (s *Server) handleTaskDurationStats(c *gin.Context) {
 		return stats[i].P95Ms > stats[j].P95Ms
 	})
 
+	// The rows are keyed by task type or by agent; name the field after the key so a caller cannot
+	// mistake one for the other.
+	rowsField := "types"
+	if groupBy == "agent" {
+		rowsField = "agents"
+		stats = s.labelDurationGroups(c, stats)
+	}
 	respond(c, gin.H{
 		"since":     c.DefaultQuery("since", "24h"),
+		"group_by":  groupBy,
 		"window_ms": window.Milliseconds(),
 		"sampled":   len(rows),
 		"truncated": len(rows) >= taskDurationSampleLimit,
-		"types":     stats,
+		rowsField:   stats,
 	})
 }
 
@@ -137,4 +162,28 @@ func parseStatsWindow(raw string) (time.Duration, bool) {
 		}
 	}
 	return 0, false
+}
+
+// labelDurationGroups adds the hostname to each agent-keyed row, in one query rather than one per row.
+func (s *Server) labelDurationGroups(c *gin.Context, stats []taskDurationStat) []taskDurationStat {
+	if len(stats) == 0 {
+		return stats
+	}
+	ids := make([]string, 0, len(stats))
+	for _, stat := range stats {
+		ids = append(ids, stat.Type)
+	}
+	var implants []db.Implant
+	if err := s.tenantScope(s.db.Model(&db.Implant{}), c).Select("id, hostname").Where("id IN ?", ids).Find(&implants).Error; err != nil {
+		// A missing hostname is cosmetic: the statistics are still valid without it.
+		return stats
+	}
+	hosts := make(map[string]string, len(implants))
+	for _, implant := range implants {
+		hosts[implant.ID] = implant.Hostname
+	}
+	for i := range stats {
+		stats[i].Hostname = hosts[stats[i].Type]
+	}
+	return stats
 }

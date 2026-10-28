@@ -134,3 +134,86 @@ func TestTaskDurationStats(t *testing.T) {
 		t.Fatalf("7d window = %d", got.Code)
 	}
 }
+
+// TestTaskDurationStatsByAgent covers group_by=agent: "which beacon is slow" is a different question
+// from "which command is slow", and it needs the hostname so the answer is readable.
+func TestTaskDurationStatsByAgent(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	s := mustTenantServer(t)
+	if err := s.db.Create(&db.Implant{ID: "a-1", Hostname: "web-01", TenantID: 1}).Error; err != nil {
+		t.Fatalf("seed agent: %v", err)
+	}
+	if err := s.db.Create(&db.Implant{ID: "b-2", Hostname: "dc-02", TenantID: 1}).Error; err != nil {
+		t.Fatalf("seed agent: %v", err)
+	}
+
+	base := time.Now().Add(-time.Hour)
+	seed := func(agentID string, ms int) {
+		task := db.Task{
+			AgentID: agentID, TenantID: 1, Type: "shell", Command: "x", Status: "completed",
+			CreatedAt: base, UpdatedAt: base.Add(time.Duration(ms) * time.Millisecond),
+		}
+		if err := s.db.Create(&task).Error; err != nil {
+			t.Fatalf("seed task: %v", err)
+		}
+	}
+	seed("a-1", 100)
+	seed("a-1", 300)
+	seed("b-2", 2000)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/stats/tasks/duration?group_by=agent", nil)
+	c.Set("user", "op")
+	c.Set("user_role", db.RoleAdmin)
+	c.Set("user_id", uint(1))
+	c.Set(middleware.TenantIDContextKey, uint(1))
+	s.handleTaskDurationStats(c)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d %s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		Data struct {
+			GroupBy string `json:"group_by"`
+			Agents  []struct {
+				Type     string  `json:"type"`
+				Hostname string  `json:"hostname"`
+				Count    int     `json:"count"`
+				P95Ms    float64 `json:"p95_ms"`
+			} `json:"agents"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v (%s)", err, w.Body.String())
+	}
+	if resp.Data.GroupBy != "agent" {
+		t.Fatalf("group_by = %q", resp.Data.GroupBy)
+	}
+	if len(resp.Data.Agents) != 2 {
+		t.Fatalf("agents = %d, want 2 (%s)", len(resp.Data.Agents), w.Body.String())
+	}
+	// Slowest first, and each row carries its hostname.
+	if resp.Data.Agents[0].Type != "b-2" || resp.Data.Agents[0].Hostname != "dc-02" {
+		t.Fatalf("first agent = %+v, want b-2/dc-02", resp.Data.Agents[0])
+	}
+	if resp.Data.Agents[0].P95Ms != 2000 {
+		t.Fatalf("b-2 p95 = %v, want 2000", resp.Data.Agents[0].P95Ms)
+	}
+	if resp.Data.Agents[1].Count != 2 || resp.Data.Agents[1].Hostname != "web-01" {
+		t.Fatalf("second agent = %+v", resp.Data.Agents[1])
+	}
+
+	// An unknown grouping is rejected rather than silently defaulting.
+	w2 := httptest.NewRecorder()
+	c2, _ := gin.CreateTestContext(w2)
+	c2.Request = httptest.NewRequest(http.MethodGet, "/api/stats/tasks/duration?group_by=tenant", nil)
+	c2.Set("user", "op")
+	c2.Set("user_role", db.RoleAdmin)
+	c2.Set("user_id", uint(1))
+	c2.Set(middleware.TenantIDContextKey, uint(1))
+	s.handleTaskDurationStats(c2)
+	if w2.Code != http.StatusBadRequest {
+		t.Fatalf("group_by=tenant = %d, want 400", w2.Code)
+	}
+}
