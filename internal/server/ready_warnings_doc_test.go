@@ -57,6 +57,13 @@ func TestDeployGuideDocumentsReadyWarnings(t *testing.T) {
 		t.Fatal("the guide does not state the threshold that keeps a blip from raising a warning")
 	}
 
+	// 3b. The audit behaviour is documented too: an operator looking for "when did this start" needs to know it is there.
+	for _, needle := range []string{"observability_warning", "observability_recovered"} {
+		if !strings.Contains(section, needle) {
+			t.Fatalf("the monitoring section does not mention %s", needle)
+		}
+	}
+
 	// 4. And the guidance an operator needs: alert on warnings, not only on the status code.
 	if !strings.Contains(section, "warnings") {
 		t.Fatal("the guide does not tell an operator to alert on warnings")

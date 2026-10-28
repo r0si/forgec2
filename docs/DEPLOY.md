@@ -267,6 +267,11 @@ not - so `status` stays `ok` and the condition travels in `warnings`.
 
 Alerting on `warnings` being non-empty is the intended integration; alerting on the status code alone will miss all three.
 
+Each warning is **also written to the audit log once per episode** - `observability_warning` when it starts (or its count
+rises) and `observability_recovered` when it returns to zero - so the trail records *when* a route started looking broken
+and *when* it was fixed. A row per poll would bury the trail in its own alarm, which is why the writes are tied to
+transitions rather than to the probe.
+
 A counter that has been fixed can be cleared, which is what removes the warning: `POST /api/notification-routes/stats/reset`
 and `POST /api/automation/action-stats/reset` (both audited), discoverable at runtime in `/api/exports/capabilities`.
 

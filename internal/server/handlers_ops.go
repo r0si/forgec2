@@ -86,11 +86,13 @@ func (s *Server) handleReadyCheck(c *gin.Context) {
 	if s != nil && s.db != nil {
 		failingRoutes := notificationRouteFailingCount()
 		checks["notification_delivery"] = deliverySummary(failingRoutes)
+		s.noteObservabilityWarning("notification_delivery", "notification route deliveries are failing", failingRoutes)
 		if failingRoutes > 0 {
 			warnings = append(warnings, fmt.Sprintf("%d notification route(s) are failing", failingRoutes))
 		}
 		failingRules := automationActionFailingCount()
 		checks["automation_actions"] = fmt.Sprintf("%d rule(s) whose actions never landed", failingRules)
+		s.noteObservabilityWarning("automation_actions", "automation rule actions are not landing", failingRules)
 		if failingRules > 0 {
 			warnings = append(warnings, fmt.Sprintf("%d automation rule(s) are firing without their actions landing", failingRules))
 		}
