@@ -521,12 +521,25 @@ func taskArgsHash(t *db.Task) string {
 	return hex.EncodeToString(sum[:])[:16]
 }
 
+// persistTaskCreator stamps the creator onto the stored task.
+//
+// The in-memory value already feeds the audit record, so an ignored write failure left the database
+// disagreeing with the audit trail about who ordered a task - the one field an investigation needs.
+func (s *Server) persistTaskCreator(task *db.Task, username string) {
+	if task == nil || username == "" {
+		return
+	}
+	task.CreatedBy = username
+	if err := s.db.Model(task).Update("created_by", username).Error; err != nil {
+		slog.Error("Failed to persist task creator", "task_id", task.ID, "creator", username, "error", err)
+	}
+}
+
 // dispatchTask logs the audit action, broadcasts the update via WS, and returns success JSON.
 func (s *Server) dispatchTask(c *gin.Context, task *db.Task, auditAction, details string) {
 	user, _ := c.Get("user")
 	if username, ok := user.(string); ok && username != "" && task.CreatedBy == "" {
-		task.CreatedBy = username
-		s.db.Model(task).Update("created_by", username)
+		s.persistTaskCreator(task, username)
 	}
 	// Dangerous tasks carry creator + args fingerprint so the audit chain
 	// answers who ordered what, approved by whom (approve_task record), with

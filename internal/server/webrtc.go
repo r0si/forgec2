@@ -778,8 +778,7 @@ func (s *Server) handleWebRTCStart(c *gin.Context) {
 	}
 	if user, ok := c.Get("user"); ok {
 		if username, ok := user.(string); ok && username != "" && task.CreatedBy == "" {
-			task.CreatedBy = username
-			s.db.Model(task).Update("created_by", username)
+			s.persistTaskCreator(task, username)
 		}
 	}
 	details := fmt.Sprintf("WebRTC session %s started (%dx%d@%d, %dkbps, encoder=%s)", sess.ID, opts.Width, opts.Height, opts.FPS, opts.BitrateKbps, opts.Encoder)
