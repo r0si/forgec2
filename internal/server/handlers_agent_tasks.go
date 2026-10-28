@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"encoding/csv"
 	"fmt"
 	"log/slog"
@@ -165,10 +166,13 @@ func (s *Server) handleExportTasks(c *gin.Context) {
 		return
 	}
 
-	c.Header("Content-Type", "text/csv; charset=utf-8")
-	c.Header("Content-Disposition", `attachment; filename="forgec2_tasks_`+time.Now().Format("2006-01-02")+`.csv"`)
-	s.LogAuditRecord(c, "task_export", "task", "", fmt.Sprintf("tasks exported as CSV (limit %d)", limit), true, nil)
-	writer := csv.NewWriter(c.Writer)
+	// Built into memory, then sent whole. Exporting is capped at ExportTaskLimit rows that are already
+	// loaded here, so buffering costs nothing, and it buys the two things streaming could not: a failed
+	// encode can be answered 500 instead of being appended to a 200 that looks complete, and the
+	// response carries a Content-Length. A truncated CSV that still parses is worse than an error,
+	// because the recipient cannot tell it is short.
+	var buf bytes.Buffer
+	writer := csv.NewWriter(&buf)
 	writer.Write([]string{"Time", "Agent", "Type", "Command", "Result", "Error", "Status"})
 
 	for _, t := range tasks {
@@ -187,11 +191,19 @@ func (s *Server) handleExportTasks(c *gin.Context) {
 		})
 	}
 	writer.Flush()
-	// Headers are already sent at this point, so a write failure can only be
-	// logged, not turned into a 500.
 	if err := writer.Error(); err != nil {
-		slog.Error("Failed to stream CSV export", "error", err)
+		// Nothing has been written to the response yet, so this is a real error, not a comment.
+		slog.Error("Failed to encode CSV export", "error", err)
+		c.Header("ETag", "")
+		c.Header("Cache-Control", "")
+		handleQueryError(c, err, "Failed to encode the task export")
+		return
 	}
+
+	s.LogAuditRecord(c, "task_export", "task", "", fmt.Sprintf("tasks exported as CSV (limit %d)", limit), true, nil)
+	c.Header("Content-Type", "text/csv; charset=utf-8")
+	c.Header("Content-Disposition", `attachment; filename="forgec2_tasks_`+time.Now().Format("2006-01-02")+`.csv"`)
+	c.Data(http.StatusOK, "text/csv; charset=utf-8", buf.Bytes())
 }
 
 func (s *Server) apiBulkTaskStatus(c *gin.Context) {

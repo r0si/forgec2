@@ -1,8 +1,10 @@
 package server
 
 import (
+	"encoding/csv"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -101,5 +103,61 @@ func TestTaskExportETag(t *testing.T) {
 	}
 	if got := call(current, 2); got.Code != http.StatusOK {
 		t.Fatalf("tenant 1's tag satisfied tenant 2 (%d)", got.Code)
+	}
+}
+
+// TestTaskExportIsSentWhole proves the export is complete before anything is written: the response
+// carries a Content-Length that matches its body, and the CSV parses with the header row plus one row
+// per exported task. Streaming could not promise either - a failed encode was appended to a 200.
+func TestTaskExportIsSentWhole(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	s := mustTenantServer(t)
+
+	now := time.Now()
+	for i, status := range []string{"completed", "failed", "pending"} {
+		if err := s.db.Create(&db.Task{
+			AgentID: "a-1", TenantID: 1, Type: "shell", Command: "whoami",
+			Status: status, Result: "res,with comma", CreatedAt: now.Add(-time.Duration(i) * time.Minute),
+			UpdatedAt: now.Add(-time.Duration(i) * time.Minute),
+		}).Error; err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+	}
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/tasks/export", nil)
+	c.Set("user", "admin")
+	c.Set("user_role", db.RoleAdmin)
+	c.Set("user_id", uint(1))
+	c.Set(middleware.TenantIDContextKey, uint(1))
+	s.handleExportTasks(c)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d (%s)", w.Code, w.Body.String())
+	}
+	length := w.Header().Get("Content-Length")
+	if length == "" {
+		t.Fatal("no Content-Length: the export is still being streamed")
+	}
+	if got := w.Header().Get("Content-Type"); !strings.HasPrefix(got, "text/csv") {
+		t.Fatalf("Content-Type = %q", got)
+	}
+
+	records, err := csv.NewReader(strings.NewReader(w.Body.String())).ReadAll()
+	if err != nil {
+		t.Fatalf("the body is not valid CSV: %v", err)
+	}
+	// Header + three tasks; the comma inside a result must be quoted, not split.
+	if len(records) != 4 {
+		t.Fatalf("records = %d, want 4 (%v)", len(records), records)
+	}
+	if records[0][0] != "Time" || records[0][6] != "Status" {
+		t.Fatalf("header = %v", records[0])
+	}
+	for _, row := range records[1:] {
+		if len(row) != 7 {
+			t.Fatalf("row has %d fields, want 7: %v", len(row), row)
+		}
 	}
 }
