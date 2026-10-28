@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"time"
 
 	"github.com/forgec2/forgec2/internal/db"
@@ -49,14 +50,23 @@ func (s *Server) registerAutomationRoutes(auth *gin.RouterGroup) {
 	{
 		autoRead.GET("/automation", s.handleAutomationPage)
 		autoRead.GET("/api/automation/rules", s.handleListAutomationRules)
-		// Static health of the rule set: unconditional mutating actions, dangling targets, duplicates.
-		autoRead.GET("/api/automation/health", s.handleAutomationHealth)
 		autoRead.GET("/api/webhooks", s.handleListWebhooks)
 		autoRead.GET("/bof_repo", func(c *gin.Context) {
 			s.renderPageOrJSON(c, gin.H{"Title": "BOF Repository", "ActiveNav": "bof_repo"})
 		})
 		autoRead.GET("/api/bof/repos", s.handleBOFRepoIndex)
 	}
+	// The diagnostics family scans the rule and route tables and writes an audit row per call. It is cheap per request
+	// and expensive in a loop, which is exactly what a retry-happy script does - so the family gets its own budget,
+	// separate from the write endpoints it shares a permission with.
+	autoDiagnose := auth.Group("/")
+	autoDiagnose.Use(middleware.RequirePermission(db.PermAutomationWrite))
+	autoDiagnose.Use(middleware.NewRateLimiter(context.Background(), 120, time.Minute).Limit())
+	{
+		// Static health of the rule set: unconditional mutating actions, dangling targets, duplicates.
+		autoDiagnose.GET("/api/automation/health", s.handleAutomationHealth)
+	}
+
 	autoWrite := auth.Group("/")
 	autoWrite.Use(middleware.RequirePermission(db.PermAutomationWrite))
 	{
@@ -67,9 +77,9 @@ func (s *Server) registerAutomationRoutes(auth *gin.RouterGroup) {
 		// Dry run: evaluate one rule against a synthetic event and explain the verdict, executing nothing.
 		autoWrite.POST("/api/automation/rules/:id/preview", s.handlePreviewAutomationRule)
 		// The other direction: which rules would fire for one event.
-		autoWrite.POST("/api/automation/preview", s.handlePreviewAutomationBatch)
+		autoDiagnose.POST("/api/automation/preview", s.handlePreviewAutomationBatch)
 		// One call: what fires for this event, and who would be told.
-		autoWrite.POST("/api/automation/diagnose", s.handleAutomationDiagnose)
+		autoDiagnose.POST("/api/automation/diagnose", s.handleAutomationDiagnose)
 		autoWrite.POST("/api/webhooks", s.handleCreateWebhook)
 		autoWrite.DELETE("/api/webhooks/:id", s.handleDeleteWebhook)
 		autoWrite.POST("/api/webhooks/test", s.handleTestWebhook)
