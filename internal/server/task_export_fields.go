@@ -15,6 +15,7 @@ import (
 // spreadsheet see the same columns in the same sequence.
 //
 // An empty list means "every field", which keeps the endpoint's existing behaviour for every current caller.
+// Three presets cover the common requests without typing the list: `minimal`, `default` and `full`.
 
 // exportField describes one selectable column.
 type exportField struct {
@@ -50,12 +51,31 @@ var exportFields = []exportField{
 	{name: "agent_id", header: "Agent ID", value: func(t db.Task, _, _ string) string { return t.AgentID }},
 }
 
+// exportMinimalFields is the "just the outcome" preset: identifiers plus what happened.
+var exportMinimalFields = []string{"task_id", "agent", "type", "status"}
+
 // selectExportFields resolves a `?fields=` value into the catalogue, or reports the first unknown name.
 func selectExportFields(raw, format string) ([]exportField, string) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return defaultExportFields(format), ""
 	}
+
+	// Presets must be the whole value: "minimal,time" has two plausible meanings (the preset plus a column, or a
+	// typo), so it is refused rather than guessed.
+	lowered := strings.ToLower(raw)
+	switch lowered {
+	case "minimal":
+		return fieldsByName(exportMinimalFields), ""
+	case "default":
+		return defaultExportFields(format), ""
+	case "full":
+		return append([]exportField(nil), exportFields...), ""
+	}
+	if strings.Contains(raw, ",") && isPresetToken(raw) {
+		return nil, "a preset cannot be combined with field names; use either the preset or an explicit list"
+	}
+
 	byName := make(map[string]exportField, len(exportFields))
 	for _, field := range exportFields {
 		byName[field.name] = field
@@ -69,7 +89,7 @@ func selectExportFields(raw, format string) ([]exportField, string) {
 		}
 		field, ok := byName[name]
 		if !ok {
-			return nil, fmt.Sprintf("unknown field %q (valid: %s)", name, exportFieldNames())
+			return nil, fmt.Sprintf("unknown field %q (valid: %s; presets: %s)", name, exportFieldNames(), exportPresetNames())
 		}
 		if seen[name] {
 			continue
@@ -78,9 +98,36 @@ func selectExportFields(raw, format string) ([]exportField, string) {
 		selected = append(selected, field)
 	}
 	if len(selected) == 0 {
-		return nil, fmt.Sprintf("no fields selected (valid: %s)", exportFieldNames())
+		return nil, fmt.Sprintf("no fields selected (valid: %s; presets: %s)", exportFieldNames(), exportPresetNames())
 	}
 	return selected, ""
+}
+
+// isPresetToken reports whether any comma-separated part is a preset name, which is what makes a mixed value an
+// error rather than a list with at least one unknown field.
+func isPresetToken(raw string) bool {
+	for _, part := range strings.Split(raw, ",") {
+		switch strings.ToLower(strings.TrimSpace(part)) {
+		case "minimal", "default", "full":
+			return true
+		}
+	}
+	return false
+}
+
+// fieldsByName resolves an explicit list of names that is known to be valid.
+func fieldsByName(names []string) []exportField {
+	byName := make(map[string]exportField, len(exportFields))
+	for _, field := range exportFields {
+		byName[field.name] = field
+	}
+	out := make([]exportField, 0, len(names))
+	for _, name := range names {
+		if field, ok := byName[name]; ok {
+			out = append(out, field)
+		}
+	}
+	return out
 }
 
 // defaultExportFields is the no-`?fields=` set, and it is format-aware on purpose.
@@ -107,6 +154,10 @@ func exportFieldNames() string {
 	}
 	return strings.Join(names, ", ")
 }
+
+// exportPresetNames lists the presets. The set is small enough to write out, and a stable string is easier to
+// assert on than a map iteration.
+func exportPresetNames() string { return "minimal, default, full" }
 
 // exportFieldsTag renders the selection into the ETag: two different column sets are two different
 // documents, and a client that revalidated one must not be told 304 for the other.
