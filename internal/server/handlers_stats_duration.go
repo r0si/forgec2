@@ -41,7 +41,19 @@ type taskDurationStat struct {
 // duration syntax the UI already uses elsewhere ("1h", "24h", "7d", "30d"), and the reply is scoped to
 // the caller's tenant.
 func (s *Server) handleTaskDurationStats(c *gin.Context) {
-	window, ok := parseStatsWindow(c.DefaultQuery("since", "24h"))
+	since := c.DefaultQuery("since", "24h")
+	filterType := c.Query("type")
+	groupBy := c.DefaultQuery("group_by", "type")
+	bucket := c.Query("bucket")
+	// Serve a fresh copy when one exists: the read costs ~28 ms per call for a 5000-row window
+	// (BenchmarkDurationStatsWindow) and the console polls while an operator watches the page.
+	cacheKey := durationStatsCacheKey(s.currentTenantID(c), since, filterType, groupBy, bucket)
+	if payload, hit := s.statsCache().get(cacheKey); hit {
+		respond(c, payload)
+		return
+	}
+
+	window, ok := parseStatsWindow(since)
 	if !ok {
 		respondError(c, http.StatusBadRequest, "invalid since (expected e.g. 1h, 24h, 7d, 30d)")
 		return
@@ -54,7 +66,7 @@ func (s *Server) handleTaskDurationStats(c *gin.Context) {
 		Where("status IN ?", []string{"completed", "failed"}).
 		Where("created_at >= ?", time.Now().Add(-window)).
 		Where("updated_at > created_at")
-	if filterType := c.Query("type"); filterType != "" {
+	if filterType != "" {
 		query = query.Where("type = ?", filterType)
 	}
 
@@ -66,12 +78,10 @@ func (s *Server) handleTaskDurationStats(c *gin.Context) {
 
 	// group_by=type answers "which command is slow"; group_by=agent answers "which beacon is slow".
 	// Both are the same question asked of a different key, so the aggregation is shared.
-	groupBy := c.DefaultQuery("group_by", "type")
 	if groupBy != "type" && groupBy != "agent" {
 		respondError(c, http.StatusBadRequest, "invalid group_by (expected type or agent)")
 		return
 	}
-	bucket := c.Query("bucket")
 	if bucket != "" && bucket != "hour" && bucket != "day" {
 		respondError(c, http.StatusBadRequest, "invalid bucket (expected hour or day)")
 		return
@@ -144,6 +154,8 @@ func (s *Server) handleTaskDurationStats(c *gin.Context) {
 		resp["bucket"] = bucket
 		resp["buckets"] = buildDurationBuckets(rows, bucket)
 	}
+	// Only successful answers are cached; an error must never be remembered as the current state.
+	s.statsCache().put(cacheKey, resp)
 	respond(c, resp)
 }
 

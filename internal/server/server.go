@@ -222,6 +222,11 @@ type Server struct {
 	auditVerdictMu sync.Mutex
 	auditVerdict   auditChainVerdict
 	auditVerdictAt time.Time
+	// durationStatsCache shortens the statistics read for the console's polling (see
+	// duration_stats_cache.go); the read costs ~28 ms per 5000-row window. statsCache() creates it on
+	// first use so every construction path has one.
+	durationStatsCache     *durationStatsCache
+	durationStatsCacheOnce sync.Once
 
 	// Backlog metric label hygiene: agents currently exported as per-agent
 	// gauge series, so drained agents can be pruned.
@@ -432,6 +437,7 @@ func New(cfg *config.Config, database *gorm.DB) *Server { // config-lock: constr
 		cfg:                   cfg,
 		db:                    database,
 		router:                r,
+		durationStatsCache:    newDurationStatsCache(),
 		wsClients:             make(map[*websocket.Conn]*wsClientConn),
 		loginLockout:          newLoginLockoutTracker(),
 		socksEngine:           newSocksRelayEngine(),
