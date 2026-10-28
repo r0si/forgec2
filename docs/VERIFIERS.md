@@ -26,6 +26,20 @@ Exit codes:
 | `1` | The artefact is wrong: damaged, edited, missing a member, or signed by a different key |
 | `2` | The file could not be read as this kind of artefact at all (not a zip, not JSON, no manifest) |
 | `3` | `verify-bundle -require-trusted` only: **intact but not provably the sender's** |
+| `4` | `verify-bundle -require-complete` only: **intact, but not the whole handover** |
+
+The switches that raise these codes exist because the artefacts are legitimately allowed to be partial:
+
+| Switch | The question it asks |
+| --- | --- |
+| `verify-bundle -require-trusted` | Is this signed by the key **I** hold? (`?include=` and signing are independent) |
+| `verify-bundle -require-complete` | Is this the **whole** handover, or a selection someone made with `?include=`? |
+| `verify-audit -min-rows N` | Did the **transfer** complete, or did the file stop early? |
+| `verify-audit -require-contiguous` | Is this the **whole chain**, or a filtered/truncated selection? An NDJSON file cannot prove it |
+
+**Four different failures, four different codes.** A broken package needs a re-send; an unproven one needs a trust
+decision; an incomplete one needs a conversation; a short file needs another download. A pipeline that collapses them
+does the wrong thing with at least one.
 
 **Why 3 is separate from 1.** A damaged file is a **transfer problem** — retry it. An intact file whose signature cannot
 be tied to a key you trust is a **trust decision** — escalate it. A pipeline that cannot tell them apart does the wrong

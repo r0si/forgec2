@@ -45,7 +45,7 @@ func TestVerifierGuideMatchesTheCommands(t *testing.T) {
 
 	// 2. The exit-code contract names every code the commands actually return, including the trust-decision code that
 	// only verify-bundle produces.
-	for _, code := range []string{"`0`", "`1`", "`2`", "`3`"} {
+	for _, code := range []string{"`0`", "`1`", "`2`", "`3`", "`4`"} {
 		if !strings.Contains(doc, code) {
 			t.Fatalf("the exit-code table does not mention %s", code)
 		}
@@ -55,7 +55,7 @@ func TestVerifierGuideMatchesTheCommands(t *testing.T) {
 	}
 
 	// 3. The two output modes every command shares, and the truncation guard that only verify-audit needs.
-	for _, needle := range []string{"-quiet", "-json", "-min-rows"} {
+	for _, needle := range []string{"-quiet", "-json", "-min-rows", "-require-complete", "-require-contiguous", "-require-trusted"} {
 		if !strings.Contains(doc, needle) {
 			t.Fatalf("the guide does not mention %q", needle)
 		}
