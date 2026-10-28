@@ -12523,8 +12523,12 @@ paths:
           schema: {type: integer}
       responses:
         '200':
-          description: The result (and the error, when the task failed) as text/plain
+          description: >-
+            The result (and the error, when the task failed) as text/plain. Supports byte ranges, so a large
+            result can be resumed or fetched in pieces: the response advertises `Accept-Ranges: bytes` and a
+            `Range` request answers 206 with `Content-Range`.
           headers:
+            Accept-Ranges: {schema: {type: string}, description: Always "bytes"}
             X-Task-Status: {schema: {type: string}, description: Stored task status}
             X-Task-Final:
               schema: {type: string}
@@ -12532,8 +12536,12 @@ paths:
           content:
             text/plain:
               schema: {type: string}
+        '206':
+          description: A partial response for a Range request, with Content-Range describing it
         '404':
           description: No such task, or the task has no output yet
+        '416':
+          description: The requested range is not satisfiable
   /api/agents/{id}/tasks/rerun-failed:
     post:
       tags: [Tasks]

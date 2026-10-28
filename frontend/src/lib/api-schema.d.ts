@@ -27207,9 +27207,11 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The result (and the error, when the task failed) as text/plain */
+            /** @description The result (and the error, when the task failed) as text/plain. Supports byte ranges, so a large result can be resumed or fetched in pieces: the response advertises `Accept-Ranges: bytes` and a `Range` request answers 206 with `Content-Range`. */
             200: {
                 headers: {
+                    /** @description Always "bytes" */
+                    "Accept-Ranges"?: string;
                     /** @description Stored task status */
                     "X-Task-Status"?: string;
                     /** @description "true" when the stored result is final (status completed) */
@@ -27220,8 +27222,22 @@ export interface operations {
                     "text/plain": string;
                 };
             };
+            /** @description A partial response for a Range request, with Content-Range describing it */
+            206: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description No such task, or the task has no output yet */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The requested range is not satisfiable */
+            416: {
                 headers: {
                     [name: string]: unknown;
                 };

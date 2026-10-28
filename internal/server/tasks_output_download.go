@@ -73,7 +73,16 @@ func (s *Server) handleDownloadTaskOutput(c *gin.Context) {
 	}
 	name := fmt.Sprintf("task-%d-%s.txt", task.ID, sanitizeFilenamePart(task.Type))
 	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, name))
-	c.Data(http.StatusOK, "text/plain; charset=utf-8", []byte(body))
+	// ServeContent instead of writing the bytes directly: it adds Range support (206 with Content-Range, and
+	// Accept-Ranges on the full response), which is what makes a large result resumable, plus If-Range and HEAD
+	// handling. The content type is set explicitly so ServeContent does not sniff it, and the modification time
+	// comes from the task row so a resumed request can be validated.
+	c.Header("Content-Type", "text/plain; charset=utf-8")
+	modTime := task.UpdatedAt
+	if modTime.IsZero() {
+		modTime = task.CreatedAt
+	}
+	http.ServeContent(c.Writer, c.Request, name, modTime, strings.NewReader(body))
 }
 
 // sanitizeFilenamePart keeps a task type usable inside a Content-Disposition filename.
