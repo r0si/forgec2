@@ -1299,7 +1299,7 @@ export interface paths {
         };
         /**
          * Get task details
-         * @description Get detailed information about a task
+         * @description Detailed information about one task. A failed task with a message additionally carries `failure_reason`, the same code vocabulary the failure report groups by (`timeout`, `access_denied`, `defender`, `not_found`, `network`, `dns`, `tls`, `unsupported`, `disk`, `cancelled`, `other`), so a client can label a task without shipping its own copy of the classification rules.
          */
         get: operations["getTaskDetails"];
         put?: never;

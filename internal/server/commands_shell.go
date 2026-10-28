@@ -275,7 +275,7 @@ func (s *Server) handleGetTaskStatus(c *gin.Context) {
 	}
 	task = taskForOperator(task)
 
-	respond(c, gin.H{
+	payload := gin.H{
 		"id":         task.ID,
 		"status":     task.Status,
 		"result":     task.Result,
@@ -285,7 +285,13 @@ func (s *Server) handleGetTaskStatus(c *gin.Context) {
 		"agent":      task.Agent.Hostname,
 		"created":    task.CreatedAt.Format("2006-01-02 15:04:05"),
 		"created_by": task.CreatedBy,
-	})
+	}
+	// A failed task carries the same reason code the failure report groups by, so the console can show "timeout" next to
+	// the message without a second request and without its own copy of the classification rules.
+	if task.Status == "failed" && strings.TrimSpace(task.Error) != "" {
+		payload["failure_reason"] = classifyFailure(task.Error)
+	}
+	respond(c, payload)
 }
 
 // handleBatchTaskStatus returns the status of multiple tasks in a single request.
