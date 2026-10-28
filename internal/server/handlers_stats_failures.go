@@ -2,7 +2,6 @@ package server
 
 import (
 	"net/http"
-	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -26,9 +25,6 @@ import (
 const (
 	failureStatsSampleLimit = 5000
 	failureSampleMaxChars   = 160
-	// The signature list is a lead, not an inventory: the top few shapes are what an operator acts on.
-	failureSignatureLimit    = 5
-	failureSignatureMaxChars = 120
 )
 
 // failureReason is one classification rule.
@@ -250,20 +246,3 @@ func unclassifiedSignatures(rows []struct {
 	}
 	return out
 }
-
-// normaliseFailureText collapses the parts of an error that differ between hosts but not between problems.
-func normaliseFailureText(text string) string {
-	lowered := strings.ToLower(strings.TrimSpace(text))
-	lowered = failurePathPattern.ReplaceAllString(lowered, "<path>")
-	lowered = failureHexPattern.ReplaceAllString(lowered, "<hex>")
-	lowered = failureDigitPattern.ReplaceAllString(lowered, "<n>")
-	// Whitespace runs are an artefact of removing the identifiers.
-	lowered = strings.Join(strings.Fields(lowered), " ")
-	return truncateString(lowered, failureSignatureMaxChars)
-}
-
-var (
-	failurePathPattern  = regexp.MustCompile(`[a-z]:\\\\[^\\s]*|/(?:[^\\s/]+/)+[^\\s/]*`)
-	failureHexPattern   = regexp.MustCompile(`\\b0x[0-9a-f]+\\b|\\b[0-9a-f]{8,}\\b`)
-	failureDigitPattern = regexp.MustCompile(`\\d+`)
-)
