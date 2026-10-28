@@ -93,9 +93,9 @@ func TestAuditExportETag(t *testing.T) {
 	}
 }
 
-// TestAuditExportNotModifiedUnit checks the comparison itself, so a failure points at the helper
+// TestIfNoneMatchUnit checks the ONE comparison the exports share, so a failure points at the helper
 // rather than at the handler.
-func TestAuditExportNotModifiedUnit(t *testing.T) {
+func TestIfNoneMatchUnit(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	tag := `W/"v1-1-max=2-since=0-limit=50000"`
 	cases := map[string]bool{
@@ -112,7 +112,7 @@ func TestAuditExportNotModifiedUnit(t *testing.T) {
 		if header != "" {
 			c.Request.Header.Set("If-None-Match", header)
 		}
-		if got := auditExportNotModified(c, tag); got != want {
+		if got := ifNoneMatch(c, tag); got != want {
 			t.Errorf("If-None-Match %q -> %v, want %v", header, got, want)
 		}
 	}

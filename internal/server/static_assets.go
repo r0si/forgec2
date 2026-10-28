@@ -101,19 +101,6 @@ func (s *Server) resolveStaticAsset(p string) (string, staticAssetMeta, bool) {
 	return "", staticAssetMeta{}, false
 }
 
-// etagMatches reports whether an If-None-Match header selects etag. It
-// handles weak validators and the `*` wildcard (RFC 9110 section 13.1.2);
-// list members are compared after trimming, never morphed.
-func etagMatches(header, etag string) bool {
-	for _, part := range strings.Split(header, ",") {
-		part = strings.TrimSpace(part)
-		if part == "*" || strings.TrimPrefix(part, "W/") == etag {
-			return true
-		}
-	}
-	return false
-}
-
 // acceptsGzip parses Accept-Encoding well enough to honour an explicit
 // `gzip;q=0` refusal (RFC 9110 section 12.5.3) without adding a content
 // negotiation dependency for a single token. Anything that is not an

@@ -46,24 +46,3 @@ func sanitizeETagToken(raw string) string {
 	}
 	return b.String()
 }
-
-// taskExportNotModified answers 304 when the client already holds this CSV.
-func taskExportNotModified(c *gin.Context, etag string) bool {
-	if etag == "" {
-		return false
-	}
-	match := strings.TrimSpace(c.GetHeader("If-None-Match"))
-	if match == "" {
-		return false
-	}
-	for _, candidate := range strings.Split(match, ",") {
-		candidate = strings.TrimSpace(candidate)
-		if candidate == "*" {
-			return true
-		}
-		if strings.TrimPrefix(candidate, "W/") == strings.TrimPrefix(etag, "W/") {
-			return true
-		}
-	}
-	return false
-}

@@ -287,7 +287,7 @@ func (s *Server) handleExportAuditChain(c *gin.Context) {
 	etag := s.auditExportETag(c, sinceID, limit, filtered)
 	c.Header("ETag", etag)
 	c.Header("Cache-Control", "private, no-cache")
-	if auditExportNotModified(c, etag) {
+	if ifNoneMatch(c, etag) {
 		// AbortWithStatus rather than Status: the 304 must be written before gin flushes any body.
 		c.AbortWithStatus(http.StatusNotModified)
 		return

@@ -177,6 +177,16 @@ by hand at least once; do not weaken one to make a change pass — fix the chang
   `Close()` without skipping `os.Stdout`/`os.Stderr` **inside the loop body** (the first version checked
   the whole file and passed a reintroduced defect). Scope is stated on purpose: it catches the construct
   that shipped, not every way to misuse a handle.
+- `check:etag-impl` (`frontend/scripts/check-etag-impl.mjs`) — the **If-None-Match comparison has exactly one
+  implementation**. Rounds 3 and 4 added conditional requests to two exports and each grew its own copy
+  of the parse-and-compare loop, on top of `etagMatches` in `static_assets.go` which had served the
+  static-asset middleware for far longer — **three** copies of one comparison, the same shape that
+  produced `check:guarded-clients` after rounds 232/233 fixed one of two HTTP-client wrappers. The gate
+  flags the duplicate marker (stripping the `W/` prefix with `strings.TrimPrefix`) outside `etag.go`, so
+  a file may still *read* the header and delegate, but it may not re-implement the compare. The
+  canonical `etagMatches(header, etag)` now lives in `etag.go` with `ifNoneMatch(c, etag)` as the
+  handler-side wrapper, and the restored test (`TestIfNoneMatchUnit`) covers exact, unquoted, wildcard
+  and non-matching inputs.
 - `check:docs` (`gen-command-reference.mjs --check` + `gen-capability-matrix.mjs --check`) —
   the generated docs must match their sources: the command reference, and the **generated
   task-inventory block** plus the version stamp in `docs/CAPABILITY_MATRIX.md`. CI runs these

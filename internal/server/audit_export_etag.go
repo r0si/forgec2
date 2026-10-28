@@ -36,24 +36,5 @@ func (s *Server) auditExportETag(c *gin.Context, sinceID uint, limit int, filter
 			c.Query("user"), c.Query("action"), c.Query("agent_id"), c.Query("since"),
 		}, ","))
 	}
-	return `W/"` + strings.Join(parts, "-") + `"`
-}
-
-// auditExportNotModified reports whether the client already holds this export.
-func auditExportNotModified(c *gin.Context, etag string) bool {
-	match := strings.TrimSpace(c.GetHeader("If-None-Match"))
-	if match == "" {
-		return false
-	}
-	// A client may echo several tags; "*" means "any".
-	for _, candidate := range strings.Split(match, ",") {
-		candidate = strings.TrimSpace(candidate)
-		if candidate == "*" {
-			return true
-		}
-		if strings.TrimPrefix(candidate, "W/") == strings.TrimPrefix(etag, "W/") {
-			return true
-		}
-	}
-	return false
+	return weakETag(strings.Join(parts, "-"))
 }

@@ -147,7 +147,7 @@ func (s *Server) handleExportTasks(c *gin.Context) {
 		c.Header("ETag", exportETag)
 		c.Header("Cache-Control", "private, no-cache")
 	}
-	if taskExportNotModified(c, exportETag) {
+	if ifNoneMatch(c, exportETag) {
 		c.AbortWithStatus(http.StatusNotModified)
 		return
 	}
