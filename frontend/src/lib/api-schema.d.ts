@@ -14934,6 +14934,8 @@ export interface operations {
                                 path?: string;
                                 method?: string;
                                 answers?: string;
+                                /** @description True for the one diagnostic that acts outside the server (the route test delivers a real message). A client offering "run all diagnostics" must exclude those. */
+                                side_effects?: boolean;
                                 body?: string[];
                                 notes?: string[];
                             }[];

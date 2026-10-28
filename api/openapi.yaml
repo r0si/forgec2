@@ -3514,6 +3514,11 @@ paths:
                             path: {type: string}
                             method: {type: string}
                             answers: {type: string}
+                            side_effects:
+                              type: boolean
+                              description: >-
+                                True for the one diagnostic that acts outside the server (the route test delivers a real
+                                message). A client offering "run all diagnostics" must exclude those.
                             body:
                               type: array
                               items: {type: string}

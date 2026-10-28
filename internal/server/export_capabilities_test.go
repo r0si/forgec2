@@ -49,10 +49,11 @@ func TestExportCapabilities(t *testing.T) {
 				Notes      []string `json:"notes"`
 			} `json:"engagement_bundle"`
 			Diagnostics []struct {
-				Path    string   `json:"path"`
-				Method  string   `json:"method"`
-				Answers string   `json:"answers"`
-				Notes   []string `json:"notes"`
+				Path        string   `json:"path"`
+				Method      string   `json:"method"`
+				Answers     string   `json:"answers"`
+				SideEffects *bool    `json:"side_effects"`
+				Notes       []string `json:"notes"`
 			} `json:"diagnostics"`
 			Limits map[string]json.RawMessage `json:"limits"`
 		} `json:"data"`
@@ -149,9 +150,21 @@ func TestExportCapabilities(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read the spec: %v", err)
 	}
+	// Every entry must STATE whether it has side effects. A client that offers "run all diagnostics" has no way to
+	// know otherwise, and one of these really does send a notification.
+	sideEffecting := 0
 	for _, entry := range resp.Data.Diagnostics {
 		if entry.Path == "" || entry.Method == "" || entry.Answers == "" {
 			t.Fatalf("an incomplete diagnostics entry: %+v", entry)
+		}
+		if entry.SideEffects == nil {
+			t.Fatalf("%s does not state side_effects", entry.Path)
+		}
+		if *entry.SideEffects {
+			sideEffecting++
+			if !strings.Contains(entry.Path, "/test") {
+				t.Fatalf("%s claims side effects but is not the test endpoint", entry.Path)
+			}
 		}
 		// The capabilities document uses gin's ":id" spelling; the spec uses "{id}".
 		specPath := strings.ReplaceAll(entry.Path, ":id", "{id}")
@@ -159,6 +172,12 @@ func TestExportCapabilities(t *testing.T) {
 			t.Fatalf("%s is advertised as a diagnostic but is not in api/openapi.yaml", specPath)
 		}
 	}
+	// Exactly one diagnostic delivers something real, and it is the route test. More than one would make a batch runner
+	// dangerous; none would mean the flag is decoration.
+	if sideEffecting != 1 {
+		t.Fatalf("%d diagnostics claim external side effects, want exactly 1 (the route test)", sideEffecting)
+	}
+
 	// 8. With a key configured the same entry reports it, so an operator can hand the expected key to the receiver.
 	seed := "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60"
 	t.Setenv(bundleSigningKeyEnv, seed)
