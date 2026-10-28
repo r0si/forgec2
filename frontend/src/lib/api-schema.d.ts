@@ -10670,6 +10670,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/stats/tasks/duration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Task duration percentiles, per type or per agent
+         * @description Answers "which task types are getting slow" (and "which beacon is slow" with group_by=agent) from the final-state task history. Only tasks that reached a final state are counted, because a pending row has no duration. Reads at most 5000 rows per request and reports `truncated` when the window had more, so a percentile is never silently computed from a partial sample.
+         */
+        get: operations["taskDurationStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tasks/{taskId}/output": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One task's result as a plain text file
+         * @description A file is what an operator wants for a large result. A failed task still downloads, and the file ends with the error rather than silently omitting why it failed; nothing to download is a 404 with a reason instead of a zero-byte file.
+         */
+        get: operations["downloadTaskOutput"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/agents/{id}/tasks/rerun-failed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Re-queue an agent's failed tasks
+         * @description Recovery after an outage fails everything queued against one beacon at once. Re-queues the agent's failed tasks newest-first, excluding control types such as kill_agent (reported in `excluded` rather than silently dropped). Each clone carries a deterministic rerun key, so a second click reports `already queued` instead of queuing the same work twice.
+         */
+        post: operations["rerunFailedTasks"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -26054,6 +26114,155 @@ export interface operations {
         responses: {
             /** @description Collection dispatched */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    taskDurationStats: {
+        parameters: {
+            query?: {
+                /** @description Window, either a duration (1h, 24h, 7d, 30d) or an RFC3339 timestamp */
+                since?: string;
+                /** @description Restrict to one task type */
+                type?: string;
+                /** @description Key the rows by task type or by agent id */
+                group_by?: "type" | "agent";
+                /** @description Add a time series (hourly or daily) so a regression's start can be located. Empty buckets are omitted rather than emitted as zeros. */
+                bucket?: "hour" | "day";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Per-key count/mean/p50/p95/max plus completed/failed/success_rate, ordered by p95 descending. With bucket=, also `buckets`. The rows live under `types` or `agents`, named after group_by. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        data?: {
+                            since?: string;
+                            group_by?: string;
+                            window_ms?: number;
+                            sampled?: number;
+                            truncated?: boolean;
+                            types?: {
+                                type?: string;
+                                count?: number;
+                                mean_ms?: number;
+                                p50_ms?: number;
+                                p95_ms?: number;
+                                max_ms?: number;
+                                completed?: number;
+                                failed?: number;
+                                success_rate?: number;
+                                hostname?: string;
+                            }[];
+                            buckets?: {
+                                start?: string;
+                                count?: number;
+                                p50_ms?: number;
+                                p95_ms?: number;
+                                max_ms?: number;
+                                failed?: number;
+                                success_rate?: number;
+                            }[];
+                        };
+                    };
+                };
+            };
+            /** @description Invalid since, group_by or bucket */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    downloadTaskOutput: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                taskId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The result (and the error, when the task failed) as text/plain */
+            200: {
+                headers: {
+                    /** @description Stored task status */
+                    "X-Task-Status"?: string;
+                    /** @description "true" when the stored result is final (status completed) */
+                    "X-Task-Final"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such task, or the task has no output yet */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    rerunFailedTasks: {
+        parameters: {
+            query?: {
+                /** @description Window over created_at */
+                since?: string;
+                /** @description Maximum tasks to re-queue (default 10, max 25) */
+                limit?: number;
+                /** @description Restrict to one task type */
+                type?: string;
+            };
+            header?: never;
+            path: {
+                /** @description Agent id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description queued count and ids, skipped entries with reasons, excluded count, truncated flag */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        data?: {
+                            queued?: number;
+                            task_ids?: number[];
+                            skipped?: {
+                                id?: number;
+                                type?: string;
+                                reason?: string;
+                            }[];
+                            excluded?: number;
+                            truncated?: boolean;
+                        };
+                    };
+                };
+            };
+            /** @description Invalid since or limit */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -11696,6 +11696,173 @@ paths:
       responses:
         '200': {description: Accepted collector payload shape}
 
+  /api/stats/tasks/duration:
+    get:
+      tags: [Statistics]
+      summary: Task duration percentiles, per type or per agent
+      description: >-
+        Answers "which task types are getting slow" (and "which beacon is slow" with
+        group_by=agent) from the final-state task history. Only tasks that reached a
+        final state are counted, because a pending row has no duration. Reads at most
+        5000 rows per request and reports `truncated` when the window had more, so a
+        percentile is never silently computed from a partial sample.
+      operationId: taskDurationStats
+      security: [{SessionCookie: []}]
+      parameters:
+        - name: since
+          in: query
+          description: Window, either a duration (1h, 24h, 7d, 30d) or an RFC3339 timestamp
+          schema: {type: string, default: 24h}
+        - name: type
+          in: query
+          description: Restrict to one task type
+          schema: {type: string}
+        - name: group_by
+          in: query
+          description: Key the rows by task type or by agent id
+          schema: {type: string, enum: [type, agent], default: type}
+        - name: bucket
+          in: query
+          description: >-
+            Add a time series (hourly or daily) so a regression's start can be located.
+            Empty buckets are omitted rather than emitted as zeros.
+          schema: {type: string, enum: [hour, day]}
+      responses:
+        '200':
+          description: >-
+            Per-key count/mean/p50/p95/max plus completed/failed/success_rate, ordered by
+            p95 descending. With bucket=, also `buckets`. The rows live under `types` or
+            `agents`, named after group_by.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  data:
+                    type: object
+                    properties:
+                      since: {type: string}
+                      group_by: {type: string}
+                      window_ms: {type: integer}
+                      sampled: {type: integer}
+                      truncated: {type: boolean}
+                      types:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            type: {type: string}
+                            count: {type: integer}
+                            mean_ms: {type: number}
+                            p50_ms: {type: number}
+                            p95_ms: {type: number}
+                            max_ms: {type: number}
+                            completed: {type: integer}
+                            failed: {type: integer}
+                            success_rate: {type: number}
+                            hostname: {type: string}
+                      buckets:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            start: {type: string}
+                            count: {type: integer}
+                            p50_ms: {type: number}
+                            p95_ms: {type: number}
+                            max_ms: {type: number}
+                            failed: {type: integer}
+                            success_rate: {type: number}
+        '400':
+          description: Invalid since, group_by or bucket
+  /api/tasks/{taskId}/output:
+    get:
+      tags: [Tasks]
+      summary: One task's result as a plain text file
+      description: >-
+        A file is what an operator wants for a large result. A failed task still
+        downloads, and the file ends with the error rather than silently omitting why it
+        failed; nothing to download is a 404 with a reason instead of a zero-byte file.
+      operationId: downloadTaskOutput
+      security: [{SessionCookie: []}]
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: The result (and the error, when the task failed) as text/plain
+          headers:
+            X-Task-Status: {schema: {type: string}, description: Stored task status}
+            X-Task-Final:
+              schema: {type: string}
+              description: '"true" when the stored result is final (status completed)'
+          content:
+            text/plain:
+              schema: {type: string}
+        '404':
+          description: No such task, or the task has no output yet
+  /api/agents/{id}/tasks/rerun-failed:
+    post:
+      tags: [Tasks]
+      summary: Re-queue an agent's failed tasks
+      description: >-
+        Recovery after an outage fails everything queued against one beacon at once.
+        Re-queues the agent's failed tasks newest-first, excluding control types such as
+        kill_agent (reported in `excluded` rather than silently dropped). Each clone
+        carries a deterministic rerun key, so a second click reports `already queued`
+        instead of queuing the same work twice.
+      operationId: rerunFailedTasks
+      security: [{SessionCookie: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Agent id
+          schema: {type: string}
+        - name: since
+          in: query
+          description: Window over created_at
+          schema: {type: string, default: 24h}
+        - name: limit
+          in: query
+          description: Maximum tasks to re-queue (default 10, max 25)
+          schema: {type: integer, default: 10, maximum: 25}
+        - name: type
+          in: query
+          description: Restrict to one task type
+          schema: {type: string}
+      responses:
+        '200':
+          description: queued count and ids, skipped entries with reasons, excluded count, truncated flag
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  data:
+                    type: object
+                    properties:
+                      queued: {type: integer}
+                      task_ids:
+                        type: array
+                        items: {type: integer}
+                      skipped:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id: {type: integer}
+                            type: {type: string}
+                            reason: {type: string}
+                      excluded: {type: integer}
+                      truncated: {type: boolean}
+        '400':
+          description: Invalid since or limit
+
 components:
   securitySchemes:
     SessionCookie:
