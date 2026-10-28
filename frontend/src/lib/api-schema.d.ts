@@ -14022,13 +14022,21 @@ export interface operations {
                                 errors?: number;
                                 warnings?: number;
                             };
+                            /** @description Firing statistics per rule. A rule that has never fired (after a 24 h grace, so a rule created minutes ago is not reported) and one that fires constantly look identical in the rule list, and both are operational facts. */
+                            rules?: {
+                                rule_id?: string;
+                                rule_name?: string;
+                                enabled?: boolean;
+                                run_count?: number;
+                                last_triggered?: string | null;
+                            }[];
                             findings?: {
                                 rule_id?: string;
                                 rule_name?: string;
                                 /** @enum {string} */
                                 severity?: "error" | "warning";
                                 /** @enum {string} */
-                                code?: "unconditional_mutating_action" | "missing_agent" | "missing_script" | "missing_macro" | "duplicate_rule";
+                                code?: "unconditional_mutating_action" | "missing_agent" | "missing_script" | "missing_macro" | "duplicate_rule" | "never_fired" | "firing_often";
                                 detail?: string;
                             }[];
                         };

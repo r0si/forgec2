@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/forgec2/forgec2/internal/db"
 	"github.com/forgec2/forgec2/internal/server/middleware"
@@ -88,7 +89,14 @@ func TestAutomationHealth(t *testing.T) {
 	}
 	var resp struct {
 		Data struct {
-			Summary  map[string]int `json:"summary"`
+			Summary map[string]int `json:"summary"`
+			Rules   []struct {
+				RuleID        string  `json:"rule_id"`
+				RuleName      string  `json:"rule_name"`
+				Enabled       bool    `json:"enabled"`
+				RunCount      int     `json:"run_count"`
+				LastTriggered *string `json:"last_triggered"`
+			} `json:"rules"`
 			Findings []struct {
 				RuleID   string `json:"rule_id"`
 				RuleName string `json:"rule_name"`
@@ -135,6 +143,71 @@ func TestAutomationHealth(t *testing.T) {
 	}
 	if resp.Data.Summary["rules"] != 6 {
 		t.Fatalf("rules = %d, want the six of this tenant", resp.Data.Summary["rules"])
+	}
+
+	// Firing statistics: a rule that has never fired and one that fires constantly look identical in the list, so both
+	// are surfaced here. The seeded rules have never fired, which is itself the finding.
+	if len(resp.Data.Rules) != 6 {
+		t.Fatalf("rules stats = %d, want the six of this tenant", len(resp.Data.Rules))
+	}
+	for _, entry := range resp.Data.Rules {
+		if entry.RunCount != 0 {
+			t.Fatalf("%s reports run_count %d, want 0 for a freshly seeded rule", entry.RuleName, entry.RunCount)
+		}
+		if entry.LastTriggered != nil {
+			t.Fatalf("%s reports a last_triggered it never had", entry.RuleName)
+		}
+	}
+	// A freshly created rule has not had a chance to fire, so the report must stay quiet about it: that is the
+	// difference between a finding and noise.
+	if byCode["never_fired"] != 0 {
+		t.Fatalf("a rule created seconds ago was reported as never fired: %v", resp.Data.Findings)
+	}
+
+	// An OLD rule that has still never fired is the real signal.
+	old := db.AutomationRule{
+		ID: "stale", Name: "stale rule", Enabled: true, EventType: string(EventImplantCheckin),
+		Conditions: conditions([]RuleCondition{{Field: "agent.hostname", Operator: "contains", Value: "web"}}),
+		Actions:    actions([]RuleAction{{Type: ActionNotify, Params: json.RawMessage(`{"message":"x"}`)}}),
+		TenantID:   1,
+	}
+	if err := s.db.Create(&old).Error; err != nil {
+		t.Fatalf("seed stale rule: %v", err)
+	}
+	// created_at is set by the ORM only on insert, so backdate it explicitly.
+	if err := s.db.Model(&db.AutomationRule{}).Where("id = ?", "stale").
+		Update("created_at", time.Now().Add(-72*time.Hour)).Error; err != nil {
+		t.Fatalf("backdate: %v", err)
+	}
+	s.invalidateAutomationCache()
+
+	w2 := httptest.NewRecorder()
+	c2, _ := gin.CreateTestContext(w2)
+	c2.Request = httptest.NewRequest(http.MethodGet, "/api/automation/health", nil)
+	c2.Set("user", "op")
+	c2.Set("user_role", db.RoleAdmin)
+	c2.Set("user_id", uint(1))
+	c2.Set(middleware.TenantIDContextKey, uint(1))
+	s.handleAutomationHealth(c2)
+	var aged struct {
+		Data struct {
+			Findings []struct {
+				RuleID string `json:"rule_id"`
+				Code   string `json:"code"`
+			} `json:"findings"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w2.Body.Bytes(), &aged); err != nil {
+		t.Fatalf("decode aged: %v", err)
+	}
+	foundStale := false
+	for _, finding := range aged.Data.Findings {
+		if finding.RuleID == "stale" && finding.Code == "never_fired" {
+			foundStale = true
+		}
+	}
+	if !foundStale {
+		t.Fatalf("a rule enabled for three days with no firing was not reported: %+v", aged.Data.Findings)
 	}
 
 	// Errors come first, so the report opens with what will bite.

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/forgec2/forgec2/internal/db"
 	"github.com/gin-gonic/gin"
@@ -125,6 +126,46 @@ func (s *Server) handleAutomationHealth(c *gin.Context) {
 		findings = []automationFinding{}
 	}
 
+	// Per-rule firing statistics: a rule that has never fired and one that fires a thousand times a day look identical
+	// in the rule list, and both are operational facts the health report is the natural place to surface.
+	createdAt := s.automationRuleCreatedAt(c)
+	stats := make([]gin.H, 0, len(rules))
+	for _, rule := range rules {
+		if rule.TenantID != 0 && rule.TenantID != tenantID {
+			continue
+		}
+		entry := gin.H{
+			"rule_id":   rule.ID,
+			"rule_name": rule.Name,
+			"enabled":   rule.Enabled,
+			"run_count": rule.RunCount,
+		}
+		if !rule.LastTriggered.IsZero() {
+			entry["last_triggered"] = rule.LastTriggered.UTC().Format(time.RFC3339)
+		} else {
+			entry["last_triggered"] = nil
+		}
+		stats = append(stats, entry)
+
+		if !rule.Enabled {
+			continue
+		}
+		// Only after it has had a chance: a rule created minutes ago legitimately has not fired yet, and reporting it
+		// would teach operators to ignore the report.
+		if rule.RunCount == 0 && time.Since(createdAt[rule.ID]) > automationNeverFiredGrace {
+			findings = append(findings, automationFinding{
+				RuleID: rule.ID, RuleName: rule.Name, Severity: "warning", Code: "never_fired",
+				Detail: fmt.Sprintf("enabled for %d day(s) and has never fired: check the event type and the conditions",
+					int(time.Since(createdAt[rule.ID]).Hours()/24)),
+			})
+		} else if rule.RunCount >= automationBusyRuleThreshold {
+			findings = append(findings, automationFinding{
+				RuleID: rule.ID, RuleName: rule.Name, Severity: "warning", Code: "firing_often",
+				Detail: fmt.Sprintf("has fired %d times: a cooldown or a narrower condition may be missing", rule.RunCount),
+			})
+		}
+	}
+
 	counts := map[string]int{"rules": 0, "errors": 0, "warnings": 0}
 	for _, rule := range rules {
 		if rule.TenantID == 0 || rule.TenantID == tenantID {
@@ -139,7 +180,7 @@ func (s *Server) handleAutomationHealth(c *gin.Context) {
 		}
 	}
 
-	respond(c, gin.H{"summary": counts, "findings": findings})
+	respond(c, gin.H{"summary": counts, "findings": findings, "rules": stats})
 }
 
 // mutatingActionTypes are the actions whose firing changes state. "notify" is deliberately excluded: a rule
@@ -248,6 +289,36 @@ func otherNames(names []string, self string) []string {
 			continue
 		}
 		out = append(out, name)
+	}
+	return out
+}
+
+// automationBusyRuleThreshold is where a rule is worth a second look.
+//
+// Not a limit - a rule that fires constantly may be exactly what the operator wanted. The number exists so the report can
+// point at the rule rather than make someone sort the table by run_count.
+const automationBusyRuleThreshold = 1000
+
+// automationNeverFiredGrace is how long an enabled rule gets before "never fired" is worth reporting.
+const automationNeverFiredGrace = 24 * time.Hour
+
+// automationRuleCreatedAt maps rule id to when it was created, for the never-fired check.
+//
+// The in-memory rule type carries firing state, not creation time, and one query for the tenant is cheaper than a
+// per-rule lookup.
+func (s *Server) automationRuleCreatedAt(c *gin.Context) map[string]time.Time {
+	out := make(map[string]time.Time, 16)
+	type row struct {
+		ID        string
+		CreatedAt time.Time
+	}
+	var rows []row
+	if err := s.tenantScope(s.db.WithContext(s.ctx).Model(&db.AutomationRule{}), c).
+		Select("id, created_at").Scan(&rows).Error; err != nil {
+		return out
+	}
+	for _, entry := range rows {
+		out[entry.ID] = entry.CreatedAt
 	}
 	return out
 }

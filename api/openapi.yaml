@@ -2542,6 +2542,20 @@ paths:
                           rules: {type: integer}
                           errors: {type: integer}
                           warnings: {type: integer}
+                      rules:
+                        type: array
+                        description: >-
+                          Firing statistics per rule. A rule that has never fired (after a 24 h grace, so a rule created
+                          minutes ago is not reported) and one that fires constantly look identical in the rule list, and
+                          both are operational facts.
+                        items:
+                          type: object
+                          properties:
+                            rule_id: {type: string}
+                            rule_name: {type: string}
+                            enabled: {type: boolean}
+                            run_count: {type: integer}
+                            last_triggered: {type: string, nullable: true}
                       findings:
                         type: array
                         items:
@@ -2552,7 +2566,14 @@ paths:
                             severity: {type: string, enum: [error, warning]}
                             code:
                               type: string
-                              enum: [unconditional_mutating_action, missing_agent, missing_script, missing_macro, duplicate_rule]
+                              enum:
+                                - unconditional_mutating_action
+                                - missing_agent
+                                - missing_script
+                                - missing_macro
+                                - duplicate_rule
+                                - never_fired
+                                - firing_often
                             detail: {type: string}
   /api/automation/preview:
     post:
