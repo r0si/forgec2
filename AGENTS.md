@@ -141,6 +141,14 @@ by hand at least once; do not weaken one to make a change pass — fix the chang
   permission set, so 17 of 44 are checked and the rest are counted, not guessed. It resolves `PermFoo`
   to its string through `internal/db/models.go` after a CamelCase guess turned `PermAIUse` into
   `AIUse` and produced a false mismatch.
+- `check:discarded-results` (`frontend/scripts/check-discarded-results.mjs`) — a delivery that failed must
+  not be discarded. Four rounds found the same shape by hand (automation script result thrown away,
+  `create_task`/`set_sleep` skipping silently, webhook response status never inspected, notification
+  delivery error ignored with `_ =`), and a discarded error is invisible both at the call site and in
+  the UI. It matches `_ = <receiver>.<send|deliver|dispatch|notify|push|post|webhook|execute>…(` and a
+  **bare call** to a known error-returning delivery function; close/flush ignores and
+  `_ = json.Unmarshal(…)` are not matched. Its allowlist is empty on purpose: the first version
+  allowlisted the notification file and let a probe reintroduce the exact defect.
 - `check:docs` (`gen-command-reference.mjs --check` + `gen-capability-matrix.mjs --check`) —
   the generated docs must match their sources: the command reference, and the **generated
   task-inventory block** plus the version stamp in `docs/CAPABILITY_MATRIX.md`. CI runs these
