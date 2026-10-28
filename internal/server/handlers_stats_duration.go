@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"math"
 	"net/http"
 	"sort"
 	"time"
@@ -25,6 +26,11 @@ type taskDurationStat struct {
 	MaxMs  float64 `json:"max_ms"`
 	// Hostname is filled only when group_by=agent, so a caller can show a name instead of an id.
 	Hostname string `json:"hostname,omitempty"`
+	// Outcome counts come from the same rows as the timings, so the endpoint answers "is it slow" and
+	// "is it failing" together instead of needing a second call.
+	Completed   int     `json:"completed"`
+	Failed      int     `json:"failed"`
+	SuccessRate float64 `json:"success_rate"`
 }
 
 // handleTaskDurationStats answers "which task types are getting slow" from the task history.
@@ -43,7 +49,9 @@ func (s *Server) handleTaskDurationStats(c *gin.Context) {
 	}
 
 	query := s.tenantScope(s.db.Model(&db.Task{}), c).
-		Select("type, agent_id, created_at, updated_at").
+		// Every column the aggregation reads must be projected: status arrived as "" and every row
+		// was counted as failed, exactly as agent_id did when group_by=agent was added.
+		Select("type, agent_id, status, created_at, updated_at").
 		Where("status IN ?", []string{"completed", "failed"}).
 		Where("created_at >= ?", time.Now().Add(-window)).
 		Where("updated_at > created_at")
@@ -72,17 +80,38 @@ func (s *Server) handleTaskDurationStats(c *gin.Context) {
 	}
 
 	byKey := make(map[string][]float64, 8)
+	// The same rows already carry the outcome, so the success rate costs nothing extra: a type that
+	// got slower is interesting, a type that started FAILING is the thing an operator needs to see.
+	outcomes := make(map[string]*taskOutcomeCounts, 8)
 	for _, row := range rows {
 		if row.UpdatedAt.IsZero() || row.CreatedAt.IsZero() || !row.UpdatedAt.After(row.CreatedAt) {
 			continue
 		}
 		k := key(row)
 		byKey[k] = append(byKey[k], float64(row.UpdatedAt.Sub(row.CreatedAt).Milliseconds()))
+		counts := outcomes[k]
+		if counts == nil {
+			counts = &taskOutcomeCounts{}
+			outcomes[k] = counts
+		}
+		if row.Status == "completed" {
+			counts.completed++
+		} else {
+			counts.failed++
+		}
 	}
 
 	stats := make([]taskDurationStat, 0, len(byKey))
 	for k, samples := range byKey {
-		stats = append(stats, summariseTaskDurations(k, samples))
+		stat := summariseTaskDurations(k, samples)
+		if counts := outcomes[k]; counts != nil {
+			stat.Completed = counts.completed
+			stat.Failed = counts.failed
+			if total := counts.completed + counts.failed; total > 0 {
+				stat.SuccessRate = math.Round(float64(counts.completed)/float64(total)*1000) / 1000
+			}
+		}
+		stats = append(stats, stat)
 	}
 	// Slowest p95 first: the endpoint exists to point at the problem type.
 	sort.Slice(stats, func(i, j int) bool {
@@ -186,4 +215,10 @@ func (s *Server) labelDurationGroups(c *gin.Context, stats []taskDurationStat) [
 		stats[i].Hostname = hosts[stats[i].Type]
 	}
 	return stats
+}
+
+// taskOutcomeCounts is the per-key outcome tally used while grouping.
+type taskOutcomeCounts struct {
+	completed int
+	failed    int
 }

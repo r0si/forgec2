@@ -62,12 +62,15 @@ func TestTaskDurationStats(t *testing.T) {
 		Data struct {
 			Sampled int `json:"sampled"`
 			Types   []struct {
-				Type   string  `json:"type"`
-				Count  int     `json:"count"`
-				P50Ms  float64 `json:"p50_ms"`
-				P95Ms  float64 `json:"p95_ms"`
-				MeanMs float64 `json:"mean_ms"`
-				MaxMs  float64 `json:"max_ms"`
+				Type        string  `json:"type"`
+				Count       int     `json:"count"`
+				P50Ms       float64 `json:"p50_ms"`
+				P95Ms       float64 `json:"p95_ms"`
+				MeanMs      float64 `json:"mean_ms"`
+				MaxMs       float64 `json:"max_ms"`
+				Completed   int     `json:"completed"`
+				Failed      int     `json:"failed"`
+				SuccessRate float64 `json:"success_rate"`
 			} `json:"types"`
 		} `json:"data"`
 	}
@@ -76,20 +79,26 @@ func TestTaskDurationStats(t *testing.T) {
 	}
 
 	byType := map[string]struct {
-		Count int
-		P50   float64
-		P95   float64
-		Mean  float64
-		Max   float64
+		Count       int
+		P50         float64
+		P95         float64
+		Mean        float64
+		Max         float64
+		Completed   int
+		Failed      int
+		SuccessRate float64
 	}{}
 	for _, row := range resp.Data.Types {
 		byType[row.Type] = struct {
-			Count int
-			P50   float64
-			P95   float64
-			Mean  float64
-			Max   float64
-		}{row.Count, row.P50Ms, row.P95Ms, row.MeanMs, row.MaxMs}
+			Count       int
+			P50         float64
+			P95         float64
+			Mean        float64
+			Max         float64
+			Completed   int
+			Failed      int
+			SuccessRate float64
+		}{row.Count, row.P50Ms, row.P95Ms, row.MeanMs, row.MaxMs, row.Completed, row.Failed, row.SuccessRate}
 	}
 
 	shell, ok := byType["shell"]
@@ -110,6 +119,13 @@ func TestTaskDurationStats(t *testing.T) {
 	}
 	if shell.Max != 1000 {
 		t.Fatalf("shell max = %v, want 1000", shell.Max)
+	}
+	// Outcome counts come from the same rows: 3 completed + 1 failed -> 0.75.
+	if shell.Completed != 3 || shell.Failed != 1 {
+		t.Fatalf("shell outcomes = %d completed / %d failed, want 3/1", shell.Completed, shell.Failed)
+	}
+	if shell.SuccessRate != 0.75 {
+		t.Fatalf("shell success rate = %v, want 0.75", shell.SuccessRate)
 	}
 	// Sorted by p95 descending: shell (1000) before screenshot (50).
 	if len(resp.Data.Types) < 2 || resp.Data.Types[0].Type != "shell" {
