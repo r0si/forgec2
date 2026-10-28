@@ -15184,7 +15184,10 @@ export interface operations {
     };
     verifyEngagementBundle: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description The hex Ed25519 public key the caller already trusts. Supplying it turns `signature.valid` into `signature.trusted`, because a key carried inside the archive proves nothing about origin - swap the manifest and the key together and every digest still matches. */
+                public_key?: string;
+            };
             header?: never;
             path: {
                 /** @description The engagement the bundle belongs to (must be visible to the caller) */
@@ -15227,6 +15230,17 @@ export interface operations {
                                 name?: string;
                             };
                             generated_at?: string;
+                            signature?: {
+                                present?: boolean;
+                                /** @description The signature verifies against the key it carries */
+                                valid?: boolean;
+                                /** @description Valid AND signed by the public_key the caller supplied */
+                                trusted?: boolean;
+                                algorithm?: string;
+                                public_key?: string;
+                                signed_members?: number;
+                                problem?: string;
+                            };
                             /** @description The stated limitation of an unkeyed */
                             note?: string;
                         };

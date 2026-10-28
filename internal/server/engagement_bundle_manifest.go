@@ -75,6 +75,9 @@ func writeBundleManifest(archive bundleWriter, recorder *hashingBundleWriter, en
 		}
 		members = append(members, description)
 	}
+	generatedAt := now.Format(time.RFC3339)
+	payload := bundleManifestPayload(engagement.ID, generatedAt, members)
+	signature := signBundleManifest(bundleSigner(), payload, len(members))
 	return writeJSONMember(archive, "MANIFEST.json", gin.H{
 		"engagement": gin.H{
 			"id":         engagement.ID,
@@ -83,8 +86,10 @@ func writeBundleManifest(archive bundleWriter, recorder *hashingBundleWriter, en
 			"ends_at":    engagement.EndsAt.UTC().Format(time.RFC3339),
 			"window_end": windowEnd.UTC().Format(time.RFC3339),
 		},
-		"generated_at": now.Format(time.RFC3339),
+		"generated_at": generatedAt,
 		"members":      members,
+		"signed":       signature != nil,
+		"signature":    signature,
 		"note": "each member names its source and its sensitivity; the sha256 is of the member exactly as written, " +
 			"and MANIFEST.json is the only file without one (it cannot contain its own digest)",
 	})

@@ -3748,6 +3748,13 @@ paths:
           required: true
           description: The engagement the bundle belongs to (must be visible to the caller)
           schema: {type: integer}
+        - name: public_key
+          in: query
+          description: >-
+            The hex Ed25519 public key the caller already trusts. Supplying it turns `signature.valid` into
+            `signature.trusted`, because a key carried inside the archive proves nothing about origin - swap the
+            manifest and the key together and every digest still matches.
+          schema: {type: string}
       requestBody:
         required: true
         content:
@@ -3793,6 +3800,16 @@ paths:
                           id: {type: integer}
                           name: {type: string}
                       generated_at: {type: string}
+                      signature:
+                        type: object
+                        properties:
+                          present: {type: boolean}
+                          valid: {type: boolean, description: The signature verifies against the key it carries}
+                          trusted: {type: boolean, description: Valid AND signed by the public_key the caller supplied}
+                          algorithm: {type: string}
+                          public_key: {type: string}
+                          signed_members: {type: integer}
+                          problem: {type: string}
                       note: {type: string, description: The stated limitation of an unkeyed, self-contained manifest}
         '400':
           description: Empty or non-zip body, missing MANIFEST.json, or a manifest that is not valid JSON

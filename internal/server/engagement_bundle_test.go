@@ -3,10 +3,12 @@ package server
 import (
 	"archive/zip"
 	"bytes"
+	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/csv"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -559,4 +561,169 @@ func TestEngagementBundleSelection(t *testing.T) {
 	if code != http.StatusOK || len(members) != 1 {
 		t.Fatalf("manifest-only bundle = %d %v", code, keysOf(members))
 	}
+}
+
+// TestEngagementBundleSignature covers signing and the distinction the verify response makes between "the manifest is
+// internally consistent" and "signed by the key I expected".
+//
+// A public key carried inside the archive proves nothing about origin: swap the manifest and the key together and
+// everything verifies. So `trusted` requires the caller to state the key they already trust, and the test pins both
+// halves - valid-but-untrusted, and trusted when the expected key is supplied.
+func TestEngagementBundleSignature(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	s := mustTenantServer(t)
+
+	seed := "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60"
+	t.Setenv(bundleSigningKeyEnv, seed)
+	signingKey := ed25519.NewKeyFromSeed(mustHexSeed(t, seed))
+	expectedKey := hex.EncodeToString(signingKey.Public().(ed25519.PublicKey))
+
+	now := time.Now().Truncate(time.Second)
+	engagement := db.Engagement{TenantID: 1, Name: "DMZ exercise", StartsAt: now.Add(-2 * time.Hour), EndsAt: now.Add(-time.Hour)}
+	if err := s.db.Create(&engagement).Error; err != nil {
+		t.Fatalf("seed engagement: %v", err)
+	}
+
+	buildBundle := func() []byte {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest(http.MethodGet, "/api/engagements/1/bundle?include=summary.md", nil)
+		c.Params = gin.Params{{Key: "id", Value: itoaUint(engagement.ID)}}
+		c.Set("user", "op")
+		c.Set("user_role", db.RoleAdmin)
+		c.Set("user_id", uint(1))
+		c.Set(middleware.TenantIDContextKey, uint(1))
+		s.handleEngagementBundle(c)
+		if w.Code != http.StatusOK {
+			t.Fatalf("bundle status = %d (%s)", w.Code, w.Body.String())
+		}
+		return w.Body.Bytes()
+	}
+	verify := func(body []byte, query string) map[string]interface{} {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest(http.MethodPost, "/api/engagements/1/bundle/verify"+query, bytes.NewReader(body))
+		c.Request.Header.Set("Content-Type", "application/zip")
+		c.Params = gin.Params{{Key: "id", Value: itoaUint(engagement.ID)}}
+		c.Set("user", "op")
+		c.Set("user_role", db.RoleAdmin)
+		c.Set("user_id", uint(1))
+		c.Set(middleware.TenantIDContextKey, uint(1))
+		s.handleVerifyEngagementBundle(c)
+		var resp struct {
+			Data map[string]interface{} `json:"data"`
+		}
+		_ = json.Unmarshal(w.Body.Bytes(), &resp)
+		return resp.Data
+	}
+
+	bundle := buildBundle()
+
+	// 1. Signed, internally consistent, but NOT trusted without an expected key.
+	data := verify(bundle, "")
+	signature, _ := data["signature"].(map[string]interface{})
+	if signature["present"] != true || signature["valid"] != true {
+		t.Fatalf("signature = %v, want present and valid", signature)
+	}
+	if signature["trusted"] != false {
+		t.Fatalf("a self-carried key was reported as trusted: %v", signature)
+	}
+	if data["ok"] != true {
+		t.Fatalf("a correctly signed bundle did not verify: %v", data)
+	}
+
+	// 2. Trusted once the caller names the key they already hold.
+	data = verify(bundle, "?public_key="+expectedKey)
+	signature, _ = data["signature"].(map[string]interface{})
+	if signature["trusted"] != true {
+		t.Fatalf("the expected key did not make the bundle trusted: %v", signature)
+	}
+
+	// 3. A wrong expected key is refused as untrusted, with the reason stated.
+	data = verify(bundle, "?public_key="+strings.Repeat("00", 32))
+	signature, _ = data["signature"].(map[string]interface{})
+	if signature["trusted"] != false || !strings.Contains(fmt.Sprint(signature["problem"]), "different key") {
+		t.Fatalf("a wrong expected key = %v", signature)
+	}
+
+	// 4. Editing a digest in the manifest after signing breaks the signature even though nothing else changed.
+	edited := editManifestDigest(t, bundle)
+	data = verify(edited, "")
+	signature, _ = data["signature"].(map[string]interface{})
+	if signature["valid"] != false {
+		t.Fatalf("an edited manifest still verified: %v", signature)
+	}
+
+	// 5. Without a configured key the bundle is unsigned and says so, rather than pretending.
+	t.Setenv(bundleSigningKeyEnv, "")
+	unsigned := buildBundle()
+	data = verify(unsigned, "")
+	signature, _ = data["signature"].(map[string]interface{})
+	if signature["present"] != false {
+		t.Fatalf("an unsigned bundle claims a signature: %v", signature)
+	}
+	if problem := fmt.Sprint(signature["problem"]); !strings.Contains(problem, "unsigned") {
+		t.Fatalf("the unsigned case is not explained: %q", problem)
+	}
+}
+
+// mustHexSeed decodes a hex Ed25519 seed.
+func mustHexSeed(t *testing.T, seed string) []byte {
+	t.Helper()
+	raw, err := hex.DecodeString(seed)
+	if err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	return raw
+}
+
+// editManifestDigest rewrites the first member digest inside MANIFEST.json without re-signing.
+func editManifestDigest(t *testing.T, raw []byte) []byte {
+	t.Helper()
+	reader, err := zip.NewReader(bytes.NewReader(raw), int64(len(raw)))
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	var buf bytes.Buffer
+	writer := zip.NewWriter(&buf)
+	for _, file := range reader.File {
+		handle, err := file.Open()
+		if err != nil {
+			t.Fatalf("open %s: %v", file.Name, err)
+		}
+		content, err := io.ReadAll(handle)
+		_ = handle.Close()
+		if err != nil {
+			t.Fatalf("read %s: %v", file.Name, err)
+		}
+		if file.Name == "MANIFEST.json" {
+			var parsed map[string]interface{}
+			if err := json.Unmarshal(content, &parsed); err != nil {
+				t.Fatalf("manifest: %v", err)
+			}
+			members, _ := parsed["members"].([]interface{})
+			for _, entry := range members {
+				member, _ := entry.(map[string]interface{})
+				if member["sha256"] != nil && member["sha256"] != "" {
+					member["sha256"] = strings.Repeat("ab", 32)
+					break
+				}
+			}
+			content, err = json.MarshalIndent(parsed, "", "  ")
+			if err != nil {
+				t.Fatalf("re-encode: %v", err)
+			}
+		}
+		out, err := writer.Create(file.Name)
+		if err != nil {
+			t.Fatalf("create %s: %v", file.Name, err)
+		}
+		if _, err := out.Write(content); err != nil {
+			t.Fatalf("write %s: %v", file.Name, err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+	return buf.Bytes()
 }

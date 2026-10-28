@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -80,11 +81,15 @@ func (s *Server) handleVerifyEngagementBundle(c *gin.Context) {
 			ID   uint   `json:"id"`
 			Name string `json:"name"`
 		} `json:"engagement"`
-		GeneratedAt string `json:"generated_at"`
+		GeneratedAt string           `json:"generated_at"`
+		Signature   *bundleSignature `json:"signature"`
 		Members     []struct {
-			Name   string `json:"name"`
-			SHA256 string `json:"sha256"`
-			Bytes  int    `json:"bytes"`
+			Name        string `json:"name"`
+			Purpose     string `json:"purpose"`
+			Source      string `json:"source"`
+			Sensitivity string `json:"sensitivity"`
+			SHA256      string `json:"sha256"`
+			Bytes       int    `json:"bytes"`
 		} `json:"members"`
 	}
 	if err := json.Unmarshal(manifestRaw, &manifest); err != nil {
@@ -135,6 +140,37 @@ func (s *Server) handleVerifyEngagementBundle(c *gin.Context) {
 		}
 	}
 
+	// The signature is checked LAST, against the digests as they are written in the manifest - and the payload is
+	// rebuilt from those digests, so a manifest whose numbers were edited after signing fails here even when every
+	// member still matches its (edited) digest.
+	descriptions := make([]bundleMemberDescription, 0, len(manifest.Members))
+	for _, entry := range manifest.Members {
+		descriptions = append(descriptions, bundleMemberDescription{
+			Name: entry.Name, Purpose: entry.Purpose, Source: entry.Source,
+			Sensitivity: entry.Sensitivity, SHA256: entry.SHA256, Bytes: entry.Bytes,
+		})
+	}
+	payload := bundleManifestPayload(manifest.Engagement.ID, manifest.GeneratedAt, descriptions)
+	signatureValid, signatureProblem := verifyBundleSignature(manifest.Signature, payload)
+	// A key carried in the same archive proves nothing about origin, so `trusted` requires the caller to state the key
+	// they already trust. Without that, a swapped manifest and a swapped key verify together.
+	expectedKey := strings.ToLower(strings.TrimSpace(c.Query("public_key")))
+	trusted := signatureValid && expectedKey != "" && strings.ToLower(manifest.Signature.PublicKey) == expectedKey
+	signatureReport := gin.H{
+		"present": manifest.Signature != nil,
+		"valid":   signatureValid,
+		"trusted": trusted,
+		"problem": signatureProblem,
+	}
+	if manifest.Signature != nil {
+		signatureReport["public_key"] = manifest.Signature.PublicKey
+		signatureReport["algorithm"] = manifest.Signature.Algorithm
+		signatureReport["signed_members"] = manifest.Signature.SignedMembers
+	}
+	if expectedKey != "" && manifest.Signature != nil && strings.ToLower(manifest.Signature.PublicKey) != expectedKey {
+		signatureReport["problem"] = "the manifest is signed by a different key than the one supplied"
+	}
+
 	inSync := len(problems) == 0 && len(extra) == 0
 	s.LogAuditRecord(c, "engagement_bundle_verify", "engagement", fmt.Sprintf("%d", manifest.Engagement.ID),
 		fmt.Sprintf("verified uploaded bundle: %d of %d member(s) intact, %d problem(s)", verified, checked, len(problems)), true, nil)
@@ -148,7 +184,9 @@ func (s *Server) handleVerifyEngagementBundle(c *gin.Context) {
 		"extra":        extra,
 		"engagement":   manifest.Engagement,
 		"generated_at": manifest.GeneratedAt,
+		"signature":    signatureReport,
 		"note": "digests are unkeyed and the manifest travels inside the archive, so this detects damage and " +
-			"partial edits, not a package rebuilt wholesale; only a signature would close that gap",
+			"partial edits, not a package rebuilt wholesale. A signature closes that gap only when the receiver " +
+			"compares it with a key they already trust, which is why trusted requires public_key",
 	})
 }
