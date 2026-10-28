@@ -55,9 +55,12 @@ var aiToolPolicies = map[string]aiToolPolicy{
 	"get_screenshot_summary": {Risk: aiToolRiskRead, Permission: db.PermFilesRead},
 	"get_keylog_summary":     {Risk: aiToolRiskSensitive, Permission: db.PermCredsRead},
 	"generate_report":        {Risk: aiToolRiskRead, Permission: db.PermIntelRead, GlobalOnly: true},
-	"create_listener":        {Risk: aiToolRiskWrite, Permission: db.PermListenersWrite, GlobalOnly: true},
-	"update_listener":        {Risk: aiToolRiskWrite, Permission: db.PermListenersWrite, GlobalOnly: true},
-	"delete_listener":        {Risk: aiToolRiskDestructive, Permission: db.PermListenersDelete, GlobalOnly: true},
+	// The assistant may write a plugin package, but plugins are installation-global and writing code is
+	// a write: plugins.write plus a human approval intent, and the tool itself never executes anything.
+	"create_plugin":   {Risk: aiToolRiskWrite, Permission: db.PermPluginsWrite, GlobalOnly: true},
+	"create_listener": {Risk: aiToolRiskWrite, Permission: db.PermListenersWrite, GlobalOnly: true},
+	"update_listener": {Risk: aiToolRiskWrite, Permission: db.PermListenersWrite, GlobalOnly: true},
+	"delete_listener": {Risk: aiToolRiskDestructive, Permission: db.PermListenersDelete, GlobalOnly: true},
 	// get_situation applies tenant and permission scoping inside the collector;
 	// keeping it GlobalOnly made the tool unusable for every normal tenant,
 	// including administrators, while older conversations could still ask the

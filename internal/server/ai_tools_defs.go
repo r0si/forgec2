@@ -760,6 +760,10 @@ authorize:
 	if name == "web_search" {
 		return s.executeAIWebSearchTool(reqCtx, normalizedArgs)
 	}
+	// Writes a plugin package: admin + approval intent, and never executed here.
+	if name == "create_plugin" {
+		return s.aiCreatePluginTool(reqCtx, normalizedArgs)
+	}
 	return s.executeToolSwitchCtx(reqCtx, name, normalizedArgs)
 }
 
