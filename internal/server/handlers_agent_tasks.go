@@ -140,6 +140,18 @@ func (s *Server) handleExportTasks(c *gin.Context) {
 			limit = n
 		}
 	}
+	// Revalidation before the query: a client that already holds this export gets a bodiless 304 and
+	// costs neither side the read.
+	exportETag := s.taskExportETag(c, limit)
+	if exportETag != "" {
+		c.Header("ETag", exportETag)
+		c.Header("Cache-Control", "private, no-cache")
+	}
+	if taskExportNotModified(c, exportETag) {
+		c.AbortWithStatus(http.StatusNotModified)
+		return
+	}
+
 	var tasks []db.Task
 	query := s.db.WithContext(s.ctx).
 		Preload("Agent", func(db *gorm.DB) *gorm.DB {
