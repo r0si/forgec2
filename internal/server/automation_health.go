@@ -129,6 +129,7 @@ func (s *Server) handleAutomationHealth(c *gin.Context) {
 	// Per-rule firing statistics: a rule that has never fired and one that fires a thousand times a day look identical
 	// in the rule list, and both are operational facts the health report is the natural place to surface.
 	createdAt := s.automationRuleCreatedAt(c)
+	actionStats := ruleActionStatsSnapshot()
 	stats := make([]gin.H, 0, len(rules))
 	for _, rule := range rules {
 		if rule.TenantID != 0 && rule.TenantID != tenantID {
@@ -139,6 +140,22 @@ func (s *Server) handleAutomationHealth(c *gin.Context) {
 			"rule_name": rule.Name,
 			"enabled":   rule.Enabled,
 			"run_count": rule.RunCount,
+		}
+		// Action health: a rule that fires into a void looks identical to one that works, because run_count counts
+		// FIRINGS, not successes.
+		action := actionStats[rule.ID]
+		entry["action_state"] = ruleActionHealth(action)
+		entry["actions_ok"] = action.OK
+		entry["actions_failed"] = action.Failed
+		if action.LastError != "" {
+			entry["last_action_error"] = action.LastError
+		}
+		if action.Failed > 0 && action.OK == 0 {
+			findings = append(findings, automationFinding{
+				RuleID: rule.ID, RuleName: rule.Name, Severity: "error", Code: "action_failing",
+				Detail: fmt.Sprintf("every action dispatch has failed (%d): the rule fires but nothing happens - %s",
+					action.Failed, action.LastError),
+			})
 		}
 		if !rule.LastTriggered.IsZero() {
 			entry["last_triggered"] = rule.LastTriggered.UTC().Format(time.RFC3339)

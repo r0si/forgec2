@@ -175,12 +175,12 @@ func TestExecuteActionTypes(t *testing.T) {
 	evt := Event{Type: "agent.checkin", AgentID: "act-agent", AgentHost: "act-host", TenantID: 1}
 
 	// create_task expands templates and attributes the task to automation.
-	s.executeAction(schedAction(t, ActionCreateTask, map[string]string{
+	s.executeAction(AutomationRule{ID: "test"}, schedAction(t, ActionCreateTask, map[string]string{
 		"type": "shell", "command": "echo {{hostname}} {{agent_id}}",
 	}), evt)
 
 	// set_sleep clamps to the OPSEC floors and queues a set_sleep task.
-	s.executeAction(schedAction(t, ActionSetSleep, map[string]int{"interval": 1, "jitter": 200}), evt)
+	s.executeAction(AutomationRule{ID: "test"}, schedAction(t, ActionSetSleep, map[string]int{"interval": 1, "jitter": 200}), evt)
 
 	var tasks []db.Task
 	if err := s.db.Where("agent_id = ?", "act-agent").Order("id asc").Find(&tasks).Error; err != nil {
@@ -202,7 +202,7 @@ func TestExecuteActionTypes(t *testing.T) {
 		t.Fatal(err)
 	}
 	before := len(tasks)
-	s.executeAction(schedAction(t, ActionRunMacro, map[string]interface{}{"macro_id": foreignMacro.ID}), evt)
+	s.executeAction(AutomationRule{ID: "test"}, schedAction(t, ActionRunMacro, map[string]interface{}{"macro_id": foreignMacro.ID}), evt)
 	var after int64
 	s.db.Model(&db.Task{}).Where("agent_id = ?", "act-agent").Count(&after)
 	if int(after) != before {
@@ -210,8 +210,8 @@ func TestExecuteActionTypes(t *testing.T) {
 	}
 
 	// notify and a blocked webhook must not panic the dispatcher.
-	s.executeAction(schedAction(t, ActionNotify, map[string]string{"message": "hello \"quoted\""}), evt)
-	s.executeAction(schedAction(t, ActionWebhook, map[string]string{"url": "http://127.0.0.1:9/hook"}), evt)
+	s.executeAction(AutomationRule{ID: "test"}, schedAction(t, ActionNotify, map[string]string{"message": "hello \"quoted\""}), evt)
+	s.executeAction(AutomationRule{ID: "test"}, schedAction(t, ActionWebhook, map[string]string{"url": "http://127.0.0.1:9/hook"}), evt)
 	// Give the async webhook goroutine a moment; it must fail closed on the
 	// private URL rather than reach the network.
 	time.Sleep(50 * time.Millisecond)

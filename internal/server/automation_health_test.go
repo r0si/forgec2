@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -208,6 +209,55 @@ func TestAutomationHealth(t *testing.T) {
 	}
 	if !foundStale {
 		t.Fatalf("a rule enabled for three days with no firing was not reported: %+v", aged.Data.Findings)
+	}
+
+	// Action health: a rule whose dispatches all fail fires successfully and does nothing, which run_count cannot show.
+	resetRuleActionStats()
+	t.Cleanup(resetRuleActionStats)
+	recordRuleActionOutcome("healthy", true, nil)
+	recordRuleActionOutcome("unconditional", false, errors.New("run_command: no target agent"))
+	w3 := httptest.NewRecorder()
+	c3, _ := gin.CreateTestContext(w3)
+	c3.Request = httptest.NewRequest(http.MethodGet, "/api/automation/health", nil)
+	c3.Set("user", "op")
+	c3.Set("user_role", db.RoleAdmin)
+	c3.Set("user_id", uint(1))
+	c3.Set(middleware.TenantIDContextKey, uint(1))
+	s.handleAutomationHealth(c3)
+	var withActions struct {
+		Data struct {
+			Rules    []map[string]interface{} `json:"rules"`
+			Findings []struct {
+				RuleID string `json:"rule_id"`
+				Code   string `json:"code"`
+			} `json:"findings"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w3.Body.Bytes(), &withActions); err != nil {
+		t.Fatalf("decode actions: %v", err)
+	}
+	sawFailing := false
+	for _, finding := range withActions.Data.Findings {
+		if finding.RuleID == "unconditional" && finding.Code == "action_failing" {
+			sawFailing = true
+		}
+	}
+	if !sawFailing {
+		t.Fatalf("a rule whose dispatches all fail was not reported: %+v", withActions.Data.Findings)
+	}
+	for _, rule := range withActions.Data.Rules {
+		state, _ := rule["action_state"].(string)
+		if state == "" {
+			t.Fatalf("rule %v reports no action_state", rule["rule_id"])
+		}
+		if rule["rule_id"] == "healthy" && state != "dispatching" {
+			t.Fatalf("a rule with only successes reports %q", state)
+		}
+		if rule["rule_id"] == "no-dispatch" || rule["rule_id"] == "stale" {
+			if state != "unused" {
+				t.Fatalf("rule %v reports %q, want unused", rule["rule_id"], state)
+			}
+		}
 	}
 
 	// Errors come first, so the report opens with what will bite.

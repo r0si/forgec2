@@ -84,7 +84,11 @@ func (s *Server) evaluateRule(evt Event, rule AutomationRule) {
 		return
 	}
 	for _, action := range rule.Actions {
-		s.executeAction(action, evt)
+		if err := s.executeAction(rule, action, evt); err != nil {
+			recordRuleActionOutcome(rule.ID, false, err)
+		} else {
+			recordRuleActionOutcome(rule.ID, true, nil)
+		}
 	}
 	// Stamp the firing unconditionally: run_count is operator-visible stats,
 	// last_triggered powers the cooldown window above (survives restarts).
@@ -114,7 +118,12 @@ func (s *Server) matchCondition(cond RuleCondition, evt Event) bool {
 	}
 }
 
-func (s *Server) executeAction(action RuleAction, evt Event) {
+// executeAction runs one action and reports the failures a rule owner needs to see.
+//
+// The return value covers DISPATCH failures: the task could not be created, the macro does not exist. Those are the ones
+// that silently mean "the rule fired and nothing happened". Outcomes that happen later - a webhook answering 500 - are
+// counted by the goroutine that learns about them, so this never claims success for something still in flight.
+func (s *Server) executeAction(rule AutomationRule, action RuleAction, evt Event) error {
 	switch action.Type {
 	case ActionRunCommand:
 		var params struct {
@@ -123,7 +132,7 @@ func (s *Server) executeAction(action RuleAction, evt Event) {
 		}
 		if err := json.Unmarshal(action.Params, &params); err != nil {
 			slog.Error("Automation: unmarshal command params", "error", err)
-			return
+			return fmt.Errorf("run_command: %w", err)
 		}
 		if params.Command != "" {
 			targetAgent := s.automationTarget(evt, params.AgentID)
@@ -131,6 +140,7 @@ func (s *Server) executeAction(action RuleAction, evt Event) {
 				expanded := s.expandTemplate(params.Command, evt)
 				if _, err := s.createSystemTask(targetAgent, "automation", expanded, "", "pending", "automation"); err != nil {
 					slog.Error("Automation: failed to create command task", "error", err)
+					return fmt.Errorf("run_command: %w", err)
 				}
 			}
 		}
@@ -143,7 +153,7 @@ func (s *Server) executeAction(action RuleAction, evt Event) {
 		}
 		if err := json.Unmarshal(action.Params, &params); err != nil {
 			slog.Error("Automation: unmarshal webhook params", "error", err)
-			return
+			return fmt.Errorf("webhook: %w", err)
 		}
 		if params.URL != "" {
 			// Recover like the notification dispatcher does: a panic in a bare goroutine takes the
@@ -282,12 +292,12 @@ func (s *Server) executeAction(action RuleAction, evt Event) {
 		}
 		if err := json.Unmarshal(action.Params, &params); err != nil || params.MacroID == 0 {
 			slog.Error("Automation: invalid run_macro params")
-			return
+			return nil
 		}
 		var macro db.CommandMacro
 		if err := s.db.First(&macro, params.MacroID).Error; err != nil {
 			slog.Error("Automation: macro not found for run_macro action", "macro_id", params.MacroID, "error", err)
-			return
+			return fmt.Errorf("run_macro: macro %d not found", params.MacroID)
 		}
 		// Macro rows are tenant assets too: a rule must not execute (or
 		// probe the existence of) another tenant's playbook.
@@ -295,12 +305,12 @@ func (s *Server) executeAction(action RuleAction, evt Event) {
 			slog.Warn("Automation: cross-tenant macro blocked", "macro_id", params.MacroID, "tenant", evt.TenantID)
 			s.LogAuditRecord(nil, "automation_blocked_cross_tenant", "macro", fmt.Sprint(params.MacroID),
 				"run_macro referenced foreign-tenant macro", true, nil)
-			return
+			return nil
 		}
 		targetAgent := evt.AgentID
 		if targetAgent == "" {
 			slog.Warn("Automation: run_macro skipped, event has no agent context", "macro", macro.Name)
-			return
+			return nil
 		}
 		// Run against the triggering agent so playbooks like "on connect,
 		// auto-recon" work without pinning a specific host.
@@ -311,6 +321,7 @@ func (s *Server) executeAction(action RuleAction, evt Event) {
 			slog.Info("Automation: macro dispatched", "macro", macro.Name, "agent_id", targetAgent)
 		}
 	}
+	return nil
 }
 
 // expandTemplate replaces template variables in a string with event data.
