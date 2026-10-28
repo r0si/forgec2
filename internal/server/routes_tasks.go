@@ -16,6 +16,8 @@ func (s *Server) registerTaskRoutes(auth *gin.RouterGroup) {
 		tasksRead.GET("/api/exports/capabilities", s.handleExportCapabilities)
 		// Why tasks fail, grouped by reason, type or agent.
 		tasksRead.GET("/api/stats/tasks/failures", s.handleTaskFailureStats)
+		// The same normalisation, across tasks and notifications: what shape of failure dominates right now.
+		tasksRead.GET("/api/stats/failures/signatures", s.handleFailureSignatures)
 		tasksRead.GET("/tasks/:taskId", s.handleGetTaskStatus)
 		// A file is what an operator wants for a large result; the JSON detail stays for the UI.
 		tasksRead.GET("/tasks/:taskId/output", s.handleDownloadTaskOutput)

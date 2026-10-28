@@ -13123,6 +13123,62 @@ paths:
       responses:
         '200': {description: Accepted collector payload shape}
 
+  /api/stats/failures/signatures:
+    get:
+      tags: [Stats]
+      summary: What shape of failure dominates, across tasks and notifications
+      description: >-
+        The question that comes after the reason breakdown: **is this four separate 401s or one expired token?** Every failed
+        task in the window is grouped by its **normalised shape** (paths, ids and digits collapsed) with the reason codes that
+        contributed and one example, and notification route failures are grouped by the **same** normalisation after the
+        message is redacted - so a signature means the same thing in both halves and in a UI. Both lists are capped at ten
+        rows and sorted by count, then by signature, so successive polls can be compared.
+      operationId: failureSignatures
+      security:
+        - SessionCookie: []
+      parameters:
+        - name: since
+          in: query
+          description: Window for the task half, e.g. 24h or 7d (default 7d)
+          schema: {type: string, default: 7d}
+      responses:
+        '200':
+          description: The dominant shapes, tasks and notifications
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  data:
+                    type: object
+                    properties:
+                      since: {type: string}
+                      task_failures: {type: integer}
+                      note: {type: string}
+                      task_signatures:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            signature: {type: string}
+                            count: {type: integer}
+                            reasons:
+                              type: array
+                              items: {type: string}
+                            sample: {type: string}
+                      notification_signatures:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            signature: {type: string}
+                            routes:
+                              type: array
+                              description: Route ids that share this shape
+                              items: {type: string}
+        '400':
+          description: Invalid since
   /api/stats/tasks/failures:
     get:
       tags: [Stats]

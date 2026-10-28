@@ -11137,6 +11137,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/stats/failures/signatures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What shape of failure dominates, across tasks and notifications
+         * @description The question that comes after the reason breakdown: **is this four separate 401s or one expired token?** Every failed task in the window is grouped by its **normalised shape** (paths, ids and digits collapsed) with the reason codes that contributed and one example, and notification route failures are grouped by the **same** normalisation after the message is redacted - so a signature means the same thing in both halves and in a UI. Both lists are capped at ten rows and sorted by count, then by signature, so successive polls can be compared.
+         */
+        get: operations["failureSignatures"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/stats/tasks/failures": {
         parameters: {
             query?: never;
@@ -27947,6 +27967,54 @@ export interface operations {
         responses: {
             /** @description Collection dispatched */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    failureSignatures: {
+        parameters: {
+            query?: {
+                /** @description Window for the task half, e.g. 24h or 7d (default 7d) */
+                since?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The dominant shapes, tasks and notifications */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        data?: {
+                            since?: string;
+                            task_failures?: number;
+                            note?: string;
+                            task_signatures?: {
+                                signature?: string;
+                                count?: number;
+                                reasons?: string[];
+                                sample?: string;
+                            }[];
+                            notification_signatures?: {
+                                signature?: string;
+                                /** @description Route ids that share this shape */
+                                routes?: string[];
+                            }[];
+                        };
+                    };
+                };
+            };
+            /** @description Invalid since */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };
