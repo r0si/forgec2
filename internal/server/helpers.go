@@ -18,6 +18,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/forgec2/forgec2/internal/config"
 	"github.com/forgec2/forgec2/internal/crypto"
@@ -51,9 +52,31 @@ func respondErrorSafe(c *gin.Context, status int, err error, context string) {
 // handleQueryError logs a database/query failure and returns a 500 to the
 // client. Use it instead of the "log and fall through to an empty 200"
 // pattern so transient failures are never reported as successful empty lists.
+// handleQueryError reports a failed query with a reference the operator can quote.
+//
+// It used to log the full error and answer the literal "Query failed", so the two could not be
+// matched: a support report of "I got Query failed" named one of 74 call sites and one of thousands of
+// log lines. The reference goes out as a header rather than into the message so the body stays a
+// literal (check:error-sanitization) and the UI is free to ignore it.
 func handleQueryError(c *gin.Context, err error, msg string) {
-	slog.Error(msg, "err", err)
+	ref := newErrorRef()
+	route := c.FullPath()
+	if route == "" {
+		route = c.Request.URL.Path
+	}
+	c.Header("X-Error-Ref", ref)
+	slog.Error(msg, "ref", ref, "route", route, "err", err)
 	respondError(c, http.StatusInternalServerError, "Query failed")
+}
+
+// newErrorRef returns a short, non-guessable reference (6 hex chars) for log correlation.
+func newErrorRef() string {
+	var b [3]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		// Never fail a request because the reference could not be drawn.
+		return fmt.Sprintf("%06x", time.Now().UnixNano()&0xffffff)
+	}
+	return hex.EncodeToString(b[:])
 }
 
 // csvSafe neutralizes spreadsheet formula injection in CSV exports: cells
