@@ -356,8 +356,9 @@ func (s *Server) executeWebhook(params struct {
 
 	resp, err := ssrfSafeClient(s.httpClient).Do(req)
 	if err != nil {
-		// *url.Error embeds the full URL (may carry a webhook secret): log cause only.
-		slog.Error("Automation: webhook request failed", "error", err)
+		// *url.Error embeds the full URL, which may carry a webhook secret. The comment here always
+		// said "log cause only" but passed the wrapper; deliveryErrorText actually strips it.
+		slog.Error("Automation: webhook request failed", "error", deliveryErrorText(err))
 		return
 	}
 	defer resp.Body.Close()

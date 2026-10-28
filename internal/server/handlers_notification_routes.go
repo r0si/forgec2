@@ -94,7 +94,14 @@ func (s *Server) DispatchNotification(n *db.Notification) {
 					slog.Error("Notification route panicked", "route", route.Name, "panic", r)
 				}
 			}()
-			_ = s.sendNotificationRoute(route, n)
+			// Do not discard this: the row above is already persisted, so a delivery failure left the
+			// operator with a notification that exists in the console and never reached Discord,
+			// Telegram or their webhook, and nothing anywhere said so.
+			if err := s.sendNotificationRoute(route, n); err != nil {
+				slog.Error("Notification route delivery failed",
+					"route", route.Name, "channel", route.Channel, "title", n.Title,
+					"error", deliveryErrorText(err))
+			}
 		}(route)
 	}
 }
