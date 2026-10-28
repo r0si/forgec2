@@ -39,7 +39,26 @@ func respond(c *gin.Context, data interface{}) {
 }
 
 // respondError sends a JSON error response with the given HTTP status and message.
+// respondError sends the standard error envelope.
+//
+// Every 5xx gets a reference (X-Error-Ref) and one log line naming the route and the sanitized
+// message, so ANY failed request can be quoted by an operator - not just the ones that go through
+// handleQueryError. The cause is whatever the handler logged before calling this; a 4xx is a client
+// mistake and deliberately gets neither. An existing header (handleQueryError sets one, and logs the
+// cause with it) is never overwritten.
 func respondError(c *gin.Context, status int, msg string) {
+	if status >= http.StatusInternalServerError {
+		ref := c.Writer.Header().Get("X-Error-Ref")
+		if ref == "" {
+			ref = newErrorRef()
+			c.Header("X-Error-Ref", ref)
+		}
+		route := c.FullPath()
+		if route == "" && c.Request != nil && c.Request.URL != nil {
+			route = c.Request.URL.Path
+		}
+		slog.Error("request failed", "ref", ref, "route", route, "status", status, "message", msg)
+	}
 	c.JSON(status, gin.H{"success": false, "error": msg})
 }
 
