@@ -194,6 +194,15 @@ by hand at least once; do not weaken one to make a change pass — fix the chang
   passed `npm run check` locally and only failed in CI. Scope worth knowing: the hand-written
   per-OS tables in that file (Yes/No/Partial cells) are **not** verified — only the block
   between the `BEGIN/END GENERATED TASK INVENTORY` markers and the `as of vX.Y.Z` stamp.
+- `TestDocumentedAPIRoutesAreInTheSpec` (Go) — the other direction from `TestFrontendAPIPathsExist`: every
+  route the **router actually registers** under `/api` must appear in `api/openapi.yaml`, with a
+  shrink-only allowlist for the beacon-facing endpoints, the WebSocket upgrades and the public landing
+  pages. It exists because three endpoints added in this batch were code-only and `check:openapi-types`
+  could not see them — that gate compares the generated types to the spec, so a route the spec never
+  mentions is invisible. **The first version of this check reported 25+ missing paths that were all its
+  own normalisation:** the spec is inconsistent about the `/api` prefix and writes parameters as `{id}`
+  where gin reports `:id`, so both spellings are now accepted. Measured after the fix: **226 distinct
+  /api paths, 0 undocumented**.
 - `TestSuccessEnvelope` / `TestErrorEnvelope` (Go) — ratchets over raw (non-envelope)
   JSON success and error responses, per file, failing in both directions: a new raw
   response, or a file that improved without lowering its number. Update the matching
