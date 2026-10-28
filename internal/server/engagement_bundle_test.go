@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/forgec2/forgec2/internal/crypto"
 	"github.com/forgec2/forgec2/internal/db"
 	"github.com/forgec2/forgec2/internal/server/middleware"
 	"github.com/gin-gonic/gin"
@@ -44,6 +45,16 @@ func TestEngagementBundle(t *testing.T) {
 		Result: "inside-window", CreatedAt: now.Add(-2 * time.Hour), UpdatedAt: now.Add(-2 * time.Hour),
 	}).Error; err != nil {
 		t.Fatalf("seed task: %v", err)
+	}
+	// A credential with a real secret in it: the bundle must describe it without carrying the secret. The vault
+	// refuses a plaintext store, so the fixture initialises loot encryption the same way production does.
+	crypto.InitLootEncryption("0000000000000000000000000000000000000000000000000000000000000000")
+	if err := s.db.Create(&db.CredentialEntry{
+		TenantID: 1, AgentID: "a-1", Domain: "CORP", Username: "svc-backup", Password: "Sup3rSecret!",
+		Hash: "8846f7eaee8fb117ad06bdd830b7586c", Type: "cleartext", Source: "lsass",
+		CreatedAt: now.Add(-100 * time.Minute),
+	}).Error; err != nil {
+		t.Fatalf("seed credential: %v", err)
 	}
 	if err := s.db.Create(&db.Task{
 		AgentID: "a-1", TenantID: 1, Type: "shell", Command: "whoami", Status: "completed",
@@ -103,7 +114,7 @@ func TestEngagementBundle(t *testing.T) {
 		}
 		members[file.Name] = content
 	}
-	for _, name := range []string{"summary.md", "timeline.md", "tasks.csv", "audit.ndjson", "agents.json", "plugins.json"} {
+	for _, name := range []string{"summary.md", "timeline.md", "tasks.csv", "audit.ndjson", "agents.json", "credentials.json", "plugins.json"} {
 		if _, ok := members[name]; !ok {
 			t.Fatalf("the bundle is missing %s (has %v)", name, keysOf(members))
 		}
@@ -166,6 +177,17 @@ func TestEngagementBundle(t *testing.T) {
 	var plugins []pluginIndexEntry
 	if err := json.Unmarshal(members["plugins.json"], &plugins); err != nil {
 		t.Fatalf("plugins.json: %v", err)
+	}
+
+	// credentials.json lists what was found WITHOUT the secret material, and says where the secrets live.
+	credentialsBody := string(members["credentials.json"])
+	if !strings.Contains(credentialsBody, "svc-backup") || !strings.Contains(credentialsBody, "metadata only") {
+		t.Fatalf("credentials.json = %q", credentialsBody)
+	}
+	for _, secret := range []string{"Sup3rSecret!", "8846f7eaee8fb117ad06bdd830b7586c"} {
+		if strings.Contains(credentialsBody, secret) {
+			t.Fatalf("the bundle carries secret material (%q): %s", secret, credentialsBody)
+		}
 	}
 
 	// The handover is audited.

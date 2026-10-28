@@ -15134,7 +15134,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description application/zip with summary.md, timeline.md, tasks.csv, audit.ndjson, agents.json and plugins.json */
+            /** @description application/zip with summary.md, timeline.md, tasks.csv, audit.ndjson, agents.json, credentials.json and plugins.json */
             200: {
                 headers: {
                     [name: string]: unknown;

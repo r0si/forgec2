@@ -193,6 +193,53 @@ func (s *Server) handleEngagementBundle(c *gin.Context) {
 		fail()
 		return
 	}
+	// credentials.json - METADATA ONLY. A handover bundle leaves the console: it gets emailed, put on a share, attached
+	// to a report. Shipping passwords and hashes in it would move live secrets out of the system that audits their use,
+	// so the file records what was found and where, and says where the secrets live instead.
+	if !add("credentials.json", func(w *zip.Writer) error {
+		var credentials []db.CredentialEntry
+		if len(agentIDs) > 0 {
+			if err := s.tenantScope(s.db.WithContext(s.ctx).Model(&db.CredentialEntry{}), c).
+				Where("agent_id IN ?", agentIDs).
+				Where("created_at >= ? AND created_at <= ?", engagement.StartsAt, windowEnd).
+				Order("created_at asc").Limit(5000).Find(&credentials).Error; err != nil {
+				return err
+			}
+		}
+		type credentialRecord struct {
+			ID        uint   `json:"id"`
+			AgentID   string `json:"agent_id"`
+			Domain    string `json:"domain,omitempty"`
+			Username  string `json:"username,omitempty"`
+			Type      string `json:"type,omitempty"`
+			Source    string `json:"source,omitempty"`
+			Tags      string `json:"tags,omitempty"`
+			CreatedAt string `json:"created_at"`
+		}
+		records := make([]credentialRecord, 0, len(credentials))
+		for _, credential := range credentials {
+			records = append(records, credentialRecord{
+				ID: credential.ID, AgentID: credential.AgentID, Domain: credential.Domain,
+				Username: credential.Username, Type: credential.Type, Source: credential.Source,
+				Tags: credential.Tags, CreatedAt: credential.CreatedAt.UTC().Format(time.RFC3339),
+			})
+		}
+		f, err := w.Create("credentials.json")
+		if err != nil {
+			return err
+		}
+		enc := json.NewEncoder(f)
+		enc.SetIndent("", "  ")
+		return enc.Encode(gin.H{
+			"count": len(records),
+			"note": "metadata only: passwords and hashes are deliberately excluded from the bundle. " +
+				"Retrieve them in the console, where the access is audited.",
+			"credentials": records,
+		})
+	}) {
+		fail()
+		return
+	}
 	if !add("plugins.json", func(w *zip.Writer) error {
 		f, err := w.Create("plugins.json")
 		if err != nil {
