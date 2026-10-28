@@ -24,6 +24,9 @@ import (
 func main() {
 	key := flag.String("key", "", "hex Ed25519 public key you already trust; makes the signature TRUSTED rather than merely valid")
 	asJSON := flag.Bool("json", false, "print the report as JSON")
+	requireTrusted := flag.Bool("require-trusted", false,
+		"fail unless the signature is valid AND made by -key; use in a pipeline that must only accept provable handovers")
+	quiet := flag.Bool("quiet", false, "print nothing; rely on the exit code")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "usage: verify-bundle [-key <hex>] [-json] <handover.zip>\n")
 		flag.PrintDefaults()
@@ -46,20 +49,35 @@ func main() {
 		os.Exit(2)
 	}
 
-	if *asJSON {
+	switch {
+	case *quiet:
+		// nothing: the exit code is the answer, for a pipeline that wants no output
+	case *asJSON:
 		encoded, err := json.MarshalIndent(report, "", "  ")
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "verify-bundle: %v\n", err)
 			os.Exit(2)
 		}
 		fmt.Println(string(encoded))
-	} else {
+	default:
 		printReport(report)
 	}
 
+	os.Exit(exitCode(report, *requireTrusted))
+}
+
+// exitCode turns a report into the process result.
+//
+// Exit 1 means the package itself is damaged; exit 3 means it is intact but not provably the sender's. Keeping them
+// apart lets a pipeline retry a broken download and escalate an unproven one, instead of treating both as "bad file".
+func exitCode(report *bundle.Report, requireTrusted bool) int {
 	if !report.OK {
-		os.Exit(1)
+		return 1
 	}
+	if requireTrusted && !report.Trusted {
+		return 3
+	}
+	return 0
 }
 
 // printReport writes the human-readable verdict: what is intact, what is not, and what the signature does and does not

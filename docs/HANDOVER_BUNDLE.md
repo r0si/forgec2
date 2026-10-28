@@ -57,7 +57,16 @@ go run ./cmd/verify-bundle handover.zip -json           # machine-readable
 ```
 
 Exit codes: `0` the archive matches its manifest, `1` a member is damaged, missing or unlisted, `2` the file could not
-be read as a bundle at all.
+be read as a bundle at all, `3` the archive is intact but **not trusted** (`-require-trusted` only).
+
+For a pipeline that must only accept provable handovers:
+
+```
+go run ./cmd/verify-bundle handover.zip -key <hex> -require-trusted -quiet
+```
+
+`-quiet` prints nothing and leaves the decision to the exit code, and `3` is separate from `1` on purpose: a broken file
+is a transfer problem worth retrying, an unproven one is a trust decision worth escalating.
 
 ### With a server
 
