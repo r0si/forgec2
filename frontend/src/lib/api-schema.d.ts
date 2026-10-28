@@ -1830,6 +1830,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/engagements/expiry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Engagement deadlines across the fleet
+         * @description Summarises how the caller's fleet ages out: how many implants are already expired, how many expire within 24 hours or a week, how many have no deadline at all, and the earliest deadline overall. Reading this is how an operator notices that a deadline is about to stop work - the alternative is a 403 appearing one day with no warning. Tenant-scoped; the list is ordered by deadline.
+         */
+        get: operations["engagementExpiry"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/plugins/index": {
         parameters: {
             query?: never;
@@ -14245,6 +14265,52 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["SuccessResponse"] & {
                         data: components["schemas"]["Task"][];
+                    };
+                };
+            };
+        };
+    };
+    engagementExpiry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deadline buckets, the earliest deadline, and the bounded implants ordered by deadline */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        data?: {
+                            total?: number;
+                            /** @description Implants that carry a deadline */
+                            bounded?: number;
+                            /** @description Implants with no deadline */
+                            unbounded?: number;
+                            expired?: number;
+                            within_24h?: number;
+                            within_7d?: number;
+                            earliest?: {
+                                agent_id?: string;
+                                hostname?: string;
+                                /** Format: date-time */
+                                expires_at?: string;
+                                expired?: boolean;
+                            };
+                            agents?: {
+                                agent_id?: string;
+                                hostname?: string;
+                                /** Format: date-time */
+                                expires_at?: string;
+                                expired?: boolean;
+                            }[];
+                        };
                     };
                 };
             };

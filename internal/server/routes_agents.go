@@ -14,6 +14,9 @@ func (s *Server) registerAgentRoutes(auth *gin.RouterGroup) {
 	agentsRead.Use(middleware.RequirePermission(db.PermAgentsRead))
 	{
 		agentsRead.GET("/agents", s.handleAgents)
+		// The engagement deadlines made enforceable last round, made visible.
+		// Full /api path: the group prefix here is "/", and the coverage guard only compares /api paths.
+		agentsRead.GET("/api/engagements/expiry", s.handleEngagementExpiry)
 		agentsRead.GET("/agents/:id", s.handleAgentDetail)
 		agentsRead.GET("/agents/:id/shell", s.handleShellPage)
 		agentsRead.GET("/agents/:id/files", s.handleFileBrowserPage)

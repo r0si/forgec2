@@ -3092,6 +3092,53 @@ paths:
                         type: array
                         items:
                           $ref: '#/components/schemas/Task'
+  /api/engagements/expiry:
+    get:
+      tags: [Agents]
+      summary: Engagement deadlines across the fleet
+      description: >-
+        Summarises how the caller's fleet ages out: how many implants are already expired, how many
+        expire within 24 hours or a week, how many have no deadline at all, and the earliest deadline
+        overall. Reading this is how an operator notices that a deadline is about to stop work - the
+        alternative is a 403 appearing one day with no warning. Tenant-scoped; the list is ordered by
+        deadline.
+      operationId: engagementExpiry
+      security:
+        - SessionCookie: []
+      responses:
+        '200':
+          description: Deadline buckets, the earliest deadline, and the bounded implants ordered by deadline
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  data:
+                    type: object
+                    properties:
+                      total: {type: integer}
+                      bounded: {type: integer, description: Implants that carry a deadline}
+                      unbounded: {type: integer, description: Implants with no deadline}
+                      expired: {type: integer}
+                      within_24h: {type: integer}
+                      within_7d: {type: integer}
+                      earliest:
+                        type: object
+                        properties:
+                          agent_id: {type: string}
+                          hostname: {type: string}
+                          expires_at: {type: string, format: date-time}
+                          expired: {type: boolean}
+                      agents:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            agent_id: {type: string}
+                            hostname: {type: string}
+                            expires_at: {type: string, format: date-time}
+                            expired: {type: boolean}
   /api/plugins/index:
     get:
       tags: [Plugins]
