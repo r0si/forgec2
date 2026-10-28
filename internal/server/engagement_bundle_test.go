@@ -103,7 +103,7 @@ func TestEngagementBundle(t *testing.T) {
 		}
 		members[file.Name] = content
 	}
-	for _, name := range []string{"summary.md", "tasks.csv", "audit.ndjson", "agents.json", "plugins.json"} {
+	for _, name := range []string{"summary.md", "timeline.md", "tasks.csv", "audit.ndjson", "agents.json", "plugins.json"} {
 		if _, ok := members[name]; !ok {
 			t.Fatalf("the bundle is missing %s (has %v)", name, keysOf(members))
 		}
@@ -112,6 +112,29 @@ func TestEngagementBundle(t *testing.T) {
 	// summary.md is the same document the summary endpoint renders.
 	if !strings.Contains(string(members["summary.md"]), "# Engagement: DMZ exercise") {
 		t.Fatalf("summary.md = %q", string(members["summary.md"]))
+	}
+
+	// timeline.md is the same two records as a chronological narrative, in one document.
+	timeline := string(members["timeline.md"])
+	if !strings.Contains(timeline, "# Timeline: DMZ exercise") {
+		t.Fatalf("timeline.md = %q", timeline)
+	}
+	// The task line shows the command and outcome, not the result text: the timeline is a narrative, and the
+	// result belongs in tasks.csv where it is not flattened into one cell.
+	for _, want := range []string{"| Time (UTC) | Kind | Detail |", "whoami", "task_create"} {
+		if !strings.Contains(timeline, want) {
+			t.Fatalf("timeline.md is missing %q:\n%s", want, timeline)
+		}
+	}
+	// The out-of-window rows must not appear in the narrative either.
+	if strings.Contains(timeline, "before-window") || strings.Contains(timeline, "| login |") {
+		t.Fatalf("timeline.md contains out-of-window records:\n%s", timeline)
+	}
+	// Chronological: the audit row is at -90m and the task at -2h, so the task line comes first.
+	taskIndex := strings.Index(timeline, "whoami")
+	auditIndex := strings.Index(timeline, "task_create")
+	if taskIndex < 0 || auditIndex < 0 || taskIndex > auditIndex {
+		t.Fatalf("timeline is not ordered by time (task at %d, audit at %d):\n%s", taskIndex, auditIndex, timeline)
 	}
 
 	// tasks.csv holds the in-window task only.

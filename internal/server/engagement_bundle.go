@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/forgec2/forgec2/internal/db"
@@ -86,17 +88,24 @@ func (s *Server) handleEngagementBundle(c *gin.Context) {
 		return
 	}
 
-	// tasks.csv - the same columns the export offers, in the default order.
-	if len(agentIDs) > 0 && !add("tasks.csv", func(w *zip.Writer) error {
-		var tasks []db.Task
+	// The window rows are fetched once: tasks.csv and timeline.md are two views of the same set, and a second
+	// query could see a different one.
+	var windowTasks []db.Task
+	if len(agentIDs) > 0 {
 		if err := s.db.WithContext(s.ctx).Preload("Agent", func(db *gorm.DB) *gorm.DB {
 			return db.Select("id, hostname")
 		}).Select("tasks.id, tasks.agent_id, tasks.type, tasks.command, tasks.result, tasks.error, tasks.status, tasks.created_at").
 			Where("agent_id IN ?", agentIDs).
 			Where("created_at >= ? AND created_at <= ?", engagement.StartsAt, windowEnd).
-			Order("created_at asc").Limit(ExportTaskLimit).Find(&tasks).Error; err != nil {
-			return err
+			Order("created_at asc").Limit(ExportTaskLimit).Find(&windowTasks).Error; err != nil {
+			handleQueryError(c, err, "Failed to load the engagement tasks")
+			return
 		}
+	}
+
+	// tasks.csv - the same columns the export offers, in the default order.
+	if len(agentIDs) > 0 && !add("tasks.csv", func(w *zip.Writer) error {
+		tasks := windowTasks
 		f, err := w.Create("tasks.csv")
 		if err != nil {
 			return err
@@ -122,14 +131,32 @@ func (s *Server) handleEngagementBundle(c *gin.Context) {
 		return
 	}
 
-	// audit.ndjson - the verification-relevant rows of the window, with every hashed field.
-	if !add("audit.ndjson", func(w *zip.Writer) error {
-		var rows []db.AuditLog
-		if err := s.auditTenantScope(s.db.WithContext(s.ctx).Model(&db.AuditLog{}), c).
-			Where("created_at >= ? AND created_at <= ?", engagement.StartsAt, windowEnd).
-			Order("id asc").Limit(200000).Find(&rows).Error; err != nil {
+	// The audit rows are fetched once as well: audit.ndjson is the verifiable form, timeline.md the readable one,
+	// and both must describe the same rows.
+	var windowAudit []db.AuditLog
+	if err := s.auditTenantScope(s.db.WithContext(s.ctx).Model(&db.AuditLog{}), c).
+		Where("created_at >= ? AND created_at <= ?", engagement.StartsAt, windowEnd).
+		Order("id asc").Limit(200000).Find(&windowAudit).Error; err != nil {
+		handleQueryError(c, err, "Failed to load the engagement audit window")
+		return
+	}
+
+	// timeline.md - the exercise as a chronological narrative, for someone who will not open a spreadsheet.
+	if !add("timeline.md", func(w *zip.Writer) error {
+		f, err := w.Create("timeline.md")
+		if err != nil {
 			return err
 		}
+		_, err = f.Write(buildEngagementTimeline(engagement, windowTasks, windowAudit))
+		return err
+	}) {
+		fail()
+		return
+	}
+
+	// audit.ndjson - the verification-relevant rows of the window, with every hashed field.
+	if !add("audit.ndjson", func(w *zip.Writer) error {
+		rows := windowAudit
 		f, err := w.Create("audit.ndjson")
 		if err != nil {
 			return err
@@ -196,4 +223,76 @@ func (s *Server) handleEngagementBundle(c *gin.Context) {
 	name := fmt.Sprintf("engagement-%d_%s.zip", engagement.ID, time.Now().UTC().Format("2006-01-02_150405"))
 	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, name))
 	c.Data(http.StatusOK, "application/zip", buf.Bytes())
+}
+
+// buildEngagementTimeline renders the exercise as a chronological narrative.
+//
+// The bundle is handed to someone who was not there (an after-action reviewer, a customer, a lawyer), and a CSV plus
+// an NDJSON dump makes them reconstruct the story themselves. This interleaves the audited actions and the task
+// outcomes by time - the two records that answer "what happened, in what order" - and says when a record was capped
+// rather than trailing off silently.
+func buildEngagementTimeline(engagement db.Engagement, tasks []db.Task, auditRows []db.AuditLog) []byte {
+	const maxLines = 500
+
+	type entry struct {
+		at     time.Time
+		kind   string
+		detail string
+	}
+	entries := make([]entry, 0, len(tasks)+len(auditRows))
+	for _, row := range auditRows {
+		detail := row.Action
+		if row.Resource != "" {
+			detail += " " + row.Resource
+		}
+		if row.AgentID != "" {
+			detail += " on " + row.AgentID
+		}
+		if row.User != "" {
+			detail += " by " + row.User
+		}
+		if !row.Success {
+			detail += " (failed)"
+		}
+		entries = append(entries, entry{at: row.CreatedAt, kind: "audit", detail: detail})
+	}
+	for _, task := range tasks {
+		host := task.AgentID
+		if task.Agent.Hostname != "" {
+			host = task.Agent.Hostname
+		}
+		entries = append(entries, entry{
+			at:     task.CreatedAt,
+			kind:   "task",
+			detail: fmt.Sprintf("%s %s on %s -> %s", task.Type, task.Command, host, task.Status),
+		})
+	}
+	sort.SliceStable(entries, func(i, j int) bool {
+		if entries[i].at.Equal(entries[j].at) {
+			return entries[i].kind < entries[j].kind
+		}
+		return entries[i].at.Before(entries[j].at)
+	})
+
+	var body bytes.Buffer
+	fmt.Fprintf(&body, "# Timeline: %s\n\n", engagement.Name)
+	fmt.Fprintf(&body, "Window: %s -> %s\n\n", engagement.StartsAt.UTC().Format(time.RFC3339),
+		engagement.EndsAt.UTC().Format(time.RFC3339))
+	if len(entries) == 0 {
+		body.WriteString("_No audited actions or tasks were recorded inside the window._\n")
+		return body.Bytes()
+	}
+	fmt.Fprintf(&body, "| Time (UTC) | Kind | Detail |\n|---|---|---|\n")
+	shown := 0
+	for _, item := range entries {
+		if shown >= maxLines {
+			fmt.Fprintf(&body, "\n_%d later entries omitted; the full record is in audit.ndjson and tasks.csv._\n",
+				len(entries)-shown)
+			break
+		}
+		fmt.Fprintf(&body, "| %s | %s | %s |\n", item.at.UTC().Format("2006-01-02 15:04:05"), item.kind,
+			strings.ReplaceAll(item.detail, "|", "¦"))
+		shown++
+	}
+	return body.Bytes()
 }
