@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -97,6 +98,35 @@ func TestAutomationDiagnose(t *testing.T) {
 		t.Fatalf("notification section = %v", notifications)
 	}
 
+	// Delivery health travels with the verdict: "would deliver" and "has been failing all morning" are different
+	// answers to "who would be told", and only the second is actionable.
+	resetNotificationStats()
+	t.Cleanup(resetNotificationStats)
+	recordNotificationDelivery(2, errors.New("post: 500"))
+	_, data = call(map[string]interface{}{
+		"event_type":   string(EventImplantCheckin),
+		"notification": map[string]interface{}{"severity": "info"},
+	})
+	notifications, _ = data["notifications"].(map[string]interface{})
+	routes, _ := notifications["routes"].([]interface{})
+	foundFailing := false
+	for _, raw := range routes {
+		route, _ := raw.(map[string]interface{})
+		if route["state"] == "failing" {
+			foundFailing = true
+			if route["failed"] != float64(1) {
+				t.Fatalf("a failing route reports %v failures", route["failed"])
+			}
+		}
+		if route["state"] == nil {
+			t.Fatalf("a route reports no delivery state: %v", route)
+		}
+	}
+	if !foundFailing {
+		t.Fatalf("no route reported as failing after a recorded failure: %v", routes)
+	}
+	t.Cleanup(resetNotificationStats)
+
 	// A malformed request is refused before either half runs.
 	if got, _ := call(map[string]interface{}{"agent_host": "web-01"}); got != http.StatusBadRequest {
 		t.Fatalf("missing event_type = %d, want 400", got)
@@ -129,8 +159,9 @@ func TestAutomationDiagnose(t *testing.T) {
 	if err := s.db.Model(&db.AuditLog{}).Where("action = ?", "automation_diagnose").Count(&audited).Error; err != nil {
 		t.Fatalf("count audit: %v", err)
 	}
-	if audited != 1 {
-		t.Fatalf("automation_diagnose rows = %d, want 1", audited)
+	// Two successful diagnoses: the first block and the delivery-health one below it.
+	if audited != 2 {
+		t.Fatalf("automation_diagnose rows = %d, want 2", audited)
 	}
 }
 

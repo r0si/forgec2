@@ -13984,7 +13984,7 @@ export interface operations {
                             notification_title?: string;
                             /** @description Same shape as /api/automation/preview */
                             automation?: Record<string, never>;
-                            /** @description Same shape as /api/notification-routes/preview */
+                            /** @description Same shape as /api/notification-routes/preview, plus delivery health per route (`state`, `delivered`, `failed`) because "would deliver" and "has been failing all morning" are different answers to the same question. */
                             notifications?: Record<string, never>;
                         };
                     };

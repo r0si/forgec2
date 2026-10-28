@@ -166,12 +166,25 @@ func (s *Server) diagnoseNotificationRoutes(severity string) (gin.H, error) {
 		Channel      string `json:"channel"`
 		WouldDeliver bool   `json:"would_deliver"`
 		Reason       string `json:"reason"`
+		// Delivery health travels with the verdict: "this route would deliver" and "this route has been failing all
+		// morning" are different answers to "who would be told", and only the second one is actionable.
+		State     string `json:"state,omitempty"`
+		Delivered int64  `json:"delivered"`
+		Failed    int64  `json:"failed"`
 	}
 	rank := severityRank(severity)
 	verdicts := make([]routeVerdict, 0, len(routes))
 	deliveries := 0
+	stats := notificationRouteStatsSnapshot()
 	for _, route := range routes {
 		verdict := routeVerdict{Name: route.Name, Channel: route.Channel}
+		if stat, ok := stats[route.ID]; ok {
+			verdict.State = notificationRouteHealth(stat)
+			verdict.Delivered = stat.Delivered
+			verdict.Failed = stat.Failed
+		} else {
+			verdict.State = "unused"
+		}
 		switch {
 		case !route.Enabled:
 			verdict.Reason = "route is disabled"

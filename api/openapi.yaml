@@ -2505,7 +2505,12 @@ paths:
                       event_type: {type: string}
                       notification_title: {type: string}
                       automation: {type: object, description: Same shape as /api/automation/preview}
-                      notifications: {type: object, description: Same shape as /api/notification-routes/preview}
+                      notifications:
+                        type: object
+                        description: >-
+                          Same shape as /api/notification-routes/preview, plus delivery health per route (`state`,
+                          `delivered`, `failed`) because "would deliver" and "has been failing all morning" are different
+                          answers to the same question.
         '400':
           description: Missing event_type, malformed body or unknown notification severity
   /api/automation/health:
@@ -2639,6 +2644,11 @@ paths:
                             cooldown_remaining: {type: integer}
                             first_reason: {type: string}
                             event_type: {type: string}
+                      # The notification half of the same response carries delivery health per route:
+                      #   state: unused | delivering | degraded | failing
+                      #   delivered / failed: counters since process start
+                      # "would deliver" and "has been failing all morning" are different answers to
+                      # "who would be told", and only the second one is actionable.
         '400':
           description: Malformed body or missing event_type
   /api/automation/rules:
