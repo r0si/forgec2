@@ -233,3 +233,101 @@ func TestTaskDurationStatsByAgent(t *testing.T) {
 		t.Fatalf("group_by=tenant = %d, want 400", w2.Code)
 	}
 }
+
+// TestTaskDurationBuckets covers ?bucket=hour: the per-type rows say WHAT is slow, the buckets say WHEN
+// it got slow - the question after someone notices a regression.
+func TestTaskDurationBuckets(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	s := mustTenantServer(t)
+
+	// Two tasks in one hour (one failed) and one in the previous hour.
+	hourStart := time.Now().Truncate(time.Hour).Add(-2 * time.Hour)
+	seed := func(created time.Time, ms int, status string) {
+		task := db.Task{
+			AgentID: "a-1", TenantID: 1, Type: "shell", Command: "x", Status: status,
+			CreatedAt: created, UpdatedAt: created.Add(time.Duration(ms) * time.Millisecond),
+		}
+		if err := s.db.Create(&task).Error; err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+	}
+	seed(hourStart, 100, "completed")
+	seed(hourStart.Add(10*time.Minute), 300, "failed")
+	seed(hourStart.Add(-30*time.Minute), 1000, "completed") // previous hour
+
+	call := func(query string) *httptest.ResponseRecorder {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest(http.MethodGet, "/api/stats/tasks/duration"+query, nil)
+		c.Set("user", "op")
+		c.Set("user_role", db.RoleAdmin)
+		c.Set("user_id", uint(1))
+		c.Set(middleware.TenantIDContextKey, uint(1))
+		s.handleTaskDurationStats(c)
+		return w
+	}
+
+	w := call("?since=7d&bucket=hour")
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d %s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		Data struct {
+			Bucket  string `json:"bucket"`
+			Buckets []struct {
+				Start       string  `json:"start"`
+				Count       int     `json:"count"`
+				P95Ms       float64 `json:"p95_ms"`
+				MaxMs       float64 `json:"max_ms"`
+				Failed      int     `json:"failed"`
+				SuccessRate float64 `json:"success_rate"`
+			} `json:"buckets"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v (%s)", err, w.Body.String())
+	}
+	if resp.Data.Bucket != "hour" {
+		t.Fatalf("bucket = %q", resp.Data.Bucket)
+	}
+	if len(resp.Data.Buckets) != 2 {
+		t.Fatalf("buckets = %d, want 2 (%s)", len(resp.Data.Buckets), w.Body.String())
+	}
+	// Oldest first.
+	if resp.Data.Buckets[0].Count != 1 || resp.Data.Buckets[0].MaxMs != 1000 {
+		t.Fatalf("first bucket = %+v", resp.Data.Buckets[0])
+	}
+	// The newer hour has the 100/300 pair, one of them failed.
+	newer := resp.Data.Buckets[1]
+	if newer.Count != 2 || newer.Failed != 1 || newer.SuccessRate != 0.5 {
+		t.Fatalf("newer bucket = %+v, want count 2 / failed 1 / rate 0.5", newer)
+	}
+	if newer.MaxMs != 300 {
+		t.Fatalf("newer bucket max = %v, want 300", newer.MaxMs)
+	}
+
+	// Day granularity collapses both into one bucket.
+	var dayResp struct {
+		Data struct {
+			Buckets []struct {
+				Count int `json:"count"`
+			} `json:"buckets"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(call("?since=7d&bucket=day").Body.Bytes(), &dayResp); err != nil {
+		t.Fatalf("decode day: %v", err)
+	}
+	if len(dayResp.Data.Buckets) != 1 || dayResp.Data.Buckets[0].Count != 3 {
+		t.Fatalf("day buckets = %+v, want one bucket of 3", dayResp.Data.Buckets)
+	}
+
+	// No bucket parameter means no buckets field at all.
+	if body := call("?since=7d").Body.String(); strings.Contains(body, `"buckets"`) {
+		t.Fatalf("buckets were returned without being asked for: %s", body)
+	}
+
+	// An unknown granularity is rejected.
+	if got := call("?bucket=week"); got.Code != http.StatusBadRequest {
+		t.Fatalf("bucket=week = %d, want 400", got.Code)
+	}
+}

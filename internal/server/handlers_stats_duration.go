@@ -2,7 +2,6 @@ package server
 
 import (
 	"fmt"
-	"math"
 	"net/http"
 	"sort"
 	"time"
@@ -72,6 +71,11 @@ func (s *Server) handleTaskDurationStats(c *gin.Context) {
 		respondError(c, http.StatusBadRequest, "invalid group_by (expected type or agent)")
 		return
 	}
+	bucket := c.Query("bucket")
+	if bucket != "" && bucket != "hour" && bucket != "day" {
+		respondError(c, http.StatusBadRequest, "invalid bucket (expected hour or day)")
+		return
+	}
 	key := func(row db.Task) string {
 		if groupBy == "agent" {
 			return row.AgentID
@@ -108,7 +112,7 @@ func (s *Server) handleTaskDurationStats(c *gin.Context) {
 			stat.Completed = counts.completed
 			stat.Failed = counts.failed
 			if total := counts.completed + counts.failed; total > 0 {
-				stat.SuccessRate = math.Round(float64(counts.completed)/float64(total)*1000) / 1000
+				stat.SuccessRate = roundToThousandths(float64(counts.completed) / float64(total))
 			}
 		}
 		stats = append(stats, stat)
@@ -128,14 +132,107 @@ func (s *Server) handleTaskDurationStats(c *gin.Context) {
 		rowsField = "agents"
 		stats = s.labelDurationGroups(c, stats)
 	}
-	respond(c, gin.H{
+	resp := gin.H{
 		"since":     c.DefaultQuery("since", "24h"),
 		"group_by":  groupBy,
 		"window_ms": window.Milliseconds(),
 		"sampled":   len(rows),
 		"truncated": len(rows) >= taskDurationSampleLimit,
 		rowsField:   stats,
-	})
+	}
+	if bucket != "" {
+		resp["bucket"] = bucket
+		resp["buckets"] = buildDurationBuckets(rows, bucket)
+	}
+	respond(c, resp)
+}
+
+// roundToThousandths keeps success_rate readable instead of a long float.
+func roundToThousandths(value float64) float64 {
+	return float64(int64(value*1000+0.5)) / 1000
+}
+
+// taskDurationBucket is one time bucket of GET /api/stats/tasks/duration?bucket=hour|day.
+//
+// The per-type and per-agent rows answer "what is slow"; a bucket answers "WHEN did it get slow",
+// which is the question after someone notices a regression. Buckets are derived from the rows the
+// endpoint already read, so asking for them costs no extra query.
+type taskDurationBucket struct {
+	Start       string  `json:"start"`
+	Count       int     `json:"count"`
+	P50Ms       float64 `json:"p50_ms"`
+	P95Ms       float64 `json:"p95_ms"`
+	MaxMs       float64 `json:"max_ms"`
+	Failed      int     `json:"failed"`
+	SuccessRate float64 `json:"success_rate"`
+}
+
+// buildDurationBuckets groups the sampled rows into hourly or daily buckets, oldest first.
+//
+// Empty buckets are omitted rather than emitted as zeros: a zero-width bucket reads as "everything was
+// instant" instead of "nothing ran". The start field makes the gaps visible to a caller that plots the
+// series.
+func buildDurationBuckets(rows []db.Task, granularity string) []taskDurationBucket {
+	type accumulator struct {
+		samples   []float64
+		failed    int
+		completed int
+	}
+	buckets := make(map[time.Time]*accumulator)
+
+	for _, row := range rows {
+		if row.UpdatedAt.IsZero() || row.CreatedAt.IsZero() || !row.UpdatedAt.After(row.CreatedAt) {
+			continue
+		}
+		start := bucketStart(row.CreatedAt, granularity)
+		bucket := buckets[start]
+		if bucket == nil {
+			bucket = &accumulator{}
+			buckets[start] = bucket
+		}
+		bucket.samples = append(bucket.samples, float64(row.UpdatedAt.Sub(row.CreatedAt).Milliseconds()))
+		if row.Status == "completed" {
+			bucket.completed++
+		} else {
+			bucket.failed++
+		}
+	}
+
+	starts := make([]time.Time, 0, len(buckets))
+	for start := range buckets {
+		starts = append(starts, start)
+	}
+	sort.Slice(starts, func(i, j int) bool { return starts[i].Before(starts[j]) })
+
+	out := make([]taskDurationBucket, 0, len(starts))
+	for _, start := range starts {
+		bucket := buckets[start]
+		sort.Float64s(bucket.samples)
+		entry := taskDurationBucket{
+			Start:  start.UTC().Format(time.RFC3339),
+			Count:  len(bucket.samples),
+			P50Ms:  percentile(bucket.samples, 0.50),
+			P95Ms:  percentile(bucket.samples, 0.95),
+			MaxMs:  bucket.samples[len(bucket.samples)-1],
+			Failed: bucket.failed,
+		}
+		if total := bucket.completed + bucket.failed; total > 0 {
+			entry.SuccessRate = roundToThousandths(float64(bucket.completed) / float64(total))
+		}
+		out = append(out, entry)
+	}
+	return out
+}
+
+// bucketStart truncates to the start of the bucket in the zone the timestamps are stored in, so a
+// "day" bucket begins at local midnight rather than at 08:00 (which is what Truncate(24h) gives on a
+// +08:00 host).
+func bucketStart(at time.Time, granularity string) time.Time {
+	local := at.In(time.Local)
+	if granularity == "day" {
+		return time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, time.Local)
+	}
+	return local.Truncate(time.Hour)
 }
 
 // summariseTaskDurations computes count/mean/percentiles for one task type.
