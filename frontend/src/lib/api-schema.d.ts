@@ -14189,7 +14189,7 @@ export interface operations {
                                 /** @enum {string} */
                                 severity?: "error" | "warning";
                                 /** @enum {string} */
-                                code?: "unconditional_mutating_action" | "missing_agent" | "missing_script" | "missing_macro" | "duplicate_rule" | "never_fired" | "firing_often" | "action_failing";
+                                code?: "unconditional_mutating_action" | "missing_agent" | "missing_script" | "missing_macro" | "duplicate_rule" | "never_fired" | "firing_often" | "action_failing" | "target_unavailable";
                                 detail?: string;
                             }[];
                         };

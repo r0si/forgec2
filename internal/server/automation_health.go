@@ -42,6 +42,9 @@ func (s *Server) handleAutomationHealth(c *gin.Context) {
 	// Agents, scripts and macros are looked up once, so a big rule set costs a bounded number of queries
 	// rather than one per action.
 	agentIDs := s.existingAgentIDs(c)
+	// Deadlines and closed engagements, fetched once: an agent that exists but is time-boxed out is the failure mode the
+	// rule list cannot show.
+	unavailable := s.agentAvailability(c)
 	scriptIDs := s.existingScriptIDs(c)
 	macroIDs := s.existingMacroIDs(c)
 
@@ -71,10 +74,19 @@ func (s *Server) handleAutomationHealth(c *gin.Context) {
 			for _, target := range actionTargets(action) {
 				switch target.kind {
 				case "agent":
-					if _, ok := agentIDs[target.id]; !ok && target.id != "" {
-						add("error", "missing_agent", fmt.Sprintf("targets agent %q, which does not exist", target.id))
+					if target.id == "" {
+						continue
 					}
-				case "script":
+					if _, ok := agentIDs[target.id]; !ok {
+						add("error", "missing_agent", fmt.Sprintf("targets agent %q, which does not exist", target.id))
+						continue
+					}
+					// The agent exists but can no longer accept work: the rule would fire and dispatch nothing. That is
+					// the same silent failure as a missing target, and harder to notice because the agent list looks fine.
+					if reason := unavailable[target.id]; reason != "" {
+						add("warning", "target_unavailable",
+							fmt.Sprintf("targets agent %q, which can no longer accept tasks: %s", target.id, reason))
+					}
 					if _, ok := scriptIDs[target.id]; !ok && target.id != "" {
 						add("error", "missing_script", fmt.Sprintf("targets script %q, which does not exist", target.id))
 					}
@@ -336,6 +348,60 @@ func (s *Server) automationRuleCreatedAt(c *gin.Context) map[string]time.Time {
 	}
 	for _, entry := range rows {
 		out[entry.ID] = entry.CreatedAt
+	}
+	return out
+}
+
+// agentAvailability maps agent id to why it can no longer accept tasks ("" when it can).
+//
+// One query for the agents and one for their engagements: the health report is read by an operator who wants a list of
+// problems, not one query per rule.
+func (s *Server) agentAvailability(c *gin.Context) map[string]string {
+	out := make(map[string]string, 64)
+	type agentRow struct {
+		ID           string
+		ExpiresAt    *time.Time
+		EngagementID *uint
+	}
+	var agents []agentRow
+	if err := s.tenantScope(s.db.WithContext(s.ctx).Model(&db.Implant{}), c).
+		Select("id, expires_at, engagement_id").Scan(&agents).Error; err != nil {
+		return out
+	}
+
+	type engagementRow struct {
+		ID       uint
+		EndsAt   time.Time
+		ClosedAt *time.Time
+	}
+	var engagements []engagementRow
+	if err := s.tenantScope(s.db.WithContext(s.ctx).Model(&db.Engagement{}), c).
+		Select("id, ends_at, closed_at").Scan(&engagements).Error; err == nil {
+		byID := make(map[uint]engagementRow, len(engagements))
+		for _, engagement := range engagements {
+			byID[engagement.ID] = engagement
+		}
+		now := time.Now()
+		for _, agent := range agents {
+			if agent.EngagementID == nil {
+				continue
+			}
+			if engagement, ok := byID[*agent.EngagementID]; ok {
+				if engagement.ClosedAt != nil {
+					out[agent.ID] = "its engagement is closed"
+				} else if !engagement.EndsAt.IsZero() && now.After(engagement.EndsAt) {
+					out[agent.ID] = "its engagement window has ended"
+				}
+			}
+		}
+	}
+
+	now := time.Now()
+	for _, agent := range agents {
+		if agent.ExpiresAt == nil || agent.ExpiresAt.IsZero() || now.Before(*agent.ExpiresAt) {
+			continue
+		}
+		out[agent.ID] = "its deadline has passed"
 	}
 	return out
 }

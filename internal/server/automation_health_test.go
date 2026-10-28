@@ -260,6 +260,56 @@ func TestAutomationHealth(t *testing.T) {
 		}
 	}
 
+	// A target that exists but cannot accept work is the same silent failure as a missing one: the rule fires and
+	// dispatches nothing, and the agent list looks fine.
+	past := time.Now().Add(-time.Hour)
+	if err := s.db.Create(&db.Implant{
+		ID: "expired", TenantID: 1, Hostname: "expired-host", Status: "online", LastSeen: time.Now(), ExpiresAt: &past,
+	}).Error; err != nil {
+		t.Fatalf("seed expired agent: %v", err)
+	}
+	if err := s.db.Create(&db.AutomationRule{
+		ID: "dead-target", Name: "dead target", Enabled: true, EventType: string(EventImplantCheckin),
+		Conditions: conditions([]RuleCondition{{Field: "agent.hostname", Operator: "contains", Value: "web"}}),
+		Actions:    actions([]RuleAction{{Type: ActionRunCommand, Params: json.RawMessage(`{"command":"whoami","agent_id":"expired"}`)}}),
+		TenantID:   1,
+	}).Error; err != nil {
+		t.Fatalf("seed dead-target rule: %v", err)
+	}
+	s.invalidateAutomationCache()
+	w4 := httptest.NewRecorder()
+	c4, _ := gin.CreateTestContext(w4)
+	c4.Request = httptest.NewRequest(http.MethodGet, "/api/automation/health", nil)
+	c4.Set("user", "op")
+	c4.Set("user_role", db.RoleAdmin)
+	c4.Set("user_id", uint(1))
+	c4.Set(middleware.TenantIDContextKey, uint(1))
+	s.handleAutomationHealth(c4)
+	var withDead struct {
+		Data struct {
+			Findings []struct {
+				RuleID string `json:"rule_id"`
+				Code   string `json:"code"`
+				Detail string `json:"detail"`
+			} `json:"findings"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w4.Body.Bytes(), &withDead); err != nil {
+		t.Fatalf("decode dead target: %v", err)
+	}
+	foundDead := false
+	for _, finding := range withDead.Data.Findings {
+		if finding.RuleID == "dead-target" && finding.Code == "target_unavailable" {
+			foundDead = true
+			if !containsFold(finding.Detail, "deadline") {
+				t.Fatalf("the finding does not name the reason: %q", finding.Detail)
+			}
+		}
+	}
+	if !foundDead {
+		t.Fatalf("a rule targeting an expired agent was not reported: %+v", withDead.Data.Findings)
+	}
+
 	// Errors come first, so the report opens with what will bite.
 	if len(resp.Data.Findings) > 0 && resp.Data.Findings[0].Severity != "error" {
 		t.Fatalf("first finding is %q, want an error", resp.Data.Findings[0].Severity)

@@ -2627,6 +2627,7 @@ paths:
                                 - never_fired
                                 - firing_often
                                 - action_failing
+                                - target_unavailable
                             detail: {type: string}
   /api/automation/preview:
     post:
