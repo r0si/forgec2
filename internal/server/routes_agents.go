@@ -60,6 +60,9 @@ func (s *Server) registerAgentRoutes(auth *gin.RouterGroup) {
 		agentsWrite.POST("/api/ai/save-playbook", s.handleAISavePlaybook)
 		agentsWrite.POST("/agents/:id/kill", s.handleKillAgent)
 		agentsWrite.POST("/agents/:id/note", s.handleUpdateNote)
+		// The engagement deadline is enforceable since round 17; this is how an operator extends or
+		// clears it without rebuilding the implant.
+		agentsWrite.POST("/api/agents/:id/expiry", s.handleSetAgentExpiry)
 		agentsWrite.POST("/agents/:id/tasks/:taskId/cancel", s.handleCancelTask)
 		agentsWrite.POST("/agents/:id/task/:taskId/rerun", s.handleRerunTask)
 		agentsWrite.POST("/api/agents/:id/tasks/rerun-failed", s.handleRerunFailedTasks)

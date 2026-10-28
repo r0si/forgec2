@@ -3092,6 +3092,60 @@ paths:
                         type: array
                         items:
                           $ref: '#/components/schemas/Task'
+  /api/agents/{id}/expiry:
+    post:
+      tags: [Agents]
+      summary: Set, extend or clear an implant's engagement deadline
+      description: >-
+        The deadline made enforceable in this release is settable at build time through the registration
+        secret; this lets an operator record an extension, a scope reduction, or an immediate end for one
+        host without rebuilding the implant. A deadline in the past is accepted on purpose - it is how an
+        engagement ends for a single host right now - and the response reports `expired: true` instead of
+        pretending it is scheduled. Every change is audited with the previous value, because moving a
+        deadline is a decision about the engagement rather than a UI toggle.
+      operationId: setAgentExpiry
+      security:
+        - SessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Agent id
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                expires_at:
+                  type: string
+                  format: date-time
+                  description: RFC3339 deadline; a value in the past ends the engagement for this host now
+                clear:
+                  type: boolean
+                  description: Remove the deadline entirely (unbounded, the historic behaviour)
+      responses:
+        '200':
+          description: New deadline, the previous one, and whether it is already in the past
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  data:
+                    type: object
+                    properties:
+                      agent_id: {type: string}
+                      expires_at: {type: string, description: RFC3339, or "none"}
+                      previous: {type: string, description: RFC3339, or "none"}
+                      expired: {type: boolean}
+        '400':
+          description: Neither expires_at nor clear, or expires_at is not RFC3339
+        '404':
+          description: No such agent in the caller's tenant
   /api/engagements/expiry:
     get:
       tags: [Agents]

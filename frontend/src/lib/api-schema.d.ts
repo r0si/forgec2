@@ -1830,6 +1830,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/agents/{id}/expiry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set, extend or clear an implant's engagement deadline
+         * @description The deadline made enforceable in this release is settable at build time through the registration secret; this lets an operator record an extension, a scope reduction, or an immediate end for one host without rebuilding the implant. A deadline in the past is accepted on purpose - it is how an engagement ends for a single host right now - and the response reports `expired: true` instead of pretending it is scheduled. Every change is audited with the previous value, because moving a deadline is a decision about the engagement rather than a UI toggle.
+         */
+        post: operations["setAgentExpiry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/engagements/expiry": {
         parameters: {
             query?: never;
@@ -14267,6 +14287,65 @@ export interface operations {
                         data: components["schemas"]["Task"][];
                     };
                 };
+            };
+        };
+    };
+    setAgentExpiry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Agent id */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /**
+                     * Format: date-time
+                     * @description RFC3339 deadline; a value in the past ends the engagement for this host now
+                     */
+                    expires_at?: string;
+                    /** @description Remove the deadline entirely (unbounded, the historic behaviour) */
+                    clear?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description New deadline, the previous one, and whether it is already in the past */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        data?: {
+                            agent_id?: string;
+                            /** @description RFC3339 */
+                            expires_at?: string;
+                            /** @description RFC3339 */
+                            previous?: string;
+                            expired?: boolean;
+                        };
+                    };
+                };
+            };
+            /** @description Neither expires_at nor clear, or expires_at is not RFC3339 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such agent in the caller's tenant */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
