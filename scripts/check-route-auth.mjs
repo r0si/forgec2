@@ -53,7 +53,10 @@ const GATE_MARKERS = [
   "currentAIPrincipal",
   "hasPermission",
   "RoleHasPermission",
-  "currentUserID",
+  // "currentUserID" was here for years: it RESOLVES the caller (and fails closed when there is
+  // none) but it does not authorize, so a handler whose only "gate" was that call passed this
+  // check - /emergency-stop armed the kill switch for ANY authenticated role that knew its own
+  // password. Identity resolution is not a gate.
   "isAdmin",
   "tenantScope",
   "findTenantOrFail",

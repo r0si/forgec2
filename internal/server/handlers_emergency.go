@@ -15,6 +15,12 @@ import (
 )
 
 func (s *Server) handleEmergencyStop(c *gin.Context) {
+	// Killing the fleet is an admin action. The password prompt below only re-authenticates the
+	// caller: before this, ANY authenticated role that knew its own password could arm the kill
+	// switch for every implant in the installation.
+	if !s.requireAdmin(c) {
+		return
+	}
 	password := c.PostForm("password")
 	if password == "" {
 		respondError(c, http.StatusBadRequest, "Password confirmation required")
@@ -44,7 +50,8 @@ func (s *Server) handleEmergencyStop(c *gin.Context) {
 	killDate := time.Now()
 	groupID := c.PostForm("group_id")
 
-	query := s.db.Model(&db.Implant{}).Where("status != ?", "offline")
+	// Tenant scope: a tenant-scoped admin stops THEIR agents, not every tenant's.
+	query := s.tenantScope(s.db.Model(&db.Implant{}), c).Where("status != ?", "offline")
 
 	if groupID != "" {
 		// Group-scoped kill: only kill agents in the specified group

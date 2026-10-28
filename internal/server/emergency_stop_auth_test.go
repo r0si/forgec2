@@ -108,6 +108,10 @@ func TestEmergencyStopRequiresAPrincipal(t *testing.T) {
 	c.Request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	c.Set("user", "admin")
 	c.Set("user_id", admin.ID)
+	// The role is part of the contract now: arming the kill switch is an admin action, so a
+	// context carrying an identity but no role is refused (see emergency_stop_authz_test.go).
+	c.Set("user_role", db.RoleAdmin)
+	c.Set("tenant_id", uint(1))
 	s.handleEmergencyStop(c)
 	if w.Code != http.StatusOK {
 		t.Fatalf("emergency stop with principal = %d %s", w.Code, w.Body.String())
@@ -126,6 +130,8 @@ func TestEmergencyStopRequiresAPrincipal(t *testing.T) {
 	c.Request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	c.Set("user", "admin")
 	c.Set("user_id", admin.ID)
+	c.Set("user_role", db.RoleAdmin)
+	c.Set("tenant_id", uint(1))
 	s.handleEmergencyStop(c)
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("wrong password = %d %s", w.Code, w.Body.String())

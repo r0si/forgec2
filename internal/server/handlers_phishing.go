@@ -560,7 +560,12 @@ func (s *Server) handleAPIStopPhishingCampaign(c *gin.Context) {
 
 func (s *Server) handleAPIDeletePhishingCampaign(c *gin.Context) {
 	id := c.Param("id")
-	if err := s.db.Delete(&db.PhishingCampaign{}, "id = ?", id).Error; err != nil {
+	scope, ok := s.phishingScope(c, &db.PhishingCampaign{})
+	if !ok {
+		respondError(c, http.StatusNotFound, "campaign not found")
+		return
+	}
+	if err := scope.Where("id = ?", id).Delete(&db.PhishingCampaign{}).Error; err != nil {
 		respondError(c, http.StatusInternalServerError, sanitizeError(err, "Phishing operation"))
 		return
 	}

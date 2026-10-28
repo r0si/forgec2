@@ -117,6 +117,13 @@ by hand at least once; do not weaken one to make a change pass — fix the chang
   no `api/` directory), and plugin **quarantine** moved deleted sources into `<cwd>/data`. The
   implant is exempt: absolute host paths (`/etc/hosts`, `/proc/<pid>`) are the point. A
   deliberate relative path carries a reason in the script's ALLOWLIST.
+- `check:owner-scope` (`scripts/check-owner-scope.mjs`) — a request handler that touches a
+  table **without a tenant column** by id must scope through the owning relationship. Fourteen
+  rounds of this audit found the same shape by hand (scripts, BOF blobs, phishing templates and
+  campaigns, workflows, one-shot schedules, agent status history, agent tags), each time with the
+  same fix and each time reachable by any operator who guessed an id. The gate knows the table →
+  helper mapping, accepts any approved scope helper (including the `findVisible*` wrappers) and
+  documents its known gap: `agent_groups` has neither a tenant nor a creator column yet.
 - `check:docs` (`gen-command-reference.mjs --check` + `gen-capability-matrix.mjs --check`) —
   the generated docs must match their sources: the command reference, and the **generated
   task-inventory block** plus the version stamp in `docs/CAPABILITY_MATRIX.md`. CI runs these
