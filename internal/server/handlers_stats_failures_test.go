@@ -106,6 +106,41 @@ func TestTaskFailureStats(t *testing.T) {
 		}
 	}
 
+	// group_by=engagement answers the after-action question: which exercise accounted for the failures. Agents outside an
+	// exercise are bucketed as "none" rather than dropped, because that is itself an answer worth seeing.
+	engagement := db.Engagement{TenantID: 1, Name: "DMZ exercise", StartsAt: now.Add(-time.Hour), EndsAt: now.Add(time.Hour)}
+	if err := s.db.Create(&engagement).Error; err != nil {
+		t.Fatalf("seed engagement: %v", err)
+	}
+	if err := s.db.Model(&db.Implant{}).Where("id = ?", "a-2").Update("engagement_id", engagement.ID).Error; err != nil {
+		t.Fatalf("assign agent: %v", err)
+	}
+	for _, id := range []string{"a-1", "a-2"} {
+		if err := s.db.Create(&db.Implant{
+			ID: id, TenantID: 1, Hostname: id + "-host", Status: "online", LastSeen: now,
+		}).Error; err != nil && !containsFold(err.Error(), "unique") {
+			t.Fatalf("seed agent %s: %v", id, err)
+		}
+	}
+	if err := s.db.Model(&db.Implant{}).Where("id = ?", "a-2").Update("engagement_id", engagement.ID).Error; err != nil {
+		t.Fatalf("assign agent again: %v", err)
+	}
+	_, byEngagement := call("?since=7d&group_by=engagement")
+	bucketsByEngagement, _ := byEngagement["buckets"].([]interface{})
+	seenEngagement, seenNone := false, false
+	for _, raw := range bucketsByEngagement {
+		entry, _ := raw.(map[string]interface{})
+		switch entry["key"] {
+		case "DMZ exercise":
+			seenEngagement = true
+		case "none":
+			seenNone = true
+		}
+	}
+	if !seenEngagement || !seenNone {
+		t.Fatalf("engagement buckets = %v, want the exercise and the unattributed hosts", bucketsByEngagement)
+	}
+
 	// group_by=type groups the same rows differently.
 	_, byType := call("?since=7d&group_by=type")
 	typeBuckets, _ := byType["buckets"].([]interface{})

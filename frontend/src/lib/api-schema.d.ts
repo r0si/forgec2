@@ -11066,7 +11066,7 @@ export interface paths {
         };
         /**
          * Why tasks failed, grouped by reason, type or agent
-         * @description "Twelve tasks failed this week" is not actionable; "nine timed out and two were denied by Defender" is. The error text is already stored on every failed task, and this classifies it into a short, transparent list of reason codes - the first matching pattern wins, and everything unmatched is collected as `other` **with an example**, so the report never hides a category it could not name. `since` accepts the dashboard's relative form (`24h`, `7d`); `group_by` switches the same rows between `reason` (default), `type` and `agent`. Each bucket carries `count`, `sample` (the first error text, truncated) and `distinct_types`, because a reason spread across many task types is systemic while one concentrated in a single type is that type's problem. The sample is capped at 5000 rows; when it is reached the response says `truncated: true` rather than implying a complete picture.
+         * @description "Twelve tasks failed this week" is not actionable; "nine timed out and two were denied by Defender" is. The error text is already stored on every failed task, and this classifies it into a short, transparent list of reason codes - the first matching pattern wins, and everything unmatched is collected as `other` **with an example**, so the report never hides a category it could not name. `since` accepts the dashboard's relative form (`24h`, `7d`); `group_by` switches the same rows between `reason` (default), `type`, `agent` and `engagement` - the last one is the after-action question, and hosts outside an exercise are bucketed as `none` rather than dropped. Each bucket carries `count`, `sample` (the first error text, truncated) and `distinct_types`, because a reason spread across many task types is systemic while one concentrated in a single type is that type's problem. The sample is capped at 5000 rows; when it is reached the response says `truncated: true` rather than implying a complete picture.
          */
         get: operations["taskFailureStats"];
         put?: never;
@@ -27717,7 +27717,7 @@ export interface operations {
             query?: {
                 /** @description Window, e.g. 24h or 7d (default 7d) */
                 since?: string;
-                group_by?: "reason" | "type" | "agent";
+                group_by?: "reason" | "type" | "agent" | "engagement";
             };
             header?: never;
             path?: never;

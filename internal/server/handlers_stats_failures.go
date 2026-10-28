@@ -71,9 +71,9 @@ func (s *Server) handleTaskFailureStats(c *gin.Context) {
 	}
 	groupBy := strings.ToLower(strings.TrimSpace(c.DefaultQuery("group_by", "reason")))
 	switch groupBy {
-	case "reason", "type", "agent":
+	case "reason", "type", "agent", "engagement":
 	default:
-		respondError(c, http.StatusBadRequest, `invalid group_by (expected "reason", "type" or "agent")`)
+		respondError(c, http.StatusBadRequest, `invalid group_by (expected "reason", "type", "agent" or "engagement")`)
 		return
 	}
 
@@ -104,6 +104,11 @@ func (s *Server) handleTaskFailureStats(c *gin.Context) {
 		// concentrated in a single type is that type's problem.
 		Types int `json:"distinct_types"`
 	}
+	// Engagement names cost one query for the whole sample, and only when they are needed.
+	var engagementNames map[string]string
+	if groupBy == "engagement" {
+		engagementNames = s.engagementNamesForAgentIDs(c, failureAgentIDs(rows))
+	}
 	byKey := map[string]*bucket{}
 	typeSeen := map[string]map[string]bool{}
 	for _, row := range rows {
@@ -115,6 +120,13 @@ func (s *Server) handleTaskFailureStats(c *gin.Context) {
 			key = row.Type
 		case "agent":
 			key = row.AgentID
+		case "engagement":
+			// The after-action question: which exercise accounted for the failures. Agents outside an exercise are
+			// bucketed as "none" rather than dropped, because "no engagement" is itself an answer worth seeing.
+			key = engagementNames[row.AgentID]
+			if key == "" {
+				key = "none"
+			}
 		}
 		if key == "" {
 			key = "unknown"
@@ -156,4 +168,22 @@ func (s *Server) handleTaskFailureStats(c *gin.Context) {
 		"note": "reason codes are a starting point: first match wins, and unmatched errors are collected as 'other' " +
 			"with an example",
 	})
+}
+
+// failureAgentIDs collects the distinct agent ids of a sample, for the engagement lookup.
+func failureAgentIDs(rows []struct {
+	Type    string
+	AgentID string
+	Error   string
+}) []string {
+	seen := make(map[string]bool, len(rows))
+	ids := make([]string, 0, len(rows))
+	for _, row := range rows {
+		if row.AgentID == "" || seen[row.AgentID] {
+			continue
+		}
+		seen[row.AgentID] = true
+		ids = append(ids, row.AgentID)
+	}
+	return ids
 }

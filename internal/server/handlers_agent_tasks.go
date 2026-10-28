@@ -334,7 +334,6 @@ func (s *Server) apiBulkTaskStatus(c *gin.Context) {
 // per-row cost would still scale with the limit. A missing engagement (or an unreadable row) simply leaves
 // the cell empty, which is the honest value - the task genuinely belongs to no exercise.
 func (s *Server) engagementNamesForTasks(c *gin.Context, tasks []db.Task) map[string]string {
-	out := make(map[string]string, len(tasks))
 	ids := make([]string, 0, len(tasks))
 	seen := make(map[string]bool, len(tasks))
 	for _, task := range tasks {
@@ -344,6 +343,13 @@ func (s *Server) engagementNamesForTasks(c *gin.Context, tasks []db.Task) map[st
 		seen[task.AgentID] = true
 		ids = append(ids, task.AgentID)
 	}
+	return s.engagementNamesForAgentIDs(c, ids)
+}
+
+// engagementNamesForAgentIDs is the same lookup for a plain list of agent ids, so the task export and the failure report
+// share one query shape rather than each growing its own.
+func (s *Server) engagementNamesForAgentIDs(c *gin.Context, ids []string) map[string]string {
+	out := make(map[string]string, len(ids))
 	if len(ids) == 0 {
 		return out
 	}

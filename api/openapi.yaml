@@ -12946,7 +12946,7 @@ paths:
         text is already stored on every failed task, and this classifies it into a short, transparent list of reason codes
         - the first matching pattern wins, and everything unmatched is collected as `other` **with an example**, so the
         report never hides a category it could not name. `since` accepts the dashboard's relative form (`24h`, `7d`);
-        `group_by` switches the same rows between `reason` (default), `type` and `agent`. Each bucket carries `count`,
+        `group_by` switches the same rows between `reason` (default), `type`, `agent` and `engagement` - the last one is the after-action question, and hosts outside an exercise are bucketed as `none` rather than dropped. Each bucket carries `count`,
         `sample` (the first error text, truncated) and `distinct_types`, because a reason spread across many task types is
         systemic while one concentrated in a single type is that type's problem. The sample is capped at 5000 rows; when it
         is reached the response says `truncated: true` rather than implying a complete picture.
@@ -12960,7 +12960,7 @@ paths:
           schema: {type: string, default: 7d}
         - name: group_by
           in: query
-          schema: {type: string, enum: [reason, type, agent], default: reason}
+          schema: {type: string, enum: [reason, type, agent, engagement], default: reason}
       responses:
         '200':
           description: Buckets, most common first
