@@ -42,6 +42,14 @@ func (s *Server) registerAgentRoutes(auth *gin.RouterGroup) {
 		agentsRead.GET("/api/scheduler/oneshot", s.handleListOneShotTasks)
 	}
 
+	// Task duration statistics: which task types are getting slow. tasks.read is enough - it only
+	// aggregates rows the caller can already list.
+	tasksStatsRead := auth.Group("/")
+	tasksStatsRead.Use(middleware.RequirePermission(db.PermTasksRead))
+	{
+		tasksStatsRead.GET("/api/stats/tasks/duration", s.handleTaskDurationStats)
+	}
+
 	agentsWrite := auth.Group("/")
 	agentsWrite.Use(middleware.RequirePermission(db.PermAgentsWrite))
 	{
