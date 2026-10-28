@@ -102,7 +102,11 @@ func notificationRouteStatsView() map[string]map[string]interface{} {
 		if stat.LastError != "" {
 			// The reason a route fails is what makes the counter actionable; the same redaction rule as the route list
 			// applies, because a delivery error can quote the target URL.
-			view["last_error"] = redactDeliveryError(stat.LastError)
+			redacted := redactDeliveryError(stat.LastError)
+			view["last_error"] = redacted
+			// The same normalisation the task-failure report uses: two routes failing for the same reason (a 401, a DNS
+			// failure) should group together in a list, and a signature is what lets a UI put them side by side.
+			view["last_error_signature"] = normaliseFailureText(redacted)
 		}
 		out[strconv.FormatUint(uint64(id), 10)] = view
 	}

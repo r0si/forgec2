@@ -60,6 +60,23 @@ func TestNotificationRouteStats(t *testing.T) {
 		t.Fatalf("the webhook path leaked into the stats: %q", lastError)
 	}
 
+	// 3b. Two routes failing for the same reason share a signature, so a list can group them; the identifiers that differ
+	// between them (a message id, a chat id) are collapsed the same way task failures are.
+	recordNotificationDelivery(9, errors.New(`Post "https://discord.com/api/webhooks/111/aaa": 401 Unauthorized`))
+	recordNotificationDelivery(10, errors.New(`Post "https://discord.com/api/webhooks/222/bbb": 401 Unauthorized`))
+	view = notificationRouteStatsView()
+	sigNine, _ := view["9"]["last_error_signature"].(string)
+	sigTen, _ := view["10"]["last_error_signature"].(string)
+	if sigNine == "" || sigNine != sigTen {
+		t.Fatalf("the same failure produced different signatures:\n  %q\n  %q", sigNine, sigTen)
+	}
+	// And the signature does not leak the webhook id or path.
+	for _, leak := range []string{"111", "222", "aaa", "bbb"} {
+		if containsFold(sigNine, leak) {
+			t.Fatalf("the signature still carries %q: %q", leak, sigNine)
+		}
+	}
+
 	// 4. The list endpoint carries the counters, so the operator sees them where the routes are.
 	s := mustTenantServer(t)
 	route := db.NotificationRoute{Name: "live", Channel: "webhook", Target: "https://example.com/hook", MinSeverity: "info", Enabled: true}

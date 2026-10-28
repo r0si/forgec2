@@ -26734,7 +26734,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Routes plus delivery counters. `stats` maps a route id to `{delivered, failed, state, last_attempt, last_error}`, where `state` is one of unused/delivering/degraded/failing and `last_error` has any webhook URL redacted - the path of a webhook is a credential. `stats_since` is always "process start": the counters are operational indicators kept in memory, so they answer "is this route still working" without being confused for an audit record. */
+            /** @description Routes plus delivery counters. `stats` maps a route id to `{delivered, failed, state, last_attempt, last_error_signature, last_error}`, where `state` is one of unused/delivering/degraded/failing and `last_error` has any webhook URL redacted - the path of a webhook is a credential - and `last_error_signature`, the same normalisation the task-failure report uses (paths, ids and digits collapsed), so two routes failing for one reason group together. `stats_since` is always "process start": the counters are operational indicators kept in memory, so they answer "is this route still working" without being confused for an audit record. */
             200: {
                 headers: {
                     [name: string]: unknown;
