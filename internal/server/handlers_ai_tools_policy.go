@@ -57,7 +57,10 @@ var aiToolPolicies = map[string]aiToolPolicy{
 	"generate_report":        {Risk: aiToolRiskRead, Permission: db.PermIntelRead, GlobalOnly: true},
 	// The assistant may write a plugin package, but plugins are installation-global and writing code is
 	// a write: plugins.write plus a human approval intent, and the tool itself never executes anything.
-	"create_plugin":   {Risk: aiToolRiskWrite, Permission: db.PermPluginsWrite, GlobalOnly: true},
+	"create_plugin": {Risk: aiToolRiskWrite, Permission: db.PermPluginsWrite, GlobalOnly: true},
+	// Running one needs its own permission: authoring code and executing code are different powers, so
+	// `plugins.execute` can be granted without `plugins.write` and vice versa.
+	"run_plugin":      {Risk: aiToolRiskWrite, Permission: db.PermPluginsExecute, GlobalOnly: true},
 	"create_listener": {Risk: aiToolRiskWrite, Permission: db.PermListenersWrite, GlobalOnly: true},
 	"update_listener": {Risk: aiToolRiskWrite, Permission: db.PermListenersWrite, GlobalOnly: true},
 	"delete_listener": {Risk: aiToolRiskDestructive, Permission: db.PermListenersDelete, GlobalOnly: true},

@@ -410,6 +410,43 @@ func (s *Server) buildTools() []toolDef {
 		{
 			Type: "function",
 			Function: toolFuncDef{
+				Name:        "create_plugin",
+				Description: "Write a ForgeC2 plugin package (manifest + entry file) from the operator's description, validate it, and register it so it appears on the Plugins page. The package is written and registered but NOT executed - use run_plugin to check it. Plugin ABI: read the JSON input from stdin, then print ONE JSON object to stdout, either {\"success\":true,\"output\":\"text\"} or {\"success\":false,\"error\":\"reason\"}; anything else on stdout is a parse error, not a result.",
+				Parameters: map[string]interface{}{
+					"type": "object",
+					"properties": map[string]interface{}{
+						"name": map[string]string{
+							"type":        "string",
+							"description": "Lowercase name, 2-64 chars, letters/digits/-/_ (becomes the directory name)",
+						},
+						"description": map[string]string{
+							"type":        "string",
+							"description": "One sentence for the plugin list",
+						},
+						"type": map[string]string{
+							"type":        "string",
+							"description": "command (default), hook or report",
+						},
+						"interpreter": map[string]string{
+							"type":        "string",
+							"description": "python, python3, powershell, pwsh, bash, sh or go",
+						},
+						"code": map[string]string{
+							"type":        "string",
+							"description": "Entry file contents (max 64 KiB). Read JSON from stdin, print one JSON object to stdout.",
+						},
+						"category": map[string]string{
+							"type":        "string",
+							"description": "recon, privesc, lateral, report, automation or utility",
+						},
+					},
+					"required": []string{"name", "description", "interpreter", "code"},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: toolFuncDef{
 				Name:        "save_engagement_note",
 				Description: "Persist a durable engagement note into long-term memory (appended with timestamp). Notes are injected into every future conversation. Use for key findings like 'DC01 allows DCSync from CA-01' or operator constraints. mode=replace overwrites ALL notes.",
 				Parameters: map[string]interface{}{
@@ -467,6 +504,31 @@ func (s *Server) buildTools() []toolDef {
 						},
 					},
 					"required": []string{"task_ids", "action"},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: toolFuncDef{
+				Name:        "run_plugin",
+				Description: "Run a registered command plugin and return its output, to check that a plugin you wrote actually works before reporting back. The plugin runs as a child process on the server with the executor's per-plugin timeout and output cap. Only command plugins can be run directly; hooks fire on events and reports render on demand.",
+				Parameters: map[string]interface{}{
+					"type": "object",
+					"properties": map[string]interface{}{
+						"name": map[string]string{
+							"type":        "string",
+							"description": "Registered plugin name (see the Plugins page or a previous create_plugin result)",
+						},
+						"agent_id": map[string]string{
+							"type":        "string",
+							"description": "Optional: the agent the plugin should act on, for plugins that use one",
+						},
+						"params": map[string]interface{}{
+							"type":        "object",
+							"description": "Plugin parameters, as declared by the plugin's manifest",
+						},
+					},
+					"required": []string{"name"},
 				},
 			},
 		},
@@ -763,6 +825,11 @@ authorize:
 	// Writes a plugin package: admin + approval intent, and never executed here.
 	if name == "create_plugin" {
 		return s.aiCreatePluginTool(reqCtx, normalizedArgs)
+	}
+	// Runs a registered plugin: a separate permission from writing one, and the existing executor's
+	// quotas and timeout apply.
+	if name == "run_plugin" {
+		return s.aiRunPluginTool(reqCtx, normalizedArgs)
 	}
 	return s.executeToolSwitchCtx(reqCtx, name, normalizedArgs)
 }
