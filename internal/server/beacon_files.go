@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/forgec2/forgec2/internal/db"
@@ -133,11 +134,63 @@ func isPrivateIP(ip string) bool {
 	return false
 }
 
-// lookupGeoIP queries ip-api.com for geolocation data
+// geoIPCacheTTL and geoIPBudgetPerMinute keep the free tier of ip-api.com (45 requests per minute
+// per source address) from being exhausted by a beacon fleet.
+//
+// Without them, EVERY check-in from a public IP issued a lookup: the call site only skips the database
+// WRITE when the location is unchanged, not the request. A burst of new beacons therefore tripped the
+// upstream limit, and once tripped ip-api answers 429 for the whole rest of the minute - so
+// geolocation went dark for everyone, which is the failure the previous round made visible but not
+// prevented.
+const (
+	geoIPCacheTTL        = 12 * time.Hour
+	geoIPBudgetPerMinute = 40
+	geoIPCacheMaxEntries = 4096
+)
+
+type geoIPEntry struct {
+	country, city string
+	lat, lon      float64
+	at            time.Time
+}
+
+var geoIPState = struct {
+	mu          sync.Mutex
+	entries     map[string]geoIPEntry
+	windowStart time.Time
+	windowCount int
+}{entries: make(map[string]geoIPEntry)}
+
+// resetGeoIPState drops the cache and the rate window (tests, and a config change).
+func resetGeoIPState() {
+	geoIPState.mu.Lock()
+	defer geoIPState.mu.Unlock()
+	geoIPState.entries = make(map[string]geoIPEntry)
+	geoIPState.windowStart = time.Time{}
+	geoIPState.windowCount = 0
+}
+
+// lookupGeoIP queries ip-api.com for geolocation data, through a per-IP cache and a local budget.
 func (s *Server) lookupGeoIP(ctx context.Context, ip string) (country, city string, lat, lon float64) {
 	if isPrivateIP(ip) {
 		return "", "", 0, 0
 	}
+	geoIPState.mu.Lock()
+	if entry, ok := geoIPState.entries[ip]; ok && time.Since(entry.at) < geoIPCacheTTL {
+		geoIPState.mu.Unlock()
+		return entry.country, entry.city, entry.lat, entry.lon
+	}
+	now := time.Now()
+	if geoIPState.windowStart.IsZero() || now.Sub(geoIPState.windowStart) >= time.Minute {
+		geoIPState.windowStart, geoIPState.windowCount = now, 0
+	}
+	if geoIPState.windowCount >= geoIPBudgetPerMinute {
+		geoIPState.mu.Unlock()
+		slog.Debug("GeoIP: local budget reached, skipping lookup", "ip", ip, "budget", geoIPBudgetPerMinute)
+		return "", "", 0, 0
+	}
+	geoIPState.windowCount++
+	geoIPState.mu.Unlock()
 	url := "https://ip-api.com/json/" + ip + "?fields=country,city,lat,lon"
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
@@ -169,6 +222,12 @@ func (s *Server) lookupGeoIP(ctx context.Context, ip string) (country, city stri
 			"ip", ip, "status", resp.StatusCode, "reason", truncateString(result.Message, 120))
 		return "", "", 0, 0
 	}
+	geoIPState.mu.Lock()
+	if len(geoIPState.entries) >= geoIPCacheMaxEntries {
+		geoIPState.entries = make(map[string]geoIPEntry)
+	}
+	geoIPState.entries[ip] = geoIPEntry{country: result.Country, city: result.City, lat: result.Lat, lon: result.Lon, at: time.Now()}
+	geoIPState.mu.Unlock()
 	return result.Country, result.City, result.Lat, result.Lon
 }
 
