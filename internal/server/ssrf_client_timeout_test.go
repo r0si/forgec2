@@ -31,6 +31,25 @@ func TestSSRFSafeClientAlwaysHasATimeout(t *testing.T) {
 	}
 }
 
+// TestAISSRFClientAlwaysHasATimeout is the same property for the AI sibling, which had the identical
+// zero-timeout hole: the AI endpoints are slow, so its fallback is the LONG bound, but it must exist.
+func TestAISSRFClientAlwaysHasATimeout(t *testing.T) {
+	s := mustTenantServer(t)
+	for _, tc := range []struct {
+		name string
+		base *http.Client
+		want time.Duration
+	}{
+		{"nil falls back to the long bound", nil, HTTPClientLongTimeout},
+		{"zero timeout is replaced", &http.Client{}, HTTPClientLongTimeout},
+		{"an explicit timeout is preserved", &http.Client{Timeout: 45 * time.Second}, 45 * time.Second},
+	} {
+		if got := s.aiSSRFClient(tc.base).Timeout; got != tc.want {
+			t.Errorf("%s: Timeout = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
 // TestSSRFSafeClientStillGuardsRedirects keeps the SSRF property while touching the timeout: the
 // client must refuse a redirect to an internal address.
 func TestSSRFSafeClientStillGuardsRedirects(t *testing.T) {
