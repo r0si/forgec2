@@ -59,7 +59,17 @@ go run ./cmd/verify-bundle handover.zip -json           # machine-readable
 ```
 
 Exit codes: `0` the archive matches its manifest, `1` a member is damaged, missing or unlisted, `2` the file could not
-be read as a bundle at all, `3` the archive is intact but **not trusted** (`-require-trusted` only).
+be read as a bundle at all, `3` the archive is intact but **not trusted** (`-require-trusted` only), `4` the archive is
+**incomplete** (`-require-complete` only).
+
+`?include=` makes a partial bundle a legitimate product, so completeness is only a failure when it was promised:
+
+```
+go run ./cmd/verify-bundle handover.zip -key <hex> -require-complete
+```
+
+`4` is separate from `1` on purpose: a broken package needs a re-send, a deliberately reduced one needs a conversation.
+The verifier always lists what is absent (`NOT INCLUDED …`), whether or not you require it.
 
 For a pipeline that must only accept provable handovers:
 

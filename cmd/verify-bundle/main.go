@@ -17,6 +17,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/forgec2/forgec2/internal/bundle"
 )
@@ -27,6 +28,8 @@ func main() {
 	requireTrusted := flag.Bool("require-trusted", false,
 		"fail unless the signature is valid AND made by -key; use in a pipeline that must only accept provable handovers")
 	quiet := flag.Bool("quiet", false, "print nothing; rely on the exit code")
+	requireComplete := flag.Bool("require-complete", false,
+		"fail unless the archive carries every member a complete handover has; a summary alone is not a handover")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "usage: verify-bundle [-key <hex>] [-json] <handover.zip>\n")
 		flag.PrintDefaults()
@@ -63,16 +66,21 @@ func main() {
 		printReport(report)
 	}
 
-	os.Exit(exitCode(report, *requireTrusted))
+	os.Exit(exitCode(report, *requireTrusted, *requireComplete))
 }
 
 // exitCode turns a report into the process result.
 //
 // Exit 1 means the package itself is damaged; exit 3 means it is intact but not provably the sender's. Keeping them
 // apart lets a pipeline retry a broken download and escalate an unproven one, instead of treating both as "bad file".
-func exitCode(report *bundle.Report, requireTrusted bool) int {
+func exitCode(report *bundle.Report, requireTrusted, requireComplete bool) int {
 	if !report.OK {
 		return 1
+	}
+	// 4 is "incomplete": a legitimate outcome for a partial bundle, and a failure for a caller who was promised a full
+	// handover. Kept apart from 1 so a pipeline can tell a broken package from a deliberately reduced one.
+	if requireComplete && len(report.Missing) > 0 {
+		return 4
 	}
 	if requireTrusted && !report.Trusted {
 		return 3
@@ -102,6 +110,9 @@ func printReport(report *bundle.Report) {
 	}
 	for _, name := range report.Extra {
 		fmt.Printf("     UNLISTED %s: present in the archive but not in the manifest\n", name)
+	}
+	if len(report.Missing) > 0 {
+		fmt.Printf("     NOT INCLUDED %s\n", strings.Join(report.Missing, ", "))
 	}
 	for _, problem := range report.Unverifiable {
 		fmt.Printf("     NO DIGEST %s: %s\n", problem.Name, problem.Problem)

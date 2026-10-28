@@ -21,6 +21,17 @@ import (
 	"strings"
 )
 
+// MemberNames is every member a complete handover carries, in the order the server writes them.
+//
+// The server derives its own selectable list from this slice, so "what a complete bundle contains" has one definition: a
+// receiver checking completeness and a producer choosing members cannot disagree about it.
+func MemberNames() []string {
+	return []string{
+		"summary.md", "timeline.md", "tasks.csv", "audit.ndjson",
+		"agents.json", "credentials.json", "iocs.json", "plugins.json",
+	}
+}
+
 // Member is one entry of MANIFEST.json.
 type Member struct {
 	Name        string `json:"name"`
@@ -119,6 +130,9 @@ type Report struct {
 	SignatureOK   bool      `json:"signature_valid"`
 	SignatureNote string    `json:"signature_problem,omitempty"`
 	PublicKey     string    `json:"public_key,omitempty"`
+	// Missing lists the members a COMPLETE handover would carry that this archive does not. It is informational: a
+	// partial bundle is a legitimate product (`?include=`), and only the caller knows whether completeness was promised.
+	Missing []string `json:"missing,omitempty"`
 	// Trusted is only meaningful when the caller supplied the key they already trust.
 	Trusted      bool   `json:"trusted"`
 	TrustedNote  string `json:"trusted_problem,omitempty"`
@@ -199,6 +213,12 @@ func Verify(raw []byte, trustedKey string) (*Report, error) {
 			continue
 		}
 		report.Verified++
+	}
+
+	for _, name := range MemberNames() {
+		if _, present := contents[name]; !present {
+			report.Missing = append(report.Missing, name)
+		}
 	}
 
 	listed := make(map[string]bool, len(manifest.Members))

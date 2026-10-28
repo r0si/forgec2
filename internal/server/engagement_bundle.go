@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/forgec2/forgec2/internal/bundle"
 	"github.com/forgec2/forgec2/internal/db"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -422,10 +423,10 @@ func buildEngagementTimeline(engagement db.Engagement, tasks []db.Task, auditRow
 }
 
 // bundleMemberNames are the members an operator may select, in the order they are written.
-var bundleMemberNames = []string{
-	"summary.md", "timeline.md", "tasks.csv", "audit.ndjson",
-	"agents.json", "credentials.json", "iocs.json", "plugins.json",
-}
+//
+// Derived from internal/bundle so the completeness check a receiver runs and the members a producer offers cannot
+// disagree: an archive that `verify-bundle -require-complete` accepts is one this endpoint could have produced whole.
+var bundleMemberNames = bundle.MemberNames()
 
 // parseBundleInclude resolves `?include=` into the set of members to write.
 //

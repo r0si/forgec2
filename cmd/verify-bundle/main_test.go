@@ -29,7 +29,7 @@ func TestExitCode(t *testing.T) {
 		{"damaged, trust required", damaged, true, 1},
 	}
 	for _, test := range cases {
-		if got := exitCode(test.report, test.requireTrusted); got != test.want {
+		if got := exitCode(test.report, test.requireTrusted, false); got != test.want {
 			t.Fatalf("%s: exit %d, want %d", test.name, got, test.want)
 		}
 	}
@@ -41,7 +41,45 @@ func TestExitCode(t *testing.T) {
 func TestExitCodeDistinguishesUntrustedFromDamaged(t *testing.T) {
 	untrusted := &bundle.Report{OK: true, Signed: true, SignatureOK: true}
 	damaged := &bundle.Report{OK: false}
-	if exitCode(untrusted, true) == exitCode(damaged, true) {
+	if exitCode(untrusted, true, false) == exitCode(damaged, true, false) {
 		t.Fatal("an unproven package and a damaged one share an exit code")
+	}
+}
+
+// TestExitCodeRequireComplete covers the completeness switch: a partial bundle is a legitimate product, and a failure
+// for a caller who was promised the whole handover.
+//
+// The separate code matters: a pipeline must be able to tell "this package is broken" from "this package is deliberately
+// the summary only", because the first needs a re-send and the second needs a conversation.
+func TestExitCodeRequireComplete(t *testing.T) {
+	complete := &bundle.Report{OK: true}
+	partial := &bundle.Report{OK: true, Missing: []string{"credentials.json", "iocs.json"}}
+	broken := &bundle.Report{OK: false, Missing: []string{"summary.md"}}
+
+	cases := []struct {
+		name            string
+		report          *bundle.Report
+		requireComplete bool
+		want            int
+	}{
+		{"complete, not required", complete, false, 0},
+		{"partial, not required", partial, false, 0},
+		{"partial, required", partial, true, 4},
+		{"complete, required", complete, true, 0},
+		{"broken and partial", broken, true, 1},
+	}
+	for _, test := range cases {
+		if got := exitCode(test.report, false, test.requireComplete); got != test.want {
+			t.Fatalf("%s: exit %d, want %d", test.name, got, test.want)
+		}
+	}
+
+	// The incompleteness code must not collide with damage or with the trust decision.
+	if exitCode(partial, false, true) == exitCode(broken, false, true) {
+		t.Fatal("an incomplete package and a broken one share an exit code")
+	}
+	untrusted := &bundle.Report{OK: true, Signed: true, SignatureOK: true}
+	if exitCode(partial, true, true) == exitCode(untrusted, true, false) {
+		t.Fatal("incomplete and untrusted share an exit code")
 	}
 }
