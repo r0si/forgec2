@@ -3709,6 +3709,14 @@ paths:
           in: path
           required: true
           schema: {type: integer}
+        - name: include
+          in: query
+          description: >-
+            Comma-separated members to include: summary.md, timeline.md, tasks.csv, audit.ndjson, agents.json,
+            credentials.json, iocs.json, plugins.json. Absent means all of them. A customer-facing handover can
+            therefore leave out the credential inventory it does not need, and MANIFEST.json is always written
+            because without it the archive cannot be verified. An unknown name is a 400 listing the valid ones.
+          schema: {type: string}
       responses:
         '200':
           description: application/zip with summary.md, timeline.md, tasks.csv, audit.ndjson, agents.json, credentials.json, iocs.json, plugins.json and MANIFEST.json

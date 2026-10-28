@@ -66,7 +66,17 @@ func (s *Server) handleEngagementBundle(c *gin.Context) {
 	// recorder hashes every member as it is written, so the manifest can carry a digest a receiver can check after
 	// the bundle has travelled.
 	recorder := &hashingBundleWriter{inner: archive, digests: map[string]string{}, bytes: map[string]int{}}
+	// Selection: a customer-facing handover must not carry the credential inventory merely because the operator can see
+	// it. `?include=` names the members to send; absent means everything.
+	selected, selectErr := parseBundleInclude(c.Query("include"))
+	if selectErr != "" {
+		respondError(c, http.StatusBadRequest, selectErr)
+		return
+	}
 	add := func(name string, write func(bundleWriter) error) bool {
+		if !selected[name] {
+			return true
+		}
 		if err := write(recorder); err != nil {
 			slog.Error("Failed to build an engagement bundle member", "engagement_id", engagement.ID, "member", name, "err", err)
 			return false
@@ -394,4 +404,54 @@ func buildEngagementTimeline(engagement db.Engagement, tasks []db.Task, auditRow
 		shown++
 	}
 	return body.Bytes()
+}
+
+// bundleMemberNames are the members an operator may select, in the order they are written.
+var bundleMemberNames = []string{
+	"summary.md", "timeline.md", "tasks.csv", "audit.ndjson",
+	"agents.json", "credentials.json", "iocs.json", "plugins.json",
+}
+
+// parseBundleInclude resolves `?include=` into the set of members to write.
+//
+// MANIFEST.json is not selectable: it describes the archive and is generated from whatever was written, so asking for
+// "everything except the manifest" would produce a package nobody can check. An unknown name is refused with the valid
+// list, because a silently ignored member would look like a file that exists and was empty.
+func parseBundleInclude(raw string) (map[string]bool, string) {
+	selected := make(map[string]bool, len(bundleMemberNames)+1)
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		for _, name := range bundleMemberNames {
+			selected[name] = true
+		}
+		selected["MANIFEST.json"] = true
+		return selected, ""
+	}
+	manifestNamed := false
+	known := make(map[string]bool, len(bundleMemberNames))
+	for _, name := range bundleMemberNames {
+		known[name] = true
+	}
+	for _, part := range strings.Split(raw, ",") {
+		name := strings.ToLower(strings.TrimSpace(part))
+		if name == "" {
+			continue
+		}
+		if name == "manifest.json" {
+			// Allowed and harmless: the manifest is always written. It still counts as a selection, so
+			// "?include=manifest.json" is a valid request for a manifest-only package.
+			manifestNamed = true
+			continue
+		}
+		if !known[name] {
+			return nil, fmt.Sprintf("unknown bundle member %q (valid: %s)", name, strings.Join(bundleMemberNames, ", "))
+		}
+		selected[name] = true
+	}
+	if len(selected) == 0 && !manifestNamed {
+		return nil, fmt.Sprintf("no members selected (valid: %s)", strings.Join(bundleMemberNames, ", "))
+	}
+	// The manifest always travels: without it the archive cannot be verified.
+	selected["MANIFEST.json"] = true
+	return selected, ""
 }

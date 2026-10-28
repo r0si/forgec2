@@ -463,3 +463,100 @@ func makeZip(t *testing.T, files map[string]string) []byte {
 	}
 	return buf.Bytes()
 }
+
+// TestEngagementBundleSelection covers `?include=`: a customer-facing handover must not carry the credential inventory
+// merely because the operator can see it.
+func TestEngagementBundleSelection(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	s := mustTenantServer(t)
+
+	now := time.Now().Truncate(time.Second)
+	engagement := db.Engagement{TenantID: 1, Name: "DMZ exercise", StartsAt: now.Add(-2 * time.Hour), EndsAt: now.Add(-time.Hour)}
+	if err := s.db.Create(&engagement).Error; err != nil {
+		t.Fatalf("seed engagement: %v", err)
+	}
+
+	build := func(query string) (int, map[string][]byte) {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest(http.MethodGet, "/api/engagements/1/bundle"+query, nil)
+		c.Params = gin.Params{{Key: "id", Value: itoaUint(engagement.ID)}}
+		c.Set("user", "op")
+		c.Set("user_role", db.RoleAdmin)
+		c.Set("user_id", uint(1))
+		c.Set(middleware.TenantIDContextKey, uint(1))
+		s.handleEngagementBundle(c)
+		if w.Code != http.StatusOK {
+			return w.Code, nil
+		}
+		reader, err := zip.NewReader(bytes.NewReader(w.Body.Bytes()), int64(w.Body.Len()))
+		if err != nil {
+			t.Fatalf("not a zip: %v", err)
+		}
+		members := map[string][]byte{}
+		for _, file := range reader.File {
+			handle, err := file.Open()
+			if err != nil {
+				t.Fatalf("open %s: %v", file.Name, err)
+			}
+			content, err := io.ReadAll(handle)
+			_ = handle.Close()
+			if err != nil {
+				t.Fatalf("read %s: %v", file.Name, err)
+			}
+			members[file.Name] = content
+		}
+		return w.Code, members
+	}
+
+	// 1. A selection writes exactly those members plus the manifest.
+	code, members := build("?include=summary.md,audit.ndjson")
+	if code != http.StatusOK {
+		t.Fatalf("status = %d", code)
+	}
+	if len(members) != 3 {
+		t.Fatalf("members = %v, want summary.md, audit.ndjson and MANIFEST.json", keysOf(members))
+	}
+	for _, name := range []string{"summary.md", "audit.ndjson", "MANIFEST.json"} {
+		if _, ok := members[name]; !ok {
+			t.Fatalf("%s is missing: %v", name, keysOf(members))
+		}
+	}
+	if _, ok := members["credentials.json"]; ok {
+		t.Fatal("the credential inventory was included in a selection that did not ask for it")
+	}
+
+	// 2. The manifest describes the selection, not the full set - that is what makes the archive verifiable.
+	var manifest struct {
+		Members []struct {
+			Name   string `json:"name"`
+			SHA256 string `json:"sha256"`
+		} `json:"members"`
+	}
+	if err := json.Unmarshal(members["MANIFEST.json"], &manifest); err != nil {
+		t.Fatalf("manifest: %v", err)
+	}
+	if len(manifest.Members) != 3 {
+		t.Fatalf("manifest lists %d member(s), want 3: %+v", len(manifest.Members), manifest.Members)
+	}
+	for _, entry := range manifest.Members {
+		if _, ok := members[entry.Name]; !ok {
+			t.Fatalf("the manifest lists %s, which is not in the archive", entry.Name)
+		}
+		if entry.Name != "MANIFEST.json" && entry.SHA256 == "" {
+			t.Fatalf("%s has no digest", entry.Name)
+		}
+	}
+
+	// 3. An unknown member is refused and the message lists the valid ones.
+	code, _ = build("?include=summary.md,secrets.txt")
+	if code != http.StatusBadRequest {
+		t.Fatalf("unknown member = %d, want 400", code)
+	}
+
+	// 4. Naming only the manifest still produces a verifiable package (the manifest always travels).
+	code, members = build("?include=manifest.json")
+	if code != http.StatusOK || len(members) != 1 {
+		t.Fatalf("manifest-only bundle = %d %v", code, keysOf(members))
+	}
+}
