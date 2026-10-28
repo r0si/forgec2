@@ -106,8 +106,31 @@ func NewScriptEngine() *ScriptEngine {
 	}
 	// Dormant template VM (no e.vm call sites): keep its captured caller at
 	// the lowest privilege so a future wiring cannot inherit admin reach.
-	e.registerAPI(vm, Caller{Username: "system", Role: "user"})
+	e.registerAPI(vm, Caller{Username: "system", Role: "user"}, newExecBudget(scriptMaxBridgeMutations))
 	return e
+}
+
+// execBudget counts mutating bridge calls in ONE execution.
+//
+// Every sendTask call inserts a task row and an audit row, and the database has a single writer, so
+// a script that loops over sendTask - or an event-bound script firing on every matching event - was
+// a write-amplification primitive. The budget makes the loop fail instead of filling the table.
+type execBudget struct {
+	mu    sync.Mutex
+	used  int
+	limit int
+}
+
+func newExecBudget(limit int) *execBudget { return &execBudget{limit: limit} }
+
+func (b *execBudget) spend() error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.used >= b.limit {
+		return fmt.Errorf("script exceeded the mutating bridge call limit (%d); send fewer tasks per execution", b.limit)
+	}
+	b.used++
+	return nil
 }
 
 func GetEngine() *ScriptEngine {
@@ -139,11 +162,15 @@ func setAPIOn(vm *goja.Runtime, name string, val any) {
 
 // registerAPI installs the JavaScript API surface on the given VM. The bridge
 // calls are synchronous: on failure the script sees a thrown exception.
-func (e *ScriptEngine) registerAPI(vm *goja.Runtime, caller Caller) {
+func (e *ScriptEngine) registerAPI(vm *goja.Runtime, caller Caller, budget *execBudget) {
 	setAPIOn(vm, "sendTask", func(call goja.FunctionCall) goja.Value {
 		bridge := e.bridgeFor(caller)
 		if bridge == nil {
 			panic(vm.NewGoError(errors.New("script bridge is not available")))
+		}
+		// See execBudget: this is the mutating call that a loop turns into table growth.
+		if err := budget.spend(); err != nil {
+			panic(vm.NewGoError(err))
 		}
 		agentID := call.Argument(0).String()
 		taskType := call.Argument(1).String()
@@ -419,7 +446,8 @@ func (e *ScriptEngine) executeScript(code string, scriptCtx map[string]interface
 		setAPIOn(vm, k, v)
 	}
 
-	e.registerAPI(vm, caller)
+	budget := newExecBudget(scriptMaxBridgeMutations)
+	e.registerAPI(vm, caller, budget)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -477,4 +505,6 @@ func (e *ScriptEngine) executeScript(code string, scriptCtx map[string]interface
 const (
 	scriptMaxCallStackSize = 4096
 	scriptMaxOutputBytes   = 1 << 20
+	// scriptMaxBridgeMutations bounds one execution's writes (task + audit row per sendTask).
+	scriptMaxBridgeMutations = 500
 )
