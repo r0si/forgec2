@@ -88,9 +88,12 @@ func writeBundleManifest(archive bundleWriter, recorder *hashingBundleWriter, en
 			"window_end": windowEnd.UTC().Format(time.RFC3339),
 		},
 		"generated_at": generatedAt,
-		"members":      members,
-		"signed":       signature != nil,
-		"signature":    signature,
+		// Which release produced this package: a bundle outlives the deployment that made it, and "was this from before
+		// the manifest gained digests" is a question a reviewer asks months later.
+		"server_version": ServerVersion,
+		"members":        members,
+		"signed":         signature != nil,
+		"signature":      signature,
 		"note": "each member names its source and its sensitivity; the sha256 is of the member exactly as written, " +
 			"and MANIFEST.json is the only file without one (it cannot contain its own digest)",
 	})

@@ -22,7 +22,9 @@ after-action reviewer needs.
 | `MANIFEST.json` | The package describing itself: purpose, source, sensitivity and SHA-256 for every member. | shareable |
 
 The same table is inside `MANIFEST.json`, generated from the members actually written, so a receiver who only has the
-archive does not need this file.
+archive does not need this file. The manifest also records `generated_at` and `server_version`: a bundle outlives the
+deployment that produced it, and *"was this made before the manifest carried digests?"* is a question asked months
+later.
 
 **Credentials never travel with secrets.** A bundle leaves the console — it gets emailed, put on a share, attached to a
 report — so passwords and hashes stay in the system that audits their use.

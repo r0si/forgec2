@@ -232,8 +232,9 @@ func TestEngagementBundle(t *testing.T) {
 			ID   uint   `json:"id"`
 			Name string `json:"name"`
 		} `json:"engagement"`
-		GeneratedAt string `json:"generated_at"`
-		Members     []struct {
+		GeneratedAt   string `json:"generated_at"`
+		ServerVersion string `json:"server_version"`
+		Members       []struct {
 			Name        string `json:"name"`
 			Purpose     string `json:"purpose"`
 			Source      string `json:"source"`
@@ -244,6 +245,9 @@ func TestEngagementBundle(t *testing.T) {
 	}
 	if err := json.Unmarshal(members["MANIFEST.json"], &manifest); err != nil {
 		t.Fatalf("MANIFEST.json: %v (%s)", err, string(members["MANIFEST.json"]))
+	}
+	if manifest.ServerVersion == "" {
+		t.Fatal("MANIFEST.json does not say which release produced it")
 	}
 	if manifest.Engagement.ID != engagement.ID || manifest.Engagement.Name != "DMZ exercise" || manifest.GeneratedAt == "" {
 		t.Fatalf("manifest header = %+v", manifest.Engagement)
