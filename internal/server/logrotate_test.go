@@ -82,6 +82,14 @@ func TestSetupLogRotationWritesAFile(t *testing.T) {
 		log.SetOutput(prev)
 		if fan, ok := w.(*fanoutWriter); ok {
 			for _, sink := range fan.sinks {
+				// Close only sinks this test OWNS. os.Stdout implements io.Closer, so the first
+				// version of this cleanup closed the test binary's stdout: the framework's final
+				// PASS line could never be written, and go test reported FAIL with no failing test
+				// named and output ending mid-run - a flake that looked like a production bug for
+				// many rounds and only bit when this test ran last.
+				if sink == io.Writer(os.Stdout) || sink == io.Writer(os.Stderr) {
+					continue
+				}
 				if c, ok := sink.(io.Closer); ok {
 					_ = c.Close()
 				}

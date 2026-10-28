@@ -189,9 +189,10 @@ func (s *Server) handleRerunTask(c *gin.Context) {
 	// soft-lock gate applies, like every other creation path). The original
 	// idempotency key carries over: rerunning a live keyed task returns the
 	// live row instead of stacking a duplicate.
-	newTask, reason := s.rerunTaskAsNew(c, agentID, &original)
-	if newTask == nil {
-		respondError(c, http.StatusBadRequest, reason)
+	newTask, err := s.rerunTaskAsNew(c, agentID, &original)
+	if err != nil {
+		// respondTaskError is what maps a rate-limited rerun to 429; a plain 400 lost that.
+		respondTaskError(c, err)
 		return
 	}
 

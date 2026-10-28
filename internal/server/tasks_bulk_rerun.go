@@ -99,9 +99,9 @@ func (s *Server) handleRerunFailedTasks(c *gin.Context) {
 			skipped = append(skipped, skip{ID: original.ID, Type: original.Type, Reason: "task type cannot be rerun"})
 			continue
 		}
-		newTask, reason := s.rerunTaskAsNew(c, agentID, original)
-		if newTask == nil {
-			skipped = append(skipped, skip{ID: original.ID, Type: original.Type, Reason: reason})
+		newTask, rerunErr := s.rerunTaskAsNew(c, agentID, original)
+		if rerunErr != nil {
+			skipped = append(skipped, skip{ID: original.ID, Type: original.Type, Reason: sanitizeError(rerunErr, "rerun")})
 			continue
 		}
 		// A row created before this request is the previous rerun being returned by its idempotency
@@ -146,7 +146,7 @@ func (s *Server) handleRerunFailedTasks(c *gin.Context) {
 //
 // Shared by the single-task rerun and the bulk one so the two cannot drift on the no-rerun list, the
 // idempotency carry-over or the caller plumbing.
-func (s *Server) rerunTaskAsNew(c *gin.Context, agentID string, original *db.Task) (*db.Task, string) {
+func (s *Server) rerunTaskAsNew(c *gin.Context, agentID string, original *db.Task) (*db.Task, error) {
 	opts := callerOpts(c)
 	// Carrying the original key over means rerunning a live keyed task returns the live row instead
 	// of stacking a duplicate. An UNKEYED original gets a deterministic key derived from its id, so
@@ -159,9 +159,12 @@ func (s *Server) rerunTaskAsNew(c *gin.Context, agentID string, original *db.Tas
 	opts = append(opts, WithIdempotencyKey(key))
 	newTask, err := s.createTask(agentID, original.Type, original.Command, original.Shell, original.Path, original.Data, original.Offset, original.Size, opts...)
 	if err != nil {
-		return nil, sanitizeError(err, "rerun")
+		// Return the error itself, not a rendered string: the single-task rerun maps it through
+		// respondTaskError so a rate-limited rerun still answers 429. Collapsing it to text here is how
+		// that mapping was lost once already.
+		return nil, err
 	}
-	return newTask, ""
+	return newTask, nil
 }
 
 // joinUintIDs renders ids for an audit detail without depending on a slice formatter.
