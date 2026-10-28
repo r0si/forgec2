@@ -27317,6 +27317,8 @@ export interface operations {
                 headers: {
                     /** @description Always "bytes" */
                     "Accept-Ranges"?: string;
+                    /** @description A strong validator for this exact output. Send it as If-Range with a Range request: if the task was re-run and the result changed, the server answers 200 with the whole document instead of splicing the new bytes onto a half-fetched old download. */
+                    ETag?: string;
                     /** @description Stored task status */
                     "X-Task-Status"?: string;
                     /** @description "true" when the stored result is final (status completed) */

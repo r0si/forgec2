@@ -82,6 +82,10 @@ func (s *Server) handleDownloadTaskOutput(c *gin.Context) {
 	if modTime.IsZero() {
 		modTime = task.CreatedAt
 	}
+	// A STRONG ETag, which is what If-Range needs: a resuming client sends the tag it holds, and ServeContent only
+	// honours the Range when it still matches. Without it a resume could splice the first half of one output onto
+	// the second half of another - the task was re-run and the result changed between the two requests.
+	c.Header("ETag", strongTaskOutputETag(task, body))
 	http.ServeContent(c.Writer, c.Request, name, modTime, strings.NewReader(body))
 }
 
@@ -100,4 +104,14 @@ func sanitizeFilenamePart(raw string) string {
 		return "task"
 	}
 	return string(out)
+}
+
+// strongTaskOutputETag identifies this exact rendered output.
+//
+// Strong (no W/ prefix) on purpose: If-Range only works with a strong validator, and the value must change whenever
+// the bytes could - so it covers the row identity, the modification time and the body length. A hash of the body
+// would be stricter still, but the body is already bounded by the download itself and the extra pass would be paid
+// on every request.
+func strongTaskOutputETag(task db.Task, body string) string {
+	return fmt.Sprintf(`"%x-%x-%x"`, task.ID, task.UpdatedAt.UnixNano(), len(body))
 }

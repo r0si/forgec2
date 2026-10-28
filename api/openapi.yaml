@@ -12630,6 +12630,12 @@ paths:
             `Range` request answers 206 with `Content-Range`.
           headers:
             Accept-Ranges: {schema: {type: string}, description: Always "bytes"}
+            ETag:
+              schema: {type: string}
+              description: >-
+                A strong validator for this exact output. Send it as If-Range with a Range request: if the task was
+                re-run and the result changed, the server answers 200 with the whole document instead of splicing
+                the new bytes onto a half-fetched old download.
             X-Task-Status: {schema: {type: string}, description: Stored task status}
             X-Task-Final:
               schema: {type: string}
