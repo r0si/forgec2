@@ -14289,6 +14289,8 @@ export interface operations {
                     rules?: Record<string, never>[];
                     /** @description Replace rules with the same name */
                     overwrite?: boolean;
+                    /** @description Answer "what would this do" without writing: the same verdicts and the same reference warnings, no rows. A preview cannot disagree with the import that follows it, because only the write is skipped. A set-level preview is audited as `automation_rule_import_preview`, so "who checked what an import would do" has an answer. */
+                    dry_run?: boolean;
                 };
             };
         };

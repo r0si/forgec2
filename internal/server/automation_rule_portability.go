@@ -93,6 +93,9 @@ func (s *Server) handleImportAutomationRule(c *gin.Context) {
 		Rule      *portableRule  `json:"rule"`
 		Rules     []portableRule `json:"rules"`
 		Overwrite bool           `json:"overwrite"`
+		// DryRun answers "what would this do" without writing: the same verdicts, the same warnings, no rows. It is the
+		// difference between trying an import on a production console and trusting a document you have not read.
+		DryRun bool `json:"dry_run"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		respondError(c, http.StatusBadRequest,
@@ -103,7 +106,7 @@ func (s *Server) handleImportAutomationRule(c *gin.Context) {
 	// The set form: a partial success is the normal case, so the answer is per rule rather than a single status. A 409 for
 	// the whole document would hide the rules that did import.
 	if len(body.Rules) > 0 {
-		s.importRuleSet(c, body.Rules, body.Overwrite)
+		s.importRuleSet(c, body.Rules, body.Overwrite, body.DryRun)
 		return
 	}
 
@@ -111,7 +114,7 @@ func (s *Server) handleImportAutomationRule(c *gin.Context) {
 		respondError(c, http.StatusBadRequest, "provide rule or rules")
 		return
 	}
-	outcome := s.importOneRule(c, *body.Rule, body.Overwrite, s.existingImportDeps(c))
+	outcome := s.importOneRule(c, *body.Rule, body.Overwrite, body.DryRun, s.existingImportDeps(c))
 	switch outcome.Status {
 	case "invalid":
 		respondError(c, http.StatusBadRequest, outcome.Reason)
@@ -122,7 +125,7 @@ func (s *Server) handleImportAutomationRule(c *gin.Context) {
 	}
 	respond(c, gin.H{
 		"rule_id": outcome.RuleID, "overwrote": outcome.Status == "replaced", "enabled": outcome.Enabled,
-		"warnings": outcome.Warnings,
+		"warnings": outcome.Warnings, "dry_run": body.DryRun,
 	})
 }
 
@@ -189,7 +192,7 @@ func (d importDeps) checkRuleReferences(rule portableRule) []string {
 }
 
 // importOneRule validates and writes a single portable rule.
-func (s *Server) importOneRule(c *gin.Context, rule portableRule, overwrite bool, deps importDeps) ruleImportOutcome {
+func (s *Server) importOneRule(c *gin.Context, rule portableRule, overwrite, dryRun bool, deps importDeps) ruleImportOutcome {
 	outcome := ruleImportOutcome{Name: strings.TrimSpace(rule.Name)}
 	outcome.Warnings = deps.checkRuleReferences(rule)
 
@@ -250,19 +253,28 @@ func (s *Server) importOneRule(c *gin.Context, rule portableRule, overwrite bool
 		LastTriggered: existing.LastTriggered,
 		RunCount:      existing.RunCount,
 	}
+	// The verdict is the same either way; only the write differs, so a preview cannot disagree with the import that
+	// follows it.
+	if found {
+		outcome.Status = "replaced"
+	} else {
+		outcome.Status = "created"
+	}
+	outcome.RuleID = ruleID
+	if dryRun {
+		return outcome
+	}
+
 	if err := s.saveAutomationRule(toSave); err != nil {
 		outcome.Status, outcome.Reason = "invalid", "failed to save"
 		return outcome
 	}
 
-	outcome.RuleID = ruleID
 	if found {
-		outcome.Status = "replaced"
 		s.LogAuditRecord(c, "automation_rule_import_overwrite", "automation", ruleID,
 			fmt.Sprintf("replaced rule %q from an imported document", outcome.Name), true, nil)
 		return outcome
 	}
-	outcome.Status = "created"
 	s.LogAuditRecord(c, "automation_rule_import", "automation", ruleID,
 		fmt.Sprintf("imported rule %q (%d condition(s), %d action(s))",
 			outcome.Name, len(rule.Conditions), len(rule.Actions)), true, nil)
@@ -270,7 +282,7 @@ func (s *Server) importOneRule(c *gin.Context, rule portableRule, overwrite bool
 }
 
 // importRuleSet imports a whole document, reporting per rule.
-func (s *Server) importRuleSet(c *gin.Context, rules []portableRule, overwrite bool) {
+func (s *Server) importRuleSet(c *gin.Context, rules []portableRule, overwrite, dryRun bool) {
 	const maxRules = 200
 	if len(rules) > maxRules {
 		respondError(c, http.StatusBadRequest, fmt.Sprintf("too many rules (%d); the limit is %d", len(rules), maxRules))
@@ -288,7 +300,7 @@ func (s *Server) importRuleSet(c *gin.Context, rules []portableRule, overwrite b
 	results := make([]result, 0, len(rules))
 	counts := map[string]int{"created": 0, "replaced": 0, "conflict": 0, "invalid": 0}
 	for _, rule := range rules {
-		outcome := s.importOneRule(c, rule, overwrite, deps)
+		outcome := s.importOneRule(c, rule, overwrite, dryRun, deps)
 		counts[outcome.Status]++
 		results = append(results, result{
 			Name: outcome.Name, Status: outcome.Status, RuleID: outcome.RuleID, Reason: outcome.Reason,
@@ -296,6 +308,14 @@ func (s *Server) importRuleSet(c *gin.Context, rules []portableRule, overwrite b
 		})
 	}
 
+	if dryRun {
+		// A preview is audited too: "who checked what an import would do" is a question a review will ask.
+		s.LogAuditRecord(c, "automation_rule_import_preview", "automation", "",
+			fmt.Sprintf("previewed a rule set: %d would be created, %d replaced, %d conflict(s), %d invalid",
+				counts["created"], counts["replaced"], counts["conflict"], counts["invalid"]), true, nil)
+		respond(c, gin.H{"counts": counts, "results": results, "dry_run": true})
+		return
+	}
 	s.LogAuditRecord(c, "automation_rule_import_set", "automation", "",
 		fmt.Sprintf("imported a rule set: %d created, %d replaced, %d conflict(s), %d invalid",
 			counts["created"], counts["replaced"], counts["conflict"], counts["invalid"]), true, nil)

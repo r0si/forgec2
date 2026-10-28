@@ -214,12 +214,43 @@ func TestAutomationRulePortability(t *testing.T) {
 		t.Fatalf("the rule was not imported: %v", err)
 	}
 
+	// 5c. A dry run answers the same question as the import and writes nothing: no rule, no import audit row.
+	before, _ := countRules(t, s)
+	dry := map[string]interface{}{
+		"name": "dry run rule", "event_type": string(EventTaskComplete), "conditions": []interface{}{},
+		"actions": []interface{}{map[string]interface{}{"type": "notify", "params": map[string]interface{}{"message": "x"}}},
+	}
+	code, data = call(http.MethodPost, "/import", 1, map[string]interface{}{"rule": dry, "dry_run": true})
+	if code != http.StatusOK {
+		t.Fatalf("dry run = %d (%v)", code, data)
+	}
+	if data["dry_run"] != true {
+		t.Fatalf("the dry run did not say so: %v", data)
+	}
+	if data["rule_id"] == "" {
+		t.Fatalf("the dry run did not say which id it would use: %v", data)
+	}
+	after, _ := countRules(t, s)
+	if after != before {
+		t.Fatalf("a dry run wrote %d rule(s)", after-before)
+	}
+	// And the same document imported for real then behaves normally.
+	if code, _ := call(http.MethodPost, "/import", 1, map[string]interface{}{"rule": dry}); code != http.StatusOK {
+		t.Fatalf("the real import after a preview = %d", code)
+	}
+	afterReal, _ := countRules(t, s)
+	if afterReal != before+1 {
+		t.Fatalf("the real import added %d rule(s)", afterReal-before)
+	}
+
 	// 6. Both directions are audited.
-	// Three single imports (tenant-2, the batch's "Second rule", and the orphan-target rule), one overwrite, one summary.
+	// Four single imports (tenant-2, the batch's "Second rule", the orphan-target rule, and the dry-run rule imported
+	// for real), one overwrite, one set summary. The DRY RUN writes no import row - that is the point of it.
 	for action, want := range map[string]int64{
-		"automation_rule_import":           3,
+		"automation_rule_import":           4,
 		"automation_rule_import_overwrite": 1,
 		"automation_rule_import_set":       1,
+		"automation_rule_import_preview":   0,
 	} {
 		var n int64
 		if err := s.db.Model(&db.AuditLog{}).Where("action = ?", action).Count(&n).Error; err != nil {
@@ -258,4 +289,12 @@ func callSet(s *Server, method, path string, tenant uint, body interface{}) (int
 	}
 	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 	return w.Code, resp.Data
+}
+
+// countRules is how many automation rules exist in total, for the dry-run assertion.
+func countRules(t *testing.T, s *Server) (int64, error) {
+	t.Helper()
+	var n int64
+	err := s.db.Model(&db.AutomationRule{}).Count(&n).Error
+	return n, err
 }

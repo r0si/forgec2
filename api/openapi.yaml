@@ -2648,6 +2648,13 @@ paths:
                     (created/replaced/conflict/invalid with reasons) rather than one status for the document.
                   items: {type: object}
                 overwrite: {type: boolean, description: Replace rules with the same name}
+                dry_run:
+                  type: boolean
+                  description: >-
+                    Answer "what would this do" without writing: the same verdicts and the same reference warnings, no rows.
+                    A preview cannot disagree with the import that follows it, because only the write is skipped. A
+                    set-level preview is audited as `automation_rule_import_preview`, so "who checked what an import would
+                    do" has an answer.
       responses:
         '200':
           description: The created or replaced rule
