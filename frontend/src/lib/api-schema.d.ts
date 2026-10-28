@@ -14305,6 +14305,8 @@ export interface operations {
                             rule_id?: string;
                             overwrote?: boolean;
                             enabled?: boolean;
+                            /** @description References in the imported document that do not resolve here (agent, script, macro). The import still SUCCEEDS - a rule may legitimately arrive before the agent it targets - but the operator is looking at the answer, which is the only moment the mismatch is cheap to fix. */
+                            warnings?: string[];
                         };
                     };
                 };

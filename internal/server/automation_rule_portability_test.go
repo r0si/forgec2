@@ -184,10 +184,40 @@ func TestAutomationRulePortability(t *testing.T) {
 		}
 	}
 
+	// 4b. A reference that will not resolve here is reported at import time, while the operator is looking at the answer.
+	orphan := map[string]interface{}{
+		"name": "orphan target", "event_type": string(EventImplantCheckin),
+		"conditions": []interface{}{},
+		"actions": []interface{}{
+			map[string]interface{}{"type": "run_command", "params": map[string]interface{}{"command": "whoami", "agent_id": "not-here"}},
+			map[string]interface{}{"type": "run_macro", "params": map[string]interface{}{"macro_id": "9999"}},
+		},
+	}
+	code, data = call(http.MethodPost, "/import", 1, map[string]interface{}{"rule": orphan})
+	if code != http.StatusOK {
+		t.Fatalf("import with unresolvable references = %d (%v)", code, data)
+	}
+	warnings, _ := data["warnings"].([]interface{})
+	if len(warnings) != 2 {
+		t.Fatalf("warnings = %v, want one for the agent and one for the macro", data["warnings"])
+	}
+	joined := ""
+	for _, raw := range warnings {
+		joined += raw.(string) + "\n"
+	}
+	if !containsFold(joined, "not-here") || !containsFold(joined, "9999") {
+		t.Fatalf("the warnings do not name the references: %q", joined)
+	}
+	// The import still SUCCEEDS: a rule may legitimately arrive before the agent it targets.
+	var orphanRow db.AutomationRule
+	if err := s.db.First(&orphanRow, "name = ?", "orphan target").Error; err != nil {
+		t.Fatalf("the rule was not imported: %v", err)
+	}
+
 	// 6. Both directions are audited.
-	// Two single imports (the tenant-2 import and the batch's "Second rule"), one overwrite, one batch summary.
+	// Three single imports (tenant-2, the batch's "Second rule", and the orphan-target rule), one overwrite, one summary.
 	for action, want := range map[string]int64{
-		"automation_rule_import":           2,
+		"automation_rule_import":           3,
 		"automation_rule_import_overwrite": 1,
 		"automation_rule_import_set":       1,
 	} {

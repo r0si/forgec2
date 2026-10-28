@@ -111,7 +111,7 @@ func (s *Server) handleImportAutomationRule(c *gin.Context) {
 		respondError(c, http.StatusBadRequest, "provide rule or rules")
 		return
 	}
-	outcome := s.importOneRule(c, *body.Rule, body.Overwrite)
+	outcome := s.importOneRule(c, *body.Rule, body.Overwrite, s.existingImportDeps(c))
 	switch outcome.Status {
 	case "invalid":
 		respondError(c, http.StatusBadRequest, outcome.Reason)
@@ -120,7 +120,10 @@ func (s *Server) handleImportAutomationRule(c *gin.Context) {
 		respondError(c, http.StatusConflict, outcome.Reason)
 		return
 	}
-	respond(c, gin.H{"rule_id": outcome.RuleID, "overwrote": outcome.Status == "replaced", "enabled": outcome.Enabled})
+	respond(c, gin.H{
+		"rule_id": outcome.RuleID, "overwrote": outcome.Status == "replaced", "enabled": outcome.Enabled,
+		"warnings": outcome.Warnings,
+	})
 }
 
 // ruleImportOutcome is what happened to one document.
@@ -130,11 +133,65 @@ type ruleImportOutcome struct {
 	RuleID  string
 	Enabled bool
 	Reason  string
+	// Warnings are references in the imported document that will not resolve HERE. The import still succeeds - a rule
+	// may be imported before the agent it targets exists - but the operator is standing in front of the response, which is
+	// the only moment the mismatch is cheap to fix.
+	Warnings []string
+}
+
+// importDeps is the destination's inventory, looked up once per request rather than once per rule.
+type importDeps struct {
+	agents      map[string]struct{}
+	scripts     map[string]struct{}
+	macros      map[string]struct{}
+	unavailable map[string]string
+}
+
+// existingImportDeps collects what an imported rule might reference.
+func (s *Server) existingImportDeps(c *gin.Context) importDeps {
+	return importDeps{
+		agents:      s.existingAgentIDs(c),
+		scripts:     s.existingScriptIDs(c),
+		macros:      s.existingMacroIDs(c),
+		unavailable: s.agentAvailability(c),
+	}
+}
+
+// checkRuleReferences reports the references an imported rule carries that do not exist here.
+func (d importDeps) checkRuleReferences(rule portableRule) []string {
+	var warnings []string
+	for _, action := range rule.Actions {
+		for _, target := range actionTargets(action) {
+			switch target.kind {
+			case "agent":
+				if target.id == "" {
+					continue
+				}
+				if _, ok := d.agents[target.id]; !ok {
+					warnings = append(warnings, "targets agent "+target.id+", which does not exist here")
+					continue
+				}
+				if reason := d.unavailable[target.id]; reason != "" {
+					warnings = append(warnings, "targets agent "+target.id+", which cannot accept tasks: "+reason)
+				}
+			case "script":
+				if _, ok := d.scripts[target.id]; !ok && target.id != "" {
+					warnings = append(warnings, "targets script "+target.id+", which does not exist here")
+				}
+			case "macro":
+				if _, ok := d.macros[target.id]; !ok && target.id != "" {
+					warnings = append(warnings, "targets macro "+target.id+", which does not exist here")
+				}
+			}
+		}
+	}
+	return warnings
 }
 
 // importOneRule validates and writes a single portable rule.
-func (s *Server) importOneRule(c *gin.Context, rule portableRule, overwrite bool) ruleImportOutcome {
+func (s *Server) importOneRule(c *gin.Context, rule portableRule, overwrite bool, deps importDeps) ruleImportOutcome {
 	outcome := ruleImportOutcome{Name: strings.TrimSpace(rule.Name)}
+	outcome.Warnings = deps.checkRuleReferences(rule)
 
 	if outcome.Name == "" {
 		outcome.Status, outcome.Reason = "invalid", "the rule needs a name"
@@ -221,18 +278,21 @@ func (s *Server) importRuleSet(c *gin.Context, rules []portableRule, overwrite b
 	}
 
 	type result struct {
-		Name   string `json:"name"`
-		Status string `json:"status"`
-		RuleID string `json:"rule_id,omitempty"`
-		Reason string `json:"reason,omitempty"`
+		Name     string   `json:"name"`
+		Status   string   `json:"status"`
+		RuleID   string   `json:"rule_id,omitempty"`
+		Reason   string   `json:"reason,omitempty"`
+		Warnings []string `json:"warnings,omitempty"`
 	}
+	deps := s.existingImportDeps(c)
 	results := make([]result, 0, len(rules))
 	counts := map[string]int{"created": 0, "replaced": 0, "conflict": 0, "invalid": 0}
 	for _, rule := range rules {
-		outcome := s.importOneRule(c, rule, overwrite)
+		outcome := s.importOneRule(c, rule, overwrite, deps)
 		counts[outcome.Status]++
 		results = append(results, result{
 			Name: outcome.Name, Status: outcome.Status, RuleID: outcome.RuleID, Reason: outcome.Reason,
+			Warnings: outcome.Warnings,
 		})
 	}
 
