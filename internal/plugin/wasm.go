@@ -232,14 +232,28 @@ func (e *executor) runWasmPlugin(ctx context.Context, pluginDir string, m *Manif
 }
 
 func (r *wasmRunner) compile(ctx context.Context, path string, binary []byte) (wazero.CompiledModule, error) {
+	// Look up under the lock, but COMPILE outside it: compilation takes milliseconds to seconds, and
+	// holding the mutex across it serialized every concurrent wasm run. Worse, a goroutine waiting on
+	// sync.Mutex.Lock cannot be cancelled, so a run whose context expired while queueing still waited
+	// for the compile ahead of it before failing.
 	r.mu.Lock()
-	defer r.mu.Unlock()
 	if c, ok := r.cache[path]; ok {
+		r.mu.Unlock()
 		return c, nil
 	}
+	r.mu.Unlock()
+
 	c, err := r.runtime.CompileModule(ctx, binary)
 	if err != nil {
 		return nil, fmt.Errorf("invalid wasm module: %w", err)
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	// Another goroutine may have compiled the same module while we did: keep the first one, so the
+	// cache stays 1:1 with the path.
+	if existing, ok := r.cache[path]; ok {
+		return existing, nil
 	}
 	if len(r.cache) >= 64 {
 		// Bounded cache: drop everything rather than grow without limit.
