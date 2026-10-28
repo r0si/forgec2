@@ -36,6 +36,22 @@ func TestAutomationScriptFailureIsLogged(t *testing.T) {
 		t.Fatalf("the log line does not identify the agent: %q", out)
 	}
 
+	// A rule that cannot act must say so too: skipping used to be indistinguishable from a rule
+	// that never matched.
+	logs.Reset()
+	s.executeAction(RuleAction{Type: ActionCreateTask, Params: []byte(`{"type":"shell","command":"whoami"}`)},
+		Event{Type: EventImplantCheckin, TenantID: 1})
+	if !strings.Contains(logs.String(), "create_task skipped") {
+		t.Fatalf("a create_task action with no target was skipped silently: %q", logs.String())
+	}
+
+	logs.Reset()
+	s.executeAction(RuleAction{Type: ActionSetSleep, Params: []byte(`{"agent_id":"a-1","interval":0}`)},
+		Event{Type: EventImplantCheckin, AgentID: "a-1", TenantID: 1})
+	if !strings.Contains(logs.String(), "set_sleep skipped") {
+		t.Fatalf("a set_sleep action with interval 0 was skipped silently: %q", logs.String())
+	}
+
 	// A successful run stays at debug level, so routine automation does not spam the log.
 	logs.Reset()
 	s.executeAction(RuleAction{Type: ActionRunScript, Params: []byte(`{"code":"1 + 1"}`)},

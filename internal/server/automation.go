@@ -220,7 +220,14 @@ func (s *Server) executeAction(action RuleAction, evt Event) {
 		}
 		if err := json.Unmarshal(action.Params, &params); err == nil {
 			targetAgent := s.automationTarget(evt, params.AgentID)
-			if targetAgent != "" && params.Type != "" {
+			if targetAgent == "" || params.Type == "" {
+				// A rule that cannot act must say so: silently doing nothing is the same symptom as
+				// a rule that never matched, and there was no trace of either.
+				slog.Warn("Automation: create_task skipped, the rule has no usable target",
+					"event", string(evt.Type), "agent_id", params.AgentID, "task_type", params.Type)
+				break
+			}
+			{
 				expanded := s.expandTemplate(params.Command, evt)
 				task, err := s.createTask(targetAgent, params.Type, expanded, "", "", "", 0, 0)
 				if err != nil {
@@ -238,7 +245,12 @@ func (s *Server) executeAction(action RuleAction, evt Event) {
 		}
 		if err := json.Unmarshal(action.Params, &params); err == nil {
 			targetAgent := s.automationTarget(evt, params.AgentID)
-			if targetAgent != "" && params.Interval > 0 {
+			if targetAgent == "" || params.Interval <= 0 {
+				slog.Warn("Automation: set_sleep skipped, the rule has no usable target or interval",
+					"event", string(evt.Type), "agent_id", params.AgentID, "interval", params.Interval)
+				break
+			}
+			{
 				interval, jitter, clamped := s.clampSleepInts(params.Interval, params.Jitter)
 				if clamped {
 					s.LogAuditRecord(nil, "automation_sleep_clamped", "agent", targetAgent,
