@@ -209,6 +209,30 @@ go run ./cmd/plugin-check ./my-plugin -key <64-hex-pubkey> -require-signed
 Install by copying the directory into the plugins tree (it loads on start and
 refresh) or through the UI's install flow, which applies the same checks.
 
+### Verifying a package you received
+
+`plugin-check` takes a **directory** and treats signatures as optional, because the bundled plugins ship unsigned. When
+the package arrived from someone else and you already know which key you expect, use the receiving entry point instead:
+
+```sh
+go run ./cmd/verify-plugin package.zip -key <64-hex-pubkey>
+go run ./cmd/verify-plugin ./extracted -key <64-hex-pubkey> -quiet
+```
+
+Three differences from `plugin-check`, and they are the whole reason it exists:
+
+- It accepts an **archive** (or a directory) and unpacks it — refusing any entry that would resolve outside the
+  destination, because the archive is attacker-supplied input.
+- `-key` is **required**, so "verified" cannot quietly mean "the package agrees with itself".
+- `RequireSigned` is **on**, so an unsigned package fails instead of being installed with a warning.
+
+Exit codes match the other verifiers (`docs/VERIFIERS.md`): `0` verified, `1` invalid, unsigned or signed by a different
+key, `2` the archive could not be read at all. `-quiet` leaves the answer to the exit code; `-json` prints the report.
+
+A single top-level directory in the archive is unwrapped automatically, so the manifest is found where the packager put
+it. A flat archive is extracted as-is.
+
+
 ## Prompt block for coding agents
 
 Paste this into an agent working on a ForgeC2 plugin:
