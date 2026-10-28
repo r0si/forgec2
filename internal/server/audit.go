@@ -3,7 +3,6 @@ package server
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -16,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/forgec2/forgec2/internal/auditchain"
 	"github.com/forgec2/forgec2/internal/db"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -621,14 +621,10 @@ func (s *Server) handleVerifyAuditChain(c *gin.Context) {
 // the column existed hash over the same field set, so adding tenant scoping does
 // not invalidate historical EntryHash values.
 func auditEntryHash(e *db.AuditLog) string {
-	// fmt.Appendf writes the exact same bytes as []byte(fmt.Sprintf(...))
-	// without the intermediate string allocation, so the digest — and the
-	// tamper-evident chain built on it — is unchanged for historical rows.
-	var buf []byte
-	buf = fmt.Appendf(buf, "%s|%s|%s|%s|%s|%t|%s|%s",
-		e.User, e.Action, e.Resource, e.AgentID, e.IP, e.Success, e.Error, e.Details)
-	h := sha256.Sum256(buf)
-	return fmt.Sprintf("%x", h)
+	// The byte layout lives in internal/auditchain so cmd/verify-audit computes the same digest: two implementations
+	// would turn a correct export into a false tampering alarm offline, which is the worst possible failure for a
+	// tamper-evidence tool.
+	return auditchain.Hash(e.User, e.Action, e.Resource, e.AgentID, e.IP, e.Success, e.Error, e.Details)
 }
 
 // persistAuditBatch chains entries onto prevHash ("": read from DB) and
