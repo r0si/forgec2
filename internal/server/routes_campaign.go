@@ -46,6 +46,8 @@ func (s *Server) registerCampaignRoutes(auth *gin.RouterGroup) {
 			notificationRoutes.GET("/api/notification-routes", s.handleListNotificationRoutes)
 			// Dry run: would a candidate notification reach anyone. Read-only, so it sits with the read group.
 			notificationRoutes.POST("/api/notification-routes/preview", s.handlePreviewNotification)
+			// Clearing the counters is audited: "the failures disappeared" is a change someone will explain later.
+			notificationRoutes.POST("/api/notification-routes/stats/reset", s.handleResetNotificationRouteStats)
 		}
 		notificationRouteWrites := auth.Group("/")
 		notificationRouteWrites.Use(middleware.RequirePermission(db.PermSettingsWrite))

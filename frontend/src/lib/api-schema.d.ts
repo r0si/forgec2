@@ -10202,6 +10202,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/notification-routes/stats/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Clear the delivery counters
+         * @description The counters are an operational indicator, so they must be clearable: a route that failed for a week and was then fixed keeps a red "failing" state forever otherwise, and an indicator that can only get worse is one operators learn to ignore. Clearing one route (`?id=7`) leaves the rest alone; omitting `id` clears every counter. An unknown route is a 404 rather than a silent no-op, because "the badge was reset" and "the id was a typo" must not look the same. Both forms are audited as `notification_stats_reset` - "the failures disappeared" is exactly the change someone will want explained later.
+         */
+        post: operations["resetNotificationRouteStats"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/notification-routes/preview": {
         parameters: {
             query?: never;
@@ -26189,6 +26209,51 @@ export interface operations {
         responses: {
             /** @description View deleted */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    resetNotificationRouteStats: {
+        parameters: {
+            query?: {
+                /** @description Route to clear; omit to clear every counter */
+                id?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description How many counters were removed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        data?: {
+                            cleared?: number;
+                            /** @enum {string} */
+                            scope?: "route" | "all";
+                            route_id?: number;
+                        };
+                    };
+                };
+            };
+            /** @description The id is not a number */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such route */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

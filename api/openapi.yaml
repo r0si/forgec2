@@ -12055,6 +12055,41 @@ paths:
         - {name: id, in: path, required: true, schema: {type: integer}}
       responses:
         '200': {description: View deleted}
+  /api/notification-routes/stats/reset:
+    post:
+      tags: [Notifications]
+      summary: Clear the delivery counters
+      description: >-
+        The counters are an operational indicator, so they must be clearable: a route that failed for a week and was then
+        fixed keeps a red "failing" state forever otherwise, and an indicator that can only get worse is one operators
+        learn to ignore. Clearing one route (`?id=7`) leaves the rest alone; omitting `id` clears every counter. An
+        unknown route is a 404 rather than a silent no-op, because "the badge was reset" and "the id was a typo" must not
+        look the same. Both forms are audited as `notification_stats_reset` - "the failures disappeared" is exactly the
+        change someone will want explained later.
+      operationId: resetNotificationRouteStats
+      security: [{SessionCookie: []}]
+      parameters:
+        - name: id
+          in: query
+          description: Route to clear; omit to clear every counter
+          schema: {type: integer}
+      responses:
+        '200':
+          description: How many counters were removed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  data:
+                    type: object
+                    properties:
+                      cleared: {type: integer}
+                      scope: {type: string, enum: [route, all]}
+                      route_id: {type: integer}
+        '400': {description: The id is not a number}
+        '404': {description: No such route}
   /api/notification-routes/preview:
     post:
       tags: [Notifications]
