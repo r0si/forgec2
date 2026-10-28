@@ -228,6 +228,11 @@ func (s *Server) handleExportAuditChain(c *gin.Context) {
 		respondError(c, http.StatusServiceUnavailable, "database is not initialized")
 		return
 	}
+	format := strings.ToLower(strings.TrimSpace(c.DefaultQuery("format", "ndjson")))
+	if format != "ndjson" && format != "json" {
+		respondError(c, http.StatusBadRequest, `invalid format (expected "ndjson" or "json")`)
+		return
+	}
 	limit := atoiDefault(c.Query("limit"), 50000)
 	if limit <= 0 || limit > 200000 {
 		limit = 50000
@@ -303,7 +308,9 @@ func (s *Server) handleExportAuditChain(c *gin.Context) {
 	// Revalidation, not caching: an investigator who re-fetches the same export should get 304 instead
 	// of another few megabytes. The tag is derived from the newest audit id, which every append bumps -
 	// including the audit_purge marker a purge writes - so it changes whenever the export could have.
-	etag := s.auditExportETag(c, sinceID, limit, filtered)
+	// The format is part of the tag: the NDJSON and the JSON document of the same rows are different
+	// documents, so a client that revalidated one must not be told 304 for the other.
+	etag := s.auditExportETag(c, sinceID, limit, filtered, format)
 	c.Header("ETag", etag)
 	c.Header("Cache-Control", "private, no-cache")
 	if ifNoneMatch(c, etag) {
@@ -356,6 +363,31 @@ func (s *Server) handleExportAuditChain(c *gin.Context) {
 		c.Header("Warning", `199 - "filtered export: rows are a selection, not a contiguous hash chain; verify the unfiltered export"`)
 	} else {
 		c.Header("X-Audit-Export-Filtered", "false")
+	}
+	if format == "json" {
+		// One document instead of newline-delimited rows, for tools that do not stream. The rows are the SAME
+		// objects, with both hashes: projection is deliberately not offered here, because a verifier needs every
+		// field the entry hash covers and a projected export would look verifiable while being unverifiable.
+		payload := make([]auditChainExportRow, 0, len(rows))
+		for i := range rows {
+			payload = append(payload, auditChainExportRow{
+				ID: rows[i].ID, TenantID: rows[i].TenantID, User: rows[i].User,
+				Action: rows[i].Action, Resource: rows[i].Resource, AgentID: rows[i].AgentID,
+				IP: rows[i].IP, Success: rows[i].Success, Error: rows[i].Error,
+				Details: rows[i].Details, PrevHash: rows[i].PrevHash, EntryHash: rows[i].EntryHash,
+				CreatedAt: rows[i].CreatedAt.UTC().Format(time.RFC3339Nano),
+			})
+		}
+		name = strings.TrimSuffix(name, ".ndjson") + ".json"
+		c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, name))
+		c.JSON(http.StatusOK, gin.H{
+			"count":     len(payload),
+			"truncated": len(rows) >= limit || byteLimited,
+			"filtered":  filtered,
+			"format":    "json",
+			"rows":      payload,
+		})
+		return
 	}
 	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, name))
 	c.Data(http.StatusOK, "application/x-ndjson; charset=utf-8", buf.Bytes())

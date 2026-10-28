@@ -18,7 +18,7 @@ import (
 //
 // Weak on purpose: two responses sharing a tag are equivalent for the investigator, not necessarily
 // byte-identical.
-func (s *Server) auditExportETag(c *gin.Context, sinceID uint, limit int, filtered bool) string {
+func (s *Server) auditExportETag(c *gin.Context, sinceID uint, limit int, filtered bool, format string) string {
 	var newest uint
 	// A failure here must not fail the export: an empty max just makes the tag conservative.
 	if err := s.auditTenantScope(s.db.Model(&db.AuditLog{}), c).
@@ -36,5 +36,6 @@ func (s *Server) auditExportETag(c *gin.Context, sinceID uint, limit int, filter
 			c.Query("user"), c.Query("action"), c.Query("agent_id"), c.Query("since"), c.Query("until"),
 		}, ","))
 	}
+	parts = append(parts, "fmt="+format)
 	return weakETag(strings.Join(parts, "-"))
 }

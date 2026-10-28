@@ -13621,6 +13621,8 @@ export interface operations {
                 since?: string;
                 /** @description Upper time bound, same spellings as since; must not precede it */
                 until?: string;
+                /** @description ndjson (default) streams one row per line; json returns a single document with count, truncated, filtered and rows. Both carry the same row objects, with both hashes and every hashed field - **projection is deliberately not offered here**, because a verifier needs all of them and a projected export would look verifiable while being unverifiable. The format is part of the ETag. */
+                format?: "ndjson" | "json";
             };
             header?: never;
             path?: never;
