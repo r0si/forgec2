@@ -180,6 +180,17 @@ func (s *Server) handleExportCapabilities(c *gin.Context) {
 					"reason codes are first-match and unmatched errors are collected as 'other' with an example",
 					"a 5000-row sample reports truncated: true rather than implying a complete picture",
 				},
+			},
+			{
+				"path":         "/api/stats/failures/signatures",
+				"method":       "GET",
+				"answers":      "what SHAPE of failure dominates, across tasks and notifications",
+				"body":         []string{},
+				"side_effects": false,
+				"notes": []string{
+					"one row per normalised shape (paths, ids and digits collapsed), so four 401s read as one problem",
+					"task signatures come from the window; notification signatures come from counters since process start",
+				},
 			}, {
 				// The one entry in this list that DOES something outside: it sends a real message. A client that offers a
 				// "run all diagnostics" button must not include it, which is why `side_effects` is stated on every entry
