@@ -666,6 +666,12 @@ func New(cfg *config.Config, database *gorm.DB) *Server { // config-lock: constr
 		slog.Warn("security.require_approval is OFF: dangerous tasks (dcsync, lateral, persistence, …) execute without a second operator's approval")
 	}
 
+	// Handover bundles are unsigned unless a key is configured. That is not an error (an unsigned bundle still carries
+	// per-member digests), but it must not be a surprise discovered by unzipping one after an exercise has ended.
+	if message, ok := bundleSigningStartupNotice(); ok {
+		slog.Warn(message)
+	}
+
 	// TLS fingerprint randomization (JARM/JA3)
 	s.initTLSFingerprint()
 
@@ -1053,4 +1059,17 @@ func (s *Server) applyPluginTrust() error {
 	}
 	s.pluginManager.SetTrust(nil, false)
 	return nil
+}
+
+// bundleSigningStartupNotice explains, at startup, whether handover bundles will be signed.
+//
+// The decision behind it: an unsigned bundle is a legitimate configuration - the per-member digests still detect damage -
+// but "the handovers we produced this exercise cannot be proven to come from us" is something an operator should learn
+// at boot, not after delivering one. Returning the message instead of logging it directly keeps the decision testable.
+func bundleSigningStartupNotice() (string, bool) {
+	if bundleSigner() != nil {
+		return "", false
+	}
+	return "engagement bundles will be UNSIGNED: set " + bundleSigningKeyEnv +
+		" (hex 32-byte Ed25519 seed) to sign handovers, or accept that a delivered bundle proves integrity but not origin", true
 }

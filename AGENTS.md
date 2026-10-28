@@ -376,6 +376,24 @@ Plugins (command/hook/report; interpreters python, python3, powershell, pwsh, ba
 - Contract reference for humans and agents: `docs/PLUGIN_AUTHORING.md` + `docs/schemas/plugin-manifest.schema.json`; tier guarantees/quotas: `docs/PLUGIN_TIERS.md`; WASM ABI v1 sample: `examples/wasm/hello-report`.
 - Never hand-edit `digest`/`signature`: stamp with `PLUGIN_SIGNING_KEY=<seed> go run ./cmd/sign-plugin <dir>` (`-gen` to create a key). Native tiers run as real child processes; only `wasm` is sandboxed.
 
+## Engagement handover bundles
+
+`GET /api/engagements/{id}/bundle` assembles one zip for delivery: `summary.md`, `timeline.md`, `tasks.csv`,
+`audit.ndjson`, `agents.json`, `credentials.json`, `iocs.json`, `plugins.json` and `MANIFEST.json`.
+
+- **`?include=`** selects members. `MANIFEST.json` is not selectable: it is generated from whatever was written, so
+  "everything except the manifest" would produce a package nobody can check.
+- **`credentials.json` is metadata only** - a bundle leaves the console, so passwords and hashes stay behind, in the
+  system that audits their use.
+- **`MANIFEST.json` publishes a SHA-256 per member**, captured by the hashing writer as the bytes enter the archive, so
+  a receiver can prove the files survived transit. It is generated from the members actually written, and it lists itself.
+- **Signing is opt-in:** `FORGEC2_BUNDLE_SIGNING_KEY` (hex 32-byte Ed25519 seed) signs a NUL-joined canonical payload.
+  Without it bundles are unsigned, the startup log says so, and `/api/exports/capabilities` reports it.
+- **`signature.valid` is not `trusted`.** A public key carried inside the archive proves nothing about origin: swap
+  the manifest and the key together and every digest still matches. `POST /api/engagements/{id}/bundle/verify` takes
+  `?public_key=` and only then reports `trusted`. Do not collapse the two - that would be a false comfort.
+- An empty member publishes the digest of the **empty file**, so "empty" and "unverifiable" stay distinguishable.
+
 ## AI plugin authoring
 
 The assistant can own a plugin end to end, and the four tools are the whole surface:
