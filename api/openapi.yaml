@@ -3484,6 +3484,24 @@ paths:
                       audit_export: {$ref: '#/components/schemas/ExportCapabilities'}
                       task_output_download: {$ref: '#/components/schemas/ExportCapabilities'}
                       plugins_index: {$ref: '#/components/schemas/ExportCapabilities'}
+                      engagement_bundle:
+                        type: object
+                        description: The handover archive; signing state is reported so an operator need not produce one to find out.
+                        properties:
+                          path: {type: string}
+                          verify_path: {type: string}
+                          members:
+                            type: array
+                            items: {type: string}
+                          signed: {type: boolean}
+                          signature_algorithm: {type: string}
+                          public_key: {type: string, description: Empty when unsigned; hand it to the receiver for verification}
+                          headers:
+                            type: array
+                            items: {type: string}
+                          notes:
+                            type: array
+                            items: {type: string}
                       limits:
                         type: object
                         properties:

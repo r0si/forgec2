@@ -14914,6 +14914,18 @@ export interface operations {
                             audit_export?: components["schemas"]["ExportCapabilities"];
                             task_output_download?: components["schemas"]["ExportCapabilities"];
                             plugins_index?: components["schemas"]["ExportCapabilities"];
+                            /** @description The handover archive; signing state is reported so an operator need not produce one to find out. */
+                            engagement_bundle?: {
+                                path?: string;
+                                verify_path?: string;
+                                members?: string[];
+                                signed?: boolean;
+                                signature_algorithm?: string;
+                                /** @description Empty when unsigned; hand it to the receiver for verification */
+                                public_key?: string;
+                                headers?: string[];
+                                notes?: string[];
+                            };
                             limits?: {
                                 task_export_rows?: number;
                                 audit_export_rows?: number;

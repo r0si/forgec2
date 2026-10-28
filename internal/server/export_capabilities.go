@@ -1,6 +1,9 @@
 package server
 
 import (
+	"crypto/ed25519"
+	"encoding/hex"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -97,6 +100,27 @@ func (s *Server) handleExportCapabilities(c *gin.Context) {
 				"POST /api/plugins/index/verify compares an uploaded index against the installation",
 			},
 		},
+		"engagement_bundle": gin.H{
+			"path":        "/api/engagements/:id/bundle",
+			"formats":     []string{"application/zip"},
+			"parameters":  []string{"id", "include"},
+			"members":     bundleMemberNames,
+			"verify_path": "/api/engagements/:id/bundle/verify",
+			// Whether a bundle will be signed is an operational fact an operator should not have to discover by
+			// producing one: without a key every handover is unsigned, and nothing in the console said so.
+			"signed":              bundleSigner() != nil,
+			"signature_algorithm": bundleSignatureAlgorithm(),
+			"public_key":          bundlePublicKeyHex(),
+			"headers": []string{
+				"X-Bundle-SHA256", "X-Bundle-Members", "X-Bundle-Signed",
+				"X-Bundle-Signature-Algorithm", "X-Bundle-Public-Key", "Content-Disposition",
+			},
+			"notes": []string{
+				"MANIFEST.json always travels and is not selectable: without it the archive cannot be verified",
+				"a bundle over the size cap is refused with 413 rather than truncated",
+				"signing needs FORGEC2_BUNDLE_SIGNING_KEY (hex 32-byte Ed25519 seed); unsigned is honest, not silent",
+			},
+		},
 		"limits": gin.H{
 			"task_export_rows":   ExportTaskLimit,
 			"audit_export_rows":  200000,
@@ -104,4 +128,24 @@ func (s *Server) handleExportCapabilities(c *gin.Context) {
 			"stats_sample_rows":  taskDurationSampleLimit,
 		},
 	})
+}
+
+// bundleSignatureAlgorithm names the algorithm a signed bundle uses, empty when the deployment cannot sign.
+func bundleSignatureAlgorithm() string {
+	if bundleSigner() == nil {
+		return ""
+	}
+	return "ed25519"
+}
+
+// bundlePublicKeyHex reports the key a receiver should compare against, empty when unsigned.
+//
+// Publishing it here is not a trust decision: it lets an operator hand the expected key to whoever receives the bundle,
+// which is exactly what the verify endpoint needs to turn "internally consistent" into "trusted".
+func bundlePublicKeyHex() string {
+	key := bundleSigner()
+	if key == nil {
+		return ""
+	}
+	return hex.EncodeToString(key.Public().(ed25519.PublicKey))
 }

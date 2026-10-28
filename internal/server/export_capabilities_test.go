@@ -33,11 +33,20 @@ func TestExportCapabilities(t *testing.T) {
 	}
 	var resp struct {
 		Data struct {
-			TaskExport   exportCapabilities         `json:"task_export"`
-			AuditExport  exportCapabilities         `json:"audit_export"`
-			Output       exportCapabilities         `json:"task_output_download"`
-			PluginsIndex exportCapabilities         `json:"plugins_index"`
-			Limits       map[string]json.RawMessage `json:"limits"`
+			TaskExport   exportCapabilities `json:"task_export"`
+			AuditExport  exportCapabilities `json:"audit_export"`
+			Output       exportCapabilities `json:"task_output_download"`
+			PluginsIndex exportCapabilities `json:"plugins_index"`
+			Bundle       struct {
+				Path       string   `json:"path"`
+				Members    []string `json:"members"`
+				VerifyPath string   `json:"verify_path"`
+				Signed     bool     `json:"signed"`
+				Algorithm  string   `json:"signature_algorithm"`
+				PublicKey  string   `json:"public_key"`
+				Notes      []string `json:"notes"`
+			} `json:"engagement_bundle"`
+			Limits map[string]json.RawMessage `json:"limits"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
@@ -103,7 +112,54 @@ func TestExportCapabilities(t *testing.T) {
 		t.Fatal("the output download does not advertise range support")
 	}
 
-	// 7. Every entry names the path it describes, so the document is usable without guessing.
+	// 7. The bundle entry lists the members from the same slice the parser uses, and says whether a handover will be
+	// signed - an operational fact an operator should not have to discover by producing one.
+	if len(resp.Data.Bundle.Members) != len(bundleMemberNames) {
+		t.Fatalf("bundle members = %v, want %v", resp.Data.Bundle.Members, bundleMemberNames)
+	}
+	for i, name := range bundleMemberNames {
+		if resp.Data.Bundle.Members[i] != name {
+			t.Fatalf("bundle member %d = %q, want %q", i, resp.Data.Bundle.Members[i], name)
+		}
+	}
+	if resp.Data.Bundle.VerifyPath != "/api/engagements/:id/bundle/verify" {
+		t.Fatalf("verify_path = %q", resp.Data.Bundle.VerifyPath)
+	}
+	if resp.Data.Bundle.Signed || resp.Data.Bundle.PublicKey != "" || resp.Data.Bundle.Algorithm != "" {
+		t.Fatalf("an unconfigured deployment advertised signing: %+v", resp.Data.Bundle)
+	}
+	if len(resp.Data.Bundle.Notes) == 0 {
+		t.Fatal("the bundle entry documents no constraints")
+	}
+
+	// 8. With a key configured the same entry reports it, so an operator can hand the expected key to the receiver.
+	seed := "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60"
+	t.Setenv(bundleSigningKeyEnv, seed)
+	w2 := httptest.NewRecorder()
+	c2, _ := gin.CreateTestContext(w2)
+	c2.Request = httptest.NewRequest(http.MethodGet, "/api/exports/capabilities", nil)
+	c2.Set("user", "op")
+	c2.Set("user_role", db.RoleAdmin)
+	c2.Set("user_id", uint(1))
+	c2.Set(middleware.TenantIDContextKey, uint(1))
+	s.handleExportCapabilities(c2)
+	var signed struct {
+		Data struct {
+			Bundle struct {
+				Signed    bool   `json:"signed"`
+				Algorithm string `json:"signature_algorithm"`
+				PublicKey string `json:"public_key"`
+			} `json:"engagement_bundle"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w2.Body.Bytes(), &signed); err != nil {
+		t.Fatalf("decode signed capabilities: %v", err)
+	}
+	if !signed.Data.Bundle.Signed || signed.Data.Bundle.Algorithm != "ed25519" || signed.Data.Bundle.PublicKey == "" {
+		t.Fatalf("a configured signing key was not reported: %+v", signed.Data.Bundle)
+	}
+
+	// 9. Every entry names the path it describes, so the document is usable without guessing.
 	for name, entry := range map[string]exportCapabilities{
 		"task_export": resp.Data.TaskExport, "audit_export": resp.Data.AuditExport,
 		"task_output_download": resp.Data.Output, "plugins_index": resp.Data.PluginsIndex,
