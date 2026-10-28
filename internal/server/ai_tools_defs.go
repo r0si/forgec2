@@ -535,6 +535,35 @@ func (s *Server) buildTools() []toolDef {
 		{
 			Type: "function",
 			Function: toolFuncDef{
+				Name:        "update_plugin",
+				Description: "Rewrite the entry file of a plugin YOU wrote (author forgec2-ai), bumping its patch version. Use it to iterate after run_plugin shows a problem; a plugin the assistant did not author is refused, because the operator edits those. The plugin is re-registered but NOT executed - call run_plugin to check the new behaviour.",
+				Parameters: map[string]interface{}{
+					"type": "object",
+					"properties": map[string]interface{}{
+						"name": map[string]string{
+							"type":        "string",
+							"description": "Plugin name to update",
+						},
+						"code": map[string]string{
+							"type":        "string",
+							"description": "New entry file contents (max 64 KiB). Read JSON from stdin, print one JSON object to stdout.",
+						},
+						"description": map[string]string{
+							"type":        "string",
+							"description": "Optional: new one-line description for the plugin list",
+						},
+						"version": map[string]string{
+							"type":        "string",
+							"description": "Optional: explicit version; defaults to a patch bump",
+						},
+					},
+					"required": []string{"name", "code"},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: toolFuncDef{
 				Name:        "get_screenshot_summary",
 				Description: "Summarize screenshot captures within a look-back window: total count, per-agent breakdown, latest captures. Read-only analysis of collection activity.",
 				Parameters: map[string]interface{}{
@@ -830,6 +859,10 @@ authorize:
 	// quotas and timeout apply.
 	if name == "run_plugin" {
 		return s.aiRunPluginTool(reqCtx, normalizedArgs)
+	}
+	// Rewrites an assistant-authored package in place; a plugin it did not write is refused.
+	if name == "update_plugin" {
+		return s.aiUpdatePluginTool(reqCtx, normalizedArgs)
 	}
 	return s.executeToolSwitchCtx(reqCtx, name, normalizedArgs)
 }

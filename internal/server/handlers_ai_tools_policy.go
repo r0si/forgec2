@@ -60,7 +60,10 @@ var aiToolPolicies = map[string]aiToolPolicy{
 	"create_plugin": {Risk: aiToolRiskWrite, Permission: db.PermPluginsWrite, GlobalOnly: true},
 	// Running one needs its own permission: authoring code and executing code are different powers, so
 	// `plugins.execute` can be granted without `plugins.write` and vice versa.
-	"run_plugin":      {Risk: aiToolRiskWrite, Permission: db.PermPluginsExecute, GlobalOnly: true},
+	"run_plugin": {Risk: aiToolRiskWrite, Permission: db.PermPluginsExecute, GlobalOnly: true},
+	// Iterating on a plugin the assistant wrote. Same permission as authoring it, plus the tool refuses
+	// any package whose author is not the assistant.
+	"update_plugin":   {Risk: aiToolRiskWrite, Permission: db.PermPluginsWrite, GlobalOnly: true},
 	"create_listener": {Risk: aiToolRiskWrite, Permission: db.PermListenersWrite, GlobalOnly: true},
 	"update_listener": {Risk: aiToolRiskWrite, Permission: db.PermListenersWrite, GlobalOnly: true},
 	"delete_listener": {Risk: aiToolRiskDestructive, Permission: db.PermListenersDelete, GlobalOnly: true},
