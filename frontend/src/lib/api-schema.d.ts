@@ -1850,6 +1850,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/plugins/index/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Compare an index document against what is installed
+         * @description Installs nothing and fetches nothing: the uploaded index is compared with the installation and the difference is reported as `missing` (in the index, not installed), `extra` (installed, not in the index), `changed` (a package digest or version differs) and `unverifiable` (the index entry carries no digest, so nothing can be proven). `in_sync` is true only when every entry was CHECKED and matched - an unverifiable entry makes it false rather than granting a false all-clear. Every comparison is audited with its counts.
+         */
+        post: operations["verifyPluginIndex"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/plugins": {
         parameters: {
             query?: never;
@@ -11349,6 +11369,16 @@ export interface components {
             /** Format: date-time */
             updated_at?: string;
         };
+        /** @description One difference between an index document and the installation. */
+        PluginIndexDifference: {
+            name?: string;
+            /** @description What the installation has (digest or version), when it has something */
+            installed?: string;
+            /** @description What the index asked for (digest or version), when it asks for something */
+            expected?: string;
+            /** @description Why this difference was reported */
+            reason?: string;
+        };
         Plugin: {
             id?: number;
             name?: string;
@@ -14257,6 +14287,54 @@ export interface operations {
                         };
                     };
                 };
+            };
+        };
+    };
+    verifyPluginIndex: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    plugins: {
+                        name: string;
+                        version?: string;
+                        /** @description sha256 digest as exported by GET /api/plugins/index */
+                        digest?: string;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description Difference report (missing / extra / changed / unverifiable) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        data?: {
+                            in_sync?: boolean;
+                            checked?: number;
+                            missing?: components["schemas"]["PluginIndexDifference"][];
+                            extra?: components["schemas"]["PluginIndexDifference"][];
+                            changed?: components["schemas"]["PluginIndexDifference"][];
+                            unverifiable?: components["schemas"]["PluginIndexDifference"][];
+                        };
+                    };
+                };
+            };
+            /** @description Empty, malformed or oversized index document */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

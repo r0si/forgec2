@@ -90,6 +90,9 @@ func (s *Server) registerPluginRoutes(auth *gin.RouterGroup) {
 	pluginsWrite := auth.Group("/api/plugins")
 	pluginsWrite.Use(middleware.RequirePermission(db.PermPluginsWrite))
 	pluginsWrite.POST("", s.handlePluginCreate)
+	// Comparing an upload against the installation installs nothing: it needs no trust decision. It sits
+	// on the write group only because it takes a request body, not because it changes state.
+	pluginsWrite.POST("/index/verify", s.handlePluginIndexVerify)
 	pluginsWrite.POST("/check-updates", s.handlePluginCheckUpdates)
 	pluginsWrite.POST("/import", s.handlePluginImport)
 	pluginsWrite.POST("/:id/reviews", s.handlePluginAddReview)

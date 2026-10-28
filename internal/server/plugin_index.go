@@ -1,6 +1,7 @@
 package server
 
 import (
+	"log/slog"
 	"sort"
 	"strings"
 
@@ -46,12 +47,17 @@ type pluginIndexEntry struct {
 	Loaded bool `json:"loaded"`
 }
 
-// handlePluginIndex answers the installed set as an index document.
-func (s *Server) handlePluginIndex(c *gin.Context) {
+// buildPluginIndex computes the installed set. It is shared with the verify path so the digest is
+// computed the same way in both directions.
+//
+// A database failure returns an empty set rather than responding here: the caller decides. The export
+// handler turns it into a 5xx, and the verify path (which must not answer "in sync" on a read failure)
+// checks the count first.
+func (s *Server) buildPluginIndex(c *gin.Context) []pluginIndexEntry {
 	var records []db.Plugin
 	if err := s.db.WithContext(s.ctx).Order("name asc").Find(&records).Error; err != nil {
-		handleQueryError(c, err, "Failed to list plugins for the index")
-		return
+		slog.Error("Failed to list plugins for the index", "err", err)
+		return nil
 	}
 
 	entries := make([]pluginIndexEntry, 0, len(records))
@@ -91,6 +97,12 @@ func (s *Server) handlePluginIndex(c *gin.Context) {
 	// Deterministic order: an index that shuffles cannot be diffed between deployments.
 	sort.SliceStable(entries, func(i, j int) bool { return entries[i].Name < entries[j].Name })
 
+	return entries
+}
+
+// handlePluginIndex answers the installed set as an index document.
+func (s *Server) handlePluginIndex(c *gin.Context) {
+	entries := s.buildPluginIndex(c)
 	respond(c, gin.H{
 		"count":   len(entries),
 		"plugins": entries,

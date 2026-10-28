@@ -3141,6 +3141,68 @@ paths:
                               description: '"sha256:..." computed by plugin.PackageDigest; empty when the package is missing'
                             signed: {type: boolean}
                             loaded: {type: boolean}
+  /api/plugins/index/verify:
+    post:
+      tags: [Plugins]
+      summary: Compare an index document against what is installed
+      description: >-
+        Installs nothing and fetches nothing: the uploaded index is compared with the installation and
+        the difference is reported as `missing` (in the index, not installed), `extra` (installed, not
+        in the index), `changed` (a package digest or version differs) and `unverifiable` (the index
+        entry carries no digest, so nothing can be proven). `in_sync` is true only when every entry was
+        CHECKED and matched - an unverifiable entry makes it false rather than granting a false
+        all-clear. Every comparison is audited with its counts.
+      operationId: verifyPluginIndex
+      security:
+        - SessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [plugins]
+              properties:
+                plugins:
+                  type: array
+                  maxItems: 2000
+                  items:
+                    type: object
+                    required: [name]
+                    properties:
+                      name: {type: string}
+                      version: {type: string}
+                      digest:
+                        type: string
+                        description: sha256 digest as exported by GET /api/plugins/index
+      responses:
+        '200':
+          description: Difference report (missing / extra / changed / unverifiable)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  data:
+                    type: object
+                    properties:
+                      in_sync: {type: boolean}
+                      checked: {type: integer}
+                      missing:
+                        type: array
+                        items: {$ref: '#/components/schemas/PluginIndexDifference'}
+                      extra:
+                        type: array
+                        items: {$ref: '#/components/schemas/PluginIndexDifference'}
+                      changed:
+                        type: array
+                        items: {$ref: '#/components/schemas/PluginIndexDifference'}
+                      unverifiable:
+                        type: array
+                        items: {$ref: '#/components/schemas/PluginIndexDifference'}
+        '400':
+          description: Empty, malformed or oversized index document
   /api/plugins:
     get:
       tags: [Plugins]
@@ -12933,6 +12995,20 @@ components:
           type: string
           format: date-time
 
+    PluginIndexDifference:
+      type: object
+      description: One difference between an index document and the installation.
+      properties:
+        name: {type: string}
+        installed:
+          type: string
+          description: What the installation has (digest or version), when it has something
+        expected:
+          type: string
+          description: What the index asked for (digest or version), when it asks for something
+        reason:
+          type: string
+          description: Why this difference was reported
     Plugin:
       type: object
       properties:
