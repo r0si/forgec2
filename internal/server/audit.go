@@ -259,21 +259,16 @@ func (s *Server) handleExportAuditChain(c *gin.Context) {
 		query = query.Where("agent_id = ?", agentID)
 		filtered = true
 	}
+	// The same parser the task export uses, so "since 24h" cannot mean two different things depending on
+	// which export an investigator opened.
 	if rawSince := strings.TrimSpace(c.Query("since")); rawSince != "" {
-		window, ok := parseStatsWindow(rawSince)
+		at, ok := parseTimeBound(rawSince, time.Now())
 		if !ok {
-			// An RFC3339 timestamp is the other useful form for an investigation.
-			if at, err := time.Parse(time.RFC3339, rawSince); err == nil {
-				query = query.Where("created_at >= ?", comparableLocalTime(at))
-				filtered = true
-			} else {
-				respondError(c, http.StatusBadRequest, "invalid since (expected e.g. 24h, 7d or an RFC3339 timestamp)")
-				return
-			}
-		} else {
-			query = query.Where("created_at >= ?", time.Now().Add(-window))
-			filtered = true
+			respondError(c, http.StatusBadRequest, formatTimeBoundError("since"))
+			return
 		}
+		query = query.Where("created_at >= ?", comparableLocalTime(at))
+		filtered = true
 	}
 	var rows []db.AuditLog
 	if err := query.Order("id ASC").Limit(limit).Find(&rows).Error; err != nil {

@@ -1279,7 +1279,7 @@ export interface paths {
         };
         /**
          * Export tasks
-         * @description Export task history as CSV
+         * @description Export task history as CSV, optionally bounded by time, engagement and a row limit. `since`/`until` accept the dashboard relative form (`24h`, `7d`) or an RFC3339 instant, from the same parser the audit export uses, so "since 24h" cannot mean two different things depending on which export is open. A relative bound is measured backwards from now. `engagement=<id>` selects one exercise and `engagement=none` the tasks of agents that belong to none. Responses carry `X-Task-Export-Truncated` and support `If-None-Match`, so a re-fetch of an unchanged window is a bodiless 304.
          */
         get: operations["exportTasks"];
         put?: never;
@@ -13692,7 +13692,16 @@ export interface operations {
     };
     exportTasks: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Maximum rows (default and cap ExportTaskLimit) */
+                limit?: number;
+                /** @description Lower time bound, e.g. 24h, 7d or RFC3339 */
+                since?: string;
+                /** @description Upper time bound, same spellings as since */
+                until?: string;
+                /** @description Engagement id, or "none" for agents in no exercise */
+                engagement?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -13707,6 +13716,20 @@ export interface operations {
                 content: {
                     "text/csv": string;
                 };
+            };
+            /** @description The caller already holds this export (If-None-Match matched) */
+            304: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid since/until, since after until, or an invalid engagement value */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

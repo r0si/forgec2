@@ -147,6 +147,17 @@ func (s *Server) handleExportTasks(c *gin.Context) {
 		respondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
+	// Time bounds share their parser with the audit export, so "since 24h" means the same thing in both.
+	now := time.Now()
+	sinceBound, hasSince, untilBound, hasUntil, boundErr := parseExportTimeBounds(c, now)
+	if boundErr != "" {
+		respondError(c, http.StatusBadRequest, boundErr)
+		return
+	}
+	if hasSince && hasUntil && sinceBound.After(untilBound) {
+		respondError(c, http.StatusBadRequest, "since must not be after until")
+		return
+	}
 	// Revalidation before the query: a client that already holds this export gets a bodiless 304 and
 	// costs neither side the read.
 	exportETag := s.taskExportETag(c, limit)
@@ -167,6 +178,12 @@ func (s *Server) handleExportTasks(c *gin.Context) {
 		Select("tasks.id, tasks.agent_id, tasks.type, tasks.command, tasks.result, tasks.error, tasks.status, tasks.created_at").
 		Where("type NOT IN ?", []string{"screen_stream_start", "screen_stream_stop", "ls"})
 	query = s.tenantScope(query, c)
+	if hasSince {
+		query = query.Where("created_at >= ?", comparableLocalTime(sinceBound))
+	}
+	if hasUntil {
+		query = query.Where("created_at <= ?", comparableLocalTime(untilBound))
+	}
 	// Same semantics as the agent list (round 25): a numeric id selects that exercise, "none" selects the
 	// agents that belong to no exercise. Expressed as a subquery so the export stays one statement and the
 	// tenant scope on the agents is explicit.
@@ -320,4 +337,26 @@ func (s *Server) engagementNamesForTasks(c *gin.Context, tasks []db.Task) map[st
 		}
 	}
 	return out
+}
+
+// parseExportTimeBounds reads the optional since/until pair shared by the exports. The returned error string is
+// empty when both parsed.
+func parseExportTimeBounds(c *gin.Context, now time.Time) (since time.Time, hasSince bool, until time.Time, hasUntil bool, errMsg string) {
+	rawSince := strings.TrimSpace(c.Query("since"))
+	if rawSince != "" {
+		parsed, ok := parseTimeBound(rawSince, now)
+		if !ok {
+			return time.Time{}, false, time.Time{}, false, formatTimeBoundError("since")
+		}
+		since, hasSince = parsed, true
+	}
+	rawUntil := strings.TrimSpace(c.Query("until"))
+	if rawUntil != "" {
+		parsed, ok := parseTimeBound(rawUntil, now)
+		if !ok {
+			return time.Time{}, false, time.Time{}, false, formatTimeBoundError("until")
+		}
+		until, hasUntil = parsed, true
+	}
+	return since, hasSince, until, hasUntil, ""
 }
