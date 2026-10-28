@@ -70,6 +70,16 @@ func (s *Server) handlePreviewAutomationRule(c *gin.Context) {
 	}
 	event.Data = flattenPreviewEventData(body.Data)
 
+	verdict := s.previewRuleVerdict(rule, event)
+	s.LogAuditRecord(c, "automation_preview", "automation", rule.ID,
+		fmt.Sprintf("previewed rule %q for event %q: would_run=%v", rule.Name, event.Type, verdict["would_run"]), true, nil)
+	respond(c, verdict)
+}
+
+// previewRuleVerdict evaluates one rule against an event and returns the explanation. It is the single
+// implementation shared by the single-rule and batch previews, so the two can never disagree about whether a
+// rule would fire.
+func (s *Server) previewRuleVerdict(rule AutomationRule, event Event) gin.H {
 	// Reasons are collected in the order they are checked, so the first entry is the one that decided.
 	var reasons []string
 	matched := true
@@ -136,10 +146,7 @@ func (s *Server) handlePreviewAutomationRule(c *gin.Context) {
 	}
 
 	wouldRun := matched && !cooldownOpen
-	s.LogAuditRecord(c, "automation_preview", "automation", rule.ID,
-		fmt.Sprintf("previewed rule %q for event %q: would_run=%v", rule.Name, event.Type, wouldRun), true, nil)
-
-	respond(c, gin.H{
+	return gin.H{
 		"rule_id":            rule.ID,
 		"rule_name":          rule.Name,
 		"would_run":          wouldRun,
@@ -149,7 +156,7 @@ func (s *Server) handlePreviewAutomationRule(c *gin.Context) {
 		"reasons":            reasonsOrEmpty(reasons),
 		"conditions":         results,
 		"actions":            actions,
-	})
+	}
 }
 
 // previewConditionValue resolves the value a condition compares against, for display.

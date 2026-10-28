@@ -1370,6 +1370,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/automation/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Which rules would fire for one event
+         * @description The other direction from the per-rule preview: given a synthetic event, report every rule of the caller's tenant that listens to it, whether it would fire, and if not why (`disabled`, `blocked_by_cooldown`, `blocked_by_conditions`). Rules for other event types are omitted rather than listed as "not firing", and rules of other tenants are never included. Uses the same cached snapshot and the same verdict function as the live event path, so a preview and a real evaluation cannot disagree. Executes nothing; every call is audited as `automation_preview_batch`.
+         */
+        post: operations["previewAutomationBatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/automation/rules": {
         parameters: {
             query?: never;
@@ -13748,6 +13768,69 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+        };
+    };
+    previewAutomationBatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description e.g. implant.checkin */
+                    event_type: string;
+                    agent_id?: string;
+                    agent_host?: string;
+                    agent_ip?: string;
+                    agent_os?: string;
+                    user?: string;
+                    data?: Record<string, never>;
+                };
+            };
+        };
+        responses: {
+            /** @description Summary counts plus one verdict per matching rule, firing rules first then by name */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        data?: {
+                            event_type?: string;
+                            summary?: {
+                                total?: number;
+                                would_run?: number;
+                                blocked_by_conditions?: number;
+                                blocked_by_cooldown?: number;
+                                disabled?: number;
+                            };
+                            rules?: {
+                                rule_id?: string;
+                                rule_name?: string;
+                                enabled?: boolean;
+                                would_run?: boolean;
+                                matched?: boolean;
+                                cooldown_open?: boolean;
+                                cooldown_remaining?: number;
+                                first_reason?: string;
+                                event_type?: string;
+                            }[];
+                        };
+                    };
+                };
+            };
+            /** @description Malformed body or missing event_type */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     listAutomationRules: {

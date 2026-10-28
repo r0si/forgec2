@@ -2392,6 +2392,72 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
+  /api/automation/preview:
+    post:
+      tags: [Automation]
+      summary: Which rules would fire for one event
+      description: >-
+        The other direction from the per-rule preview: given a synthetic event, report every rule of the
+        caller's tenant that listens to it, whether it would fire, and if not why (`disabled`,
+        `blocked_by_cooldown`, `blocked_by_conditions`). Rules for other event types are omitted rather than
+        listed as "not firing", and rules of other tenants are never included. Uses the same cached snapshot
+        and the same verdict function as the live event path, so a preview and a real evaluation cannot
+        disagree. Executes nothing; every call is audited as `automation_preview_batch`.
+      operationId: previewAutomationBatch
+      security:
+        - SessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [event_type]
+              properties:
+                event_type: {type: string, description: e.g. implant.checkin, task.complete}
+                agent_id: {type: string}
+                agent_host: {type: string}
+                agent_ip: {type: string}
+                agent_os: {type: string}
+                user: {type: string}
+                data: {type: object}
+      responses:
+        '200':
+          description: Summary counts plus one verdict per matching rule, firing rules first then by name
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  data:
+                    type: object
+                    properties:
+                      event_type: {type: string}
+                      summary:
+                        type: object
+                        properties:
+                          total: {type: integer}
+                          would_run: {type: integer}
+                          blocked_by_conditions: {type: integer}
+                          blocked_by_cooldown: {type: integer}
+                          disabled: {type: integer}
+                      rules:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            rule_id: {type: string}
+                            rule_name: {type: string}
+                            enabled: {type: boolean}
+                            would_run: {type: boolean}
+                            matched: {type: boolean}
+                            cooldown_open: {type: boolean}
+                            cooldown_remaining: {type: integer}
+                            first_reason: {type: string}
+                            event_type: {type: string}
+        '400':
+          description: Malformed body or missing event_type
   /api/automation/rules:
     get:
       tags: [Automation]

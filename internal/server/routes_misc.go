@@ -64,6 +64,8 @@ func (s *Server) registerAutomationRoutes(auth *gin.RouterGroup) {
 		autoWrite.POST("/api/automation/rules/:id/toggle", s.handleToggleAutomationRule)
 		// Dry run: evaluate one rule against a synthetic event and explain the verdict, executing nothing.
 		autoWrite.POST("/api/automation/rules/:id/preview", s.handlePreviewAutomationRule)
+		// The other direction: which rules would fire for one event.
+		autoWrite.POST("/api/automation/preview", s.handlePreviewAutomationBatch)
 		autoWrite.POST("/api/webhooks", s.handleCreateWebhook)
 		autoWrite.DELETE("/api/webhooks/:id", s.handleDeleteWebhook)
 		autoWrite.POST("/api/webhooks/test", s.handleTestWebhook)
