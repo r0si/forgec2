@@ -1,0 +1,84 @@
+package server
+
+import (
+	"encoding/json"
+	"errors"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/forgec2/forgec2/internal/db"
+	"github.com/forgec2/forgec2/internal/server/middleware"
+	"github.com/gin-gonic/gin"
+)
+
+// TestReadyReportsDeliveryAndActionHealth covers the two operational checks added to the readiness probe.
+//
+// The property under test is the one that makes a warning worth having: it fires when a route has NEVER delivered and a
+// rule's actions have NEVER landed, and stays quiet otherwise. A probe that warns on one failure after a hundred successes
+// is a probe an operator mutes, and a muted probe is worse than none.
+func TestReadyReportsDeliveryAndActionHealth(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	s := mustTenantServer(t)
+	resetNotificationStats()
+	resetRuleActionStats()
+	t.Cleanup(func() {
+		resetNotificationStats()
+		resetRuleActionStats()
+	})
+
+	ready := func() map[string]interface{} {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest(http.MethodGet, "/ready", nil)
+		c.Set("user", "op")
+		c.Set("user_role", db.RoleAdmin)
+		c.Set("user_id", uint(1))
+		c.Set(middleware.TenantIDContextKey, uint(1))
+		s.handleReadyCheck(c)
+		var resp map[string]interface{}
+		_ = json.Unmarshal(w.Body.Bytes(), &resp)
+		return resp
+	}
+
+	// 1. Nothing recorded: both checks are present and quiet.
+	payload := ready()
+	checks, _ := payload["checks"].(map[string]interface{})
+	if checks["notification_delivery"] == nil || checks["automation_actions"] == nil {
+		t.Fatalf("the readiness checks do not include delivery and action health: %v", checks)
+	}
+	if payload["warnings"] != nil {
+		t.Fatalf("a healthy server reported warnings: %v", payload["warnings"])
+	}
+
+	// 2. A route that has only failed, and a rule whose actions have only failed: warnings.
+	recordNotificationDelivery(11, errors.New("post: 500"))
+	recordRuleActionOutcome("rule-x", false, errors.New("run_command: no target agent"))
+	payload = ready()
+	warnings, _ := payload["warnings"].([]interface{})
+	if len(warnings) != 2 {
+		t.Fatalf("warnings = %v, want one for the route and one for the rule", warnings)
+	}
+	checks, _ = payload["checks"].(map[string]interface{})
+	if got, _ := checks["notification_delivery"].(string); got == "" || got == "ok (1 route(s) with recorded deliveries)" {
+		t.Fatalf("the delivery check did not report the failure: %q", got)
+	}
+
+	// 3. One failure among successes is a blip, not a warning.
+	resetNotificationStats()
+	resetRuleActionStats()
+	for i := 0; i < 5; i++ {
+		recordNotificationDelivery(11, nil)
+		recordRuleActionOutcome("rule-x", true, nil)
+	}
+	recordNotificationDelivery(11, errors.New("post: 500"))
+	recordRuleActionOutcome("rule-x", false, errors.New("run_command: no target agent"))
+	if payload := ready(); payload["warnings"] != nil {
+		t.Fatalf("a blip raised warnings: %v", payload["warnings"])
+	}
+
+	// 4. It stays READY: a failing route is an alarm about notifications, not about the process.
+	if status, _ := payload["status"].(string); status != "ok" {
+		t.Fatalf("a failing route made the server unready: %q", status)
+	}
+}

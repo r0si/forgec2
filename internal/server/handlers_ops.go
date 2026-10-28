@@ -80,6 +80,22 @@ func (s *Server) handleReadyCheck(c *gin.Context) {
 		}
 	}
 
+	// Delivery and action health are warnings, not readiness: a route nobody can reach does not make the process unready,
+	// but a monitor should be able to alert on it without scraping a UI. Both figures come from in-memory counters, so a
+	// frequent poll costs nothing.
+	if s != nil && s.db != nil {
+		failingRoutes := notificationRouteFailingCount()
+		checks["notification_delivery"] = deliverySummary(failingRoutes)
+		if failingRoutes > 0 {
+			warnings = append(warnings, fmt.Sprintf("%d notification route(s) are failing", failingRoutes))
+		}
+		failingRules := automationActionFailingCount()
+		checks["automation_actions"] = fmt.Sprintf("%d rule(s) whose actions never landed", failingRules)
+		if failingRules > 0 {
+			warnings = append(warnings, fmt.Sprintf("%d automation rule(s) are firing without their actions landing", failingRules))
+		}
+	}
+
 	status := "ok"
 	code := http.StatusOK
 	if !ready {
