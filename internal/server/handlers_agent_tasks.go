@@ -141,6 +141,12 @@ func (s *Server) handleExportTasks(c *gin.Context) {
 			limit = n
 		}
 	}
+	// The engagement filter must be validated BEFORE the ETag: an invalid value must answer 400, not be
+	// cached under a tag that ignores it.
+	if err := validateEngagementQuery(c.Query("engagement")); err != nil {
+		respondError(c, http.StatusBadRequest, err.Error())
+		return
+	}
 	// Revalidation before the query: a client that already holds this export gets a bodiless 304 and
 	// costs neither side the read.
 	exportETag := s.taskExportETag(c, limit)
@@ -161,6 +167,18 @@ func (s *Server) handleExportTasks(c *gin.Context) {
 		Select("tasks.id, tasks.agent_id, tasks.type, tasks.command, tasks.result, tasks.error, tasks.status, tasks.created_at").
 		Where("type NOT IN ?", []string{"screen_stream_start", "screen_stream_stop", "ls"})
 	query = s.tenantScope(query, c)
+	// Same semantics as the agent list (round 25): a numeric id selects that exercise, "none" selects the
+	// agents that belong to no exercise. Expressed as a subquery so the export stays one statement and the
+	// tenant scope on the agents is explicit.
+	if engagement := strings.TrimSpace(c.Query("engagement")); engagement != "" {
+		agentsInEngagement := s.tenantScope(s.db.WithContext(s.ctx).Model(&db.Implant{}).Select("id"), c)
+		if engagement == "none" {
+			agentsInEngagement = agentsInEngagement.Where("engagement_id IS NULL")
+		} else {
+			agentsInEngagement = agentsInEngagement.Where("engagement_id = ?", engagement)
+		}
+		query = query.Where("agent_id IN (?)", agentsInEngagement)
+	}
 	if err := query.Order("created_at desc").Limit(limit).Find(&tasks).Error; err != nil {
 		handleQueryError(c, err, "Failed to export tasks")
 		return
