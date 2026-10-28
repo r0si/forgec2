@@ -11669,6 +11669,64 @@ paths:
         - {name: id, in: path, required: true, schema: {type: integer}}
       responses:
         '200': {description: View deleted}
+  /api/notification-routes/preview:
+    post:
+      tags: [Notifications]
+      summary: Would a notification reach anyone
+      description: >-
+        Applies the sender's own rules to a candidate notification and reports each route's verdict, without
+        persisting or delivering anything. The failure it replaces is quiet in the worst way: notifications are
+        persisted first and fanned out in goroutines, so a route filtered out by severity, a disabled route and
+        a route with an unusable target all look identical from the console - a notification that exists and
+        reached nobody. Each route reports `would_deliver` plus the precise reason it would not (disabled,
+        severity below the route minimum, no bot token for Telegram, no or invalid target URL), and the summary
+        says how many of the configured routes would deliver - including zero, which is the case worth knowing
+        before a real beacon fails.
+      operationId: previewNotification
+      security:
+        - SessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: {type: string, description: What a route's message shows}
+                message: {type: string}
+                severity: {type: string, enum: [info, warning, critical], default: info}
+                type: {type: string}
+      responses:
+        '200':
+          description: One verdict per route plus delivery counts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  data:
+                    type: object
+                    properties:
+                      severity: {type: string}
+                      would_deliver: {type: integer}
+                      total_routes: {type: integer}
+                      no_route_at_all: {type: boolean, description: No routes are configured at all}
+                      routes:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id: {type: integer}
+                            name: {type: string}
+                            channel: {type: string}
+                            enabled: {type: boolean}
+                            min_severity: {type: string}
+                            would_deliver: {type: boolean}
+                            reason: {type: string}
+        '400':
+          description: Missing title, malformed body or unknown severity
   /api/notification-routes:
     get:
       tags: [Notifications]

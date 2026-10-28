@@ -10122,6 +10122,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/notification-routes/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Would a notification reach anyone
+         * @description Applies the sender's own rules to a candidate notification and reports each route's verdict, without persisting or delivering anything. The failure it replaces is quiet in the worst way: notifications are persisted first and fanned out in goroutines, so a route filtered out by severity, a disabled route and a route with an unusable target all look identical from the console - a notification that exists and reached nobody. Each route reports `would_deliver` plus the precise reason it would not (disabled, severity below the route minimum, no bot token for Telegram, no or invalid target URL), and the summary says how many of the configured routes would deliver - including zero, which is the case worth knowing before a real beacon fails.
+         */
+        post: operations["previewNotification"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/notification-routes": {
         parameters: {
             query?: never;
@@ -25779,6 +25799,65 @@ export interface operations {
         responses: {
             /** @description View deleted */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    previewNotification: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description What a route's message shows */
+                    title: string;
+                    message?: string;
+                    /**
+                     * @default info
+                     * @enum {string}
+                     */
+                    severity?: "info" | "warning" | "critical";
+                    type?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description One verdict per route plus delivery counts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        data?: {
+                            severity?: string;
+                            would_deliver?: number;
+                            total_routes?: number;
+                            /** @description No routes are configured at all */
+                            no_route_at_all?: boolean;
+                            routes?: {
+                                id?: number;
+                                name?: string;
+                                channel?: string;
+                                enabled?: boolean;
+                                min_severity?: string;
+                                would_deliver?: boolean;
+                                reason?: string;
+                            }[];
+                        };
+                    };
+                };
+            };
+            /** @description Missing title, malformed body or unknown severity */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };

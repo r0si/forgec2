@@ -44,6 +44,8 @@ func (s *Server) registerCampaignRoutes(auth *gin.RouterGroup) {
 		notificationRoutes.Use(middleware.RequirePermission(db.PermSettingsRead))
 		{
 			notificationRoutes.GET("/api/notification-routes", s.handleListNotificationRoutes)
+			// Dry run: would a candidate notification reach anyone. Read-only, so it sits with the read group.
+			notificationRoutes.POST("/api/notification-routes/preview", s.handlePreviewNotification)
 		}
 		notificationRouteWrites := auth.Group("/")
 		notificationRouteWrites.Use(middleware.RequirePermission(db.PermSettingsWrite))
