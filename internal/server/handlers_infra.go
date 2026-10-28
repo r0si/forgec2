@@ -53,6 +53,10 @@ func (s *Server) handleGenerateNginx(c *gin.Context) {
 		return
 	}
 	rc := toRedirectorConfig(req, "nginx")
+	if err := validateRedirectorConfig(rc); err != nil {
+		respondError(c, http.StatusBadRequest, err.Error())
+		return
+	}
 	config := infrastructure.GenerateNginxConfig(rc)
 	respond(c, gin.H{"config": config})
 }
@@ -64,6 +68,10 @@ func (s *Server) handleGenerateApache(c *gin.Context) {
 		return
 	}
 	rc := toRedirectorConfig(req, "apache")
+	if err := validateRedirectorConfig(rc); err != nil {
+		respondError(c, http.StatusBadRequest, err.Error())
+		return
+	}
 	config := infrastructure.GenerateApacheConfig(rc)
 	respond(c, gin.H{"config": config})
 }
@@ -75,6 +83,10 @@ func (s *Server) handleGenerateHAProxy(c *gin.Context) {
 		return
 	}
 	rc := toRedirectorConfig(req, "haproxy")
+	if err := validateRedirectorConfig(rc); err != nil {
+		respondError(c, http.StatusBadRequest, err.Error())
+		return
+	}
 	config := infrastructure.GenerateHAProxyConfig(rc)
 	respond(c, gin.H{"config": config})
 }
