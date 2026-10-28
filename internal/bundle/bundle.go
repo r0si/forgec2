@@ -48,10 +48,11 @@ type Manifest struct {
 		EndsAt    string `json:"ends_at"`
 		WindowEnd string `json:"window_end"`
 	} `json:"engagement"`
-	GeneratedAt string     `json:"generated_at"`
-	Signed      bool       `json:"signed"`
-	Signature   *Signature `json:"signature"`
-	Members     []Member   `json:"members"`
+	GeneratedAt   string     `json:"generated_at"`
+	ServerVersion string     `json:"server_version"`
+	Signed        bool       `json:"signed"`
+	Signature     *Signature `json:"signature"`
+	Members       []Member   `json:"members"`
 }
 
 // Payload builds the canonical string for a manifest assembled elsewhere. The server's manifest writer signs through
@@ -119,11 +120,13 @@ type Report struct {
 	SignatureNote string    `json:"signature_problem,omitempty"`
 	PublicKey     string    `json:"public_key,omitempty"`
 	// Trusted is only meaningful when the caller supplied the key they already trust.
-	Trusted       bool   `json:"trusted"`
-	TrustedNote   string `json:"trusted_problem,omitempty"`
-	EngagementID  uint   `json:"engagement_id"`
-	Engagement    string `json:"engagement_name"`
-	GeneratedAt   string `json:"generated_at"`
+	Trusted      bool   `json:"trusted"`
+	TrustedNote  string `json:"trusted_problem,omitempty"`
+	EngagementID uint   `json:"engagement_id"`
+	Engagement   string `json:"engagement_name"`
+	GeneratedAt  string `json:"generated_at"`
+	// ServerVersion is the release that produced the archive, empty for a package made before it was recorded.
+	ServerVersion string `json:"server_version,omitempty"`
 	ArchiveSHA256 string `json:"archive_sha256"`
 }
 
@@ -163,12 +166,13 @@ func Verify(raw []byte, trustedKey string) (*Report, error) {
 	}
 
 	report := &Report{
-		Mismatched:   []Problem{},
-		Unverifiable: []Problem{},
-		Extra:        []string{},
-		EngagementID: manifest.Engagement.ID,
-		Engagement:   manifest.Engagement.Name,
-		GeneratedAt:  manifest.GeneratedAt,
+		Mismatched:    []Problem{},
+		Unverifiable:  []Problem{},
+		Extra:         []string{},
+		EngagementID:  manifest.Engagement.ID,
+		Engagement:    manifest.Engagement.Name,
+		GeneratedAt:   manifest.GeneratedAt,
+		ServerVersion: manifest.ServerVersion,
 	}
 	sum := sha256.Sum256(raw)
 	report.ArchiveSHA256 = hex.EncodeToString(sum[:])

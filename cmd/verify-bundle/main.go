@@ -87,7 +87,13 @@ func printReport(report *bundle.Report) {
 	if !report.OK {
 		verdict = "FAILED"
 	}
-	fmt.Printf("%s  engagement %d (%s), generated %s\n", verdict, report.EngagementID, report.Engagement, report.GeneratedAt)
+	producedBy := report.ServerVersion
+	if producedBy == "" {
+		// A package predating the field: say so rather than print a blank.
+		producedBy = "an unrecorded release"
+	}
+	fmt.Printf("%s  engagement %d (%s), generated %s by %s\n",
+		verdict, report.EngagementID, report.Engagement, report.GeneratedAt, producedBy)
 	fmt.Printf("     archive sha256: %s\n", report.ArchiveSHA256)
 	fmt.Printf("     members: %d checked, %d intact, %d unlisted\n",
 		report.Checked, report.Verified, len(report.Extra))

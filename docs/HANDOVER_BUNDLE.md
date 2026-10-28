@@ -80,7 +80,11 @@ Content-Type: application/zip
 
 The response reports `ok`, `checked`, `verified`, `mismatched`, `unverifiable`, `extra` and a `signature` block.
 
-Both paths accept the archive's own `X-Bundle-SHA256` response header, which is the digest of the **zip file** — the
+Both paths accept the archive's own `X-Bundle-SHA256` response header
+
+The verifier also prints **which release produced the package** (`server_version` from the manifest), because a receiver
+comparing a bundle against their own tooling needs to know when the archive is older than the format they expect. A
+package made before that field existed prints `an unrecorded release` rather than a blank., which is the digest of the **zip file** — the
 check to run before opening anything.
 
 ## valid is not trusted

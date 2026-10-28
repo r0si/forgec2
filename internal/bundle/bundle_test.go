@@ -23,6 +23,9 @@ func TestVerifyAcceptsAGoodBundle(t *testing.T) {
 	if !report.OK {
 		t.Fatalf("a good bundle failed: %+v", report)
 	}
+	if report.ServerVersion != "2.7.1" {
+		t.Fatalf("server version = %q, want the one the manifest records", report.ServerVersion)
+	}
 	if report.Checked != len(manifest.Members) || report.Verified != len(manifest.Members)-1 {
 		t.Fatalf("checked = %d, verified = %d, want every member but the manifest", report.Checked, report.Verified)
 	}
@@ -110,7 +113,7 @@ func sampleBundle(t *testing.T, sign bool) ([]byte, Manifest) {
 		"summary.md": []byte("# Summary\n"),
 		"tasks.csv":  []byte("Time,Agent\n"),
 	}
-	manifest := Manifest{GeneratedAt: "2026-10-29T00:00:00Z"}
+	manifest := Manifest{GeneratedAt: "2026-10-29T00:00:00Z", ServerVersion: "2.7.1"}
 	manifest.Engagement.ID = 7
 	manifest.Engagement.Name = "DMZ exercise"
 	for _, name := range []string{"summary.md", "tasks.csv"} {
