@@ -71,11 +71,23 @@ export function resetAuthRedirectState(): void {
 
 export class ApiError extends Error {
   status: number;
-  constructor(message: string, status: number) {
+  /**
+   * Server-side reference for a 5xx (`X-Error-Ref`). Every server error now logs a line tagged with
+   * this id, so showing it lets an operator quote something the server can find; a 4xx has none.
+   */
+  ref?: string;
+  constructor(message: string, status: number, ref?: string) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.ref = ref;
   }
+}
+
+/** Append the server error reference to a message, when the response carried one. */
+export function withErrorRef(message: string, ref: string | null | undefined): string {
+  if (!ref) return message;
+  return `${message} (ref ${ref})`;
 }
 
 /** Operator-facing text for thrown API/network errors (no `ApiError:` prefix). */
@@ -250,7 +262,7 @@ async function request<T>(path: string, options: RequestOptions & { body?: unkno
             errorMsg = String(errBody.error);
           }
         } catch { /* ignore parse error */ }
-        throw new ApiError(errorMsg, res.status);
+        throw new ApiError(withErrorRef(errorMsg, res.headers.get("X-Error-Ref")), res.status, res.headers.get("X-Error-Ref") ?? undefined);
       }
 
       if (options.raw) {
@@ -264,7 +276,7 @@ async function request<T>(path: string, options: RequestOptions & { body?: unkno
       const respBody = await res.json();
       if (respBody && typeof respBody === "object" && "success" in respBody && (respBody as Record<string, unknown>).success === false) {
         const msg = (respBody as Record<string, unknown>).error ? String((respBody as Record<string, unknown>).error) : "operation failed";
-        throw new ApiError(msg, res.status);
+        throw new ApiError(withErrorRef(msg, res.headers.get("X-Error-Ref")), res.status, res.headers.get("X-Error-Ref") ?? undefined);
       }
       return options.unwrap === false ? (respBody as T) : unwrapBody<T>(respBody);
     } catch (e) {
