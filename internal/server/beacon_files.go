@@ -148,13 +148,25 @@ func (s *Server) lookupGeoIP(ctx context.Context, ip string) (country, city stri
 		return "", "", 0, 0
 	}
 	defer resp.Body.Close()
+	// ip-api answers 200 with {"status":"fail","message":"..."} for a rejected lookup and 429 once the
+	// free tier rate limit (45/min) is exhausted, so the status and the body status are both checked.
+	// Without this, "geolocation stopped working" had no explanation anywhere: the decode simply
+	// produced empty fields.
 	var result struct {
+		Status  string  `json:"status"`
+		Message string  `json:"message"`
 		Country string  `json:"country"`
 		City    string  `json:"city"`
 		Lat     float64 `json:"lat"`
 		Lon     float64 `json:"lon"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		slog.Debug("GeoIP: response was not JSON", "ip", ip, "status", resp.StatusCode)
+		return "", "", 0, 0
+	}
+	if resp.StatusCode != http.StatusOK || result.Status == "fail" {
+		slog.Debug("GeoIP: lookup did not return a location",
+			"ip", ip, "status", resp.StatusCode, "reason", truncateString(result.Message, 120))
 		return "", "", 0, 0
 	}
 	return result.Country, result.City, result.Lat, result.Lon

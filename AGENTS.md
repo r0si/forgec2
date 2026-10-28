@@ -149,6 +149,12 @@ by hand at least once; do not weaken one to make a change pass — fix the chang
   **bare call** to a known error-returning delivery function; close/flush ignores and
   `_ = json.Unmarshal(…)` are not matched. Its allowlist is empty on purpose: the first version
   allowlisted the notification file and let a probe reintroduce the exact defect.
+- `check:http-status` (`frontend/scripts/check-http-status.mjs`) — an outbound call must read the status it
+  got. The notification webhook had this defect in 227 (a receiver answering 500 looked like a 200) and
+  the GeoIP lookup had it one layer down: `ip-api` answers **200** with `{"status":"fail"}` and **429**
+  once the free tier is exhausted, and the decoder turned both into empty fields with no explanation.
+  The gate requires a `StatusCode` check within 45 lines of any `http.Client.Do` /
+  `http.Get/Post/Head/PostForm`; 13 such calls currently comply, and the allowlist is empty.
 - `check:docs` (`gen-command-reference.mjs --check` + `gen-capability-matrix.mjs --check`) —
   the generated docs must match their sources: the command reference, and the **generated
   task-inventory block** plus the version stamp in `docs/CAPABILITY_MATRIX.md`. CI runs these
