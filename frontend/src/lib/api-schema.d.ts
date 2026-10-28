@@ -27215,6 +27215,8 @@ export interface operations {
             query?: {
                 types?: string;
                 limit?: number;
+                /** @description csv returns the same events, newest first, as a downloadable file (Time,Kind,Type,Title,Detail,Status, Ref ID). The timeline is the one list read IN ORDER, which is what a spreadsheet is good at; the default is JSON. */
+                format?: "json" | "csv";
             };
             header?: never;
             path: {
@@ -27224,12 +27226,15 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Timeline entries */
+            /** @description Timeline entries, newest first */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                    "text/csv": string;
+                };
             };
             /** @description Agent not visible to this tenant */
             404: {

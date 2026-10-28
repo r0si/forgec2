@@ -12725,8 +12725,21 @@ paths:
         - {name: id, in: path, required: true, schema: {type: string}}
         - {name: types, in: query, schema: {type: string}}
         - {name: limit, in: query, schema: {type: integer}}
+        - name: format
+          in: query
+          description: >-
+            csv returns the same events, newest first, as a downloadable file (Time,Kind,Type,Title,Detail,Status,
+            Ref ID). The timeline is the one list read IN ORDER, which is what a spreadsheet is good at; the default
+            is JSON.
+          schema: {type: string, enum: [json, csv], default: json}
       responses:
-        '200': {description: Timeline entries}
+        '200':
+          description: Timeline entries, newest first
+          content:
+            application/json:
+              schema: {type: object}
+            text/csv:
+              schema: {type: string}
         '404': {description: Agent not visible to this tenant}
   /agents/{id}/hostinfo:
     post:
