@@ -43,6 +43,10 @@ go run ./cmd/verify-audit audit.ndjson -min-rows 1000 -quiet
 verifier — and both are what an attacker with write access would prefer. Set it to the number of rows you expect; `-quiet`
 prints nothing and leaves the answer to the exit code.
 
+`-require-contiguous` is for the other question — *"prove this is the whole chain"*. It fails on a **filtered** export, a
+**truncated** one, an **id gap**, and on an **NDJSON** export, which cannot say: that fact lives in response headers and a
+file has none. Export with `format=json` when you need the file to prove it.
+
 ## What this proves, and what it does not
 
 Read this part before relying on the file.

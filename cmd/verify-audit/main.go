@@ -30,6 +30,8 @@ func main() {
 	// A truncated download and a log with nothing in it both look like "no problems found" to a naive verifier, and
 	// both are exactly what an attacker with write access would prefer. A floor makes that failure loud.
 	minRows := flag.Int("min-rows", 1, "fail when the file holds fewer rows than this; guards against verifying a truncated export")
+	requireContiguous := flag.Bool("require-contiguous", false,
+		"fail unless the file proves it is the whole chain: no filter, no truncation, no id gaps. An NDJSON export cannot prove that")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "usage: verify-audit [-json] [-quiet] [-min-rows N] <audit.ndjson|audit.json>\n")
 		flag.PrintDefaults()
@@ -71,7 +73,7 @@ func main() {
 		printVerdict(verdict, meta)
 	}
 
-	os.Exit(exitCode(verdict, len(rows), *minRows))
+	os.Exit(exitCode(verdict, len(rows), *minRows, *requireContiguous, meta))
 }
 
 // exitCode turns a verdict into the process result.
@@ -79,8 +81,16 @@ func main() {
 // Exit 1 means the chain does not check out OR the file holds fewer rows than the caller requires: a caller that asked
 // for at least a thousand rows got a truncated download, and telling them "OK" because the rows that did arrive are
 // consistent would be the wrong answer twice over. Exit 2 is reserved for "this file is not an audit export".
-func exitCode(verdict auditchain.Verdict, rows, minRows int) int {
+func exitCode(verdict auditchain.Verdict, rows, minRows int, requireContiguous bool, meta exportMeta) int {
 	if !verdict.OK || rows < minRows {
+		return 1
+	}
+	if !requireContiguous {
+		return 0
+	}
+	// The caller asked for a contiguous chain. A filtered or truncated export is not one, and an NDJSON export cannot
+	// even say: refusing is the only honest answer, because "probably contiguous" is not what was requested.
+	if !meta.Known || meta.Filtered || meta.Truncated || verdict.Discontinuities > 0 {
 		return 1
 	}
 	return 0

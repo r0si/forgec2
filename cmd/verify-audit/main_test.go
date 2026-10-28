@@ -26,7 +26,34 @@ func TestExitCode(t *testing.T) {
 		{"exactly at the floor", good, 5, 5, 0},
 	}
 	for _, test := range cases {
-		if got := exitCode(test.verdict, test.rows, test.minRows); got != test.want {
+		if got := exitCode(test.verdict, test.rows, test.minRows, false, exportMeta{Known: true}); got != test.want {
+			t.Fatalf("%s: exit %d, want %d", test.name, got, test.want)
+		}
+	}
+}
+
+// TestRequireContiguous covers the switch for "I must verify the whole chain".
+//
+// A filtered export, a truncated one and an NDJSON export (which cannot say) all fail it: the caller asked for a
+// contiguous chain, and "probably contiguous" is not what they asked for.
+func TestRequireContiguous(t *testing.T) {
+	good := auditchain.Verdict{OK: true, Checked: 10}
+	gapped := auditchain.Verdict{OK: true, Checked: 10, Discontinuities: 1}
+
+	cases := []struct {
+		name    string
+		verdict auditchain.Verdict
+		meta    exportMeta
+		want    int
+	}{
+		{"whole chain from a JSON document", good, exportMeta{Known: true, Format: "json"}, 0},
+		{"filtered", good, exportMeta{Known: true, Filtered: true, Format: "json"}, 1},
+		{"truncated", good, exportMeta{Known: true, Truncated: true, Format: "json"}, 1},
+		{"id gap with an intact chain", gapped, exportMeta{Known: true, Format: "json"}, 1},
+		{"ndjson cannot prove contiguity", good, exportMeta{Format: "ndjson"}, 1},
+	}
+	for _, test := range cases {
+		if got := exitCode(test.verdict, 10, 1, true, test.meta); got != test.want {
 			t.Fatalf("%s: exit %d, want %d", test.name, got, test.want)
 		}
 	}
