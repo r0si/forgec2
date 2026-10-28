@@ -240,6 +240,39 @@ func (s *Server) handleEngagementBundle(c *gin.Context) {
 		fail()
 		return
 	}
+	// iocs.json - the indicators extracted from the engagement hosts, using the same extractor as the IOC export so
+	// the bundle and the export cannot disagree about what counts as an indicator.
+	if !add("iocs.json", func(w *zip.Writer) error {
+		scope := s.db.Model(&db.Implant{}).Select("id").Where("engagement_id = ?", engagement.ID)
+		// The extractor takes a day count rather than a window: give it the span of the engagement, rounded up, and
+		// say so in the file, because a reader deserves to know this bound is looser than the others.
+		days := int(windowEnd.Sub(engagement.StartsAt).Hours()/24) + 1
+		if days < 1 {
+			days = 1
+		}
+		if days > 365 {
+			days = 365
+		}
+		indicators, _, err := s.extractIOCs(days, false, scope)
+		if err != nil {
+			return err
+		}
+		f, err := w.Create("iocs.json")
+		if err != nil {
+			return err
+		}
+		enc := json.NewEncoder(f)
+		enc.SetIndent("", "  ")
+		return enc.Encode(gin.H{
+			"count":       len(indicators),
+			"window_days": days,
+			"note":        "the extraction bound is a day count spanning the engagement rather than the exact window the other members use",
+			"indicators":  indicators,
+		})
+	}) {
+		fail()
+		return
+	}
 	if !add("plugins.json", func(w *zip.Writer) error {
 		f, err := w.Create("plugins.json")
 		if err != nil {

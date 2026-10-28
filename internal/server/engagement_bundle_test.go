@@ -114,7 +114,7 @@ func TestEngagementBundle(t *testing.T) {
 		}
 		members[file.Name] = content
 	}
-	for _, name := range []string{"summary.md", "timeline.md", "tasks.csv", "audit.ndjson", "agents.json", "credentials.json", "plugins.json"} {
+	for _, name := range []string{"summary.md", "timeline.md", "tasks.csv", "audit.ndjson", "agents.json", "credentials.json", "iocs.json", "plugins.json"} {
 		if _, ok := members[name]; !ok {
 			t.Fatalf("the bundle is missing %s (has %v)", name, keysOf(members))
 		}
@@ -188,6 +188,22 @@ func TestEngagementBundle(t *testing.T) {
 		if strings.Contains(credentialsBody, secret) {
 			t.Fatalf("the bundle carries secret material (%q): %s", secret, credentialsBody)
 		}
+	}
+
+	// iocs.json parses and says which bound it used, because its bound is looser than the other members.
+	var iocs struct {
+		Count      int    `json:"count"`
+		WindowDays int    `json:"window_days"`
+		Note       string `json:"note"`
+	}
+	if err := json.Unmarshal(members["iocs.json"], &iocs); err != nil {
+		t.Fatalf("iocs.json: %v (%s)", err, string(members["iocs.json"]))
+	}
+	if iocs.WindowDays < 1 {
+		t.Fatalf("iocs window_days = %d", iocs.WindowDays)
+	}
+	if !strings.Contains(iocs.Note, "day count") {
+		t.Fatalf("iocs.json does not state its bound: %q", iocs.Note)
 	}
 
 	// The handover is audited.
