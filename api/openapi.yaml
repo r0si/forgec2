@@ -2493,6 +2493,86 @@ paths:
               schema:
                 $ref: '#/components/schemas/SuccessResponse'
 
+  /api/automation/rules/{id}/preview:
+    post:
+      tags: [Automation]
+      summary: Dry-run one automation rule against a synthetic event
+      description: >-
+        Answers "would this rule fire for this event, and if not, why not" without executing anything. The
+        verdict lists every condition with the value it actually resolved, the cooldown state and remaining
+        seconds, a reason for each failed condition, and each action with its **template expanded** - because
+        an unexpanded template hides a broken variable reference, which is the second most common silent
+        failure. A condition addresses event data as `data.<field>` (the preview namespaces `data.user` for
+        you), and the template variables are the documented ones (`{{hostname}}`, `{{agent_id}}`, `{{ip}}`,
+        `{{os}}`, `{{user}}`, `{{event_type}}`). Every preview is audited as `automation_preview`; another
+        tenant's rule is a 404.
+      operationId: previewAutomationRule
+      security:
+        - SessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                event_type: {type: string, description: e.g. implant.checkin, task.complete}
+                agent_id: {type: string}
+                agent_host: {type: string}
+                agent_ip: {type: string}
+                agent_os: {type: string}
+                user: {type: string}
+                data:
+                  type: object
+                  description: Event data. An entry like user=alice becomes data.user, which is what conditions reference
+      responses:
+        '200':
+          description: Verdict with per-condition detail, cooldown state and expanded action templates
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  data:
+                    type: object
+                    properties:
+                      rule_id: {type: string}
+                      rule_name: {type: string}
+                      would_run: {type: boolean}
+                      matched: {type: boolean}
+                      cooldown_open: {type: boolean}
+                      cooldown_remaining: {type: integer}
+                      reasons:
+                        type: array
+                        items: {type: string}
+                      conditions:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            field: {type: string}
+                            operator: {type: string}
+                            value: {type: string}
+                            actual: {type: string}
+                            matched: {type: boolean}
+                      actions:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            type: {type: string}
+                            would_run: {type: boolean}
+                            template: {type: string}
+        '400':
+          description: Missing rule id or malformed body
+        '404':
+          description: No such rule in the caller's tenant
   /api/automation/rules/{id}/toggle:
     post:
       tags: [Automation]

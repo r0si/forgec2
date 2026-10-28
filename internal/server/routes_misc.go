@@ -62,6 +62,8 @@ func (s *Server) registerAutomationRoutes(auth *gin.RouterGroup) {
 		autoWrite.PUT("/api/automation/rules/:id", s.handleUpdateAutomationRule)
 		autoWrite.DELETE("/api/automation/rules/:id", s.handleDeleteAutomationRule)
 		autoWrite.POST("/api/automation/rules/:id/toggle", s.handleToggleAutomationRule)
+		// Dry run: evaluate one rule against a synthetic event and explain the verdict, executing nothing.
+		autoWrite.POST("/api/automation/rules/:id/preview", s.handlePreviewAutomationRule)
 		autoWrite.POST("/api/webhooks", s.handleCreateWebhook)
 		autoWrite.DELETE("/api/webhooks/:id", s.handleDeleteWebhook)
 		autoWrite.POST("/api/webhooks/test", s.handleTestWebhook)

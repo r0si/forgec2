@@ -539,6 +539,14 @@ func (s *Server) saveAutomationRule(rule AutomationRule) error {
 	if err := s.db.Save(&dbRule).Error; err != nil {
 		return err
 	}
+	// Save() inserts when the row is new, and INSERT applies GORM defaults: the column carries
+	// `default:true`, so a rule created DISABLED came back ENABLED and started firing on its own. Writing
+	// the column explicitly after the insert is what persists the caller value - found by the automation
+	// preview test, which asserted that a disabled rule would not run.
+	if err := s.db.Model(&db.AutomationRule{}).Where("id = ?", dbRule.ID).
+		Update("enabled", rule.Enabled).Error; err != nil {
+		return err
+	}
 	s.invalidateAutomationCache()
 	return nil
 }

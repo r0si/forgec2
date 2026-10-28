@@ -1418,6 +1418,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/automation/rules/{id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dry-run one automation rule against a synthetic event
+         * @description Answers "would this rule fire for this event, and if not, why not" without executing anything. The verdict lists every condition with the value it actually resolved, the cooldown state and remaining seconds, a reason for each failed condition, and each action with its **template expanded** - because an unexpanded template hides a broken variable reference, which is the second most common silent failure. A condition addresses event data as `data.<field>` (the preview namespaces `data.user` for you), and the template variables are the documented ones (`{{hostname}}`, `{{agent_id}}`, `{{ip}}`, `{{os}}`, `{{user}}`, `{{event_type}}`). Every preview is audited as `automation_preview`; another tenant's rule is a 404.
+         */
+        post: operations["previewAutomationRule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/automation/rules/{id}/toggle": {
         parameters: {
             query?: never;
@@ -13825,6 +13845,79 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["SuccessResponse"];
                 };
+            };
+        };
+    };
+    previewAutomationRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description e.g. implant.checkin */
+                    event_type?: string;
+                    agent_id?: string;
+                    agent_host?: string;
+                    agent_ip?: string;
+                    agent_os?: string;
+                    user?: string;
+                    /** @description Event data. An entry like user=alice becomes data.user, which is what conditions reference */
+                    data?: Record<string, never>;
+                };
+            };
+        };
+        responses: {
+            /** @description Verdict with per-condition detail, cooldown state and expanded action templates */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        data?: {
+                            rule_id?: string;
+                            rule_name?: string;
+                            would_run?: boolean;
+                            matched?: boolean;
+                            cooldown_open?: boolean;
+                            cooldown_remaining?: number;
+                            reasons?: string[];
+                            conditions?: {
+                                field?: string;
+                                operator?: string;
+                                value?: string;
+                                actual?: string;
+                                matched?: boolean;
+                            }[];
+                            actions?: {
+                                type?: string;
+                                would_run?: boolean;
+                                template?: string;
+                            }[];
+                        };
+                    };
+                };
+            };
+            /** @description Missing rule id or malformed body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such rule in the caller's tenant */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
