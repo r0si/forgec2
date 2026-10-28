@@ -131,14 +131,22 @@ func (s *Server) validateTaskCreationWithAgent(c *gin.Context, agentID, taskType
 	// that deadline passes. Enforced here, at the single creation gate every path goes through, so a
 	// handler, a bulk action, an automation rule and a script cannot disagree about it.
 	if agent := s.agentForExpiryCheck(agentID, preloadedAgent); agent != nil {
-		if s.agentExpired(*agent) {
+		// Load the engagement ONCE: the same row answers "has the window opened" and "has it closed".
+		engagement := s.engagementFor(*agent)
+		if s.engagementNotStarted(*agent, engagement, time.Now()) {
+			// The end of the window was enforced in an earlier round; refusing to start early is the
+			// symmetric half, and without it the agreed window does not bound anything on the left.
+			slog.Warn("Task refused: engagement has not started", "agent_id", agentID, "task_type", taskType,
+				"starts_at", engagement.StartsAt.UTC().Format(time.RFC3339))
+			s.LogAuditRecord(nil, "agent_not_started_block", "agent", agentID,
+				fmt.Sprintf("refused %s: engagement starts %s", taskType, engagement.StartsAt.UTC().Format(time.RFC3339)), false, nil)
+			return fmt.Errorf("agent not in scope yet: the engagement for this implant starts at %s",
+				engagement.StartsAt.UTC().Format(time.RFC3339))
+		}
+		if deadline := effectiveDeadlineFor(*agent, engagement); deadline != nil && time.Now().After(*deadline) {
 			// Name the EFFECTIVE deadline: it may be the engagement window rather than the implant own,
 			// and an operator needs to know which one stopped the work.
-			deadline := s.effectiveAgentDeadline(*agent)
-			when := "unknown"
-			if deadline != nil {
-				when = deadline.UTC().Format(time.RFC3339)
-			}
+			when := deadline.UTC().Format(time.RFC3339)
 			slog.Warn("Task refused: agent engagement expired", "agent_id", agentID, "task_type", taskType, "deadline", when)
 			s.LogAuditRecord(nil, "agent_expired_block", "agent", agentID,
 				fmt.Sprintf("refused %s: deadline passed (%s)", taskType, when), false, nil)
@@ -1186,7 +1194,8 @@ func clientErrorStatus(err error) (int, bool) {
 		strings.Contains(msg, "is not supported on chrome extension agents"),
 		strings.Contains(msg, "lportfwd is disabled"),
 		strings.Contains(msg, "blocked by adaptive opsec"),
-		strings.Contains(msg, "agent expired"):
+		strings.Contains(msg, "agent expired"),
+		strings.Contains(msg, "agent not in scope yet"):
 		return http.StatusForbidden, true
 	case strings.Contains(msg, "unknown task type"),
 		strings.Contains(msg, "requires 'command' parameter"),
@@ -1230,14 +1239,30 @@ func (s *Server) agentExpired(agent db.Implant) bool {
 // engagements pay nothing for the feature. A closed engagement ends at ClosedAt, not at its agreed
 // EndsAt: closing early is a decision, and the earlier end is the one that applies.
 func (s *Server) effectiveAgentDeadline(agent db.Implant) *time.Time {
-	effective := agent.ExpiresAt
+	return effectiveDeadlineFor(agent, s.engagementFor(agent))
+}
+
+// engagementFor loads the engagement an implant belongs to, or nil. One query, shared by the "has it
+// started" check and the deadline merge so a task creation reads the engagement once.
+//
+// An unreadable row returns nil, which means "no engagement constraints": the implant deadline still
+// applies, and a database hiccup must not silently stop work.
+func (s *Server) engagementFor(agent db.Implant) *db.Engagement {
 	if agent.EngagementID == nil {
-		return effective
+		return nil
 	}
 	var engagement db.Engagement
 	if err := s.db.Select("id", "starts_at", "ends_at", "closed_at").
 		Where("id = ?", *agent.EngagementID).First(&engagement).Error; err != nil {
-		// An unreadable engagement must not block work: the implant deadline still applies.
+		return nil
+	}
+	return &engagement
+}
+
+// effectiveDeadlineFor merges the implant deadline with an already-loaded engagement window.
+func effectiveDeadlineFor(agent db.Implant, engagement *db.Engagement) *time.Time {
+	effective := agent.ExpiresAt
+	if engagement == nil {
 		return effective
 	}
 	end := engagement.EndsAt
@@ -1251,4 +1276,15 @@ func (s *Server) effectiveAgentDeadline(agent db.Implant) *time.Time {
 		return &end
 	}
 	return effective
+}
+
+// engagementNotStarted reports the window an implant must wait for: work is only allowed while the
+// engagement it belongs to is open. The end of the window was enforced in an earlier round; the start is
+// the symmetric half, and without it an operator can task a host before the exercise has begun - the
+// exact thing the agreed window exists to prevent.
+func (s *Server) engagementNotStarted(agent db.Implant, engagement *db.Engagement, now time.Time) bool {
+	if engagement == nil || engagement.StartsAt.IsZero() {
+		return false
+	}
+	return now.Before(engagement.StartsAt)
 }
