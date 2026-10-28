@@ -146,6 +146,11 @@ func (s *Server) handleAPITagDelete(c *gin.Context) {
 
 func (s *Server) handleAgentTags(c *gin.Context) {
 	id := c.Param("id")
+	// The agent id comes from the URL: verify it belongs to the caller before disclosing which
+	// tags (i.e. which classification) another tenant put on their host.
+	if _, ok := s.getAgentOrFail(c, id); !ok {
+		return
+	}
 	var tags []db.AgentTag
 	if err := s.db.Table("agent_tags").
 		Joins("JOIN agent_tag_assignments ON agent_tag_assignments.agent_tag_id = agent_tags.id").
@@ -174,11 +179,16 @@ func (s *Server) handleBatchAgentTags(c *gin.Context) {
 		Name    string `gorm:"column:name"`
 		Color   string `gorm:"column:color"`
 	}
+	// Same rule for the batch form: the id list is caller-supplied, so narrow it to the agents
+	// this caller can see before reading their tags.
+	visible := s.db.Model(&db.Implant{}).Select("id")
+	visible = s.tenantScope(visible, c)
 	var rows []agentTagsRow
 	if err := s.db.Table("agent_tag_assignments").
 		Select("agent_tag_assignments.implant_id as agent_id, agent_tags.id as tag_id, agent_tags.name, agent_tags.color").
 		Joins("JOIN agent_tags ON agent_tags.id = agent_tag_assignments.agent_tag_id").
 		Where("agent_tag_assignments.implant_id IN ?", req.AgentIDs).
+		Where("agent_tag_assignments.implant_id IN (?)", visible).
 		Find(&rows).Error; err != nil {
 		slog.Error("Failed to batch-load agent tags", "agent_ids", req.AgentIDs, "err", err)
 	}
