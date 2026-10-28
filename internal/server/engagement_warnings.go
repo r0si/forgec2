@@ -162,7 +162,80 @@ func (s *Server) runEngagementWarnings(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			s.announceEngagementWarnings(time.Now())
+			now := time.Now()
+			s.announceEngagementWarnings(now)
+			s.announceEngagementWindowWarnings(now)
 		}
 	}
+}
+
+// announceEngagementWindowWarnings covers the other deadline an operator carries: the engagement window
+// itself. A whole fleet stops when the exercise ends, so "the window closes in a day" and "the window has
+// closed, produce the summary" are the two facts worth pushing - the per-implant warning alone leaves the
+// engagement ending as a surprise for every host at once.
+//
+// Deduped with the same tracker, keyed by the engagement and its end date, so extending a window re-arms
+// the reminder and a restart does not repeat it.
+func (s *Server) announceEngagementWindowWarnings(now time.Time) int {
+	announced := 0
+	horizon := now.Add(engagementWarnWindow)
+
+	var upcoming []db.Engagement
+	if err := s.db.WithContext(s.ctx).Model(&db.Engagement{}).
+		Where("closed_at IS NULL").
+		Where("ends_at > ? AND ends_at <= ?", now, horizon).
+		Order("ends_at asc").Limit(engagementWarnMaxEntries).
+		Find(&upcoming).Error; err != nil {
+		slog.Error("Failed to scan engagement windows", "err", err)
+		return 0
+	}
+	for _, engagement := range upcoming {
+		if !s.engagementWarns.shouldAnnounce(fmt.Sprintf("engagement:%d", engagement.ID), engagement.EndsAt) {
+			continue
+		}
+		notification := &db.Notification{
+			Type:     "engagement_ending",
+			Title:    "Engagement window closing",
+			Message:  fmt.Sprintf("%q ends at %s; tasks stop being accepted after that", engagement.Name, engagement.EndsAt.UTC().Format(time.RFC3339)),
+			Severity: "warning",
+		}
+		if err := s.db.Create(notification).Error; err != nil {
+			slog.Error("Failed to create engagement window warning", "engagement_id", engagement.ID, "err", err)
+			continue
+		}
+		s.DispatchNotification(notification)
+		s.LogAuditRecord(nil, "engagement_ending", "engagement", fmt.Sprintf("%d", engagement.ID),
+			fmt.Sprintf("window ends %s", engagement.EndsAt.UTC().Format(time.RFC3339)), true, nil)
+		announced++
+	}
+
+	var ended []db.Engagement
+	if err := s.db.WithContext(s.ctx).Model(&db.Engagement{}).
+		Where("closed_at IS NULL").
+		Where("ends_at <= ?", now).
+		Order("ends_at desc").Limit(engagementWarnMaxEntries).
+		Find(&ended).Error; err != nil {
+		slog.Error("Failed to scan ended engagements", "err", err)
+		return announced
+	}
+	for _, engagement := range ended {
+		if !s.engagementWarns.shouldAnnounce(fmt.Sprintf("engagement-ended:%d", engagement.ID), engagement.EndsAt) {
+			continue
+		}
+		notification := &db.Notification{
+			Type:     "engagement_ended",
+			Title:    "Engagement window ended",
+			Message:  fmt.Sprintf("%q ended at %s; new tasks are refused and the summary is ready", engagement.Name, engagement.EndsAt.UTC().Format(time.RFC3339)),
+			Severity: "info",
+		}
+		if err := s.db.Create(notification).Error; err != nil {
+			slog.Error("Failed to create engagement ended notice", "engagement_id", engagement.ID, "err", err)
+			continue
+		}
+		s.DispatchNotification(notification)
+		s.LogAuditRecord(nil, "engagement_ended", "engagement", fmt.Sprintf("%d", engagement.ID),
+			fmt.Sprintf("window ended %s", engagement.EndsAt.UTC().Format(time.RFC3339)), true, nil)
+		announced++
+	}
+	return announced
 }
