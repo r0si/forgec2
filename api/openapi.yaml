@@ -3525,6 +3525,19 @@ paths:
                             notes:
                               type: array
                               items: {type: string}
+                      diagnostic_rate_limit:
+                        type: object
+                        description: >-
+                          The diagnostics family is throttled separately from the write endpoints it shares a permission
+                          with. Published so a client can back off before it receives a 429 (which carries Retry-After),
+                          and derived from the constants the limiter uses.
+                        properties:
+                          requests: {type: integer}
+                          window_seconds: {type: integer}
+                          scope: {type: string}
+                          notes:
+                            type: array
+                            items: {type: string}
                       limits:
                         type: object
                         properties:

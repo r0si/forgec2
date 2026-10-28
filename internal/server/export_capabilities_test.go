@@ -55,6 +55,12 @@ func TestExportCapabilities(t *testing.T) {
 				SideEffects *bool    `json:"side_effects"`
 				Notes       []string `json:"notes"`
 			} `json:"diagnostics"`
+			DiagnosticRateLimit struct {
+				Requests      int      `json:"requests"`
+				WindowSeconds int      `json:"window_seconds"`
+				Scope         string   `json:"scope"`
+				Notes         []string `json:"notes"`
+			} `json:"diagnostic_rate_limit"`
 			Limits map[string]json.RawMessage `json:"limits"`
 		} `json:"data"`
 	}
@@ -176,6 +182,20 @@ func TestExportCapabilities(t *testing.T) {
 	// dangerous; none would mean the flag is decoration.
 	if sideEffecting != 1 {
 		t.Fatalf("%d diagnostics claim external side effects, want exactly 1 (the route test)", sideEffecting)
+	}
+
+	// 7c. The diagnostics budget is published from the same constants the limiter uses: a client that knows the ceiling
+	// can back off before it is throttled, and a copy of the number here could silently disagree with the limiter.
+	if resp.Data.DiagnosticRateLimit.Requests != diagnosticRateLimitRequests {
+		t.Fatalf("published requests = %d, the limiter uses %d",
+			resp.Data.DiagnosticRateLimit.Requests, diagnosticRateLimitRequests)
+	}
+	if resp.Data.DiagnosticRateLimit.WindowSeconds != int(diagnosticRateLimitWindow.Seconds()) {
+		t.Fatalf("published window = %d, the limiter uses %d",
+			resp.Data.DiagnosticRateLimit.WindowSeconds, int(diagnosticRateLimitWindow.Seconds()))
+	}
+	if resp.Data.DiagnosticRateLimit.Scope == "" || len(resp.Data.DiagnosticRateLimit.Notes) == 0 {
+		t.Fatalf("the rate limit is not explained: %+v", resp.Data.DiagnosticRateLimit)
 	}
 
 	// 8. With a key configured the same entry reports it, so an operator can hand the expected key to the receiver.

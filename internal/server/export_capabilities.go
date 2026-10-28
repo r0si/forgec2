@@ -186,6 +186,15 @@ func (s *Server) handleExportCapabilities(c *gin.Context) {
 				},
 			},
 		},
+		"diagnostic_rate_limit": gin.H{
+			"requests":       diagnosticRateLimitRequests,
+			"window_seconds": int(diagnosticRateLimitWindow.Seconds()),
+			"scope":          "per client IP, on the diagnostics endpoints only",
+			"notes": []string{
+				"the diagnostics family is throttled separately from the write endpoints it shares a permission with",
+				"a 429 carries Retry-After",
+			},
+		},
 		"limits": gin.H{
 			"task_export_rows":   ExportTaskLimit,
 			"audit_export_rows":  200000,

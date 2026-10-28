@@ -14939,6 +14939,13 @@ export interface operations {
                                 body?: string[];
                                 notes?: string[];
                             }[];
+                            /** @description The diagnostics family is throttled separately from the write endpoints it shares a permission with. Published so a client can back off before it receives a 429 (which carries Retry-After), and derived from the constants the limiter uses. */
+                            diagnostic_rate_limit?: {
+                                requests?: number;
+                                window_seconds?: number;
+                                scope?: string;
+                                notes?: string[];
+                            };
                             limits?: {
                                 task_export_rows?: number;
                                 audit_export_rows?: number;

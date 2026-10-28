@@ -61,7 +61,7 @@ func (s *Server) registerAutomationRoutes(auth *gin.RouterGroup) {
 	// separate from the write endpoints it shares a permission with.
 	autoDiagnose := auth.Group("/")
 	autoDiagnose.Use(middleware.RequirePermission(db.PermAutomationWrite))
-	autoDiagnose.Use(middleware.NewRateLimiter(context.Background(), 120, time.Minute).Limit())
+	autoDiagnose.Use(middleware.NewRateLimiter(context.Background(), diagnosticRateLimitRequests, diagnosticRateLimitWindow).Limit())
 	{
 		// Static health of the rule set: unconditional mutating actions, dangling targets, duplicates.
 		autoDiagnose.GET("/api/automation/health", s.handleAutomationHealth)
@@ -134,3 +134,12 @@ func (s *Server) registerPluginRoutes(auth *gin.RouterGroup) {
 }
 
 // registerTaskRoutes registers task history and logout routes.
+
+// The diagnostics budget, stated once so the limiter and the capabilities document cannot disagree about it.
+//
+// A client that knows the ceiling can back off before it gets a 429, which is the difference between a polite integration
+// and one that spends its first minute being throttled.
+const (
+	diagnosticRateLimitRequests = 120
+	diagnosticRateLimitWindow   = time.Minute
+)
