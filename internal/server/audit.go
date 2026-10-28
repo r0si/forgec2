@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -240,6 +241,40 @@ func (s *Server) handleExportAuditChain(c *gin.Context) {
 	if sinceID > 0 {
 		query = query.Where("id > ?", sinceID)
 	}
+
+	// Investigation filters. They are deliberately separate from since_id: since_id keeps the chain
+	// CONTIGUOUS (it is a prefix continuation), while these skip rows, so a filtered export is a
+	// selection and not a verifiable chain. The response says so in headers rather than by injecting
+	// a metadata line into the NDJSON, because a verifier must be able to treat every line as a row.
+	filtered := false
+	if actor := strings.TrimSpace(c.Query("user")); actor != "" {
+		query = query.Where("user = ?", actor)
+		filtered = true
+	}
+	if action := strings.TrimSpace(c.Query("action")); action != "" {
+		query = query.Where("action = ?", action)
+		filtered = true
+	}
+	if agentID := strings.TrimSpace(c.Query("agent_id")); agentID != "" {
+		query = query.Where("agent_id = ?", agentID)
+		filtered = true
+	}
+	if rawSince := strings.TrimSpace(c.Query("since")); rawSince != "" {
+		window, ok := parseStatsWindow(rawSince)
+		if !ok {
+			// An RFC3339 timestamp is the other useful form for an investigation.
+			if at, err := time.Parse(time.RFC3339, rawSince); err == nil {
+				query = query.Where("created_at >= ?", comparableLocalTime(at))
+				filtered = true
+			} else {
+				respondError(c, http.StatusBadRequest, "invalid since (expected e.g. 24h, 7d or an RFC3339 timestamp)")
+				return
+			}
+		} else {
+			query = query.Where("created_at >= ?", time.Now().Add(-window))
+			filtered = true
+		}
+	}
 	var rows []db.AuditLog
 	if err := query.Order("id ASC").Limit(limit).Find(&rows).Error; err != nil {
 		respondError(c, http.StatusInternalServerError, "failed to read the audit chain")
@@ -261,7 +296,17 @@ func (s *Server) handleExportAuditChain(c *gin.Context) {
 			return
 		}
 	}
-	c.Header("Content-Disposition", `attachment; filename="forgec2-audit-chain.ndjson"`)
+	name := "forgec2-audit-chain.ndjson"
+	c.Header("X-Audit-Export-Rows", strconv.Itoa(len(rows)))
+	if filtered {
+		name = "forgec2-audit-chain-filtered.ndjson"
+		c.Header("X-Audit-Export-Filtered", "true")
+		// 199 is the "miscellaneous warning" class; the text is what a human reads.
+		c.Header("Warning", `199 - "filtered export: rows are a selection, not a contiguous hash chain; verify the unfiltered export"`)
+	} else {
+		c.Header("X-Audit-Export-Filtered", "false")
+	}
+	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, name))
 	c.Data(http.StatusOK, "application/x-ndjson; charset=utf-8", buf.Bytes())
 }
 
