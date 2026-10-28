@@ -227,6 +227,8 @@ type Server struct {
 	// first use so every construction path has one.
 	durationStatsCache     *durationStatsCache
 	durationStatsCacheOnce sync.Once
+	// engagementWarns dedupes deadline notifications per implant+deadline.
+	engagementWarns *engagementWarnTracker
 
 	// Backlog metric label hygiene: agents currently exported as per-agent
 	// gauge series, so drained agents can be pruned.
@@ -555,6 +557,10 @@ func New(cfg *config.Config, database *gorm.DB) *Server { // config-lock: constr
 
 	// Start periodic cleanup for beacon seq-flood lockout entries (S5)
 	s.startSeqLockoutCleanup(s.ctx)
+
+	// Warn an operator a day before an engagement deadline stops work (see engagement_warnings.go).
+	s.engagementWarns = newEngagementWarnTracker()
+	go s.runEngagementWarnings(s.ctx)
 
 	// Beacon payload encryption via ECDH session (cfg.Crypto.Key = "ecdh:")
 	if strings.HasPrefix(cfg.Crypto.Key, "ecdh:") {
