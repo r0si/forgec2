@@ -425,6 +425,15 @@ func (s *Server) processTaskResults(agent db.Implant, results []taskResult, uuid
 		if !isSilent {
 			s.broadcastTaskUpdate(uuid, *task)
 		}
+		// A read-only enumeration that failed is worth one more ask; anything that changes state is not. The helper owns
+		// that distinction, and swallows its own failures so a retry can never damage the result just stored.
+		if task.Status == "failed" {
+			if retryID, created := s.maybeAutoRetryTask(task.ID, uuid, task.Type, task.Command, task.Shell,
+				task.CreatedBy, task.RetryCount, task.TenantID); created {
+				slog.Info("Automation: re-issued a failed read-only task",
+					"task_id", task.ID, "retry_id", retryID, "type", task.Type)
+			}
+		}
 
 		// Emit task lifecycle events so webhooks, email, automation rules, and
 		// (for failures) the alert/notification pipeline react. Generic results

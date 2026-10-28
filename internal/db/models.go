@@ -277,11 +277,15 @@ type Task struct {
 	// TaskKey is the operator-issued per-task AES-256-GCM key (base64) used to
 	// seal this task's result independently of the session key (P2). Empty when
 	// the task uses the normal channel encryption.
-	TaskKey  string `gorm:"column:task_key" json:"task_key,omitempty"`
-	Status   string `gorm:"index;index:idx_tasks_agent_status,priority:2;index:idx_tasks_status_created,priority:1" json:"status"`
-	Priority int    `gorm:"default:1;index:idx_tasks_agent_status,priority:3" json:"priority"` // 0=low, 1=normal, 2=high, 3=urgent
-	Result   string `json:"result"`
-	Error    string `json:"error"`
+	TaskKey string `gorm:"column:task_key" json:"task_key,omitempty"`
+	// RetryCount is how many times this task has been re-issued because a READ-ONLY task failed. Automatic retries are
+	// deliberately limited to enumerations (see autoRetryableTaskTypes): re-running a command that changes state on a
+	// timeout is how one action becomes two.
+	RetryCount int    `gorm:"default:0" json:"retry_count,omitempty"`
+	Status     string `gorm:"index;index:idx_tasks_agent_status,priority:2;index:idx_tasks_status_created,priority:1" json:"status"`
+	Priority   int    `gorm:"default:1;index:idx_tasks_agent_status,priority:3" json:"priority"` // 0=low, 1=normal, 2=high, 3=urgent
+	Result     string `json:"result"`
+	Error      string `json:"error"`
 	// File transfer progress tracking (optimization)
 	Progress    int    `json:"progress,omitempty"`    // 0-100 percentage
 	TotalBytes  int64  `json:"total_bytes,omitempty"` // total file size
