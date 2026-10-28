@@ -95,6 +95,9 @@ func (s *Server) diagnoseAutomation(event Event, tenantID uint) gin.H {
 	}
 
 	var verdicts []ruleVerdict
+	// Suggestions are what the verdict reveals about the CONFIGURATION rather than about this event: a template
+	// variable the event cannot fill, or an event that no rule listens to at all.
+	var suggestions []diagnoseSuggestion
 	counts := map[string]int{"total": 0, "would_run": 0, "blocked_by_conditions": 0, "blocked_by_cooldown": 0, "disabled": 0}
 	for _, rule := range s.loadAutomationRules() {
 		if rule.TenantID != 0 && rule.TenantID != tenantID {
@@ -123,6 +126,15 @@ func (s *Server) diagnoseAutomation(event Event, tenantID uint) gin.H {
 			counts["blocked_by_conditions"]++
 		}
 		verdicts = append(verdicts, entry)
+		suggestions = append(suggestions, templateSuggestions(rule, event)...)
+	}
+
+	if counts["total"] == 0 {
+		suggestions = append(suggestions, diagnoseSuggestion{
+			Severity: "info",
+			Code:     "no_rule_listens",
+			Detail:   "no rule of this tenant listens to " + string(event.Type) + "; this event triggers nothing",
+		})
 	}
 
 	sort.SliceStable(verdicts, func(i, j int) bool {
@@ -134,7 +146,12 @@ func (s *Server) diagnoseAutomation(event Event, tenantID uint) gin.H {
 	if verdicts == nil {
 		verdicts = []ruleVerdict{}
 	}
-	return gin.H{"summary": counts, "rules": verdicts}
+	// A nil slice marshals as null, and a client reading `suggestions.length` should not have to special-case
+	// it - the same rule the export list and the notification section follow.
+	if suggestions == nil {
+		suggestions = []diagnoseSuggestion{}
+	}
+	return gin.H{"summary": counts, "rules": verdicts, "suggestions": suggestions}
 }
 
 // diagnoseNotificationRoutes returns the delivery verdict for a severity, using the same rule set the sender
@@ -174,11 +191,25 @@ func (s *Server) diagnoseNotificationRoutes(severity string) (gin.H, error) {
 	if verdicts == nil {
 		verdicts = []routeVerdict{}
 	}
+	suggestions := []diagnoseSuggestion{}
+	switch {
+	case len(verdicts) == 0:
+		suggestions = append(suggestions, diagnoseSuggestion{
+			Severity: "warning", Code: "no_notification_route",
+			Detail: "no notification routes are configured: this notification would reach nobody",
+		})
+	case deliveries == 0:
+		suggestions = append(suggestions, diagnoseSuggestion{
+			Severity: "warning", Code: "no_route_would_deliver",
+			Detail: "every configured route would reject this notification (disabled, below its minimum severity, or missing credentials)",
+		})
+	}
 	return gin.H{
 		"severity":      severity,
 		"would_deliver": deliveries,
 		"total_routes":  len(verdicts),
 		"routes":        verdicts,
+		"suggestions":   suggestions,
 	}, nil
 }
 
@@ -192,4 +223,58 @@ func countsOf(section gin.H, key string) uint {
 		return uint(value)
 	}
 	return 0
+}
+
+// diagnoseSuggestion is advice about the configuration, derived from what the verdict revealed.
+type diagnoseSuggestion struct {
+	Severity string `json:"severity"`
+	Code     string `json:"code"`
+	Detail   string `json:"detail"`
+}
+
+// templateSuggestions reports action templates whose variables this event cannot fill.
+//
+// expandTemplate replaces {{hostname}}, {{user}}, {{agent_id}}, {{ip}}, {{os}} and {{event_type}} by plain
+// substitution, so a variable the event does not carry silently becomes an empty string: a notification that
+// says "host  checked in" and a webhook that posts an empty agent id. Nothing errors, which is why this is worth
+// reporting before the rule ever fires.
+func templateSuggestions(rule AutomationRule, event Event) []diagnoseSuggestion {
+	available := map[string]bool{
+		"{{hostname}}":   event.AgentHost != "",
+		"{{user}}":       event.User != "",
+		"{{agent_id}}":   event.AgentID != "",
+		"{{ip}}":         event.AgentIP != "",
+		"{{os}}":         event.AgentOS != "",
+		"{{event_type}}": event.Type != "",
+	}
+	var out []diagnoseSuggestion
+	seen := make(map[string]bool, 4)
+	for _, action := range rule.Actions {
+		template := previewActionTemplate(action)
+		if template == "" {
+			continue
+		}
+		for variable, filled := range available {
+			if filled || seen[variable] {
+				continue
+			}
+			if !strings.Contains(template, variable) {
+				continue
+			}
+			seen[variable] = true
+			detail := "rule " + rule.Name + " uses " + variable +
+				" but this event carries no value for it: it would render empty"
+			// The distinction that traps operators: expandTemplate reads the event's own fields, NOT the data
+			// map, so providing data.user does not fill {{user}}. Say so rather than leaving them to find out.
+			if variable == "{{user}}" && event.Data["data.user"] != nil {
+				detail += " ({{user}} comes from the event's user field, not from data.user)"
+			}
+			out = append(out, diagnoseSuggestion{
+				Severity: "warning",
+				Code:     "template_variable_unfilled",
+				Detail:   detail,
+			})
+		}
+	}
+	return out
 }
