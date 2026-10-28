@@ -3,12 +3,15 @@ package server
 import (
 	"archive/zip"
 	"bytes"
+	"crypto/sha256"
 	"encoding/csv"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -304,12 +307,14 @@ func (s *Server) handleEngagementBundle(c *gin.Context) {
 	}
 
 	// MANIFEST.json - the package describes itself: what each member is, where it came from, how it may be shared. It
-	// is written last, from the list of members that actually made it into the archive.
+	// is written last, from the list of members that actually made it into the archive. The signature is handed back so
+	// the response can announce it: a script should not have to unzip the archive to learn whether it was signed.
+	var signedSignature *bundleSignature
 	if !add("MANIFEST.json", func(_ bundleWriter) error {
 		// The manifest lists the members written so far PLUS itself: it is being added right now, and a package that
 		// does not mention its own manifest is a package whose receiver wonders what he is holding.
 		members := append(append([]string{}, written...), "MANIFEST.json")
-		return writeBundleManifest(archive, recorder, engagement, windowEnd, now, members)
+		return writeBundleManifest(archive, recorder, engagement, windowEnd, now, members, &signedSignature)
 	}) {
 		fail()
 		return
@@ -330,6 +335,16 @@ func (s *Server) handleEngagementBundle(c *gin.Context) {
 		fmt.Sprintf("bundled %d agent(s), %d member(s), %d byte(s)", len(agents), 5, buf.Len()), true, nil)
 
 	name := fmt.Sprintf("engagement-%d_%s.zip", engagement.ID, time.Now().UTC().Format("2006-01-02_150405"))
+	// Transport-level facts, readable without unzipping: whether the manifest was signed and with which key, how many
+	// members travelled, and the digest of the archive itself - which a receiver can compare before opening anything.
+	archiveSum := sha256.Sum256(buf.Bytes())
+	c.Header("X-Bundle-SHA256", hex.EncodeToString(archiveSum[:]))
+	c.Header("X-Bundle-Members", strconv.Itoa(len(written)))
+	c.Header("X-Bundle-Signed", strconv.FormatBool(signedSignature != nil))
+	if signedSignature != nil {
+		c.Header("X-Bundle-Signature-Algorithm", signedSignature.Algorithm)
+		c.Header("X-Bundle-Public-Key", signedSignature.PublicKey)
+	}
 	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, name))
 	c.Data(http.StatusOK, "application/zip", buf.Bytes())
 }

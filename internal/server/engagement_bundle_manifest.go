@@ -65,7 +65,7 @@ func describeBundleMember(name string) bundleMemberDescription {
 // appearing here - and the test asserts the two directions agree. Each entry carries the digest the recorder captured
 // while the member was written, so the manifest describes what shipped rather than what was intended.
 func writeBundleManifest(archive bundleWriter, recorder *hashingBundleWriter, engagement db.Engagement,
-	windowEnd, now time.Time, written []string) error {
+	windowEnd, now time.Time, written []string, signatureOut **bundleSignature) error {
 	members := make([]bundleMemberDescription, 0, len(written))
 	for _, name := range written {
 		description := describeBundleMember(name)
@@ -78,6 +78,7 @@ func writeBundleManifest(archive bundleWriter, recorder *hashingBundleWriter, en
 	generatedAt := now.Format(time.RFC3339)
 	payload := bundleManifestPayload(engagement.ID, generatedAt, members)
 	signature := signBundleManifest(bundleSigner(), payload, len(members))
+	*signatureOut = signature
 	return writeJSONMember(archive, "MANIFEST.json", gin.H{
 		"engagement": gin.H{
 			"id":         engagement.ID,

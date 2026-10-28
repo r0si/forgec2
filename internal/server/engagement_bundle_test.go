@@ -100,6 +100,21 @@ func TestEngagementBundle(t *testing.T) {
 		t.Fatalf("Content-Disposition = %q", cd)
 	}
 
+	// The transport-level headers let a receiver check the archive and learn whether it was signed WITHOUT unzipping.
+	archiveSum := sha256.Sum256(w.Body.Bytes())
+	if got := w.Header().Get("X-Bundle-SHA256"); got != hex.EncodeToString(archiveSum[:]) {
+		t.Fatalf("X-Bundle-SHA256 = %q, want the digest of the body", got)
+	}
+	if got := w.Header().Get("X-Bundle-Members"); got != "9" {
+		t.Fatalf("X-Bundle-Members = %q, want 9", got)
+	}
+	if got := w.Header().Get("X-Bundle-Signed"); got != "false" {
+		t.Fatalf("X-Bundle-Signed = %q, want false without a configured key", got)
+	}
+	if got := w.Header().Get("X-Bundle-Public-Key"); got != "" {
+		t.Fatalf("an unsigned bundle advertised a key: %q", got)
+	}
+
 	// The archive must parse, and every promised member must be present.
 	reader, err := zip.NewReader(bytes.NewReader(w.Body.Bytes()), int64(w.Body.Len()))
 	if err != nil {
@@ -584,6 +599,7 @@ func TestEngagementBundleSignature(t *testing.T) {
 		t.Fatalf("seed engagement: %v", err)
 	}
 
+	var buildHeaders http.Header
 	buildBundle := func() []byte {
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
@@ -597,6 +613,7 @@ func TestEngagementBundleSignature(t *testing.T) {
 		if w.Code != http.StatusOK {
 			t.Fatalf("bundle status = %d (%s)", w.Code, w.Body.String())
 		}
+		buildHeaders = w.Header()
 		return w.Body.Bytes()
 	}
 	verify := func(body []byte, query string) map[string]interface{} {
@@ -618,6 +635,17 @@ func TestEngagementBundleSignature(t *testing.T) {
 	}
 
 	bundle := buildBundle()
+
+	// The response announces the signature, so a script does not have to unzip to learn about it.
+	if got := buildHeaders.Get("X-Bundle-Signed"); got != "true" {
+		t.Fatalf("a signed bundle did not say so in a header: %q", got)
+	}
+	if got := buildHeaders.Get("X-Bundle-Signature-Algorithm"); got != "ed25519" {
+		t.Fatalf("X-Bundle-Signature-Algorithm = %q", got)
+	}
+	if got := buildHeaders.Get("X-Bundle-Public-Key"); got != expectedKey {
+		t.Fatalf("X-Bundle-Public-Key = %q, want %q", got, expectedKey)
+	}
 
 	// 1. Signed, internally consistent, but NOT trusted without an expected key.
 	data := verify(bundle, "")

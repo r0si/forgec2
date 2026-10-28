@@ -15157,9 +15157,19 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description application/zip with summary.md, timeline.md, tasks.csv, audit.ndjson, agents.json, credentials.json, iocs.json, plugins.json and MANIFEST.json */
+            /** @description application/zip with summary.md, timeline.md, tasks.csv, audit.ndjson, agents.json, credentials.json, iocs.json, plugins.json and MANIFEST.json. The response announces transport-level facts so a script does not have to unzip to learn them. */
             200: {
                 headers: {
+                    /** @description SHA-256 of the archive itself, comparable before it is opened */
+                    "X-Bundle-SHA256"?: string;
+                    /** @description How many members travelled (the manifest lists the same set) */
+                    "X-Bundle-Members"?: number;
+                    /** @description Whether the manifest was signed (FORGEC2_BUNDLE_SIGNING_KEY configured) */
+                    "X-Bundle-Signed"?: boolean;
+                    /** @description Present when signed */
+                    "X-Bundle-Signature-Algorithm"?: string;
+                    /** @description Present when signed; compare it with the key you already trust */
+                    "X-Bundle-Public-Key"?: string;
                     [name: string]: unknown;
                 };
                 content: {
