@@ -12871,6 +12871,58 @@ paths:
       responses:
         '200': {description: Accepted collector payload shape}
 
+  /api/stats/tasks/failures:
+    get:
+      tags: [Stats]
+      summary: Why tasks failed, grouped by reason, type or agent
+      description: >-
+        "Twelve tasks failed this week" is not actionable; "nine timed out and two were denied by Defender" is. The error
+        text is already stored on every failed task, and this classifies it into a short, transparent list of reason codes
+        - the first matching pattern wins, and everything unmatched is collected as `other` **with an example**, so the
+        report never hides a category it could not name. `since` accepts the dashboard's relative form (`24h`, `7d`);
+        `group_by` switches the same rows between `reason` (default), `type` and `agent`. Each bucket carries `count`,
+        `sample` (the first error text, truncated) and `distinct_types`, because a reason spread across many task types is
+        systemic while one concentrated in a single type is that type's problem. The sample is capped at 5000 rows; when it
+        is reached the response says `truncated: true` rather than implying a complete picture.
+      operationId: taskFailureStats
+      security:
+        - SessionCookie: []
+      parameters:
+        - name: since
+          in: query
+          description: Window, e.g. 24h or 7d (default 7d)
+          schema: {type: string, default: 7d}
+        - name: group_by
+          in: query
+          schema: {type: string, enum: [reason, type, agent], default: reason}
+      responses:
+        '200':
+          description: Buckets, most common first
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  data:
+                    type: object
+                    properties:
+                      since: {type: string}
+                      group_by: {type: string}
+                      failed: {type: integer}
+                      truncated: {type: boolean}
+                      note: {type: string}
+                      buckets:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            key: {type: string}
+                            count: {type: integer}
+                            sample: {type: string}
+                            distinct_types: {type: integer}
+        '400':
+          description: Invalid since or group_by
   /api/stats/tasks/duration:
     get:
       tags: [Statistics]

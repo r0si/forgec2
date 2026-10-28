@@ -11037,6 +11037,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/stats/tasks/failures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Why tasks failed, grouped by reason, type or agent
+         * @description "Twelve tasks failed this week" is not actionable; "nine timed out and two were denied by Defender" is. The error text is already stored on every failed task, and this classifies it into a short, transparent list of reason codes - the first matching pattern wins, and everything unmatched is collected as `other` **with an example**, so the report never hides a category it could not name. `since` accepts the dashboard's relative form (`24h`, `7d`); `group_by` switches the same rows between `reason` (default), `type` and `agent`. Each bucket carries `count`, `sample` (the first error text, truncated) and `distinct_types`, because a reason spread across many task types is systemic while one concentrated in a single type is that type's problem. The sample is capped at 5000 rows; when it is reached the response says `truncated: true` rather than implying a complete picture.
+         */
+        get: operations["taskFailureStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/stats/tasks/duration": {
         parameters: {
             query?: never;
@@ -27610,6 +27630,52 @@ export interface operations {
         responses: {
             /** @description Collection dispatched */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    taskFailureStats: {
+        parameters: {
+            query?: {
+                /** @description Window, e.g. 24h or 7d (default 7d) */
+                since?: string;
+                group_by?: "reason" | "type" | "agent";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Buckets, most common first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        data?: {
+                            since?: string;
+                            group_by?: string;
+                            failed?: number;
+                            truncated?: boolean;
+                            note?: string;
+                            buckets?: {
+                                key?: string;
+                                count?: number;
+                                sample?: string;
+                                distinct_types?: number;
+                            }[];
+                        };
+                    };
+                };
+            };
+            /** @description Invalid since or group_by */
+            400: {
                 headers: {
                     [name: string]: unknown;
                 };
