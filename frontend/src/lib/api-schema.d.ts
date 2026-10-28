@@ -1930,6 +1930,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/agents/bulk/expiry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set or clear the deadline for a whole selection
+         * @description Ending an exercise means time-boxing every host, and doing that one agent at a time is forty requests and one omission away from a beacon that outlives the engagement. Select with `agent_ids` (at most 500) or with `engagement_id`, then set `expires_at` (RFC3339, a past instant is allowed - it is how an operator says "end this now without killing the host") or `clear: true`. **The strictness is the point:** ids the caller cannot see are returned in `skipped` rather than silently dropped, because "I set 39 of 40" must not look like success, and another tenant's agents are never touched. Every application is audited as `agent_expiry_bulk` with its counts.
+         */
+        post: operations["bulkSetAgentExpiry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/agents/{id}/expiry": {
         parameters: {
             query?: never;
@@ -14954,6 +14974,53 @@ export interface operations {
                         data: components["schemas"]["Task"][];
                     };
                 };
+            };
+        };
+    };
+    bulkSetAgentExpiry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    agent_ids?: string[];
+                    engagement_id?: number;
+                    /** @description RFC3339; empty unless clear is true */
+                    expires_at?: string;
+                    clear?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description What was applied and what was skipped */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        data?: {
+                            updated?: number;
+                            /** @description The applied deadline */
+                            expires_at?: string;
+                            /** @description Requested ids the caller could not see */
+                            skipped?: string[];
+                            engagement_id?: number;
+                        };
+                    };
+                };
+            };
+            /** @description No selection, no deadline, a malformed deadline, or more than 500 ids */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

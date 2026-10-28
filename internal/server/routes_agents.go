@@ -70,6 +70,8 @@ func (s *Server) registerAgentRoutes(auth *gin.RouterGroup) {
 		// The engagement deadline is enforceable since round 17; this is how an operator extends or
 		// clears it without rebuilding the implant.
 		agentsWrite.POST("/api/agents/:id/expiry", s.handleSetAgentExpiry)
+		// The same deadline across a whole selection: ending an exercise must not be forty requests.
+		agentsWrite.POST("/api/agents/bulk/expiry", s.handleBulkSetAgentExpiry)
 		// Receiving side of a handover: re-compute the manifest digests of an uploaded bundle.
 		agentsWrite.POST("/api/engagements/:id/bundle/verify", s.handleVerifyEngagementBundle)
 		// Engagements are the time-boxed container above the tenant; creating and closing one changes

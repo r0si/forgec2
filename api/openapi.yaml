@@ -3475,6 +3475,53 @@ paths:
                         type: array
                         items:
                           $ref: '#/components/schemas/Task'
+  /api/agents/bulk/expiry:
+    post:
+      tags: [Agents]
+      summary: Set or clear the deadline for a whole selection
+      description: >-
+        Ending an exercise means time-boxing every host, and doing that one agent at a time is forty requests and one
+        omission away from a beacon that outlives the engagement. Select with `agent_ids` (at most 500) or with
+        `engagement_id`, then set `expires_at` (RFC3339, a past instant is allowed - it is how an operator says "end this
+        now without killing the host") or `clear: true`. **The strictness is the point:** ids the caller cannot see are
+        returned in `skipped` rather than silently dropped, because "I set 39 of 40" must not look like success, and
+        another tenant's agents are never touched. Every application is audited as `agent_expiry_bulk` with its counts.
+      operationId: bulkSetAgentExpiry
+      security: [{SessionCookie: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                agent_ids:
+                  type: array
+                  items: {type: string}
+                engagement_id: {type: integer}
+                expires_at: {type: string, description: RFC3339; empty unless clear is true}
+                clear: {type: boolean}
+      responses:
+        '200':
+          description: What was applied and what was skipped
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  data:
+                    type: object
+                    properties:
+                      updated: {type: integer}
+                      expires_at: {type: string, description: The applied deadline, or "cleared"}
+                      skipped:
+                        type: array
+                        description: Requested ids the caller could not see
+                        items: {type: string}
+                      engagement_id: {type: integer}
+        '400':
+          description: No selection, no deadline, a malformed deadline, or more than 500 ids
   /api/agents/{id}/expiry:
     post:
       tags: [Agents]
