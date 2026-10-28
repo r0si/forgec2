@@ -53,7 +53,7 @@ func (s *Server) ensureBeaconImplantRow(agentID, secretID string) {
 	// The implant inherits the deadline of the secret it was built with, so "this exercise ends on
 	// Friday" becomes a property of the deployment rather than of the operator notes. A secret without
 	// an expiry leaves the implant unbounded, exactly as before.
-	row.ExpiresAt = s.regSecretExpiry(secretID)
+	row.ExpiresAt, row.EngagementID = s.regSecretBounds(secretID)
 	if err := s.db.Create(&row).Error; err != nil {
 		// Concurrent create for the same UUID: someone else won the race.
 		slog.Debug("ensureBeaconImplantRow create skipped", "agent_id", agentID, "error", err)
@@ -539,12 +539,19 @@ func sanitizeInfo(info map[string]string) map[string]string {
 // expiry could not be read. The deadline is enforced at task creation, where a missing value simply
 // means "unbounded", which is the historic behaviour.
 func (s *Server) regSecretExpiry(secretID string) *time.Time {
+	expiry, _ := s.regSecretBounds(secretID)
+	return expiry
+}
+
+// regSecretBounds returns both pieces of build-time scope a secret can carry: its own deadline and the
+// engagement the implant belongs to. One query, because registration needs both.
+func (s *Server) regSecretBounds(secretID string) (*time.Time, *uint) {
 	if secretID == "" {
-		return nil
+		return nil, nil
 	}
 	var secret db.RegSecret
-	if err := s.db.Select("id", "expires_at").Where("id = ?", secretID).First(&secret).Error; err != nil {
-		return nil
+	if err := s.db.Select("id", "expires_at", "engagement_id").Where("id = ?", secretID).First(&secret).Error; err != nil {
+		return nil, nil
 	}
-	return secret.ExpiresAt
+	return secret.ExpiresAt, secret.EngagementID
 }

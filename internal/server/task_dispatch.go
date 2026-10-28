@@ -132,11 +132,17 @@ func (s *Server) validateTaskCreationWithAgent(c *gin.Context, agentID, taskType
 	// handler, a bulk action, an automation rule and a script cannot disagree about it.
 	if agent := s.agentForExpiryCheck(agentID, preloadedAgent); agent != nil {
 		if s.agentExpired(*agent) {
-			slog.Warn("Task refused: agent engagement expired", "agent_id", agentID, "task_type", taskType, "expires_at", agent.ExpiresAt)
+			// Name the EFFECTIVE deadline: it may be the engagement window rather than the implant own,
+			// and an operator needs to know which one stopped the work.
+			deadline := s.effectiveAgentDeadline(*agent)
+			when := "unknown"
+			if deadline != nil {
+				when = deadline.UTC().Format(time.RFC3339)
+			}
+			slog.Warn("Task refused: agent engagement expired", "agent_id", agentID, "task_type", taskType, "deadline", when)
 			s.LogAuditRecord(nil, "agent_expired_block", "agent", agentID,
-				fmt.Sprintf("refused %s: engagement deadline passed (%s)", taskType, agent.ExpiresAt.UTC().Format(time.RFC3339)), false, nil)
-			return fmt.Errorf("agent expired: the engagement deadline for this implant passed at %s",
-				agent.ExpiresAt.UTC().Format(time.RFC3339))
+				fmt.Sprintf("refused %s: deadline passed (%s)", taskType, when), false, nil)
+			return fmt.Errorf("agent expired: the engagement deadline for this implant passed at %s", when)
 		}
 	}
 
@@ -1200,7 +1206,9 @@ func (s *Server) agentForExpiryCheck(agentID string, preloaded *db.Implant) *db.
 		return preloaded
 	}
 	var agent db.Implant
-	if err := s.db.Select("id", "expires_at").Where("id = ?", agentID).First(&agent).Error; err != nil {
+	// engagement_id must be projected: without it the merged deadline silently ignored the engagement
+	// and the whole feature was inert on the real path (the enforcement test caught exactly that).
+	if err := s.db.Select("id", "expires_at", "engagement_id").Where("id = ?", agentID).First(&agent).Error; err != nil {
 		return nil
 	}
 	return &agent
@@ -1209,5 +1217,38 @@ func (s *Server) agentForExpiryCheck(agentID string, preloaded *db.Implant) *db.
 // agentExpired reports whether the engagement deadline has passed. A nil deadline is unbounded, which
 // keeps every existing installation behaving exactly as before.
 func (s *Server) agentExpired(agent db.Implant) bool {
-	return agent.ExpiresAt != nil && !agent.ExpiresAt.IsZero() && time.Now().After(*agent.ExpiresAt)
+	deadline := s.effectiveAgentDeadline(agent)
+	return deadline != nil && !deadline.IsZero() && time.Now().After(*deadline)
+}
+
+// effectiveAgentDeadline merges the two deadlines an implant can carry: its own (inherited from the
+// registration secret) and the window of the engagement it belongs to. The EARLIER one wins, because
+// the engagement is the promise made to the customer - an implant built to run for a month must still
+// stop when the exercise it belongs to ends, or the next day, whichever is sooner.
+//
+// The engagement lookup only happens when the implant is linked to one, so installations without
+// engagements pay nothing for the feature. A closed engagement ends at ClosedAt, not at its agreed
+// EndsAt: closing early is a decision, and the earlier end is the one that applies.
+func (s *Server) effectiveAgentDeadline(agent db.Implant) *time.Time {
+	effective := agent.ExpiresAt
+	if agent.EngagementID == nil {
+		return effective
+	}
+	var engagement db.Engagement
+	if err := s.db.Select("id", "starts_at", "ends_at", "closed_at").
+		Where("id = ?", *agent.EngagementID).First(&engagement).Error; err != nil {
+		// An unreadable engagement must not block work: the implant deadline still applies.
+		return effective
+	}
+	end := engagement.EndsAt
+	if engagement.ClosedAt != nil && engagement.ClosedAt.Before(end) {
+		end = *engagement.ClosedAt
+	}
+	if end.IsZero() {
+		return effective
+	}
+	if effective == nil || end.Before(*effective) {
+		return &end
+	}
+	return effective
 }
