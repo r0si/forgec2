@@ -3,10 +3,10 @@ package server
 import (
 	"crypto/ed25519"
 	"encoding/hex"
-	"fmt"
 	"os"
-	"sort"
 	"strings"
+
+	"github.com/forgec2/forgec2/internal/bundle"
 )
 
 // Bundle manifest signing.
@@ -44,14 +44,16 @@ func bundleSigner() ed25519.PrivateKey {
 // different set from the one described. Fields are joined with NUL: a name or a digest containing a printable separator
 // could otherwise make two different manifests produce one payload.
 func bundleManifestPayload(engagementID uint, generatedAt string, members []bundleMemberDescription) []byte {
-	parts := make([]string, 0, len(members)+2)
-	parts = append(parts, fmt.Sprintf("engagement=%d", engagementID), "generated_at="+generatedAt)
-	ordered := append([]bundleMemberDescription(nil), members...)
-	sort.SliceStable(ordered, func(i, j int) bool { return ordered[i].Name < ordered[j].Name })
-	for _, member := range ordered {
-		parts = append(parts, member.Name+"="+member.SHA256)
+	// The canonical form lives in internal/bundle, which cmd/verify-bundle also uses: a payload built two ways would
+	// verify on one side and fail on the other, and the failure would look like tampering.
+	shared := make([]bundle.Member, 0, len(members))
+	for _, member := range members {
+		shared = append(shared, bundle.Member{
+			Name: member.Name, Purpose: member.Purpose, Source: member.Source,
+			Sensitivity: member.Sensitivity, SHA256: member.SHA256, Bytes: member.Bytes,
+		})
 	}
-	return []byte(strings.Join(parts, "\x00"))
+	return bundle.Payload(engagementID, generatedAt, shared)
 }
 
 // bundleSignature describes how a manifest was signed.
