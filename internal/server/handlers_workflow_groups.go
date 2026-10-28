@@ -346,7 +346,7 @@ func (s *Server) handleAPIDeleteWorkflow(c *gin.Context) {
 
 func (s *Server) handleAPIGroups(c *gin.Context) {
 	var groups []db.AgentGroup
-	if err := s.db.Limit(200).Find(&groups).Error; err != nil {
+	if err := s.tenantScope(s.db.Model(&db.AgentGroup{}), c).Limit(200).Find(&groups).Error; err != nil {
 		respondError(c, http.StatusInternalServerError, "failed to load groups")
 		return
 	}
@@ -430,6 +430,7 @@ func (s *Server) handleAPICreateGroup(c *gin.Context) {
 		Description: req.Description,
 		Color:       req.Color,
 		ParentID:    req.ParentID,
+		TenantID:    s.currentTenantID(c),
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 	}
@@ -443,7 +444,8 @@ func (s *Server) handleAPICreateGroup(c *gin.Context) {
 func (s *Server) handleAPIUpdateGroup(c *gin.Context) {
 	id := c.Param("id")
 	var group db.AgentGroup
-	if !s.findOrFail(c, &group, id, "group") {
+	if err := s.tenantScope(s.db.Model(&db.AgentGroup{}), c).Where("id = ?", id).First(&group).Error; err != nil {
+		respondError(c, http.StatusNotFound, "group not found")
 		return
 	}
 	var req struct {
@@ -497,7 +499,8 @@ func (s *Server) handleAPIDeleteGroup(c *gin.Context) {
 		respondError(c, http.StatusBadRequest, "cannot delete group with child groups — remove children first")
 		return
 	}
-	if err := s.db.Delete(&db.AgentGroup{}, "id = ?", id).Error; err != nil {
+	// Delete through the tenant scope: a group belongs to one tenant now.
+	if err := s.tenantScope(s.db.Model(&db.AgentGroup{}), c).Where("id = ?", id).Delete(&db.AgentGroup{}).Error; err != nil {
 		respondError(c, http.StatusInternalServerError, "failed to delete group")
 		return
 	}

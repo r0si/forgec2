@@ -40,7 +40,7 @@ func validTagColor(color string) bool {
 
 func (s *Server) handleAPITagList(c *gin.Context) {
 	var tags []db.AgentTag
-	if err := s.db.Order("name asc").Find(&tags).Error; err != nil {
+	if err := s.tenantScope(s.db.Model(&db.AgentTag{}), c).Order("name asc").Find(&tags).Error; err != nil {
 		slog.Error("Failed to list tags", "err", err)
 	}
 	respond(c, tags)
@@ -71,9 +71,12 @@ func (s *Server) handleAPITagCreate(c *gin.Context) {
 		return
 	}
 	tag := db.AgentTag{
-		ID:        util.NewString(),
-		Name:      req.Name,
-		Color:     req.Color,
+		ID:    util.NewString(),
+		Name:  req.Name,
+		Color: req.Color,
+		// Tags are per tenant now: uniqueness is (tenant_id, name), so two tenants can each
+		// have a "critical" tag without colliding.
+		TenantID:  s.currentTenantID(c),
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -91,7 +94,8 @@ func (s *Server) handleAPITagUpdate(c *gin.Context) {
 	}
 	id := c.Param("id")
 	var tag db.AgentTag
-	if !s.findOrFail(c, &tag, id, "tag") {
+	if err := s.tenantScope(s.db.Model(&db.AgentTag{}), c).Where("id = ?", id).First(&tag).Error; err != nil {
+		respondError(c, http.StatusNotFound, "tag not found")
 		return
 	}
 	var req struct {
@@ -132,7 +136,8 @@ func (s *Server) handleAPITagDelete(c *gin.Context) {
 	}
 	id := c.Param("id")
 	var tag db.AgentTag
-	if !s.findOrFail(c, &tag, id, "tag") {
+	if err := s.tenantScope(s.db.Model(&db.AgentTag{}), c).Where("id = ?", id).First(&tag).Error; err != nil {
+		respondError(c, http.StatusNotFound, "tag not found")
 		return
 	}
 	_ = s.db.Model(&tag).Association("Agents").Clear() // the tag delete below is the source of truth for the cascade

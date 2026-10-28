@@ -1467,8 +1467,11 @@ func (e *PhishingEvent) BeforeUpdate(tx *gorm.DB) error {
 }
 
 type AgentTag struct {
-	ID        string     `gorm:"primaryKey;size:36" json:"id"`
-	Name      string     `gorm:"uniqueIndex;size:100;not null" json:"name"`
+	ID   string `gorm:"primaryKey;size:36" json:"id"`
+	Name string `gorm:"size:100;not null;uniqueIndex:idx_agent_tags_tenant_name,priority:2" json:"name"`
+	// Uniqueness is per tenant: a global unique index made tenant B unable to create a tag
+	// called "critical" because tenant A had one.
+	TenantID  uint       `gorm:"index;uniqueIndex:idx_agent_tags_tenant_name,priority:1" json:"tenant_id"`
 	Color     string     `gorm:"size:7;default:#3498db" json:"color"` // hex color
 	CreatedAt time.Time  `json:"created_at"`
 	UpdatedAt time.Time  `json:"updated_at"`
@@ -1493,6 +1496,7 @@ type AutoTagRule struct {
 	TagID     string    `gorm:"size:36;not null" json:"tag_id"`
 	Tag       *AgentTag `gorm:"foreignKey:TagID" json:"tag,omitempty"`
 	Priority  int       `gorm:"default:0" json:"priority"`
+	TenantID  uint      `gorm:"index" json:"tenant_id"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -1521,8 +1525,12 @@ type AgentGroup struct {
 	Parent      *AgentGroup   `gorm:"foreignKey:ParentID" json:"parent,omitempty"`
 	Children    []*AgentGroup `gorm:"foreignKey:ParentID" json:"children,omitempty"`
 	Agents      []*Implant    `gorm:"many2many:agent_group_assignments;" json:"agents,omitempty"`
-	CreatedAt   time.Time     `json:"created_at"`
-	UpdatedAt   time.Time     `json:"updated_at"`
+	// TenantID scopes the group to its tenant. Groups are labels over agents, and without this
+	// column every tenant saw (and could rename or delete) every other tenant's groups: the
+	// handler could only scope by "contains one of my agents", which an empty group defeats.
+	TenantID  uint      `gorm:"index" json:"tenant_id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 func (AgentGroup) TableName() string { return "agent_groups" }

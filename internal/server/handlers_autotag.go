@@ -16,8 +16,9 @@ import (
 // handleAutoTagRules lists all auto-tag rules.
 // GET /api/autotag/rules
 func (s *Server) handleAutoTagRules(c *gin.Context) {
+	// Rules are per tenant: they tag agents, and agents belong to a tenant.
 	var rules []db.AutoTagRule
-	if err := s.db.Preload("Tag").Order("priority desc, created_at desc").Limit(200).Find(&rules).Error; err != nil {
+	if err := s.tenantScope(s.db.Model(&db.AutoTagRule{}), c).Preload("Tag").Order("priority desc, created_at desc").Limit(200).Find(&rules).Error; err != nil {
 		handleQueryError(c, err, "Failed to list auto-tag rules")
 		return
 	}
@@ -40,6 +41,9 @@ func (s *Server) handleAutoTagCreate(c *gin.Context) {
 	if rule.ID == "" {
 		rule.ID = util.NewString()
 	}
+	// The whole model is bound from the request body, so the tenant is FORCED here: trusting the
+	// bound value would let a caller file a rule into another tenant by sending tenant_id.
+	rule.TenantID = s.currentTenantID(c)
 	if err := s.db.Create(&rule).Error; err != nil {
 		respondError(c, http.StatusInternalServerError, "failed to create rule")
 		return
@@ -57,7 +61,8 @@ func (s *Server) handleAutoTagCreate(c *gin.Context) {
 func (s *Server) handleAutoTagUpdate(c *gin.Context) {
 	id := c.Param("id")
 	var rule db.AutoTagRule
-	if !s.findOrFail(c, &rule, id, "rule") {
+	if err := s.tenantScope(s.db.Model(&db.AutoTagRule{}), c).Where("id = ?", id).First(&rule).Error; err != nil {
+		respondError(c, http.StatusNotFound, "rule not found")
 		return
 	}
 	if err := c.ShouldBindJSON(&rule); err != nil {
@@ -65,6 +70,7 @@ func (s *Server) handleAutoTagUpdate(c *gin.Context) {
 		return
 	}
 	rule.ID = id
+	rule.TenantID = s.currentTenantID(c)
 	if err := s.db.Save(&rule).Error; err != nil {
 		respondError(c, http.StatusInternalServerError, "failed to update rule")
 		return
@@ -82,7 +88,8 @@ func (s *Server) handleAutoTagUpdate(c *gin.Context) {
 func (s *Server) handleAutoTagToggle(c *gin.Context) {
 	id := c.Param("id")
 	var rule db.AutoTagRule
-	if !s.findOrFail(c, &rule, id, "rule") {
+	if err := s.tenantScope(s.db.Model(&db.AutoTagRule{}), c).Where("id = ?", id).First(&rule).Error; err != nil {
+		respondError(c, http.StatusNotFound, "rule not found")
 		return
 	}
 	rule.Enabled = !rule.Enabled
@@ -97,7 +104,7 @@ func (s *Server) handleAutoTagToggle(c *gin.Context) {
 // DELETE /api/autotag/rules/:id
 func (s *Server) handleAutoTagDelete(c *gin.Context) {
 	id := c.Param("id")
-	res := s.db.Delete(&db.AutoTagRule{}, "id = ?", id)
+	res := s.tenantScope(s.db.Model(&db.AutoTagRule{}), c).Where("id = ?", id).Delete(&db.AutoTagRule{})
 	if res.Error != nil {
 		respondError(c, http.StatusInternalServerError, sanitizeError(res.Error, "Auto tag"))
 		return
@@ -113,12 +120,12 @@ func (s *Server) handleAutoTagDelete(c *gin.Context) {
 // POST /api/autotag/apply
 func (s *Server) handleAutoTagApply(c *gin.Context) {
 	var rules []db.AutoTagRule
-	if err := s.db.Preload("Tag").Where("enabled = ?", true).Limit(AutoTagRuleLimit).Find(&rules).Error; err != nil {
+	if err := s.tenantScope(s.db.Model(&db.AutoTagRule{}), c).Preload("Tag").Where("enabled = ?", true).Limit(AutoTagRuleLimit).Find(&rules).Error; err != nil {
 		slog.Error("Failed to load auto-tag rules for apply", "err", err)
 	}
 
 	var agents []db.Implant
-	if err := s.db.Limit(AutoTagAgentLimit).Find(&agents).Error; err != nil {
+	if err := s.tenantScope(s.db.Model(&db.Implant{}), c).Limit(AutoTagAgentLimit).Find(&agents).Error; err != nil {
 		slog.Error("Failed to load agents for auto-tag", "err", err)
 	}
 

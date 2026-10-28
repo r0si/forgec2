@@ -30,22 +30,14 @@ const TABLE_RULES = new Map([
   ["Workflow", ["workflowScope", "creatorScope"]],
   ["OneShotTask", ["visibleAgentIDSubquery"]],
   ["AgentStatusEvent", ["getAgentOrFail", "visibleAgentIDSubquery"]],
-  ["AgentTag", ["getAgentOrFail", "tenantScope"]],
-  ["AgentGroup", ["getAgentOrFail", "tenantScope"]],
+  ["AgentTag", ["tenantScope"]],
+  ["AgentGroup", ["tenantScope"]],
+  ["AutoTagRule", ["tenantScope"]],
 ]);
 
 // Handlers that legitimately work on the whole installation, with the reason.
 const ALLOWLIST = new Map([
-  ["handleAPITagUpdate", "tags are a global label catalogue; assignment (the tenant-bound part) is checked separately"],
-  ["handleAPITagDelete", "tags are a global label catalogue; the cascade is scoped by the agent rows it removes"],
-  ["handleAPITagCreate", "tags are a global label catalogue"],
-  ["handleAPITagList", "tags are a global label catalogue; no per-tenant data in the row"],
   ["handleBatchAgentTags", "narrowed with a tenant-scoped implants subquery before reading assignments"],
-  // Known gap, documented in AGENTS.md: groups have neither a tenant column nor a creator, so
-  // they are installation-global until the schema gains an owner. Listing leaks metadata only;
-  // deleting one is destructive, which is why the row is called out in the CHANGELOG.
-  ["handleAPIGroups", "agent_groups has no tenant or creator column yet (documented gap)"],
-  ["handleAPIDeleteGroup", "agent_groups has no tenant or creator column yet (documented gap)"],
 ]);
 
 const SCOPES = [
@@ -107,6 +99,10 @@ for (const file of walk(SERVER_DIR)) {
       // call a wrapper (findVisibleWorkflow) that scopes for it, and demanding the exact name
       // would flag correct code.
       if (helpers.some((h) => fn.body.includes(h)) || SCOPES.some((h) => fn.body.includes(h))) continue;
+      // A CREATE cannot scope a row that does not exist yet: stamping the owner is the scoping.
+      // Accept currentTenantID only when the handler also creates, so a read path cannot use it
+      // as a free pass.
+      if (fn.body.includes(".Create(") && fn.body.includes("currentTenantID(")) continue;
       findings.push({
         file: rel,
         line: fn.line,
