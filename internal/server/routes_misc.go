@@ -71,6 +71,8 @@ func (s *Server) registerAutomationRoutes(auth *gin.RouterGroup) {
 	autoWrite.Use(middleware.RequirePermission(db.PermAutomationWrite))
 	{
 		autoWrite.POST("/api/automation/rules", s.handleSaveAutomationRule)
+		// Clearing a rule's action counters: a fixed rule must not keep an error-level finding forever.
+		autoWrite.POST("/api/automation/action-stats/reset", s.handleResetAutomationActionStats)
 		autoWrite.PUT("/api/automation/rules/:id", s.handleUpdateAutomationRule)
 		autoWrite.DELETE("/api/automation/rules/:id", s.handleDeleteAutomationRule)
 		autoWrite.POST("/api/automation/rules/:id/toggle", s.handleToggleAutomationRule)

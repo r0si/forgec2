@@ -2513,6 +2513,40 @@ paths:
                           answers to the same question.
         '400':
           description: Missing event_type, malformed body or unknown notification severity
+  /api/automation/action-stats/reset:
+    post:
+      tags: [Automation]
+      summary: Clear a rule's action counters
+      description: >-
+        A rule whose action failed for a week and was then fixed would keep an error-level `action_failing` finding
+        forever, and an indicator that can only get worse is one operators learn to ignore. Clearing one rule (`?id=`)
+        leaves the others alone; omitting `id` clears every counter and reports how many it removed. An unknown rule is a
+        404 rather than a silent no-op, because "the finding is gone" and "the id was a typo" must not look the same.
+        Both forms are audited as `automation_action_stats_reset`.
+      operationId: resetAutomationActionStats
+      security: [{SessionCookie: []}]
+      parameters:
+        - name: id
+          in: query
+          description: Rule id (a string, not a number); omit to clear every counter
+          schema: {type: string}
+      responses:
+        '200':
+          description: How many counters were removed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  data:
+                    type: object
+                    properties:
+                      cleared: {type: integer}
+                      scope: {type: string, enum: [rule, all]}
+                      rule_id: {type: string}
+        '400': {description: The id was given in the wrong shape}
+        '404': {description: No such rule}
   /api/automation/health:
     get:
       tags: [Automation]

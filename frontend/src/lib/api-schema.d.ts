@@ -1390,6 +1390,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/automation/action-stats/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Clear a rule's action counters
+         * @description A rule whose action failed for a week and was then fixed would keep an error-level `action_failing` finding forever, and an indicator that can only get worse is one operators learn to ignore. Clearing one rule (`?id=`) leaves the others alone; omitting `id` clears every counter and reports how many it removed. An unknown rule is a 404 rather than a silent no-op, because "the finding is gone" and "the id was a typo" must not look the same. Both forms are audited as `automation_action_stats_reset`.
+         */
+        post: operations["resetAutomationActionStats"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/automation/health": {
         parameters: {
             query?: never;
@@ -14012,6 +14032,51 @@ export interface operations {
             };
             /** @description Missing event_type, malformed body or unknown notification severity */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    resetAutomationActionStats: {
+        parameters: {
+            query?: {
+                /** @description Rule id (a string, not a number); omit to clear every counter */
+                id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description How many counters were removed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        data?: {
+                            cleared?: number;
+                            /** @enum {string} */
+                            scope?: "rule" | "all";
+                            rule_id?: string;
+                        };
+                    };
+                };
+            };
+            /** @description The id was given in the wrong shape */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such rule */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
