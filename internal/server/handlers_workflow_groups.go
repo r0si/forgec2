@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -14,11 +13,16 @@ import (
 func (s *Server) handleAPIWorkflows(c *gin.Context) {
 	p := parsePagination(c, 50, 200)
 	var total int64
-	if err := s.db.Model(&db.Workflow{}).Count(&total).Error; err != nil {
+	wfScope, wfOK := s.workflowScope(c)
+	if !wfOK {
+		respond(c, gin.H{"workflows": []db.Workflow{}, "total": 0})
+		return
+	}
+	if err := wfScope.Count(&total).Error; err != nil {
 		slog.Error("Failed to count workflows", "err", err)
 	}
 	var workflows []db.Workflow
-	if err := s.db.Preload("Steps").Order("created_at desc").Offset(p.Offset).Limit(p.PageSize).Find(&workflows).Error; err != nil {
+	if err := wfScope.Preload("Steps").Order("created_at desc").Offset(p.Offset).Limit(p.PageSize).Find(&workflows).Error; err != nil {
 		respondError(c, http.StatusInternalServerError, "failed to load workflows")
 		return
 	}
@@ -26,68 +30,42 @@ func (s *Server) handleAPIWorkflows(c *gin.Context) {
 }
 
 func (s *Server) handleAPIWorkflowsDetail(c *gin.Context) {
-	var wf db.Workflow
-	if err := s.db.Preload("Steps").First(&wf, "id = ?", c.Param("id")).Error; err != nil {
-		respondError(c, http.StatusNotFound, "workflow not found")
+	wf, ok := s.findVisibleWorkflow(c, c.Param("id"))
+	if !ok {
 		return
 	}
 	respond(c, gin.H{"workflow": wf})
 }
 
 func (s *Server) handleAPIWorkflowsToggle(c *gin.Context) {
-	var wf db.Workflow
-	if !s.findOrFail(c, &wf, c.Param("id"), "workflow") {
+	wf, ok := s.findVisibleWorkflow(c, c.Param("id"))
+	if !ok {
 		return
 	}
-	wf.Enabled = !wf.Enabled
-	if err := s.db.Save(&wf).Error; err != nil {
+	// Update the single column instead of Save(&wf): the preloaded Steps association makes a
+	// full Save rewrite child rows as well, which is both wider than intended and the source of
+	// a bogus "no such column" alias in the generated SQL.
+	if err := s.db.Model(&db.Workflow{}).Where("id = ?", wf.ID).Update("enabled", !wf.Enabled).Error; err != nil {
 		respondError(c, http.StatusInternalServerError, "failed to update workflow")
 		return
 	}
-	respond(c, gin.H{"enabled": wf.Enabled})
-	s.LogAuditRecord(c, "workflow_toggle", "workflow", wf.ID, fmt.Sprintf("Workflow %s", map[bool]string{true: "enabled", false: "disabled"}[wf.Enabled]), true, nil)
+	respond(c, gin.H{"enabled": !wf.Enabled})
+	s.LogAuditRecord(c, "workflow_toggle", "workflow", wf.ID, fmt.Sprintf("Workflow %s", map[bool]string{true: "enabled", false: "disabled"}[!wf.Enabled]), true, nil)
 }
 
 func (s *Server) handleAPIWorkflowsExecute(c *gin.Context) {
-	var wf db.Workflow
-	if err := s.db.Preload("Steps").First(&wf, "id = ?", c.Param("id")).Error; err != nil {
-		respondError(c, http.StatusNotFound, "workflow not found")
+	wf, ok := s.findVisibleWorkflow(c, c.Param("id"))
+	if !ok {
 		return
 	}
 
-	var targetAgents []db.Implant
-	switch wf.ScopeType {
-	case "tags", "groups", "agents":
-		if wf.ScopeIDs == "" {
-			respond(c, gin.H{"task_count": 0, "agents_count": 0})
-			return
-		}
-		var ids []string
-		if err := json.Unmarshal([]byte(wf.ScopeIDs), &ids); err != nil {
-			respondError(c, http.StatusInternalServerError, "invalid scope_ids")
-			return
-		}
-		if wf.ScopeType == "agents" {
-			if err := s.db.Where("id IN ?", ids).Limit(AgentQueryLimit).Find(&targetAgents).Error; err != nil {
-				slog.Error("Workflow: failed to query target agents by IDs", "err", err)
-			}
-		} else if wf.ScopeType == "tags" {
-			if err := s.db.Distinct("implants.*").Joins("JOIN agent_tag_assignments ON agent_tag_assignments.implant_id = implants.id").
-				Where("agent_tag_assignments.agent_tag_id IN ?", ids).Limit(AgentQueryLimit).Find(&targetAgents).Error; err != nil {
-				slog.Error("Workflow: failed to query target agents by tags", "err", err)
-			}
-		} else {
-			if err := s.db.Distinct("implants.*").Joins("JOIN agent_group_assignments ON agent_group_assignments.implant_id = implants.id").
-				Where("agent_group_assignments.agent_group_id IN ?", ids).Limit(AgentQueryLimit).Find(&targetAgents).Error; err != nil {
-				slog.Error("Workflow: failed to query target agents by groups", "err", err)
-			}
-		}
-	default:
-		if err := s.db.Where("last_seen > ?", time.Now().Add(-30*time.Minute)).Limit(AgentQueryLimit).Find(&targetAgents).Error; err != nil {
-			slog.Error("Workflow: failed to query recent agents", "err", err)
-		}
+	// Target resolution is tenant-scoped too: the workflow's own scope_ids must not be able to
+	// name another tenant's hosts.
+	targetAgents := s.workflowTargetAgents(c, wf)
+	if len(targetAgents) == 0 {
+		respond(c, gin.H{"task_count": 0, "agents_count": 0})
+		return
 	}
-
 	agentIDs := make([]string, len(targetAgents))
 	for i, a := range targetAgents {
 		agentIDs[i] = a.ID
@@ -159,7 +137,8 @@ func (s *Server) handleAPICreateWorkflow(c *gin.Context) {
 func (s *Server) handleAPIUpdateWorkflow(c *gin.Context) {
 	id := c.Param("id")
 	var wf db.Workflow
-	if !s.findOrFail(c, &wf, id, "workflow") {
+	wf, ok := s.findVisibleWorkflow(c, id)
+	if !ok {
 		return
 	}
 	var req struct {
@@ -352,7 +331,12 @@ func (s *Server) handleAPIDeleteWorkflow(c *gin.Context) {
 		respondError(c, http.StatusInternalServerError, "failed to delete workflow steps")
 		return
 	}
-	if err := s.db.Delete(&db.Workflow{}, "id = ?", id).Error; err != nil {
+	wfDelScope, wfDelOK := s.workflowScope(c)
+	if !wfDelOK {
+		respondError(c, http.StatusNotFound, "workflow not found")
+		return
+	}
+	if err := wfDelScope.Where("id = ?", id).Delete(&db.Workflow{}).Error; err != nil {
 		respondError(c, http.StatusInternalServerError, sanitizeError(err, "Workflow operation"))
 		return
 	}
