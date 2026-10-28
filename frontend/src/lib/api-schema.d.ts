@@ -1370,6 +1370,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/automation/diagnose": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * What fires for this event, and who would be told
+         * @description The composed answer, for debugging an automation set without correlating two endpoints by hand: the same automation batch preview (which rules would fire, how many are blocked by conditions or cooldown) plus the notification delivery verdict for a candidate severity (how many of the configured routes would deliver). Runs nothing - no rule fires, no notification is persisted, no task is created - and the call is audited as `automation_diagnose`. The `notification` block is optional and defaults to severity `info`.
+         */
+        post: operations["diagnoseAutomation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/automation/health": {
         parameters: {
             query?: never;
@@ -13808,6 +13828,61 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+        };
+    };
+    diagnoseAutomation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    event_type: string;
+                    agent_id?: string;
+                    agent_host?: string;
+                    agent_ip?: string;
+                    agent_os?: string;
+                    user?: string;
+                    data?: Record<string, never>;
+                    notification?: {
+                        title?: string;
+                        message?: string;
+                        /** @enum {string} */
+                        severity?: "info" | "warning" | "critical";
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description Both verdicts for one event */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        data?: {
+                            event_type?: string;
+                            notification_title?: string;
+                            /** @description Same shape as /api/automation/preview */
+                            automation?: Record<string, never>;
+                            /** @description Same shape as /api/notification-routes/preview */
+                            notifications?: Record<string, never>;
+                        };
+                    };
+                };
+            };
+            /** @description Missing event_type, malformed body or unknown notification severity */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     automationHealth: {

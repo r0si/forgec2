@@ -68,6 +68,8 @@ func (s *Server) registerAutomationRoutes(auth *gin.RouterGroup) {
 		autoWrite.POST("/api/automation/rules/:id/preview", s.handlePreviewAutomationRule)
 		// The other direction: which rules would fire for one event.
 		autoWrite.POST("/api/automation/preview", s.handlePreviewAutomationBatch)
+		// One call: what fires for this event, and who would be told.
+		autoWrite.POST("/api/automation/diagnose", s.handleAutomationDiagnose)
 		autoWrite.POST("/api/webhooks", s.handleCreateWebhook)
 		autoWrite.DELETE("/api/webhooks/:id", s.handleDeleteWebhook)
 		autoWrite.POST("/api/webhooks/test", s.handleTestWebhook)

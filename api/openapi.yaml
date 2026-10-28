@@ -2392,6 +2392,58 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
+  /api/automation/diagnose:
+    post:
+      tags: [Automation]
+      summary: What fires for this event, and who would be told
+      description: >-
+        The composed answer, for debugging an automation set without correlating two endpoints by hand: the same
+        automation batch preview (which rules would fire, how many are blocked by conditions or cooldown) plus
+        the notification delivery verdict for a candidate severity (how many of the configured routes would
+        deliver). Runs nothing - no rule fires, no notification is persisted, no task is created - and the call
+        is audited as `automation_diagnose`. The `notification` block is optional and defaults to severity `info`.
+      operationId: diagnoseAutomation
+      security:
+        - SessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [event_type]
+              properties:
+                event_type: {type: string}
+                agent_id: {type: string}
+                agent_host: {type: string}
+                agent_ip: {type: string}
+                agent_os: {type: string}
+                user: {type: string}
+                data: {type: object}
+                notification:
+                  type: object
+                  properties:
+                    title: {type: string}
+                    message: {type: string}
+                    severity: {type: string, enum: [info, warning, critical]}
+      responses:
+        '200':
+          description: Both verdicts for one event
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  data:
+                    type: object
+                    properties:
+                      event_type: {type: string}
+                      notification_title: {type: string}
+                      automation: {type: object, description: Same shape as /api/automation/preview}
+                      notifications: {type: object, description: Same shape as /api/notification-routes/preview}
+        '400':
+          description: Missing event_type, malformed body or unknown notification severity
   /api/automation/health:
     get:
       tags: [Automation]
