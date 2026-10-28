@@ -3600,6 +3600,21 @@ paths:
                             notes:
                               type: array
                               items: {type: string}
+                      maintenance:
+                        type: array
+                        description: >-
+                          Endpoints that change what a report will say next, listed apart from the diagnostics because
+                          every diagnostic answers a question. Each names the audit action it writes.
+                        items:
+                          type: object
+                          properties:
+                            path: {type: string}
+                            method: {type: string}
+                            clears: {type: string}
+                            audited: {type: string}
+                            params:
+                              type: array
+                              items: {type: string}
                       diagnostic_rate_limit:
                         type: object
                         description: >-

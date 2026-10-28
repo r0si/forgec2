@@ -15060,6 +15060,14 @@ export interface operations {
                                 body?: string[];
                                 notes?: string[];
                             }[];
+                            /** @description Endpoints that change what a report will say next, listed apart from the diagnostics because every diagnostic answers a question. Each names the audit action it writes. */
+                            maintenance?: {
+                                path?: string;
+                                method?: string;
+                                clears?: string;
+                                audited?: string;
+                                params?: string[];
+                            }[];
                             /** @description The diagnostics family is throttled separately from the write endpoints it shares a permission with. Published so a client can back off before it receives a 429 (which carries Retry-After), and derived from the constants the limiter uses. */
                             diagnostic_rate_limit?: {
                                 requests?: number;

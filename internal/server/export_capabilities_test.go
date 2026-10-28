@@ -55,6 +55,13 @@ func TestExportCapabilities(t *testing.T) {
 				SideEffects *bool    `json:"side_effects"`
 				Notes       []string `json:"notes"`
 			} `json:"diagnostics"`
+			Maintenance []struct {
+				Path    string   `json:"path"`
+				Method  string   `json:"method"`
+				Clears  string   `json:"clears"`
+				Audited string   `json:"audited"`
+				Params  []string `json:"params"`
+			} `json:"maintenance"`
 			DiagnosticRateLimit struct {
 				Requests      int      `json:"requests"`
 				WindowSeconds int      `json:"window_seconds"`
@@ -178,6 +185,22 @@ func TestExportCapabilities(t *testing.T) {
 			t.Fatalf("%s is advertised as a diagnostic but is not in api/openapi.yaml", specPath)
 		}
 	}
+	// The maintenance endpoints are listed apart from the diagnostics: every diagnostic answers a question, while these
+	// change what the report will say next. Both must name the audit action they write, because "the counter was cleared"
+	// is a change someone will look for later.
+	if len(resp.Data.Maintenance) != 2 {
+		t.Fatalf("maintenance entries = %d, want the two reset endpoints", len(resp.Data.Maintenance))
+	}
+	for _, entry := range resp.Data.Maintenance {
+		if entry.Path == "" || entry.Method != "POST" || entry.Clears == "" || entry.Audited == "" {
+			t.Fatalf("an incomplete maintenance entry: %+v", entry)
+		}
+		specPath := strings.ReplaceAll(entry.Path, ":id", "{id}")
+		if !strings.Contains(string(spec), specPath+":") {
+			t.Fatalf("%s is listed as maintenance but is not in api/openapi.yaml", specPath)
+		}
+	}
+
 	// Exactly one diagnostic delivers something real, and it is the route test. More than one would make a batch runner
 	// dangerous; none would mean the flag is decoration.
 	if sideEffecting != 1 {

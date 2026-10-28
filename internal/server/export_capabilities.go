@@ -171,6 +171,16 @@ func (s *Server) handleExportCapabilities(c *gin.Context) {
 				"notes":        []string{"persists and delivers nothing; only successful previews are audited"},
 			},
 			{
+				"path":         "/api/stats/tasks/failures",
+				"method":       "GET",
+				"answers":      "why tasks failed, grouped by reason, type or agent",
+				"body":         []string{},
+				"side_effects": false,
+				"notes": []string{
+					"reason codes are first-match and unmatched errors are collected as 'other' with an example",
+					"a 5000-row sample reports truncated: true rather than implying a complete picture",
+				},
+			}, {
 				// The one entry in this list that DOES something outside: it sends a real message. A client that offers a
 				// "run all diagnostics" button must not include it, which is why `side_effects` is stated on every entry
 				// rather than implied by the absence of a note.
@@ -186,7 +196,25 @@ func (s *Server) handleExportCapabilities(c *gin.Context) {
 				},
 			},
 		},
-		"diagnostic_rate_limit": gin.H{
+		// The clearing endpoints are deliberately NOT in the list above: every diagnostic answers a question, while these
+		// change what the report will say next. Keeping them apart means a client can offer "run all diagnostics" and a
+		// separate, deliberate "clear the counters" action.
+		"maintenance": []gin.H{
+			{
+				"path":    "/api/notification-routes/stats/reset",
+				"method":  "POST",
+				"clears":  "notification delivery counters",
+				"audited": "notification_stats_reset",
+				"params":  []string{"id (optional)"},
+			},
+			{
+				"path":    "/api/automation/action-stats/reset",
+				"method":  "POST",
+				"clears":  "automation rule action counters",
+				"audited": "automation_action_stats_reset",
+				"params":  []string{"id (optional)"},
+			},
+		}, "diagnostic_rate_limit": gin.H{
 			"requests":       diagnosticRateLimitRequests,
 			"window_seconds": int(diagnosticRateLimitWindow.Seconds()),
 			"scope":          "per client IP, on the diagnostics endpoints only",

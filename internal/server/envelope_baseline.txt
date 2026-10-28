@@ -11,8 +11,16 @@
 #                  payloads; wrapping them would change the page JSON contract.
 #   server_http.go /health, whose status/version/uptime keys container and
 #                  deploy probes read at the top level.
+#   audit.go       the format=json audit export is ONE document
+#                  (count/truncated/filtered/rows) for tools that do not
+#                  stream; the NDJSON variant is not JSON at all.
+#   handlers_agent_tasks.go  the format=json task export, same reasoning: a
+#                  single document with count/truncated/tasks, whose rows a
+ #                  caller asked for by name.
 helpers.go 1
 api.go 4
 extc2.go 1
 render_api.go 1
 server_http.go 1
+audit.go 1
+handlers_agent_tasks.go 1
