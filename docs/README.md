@@ -30,6 +30,7 @@ nobody reads.
 |---|---|
 | [VERIFIERS.md](VERIFIERS.md) | The three offline verifiers, their shared exit codes, and what none of them can prove |
 | [HANDOVER_BUNDLE.md](HANDOVER_BUNDLE.md) | Producing and checking an engagement handover |
+| [ENGAGEMENT_CLOSEOUT.md](ENGAGEMENT_CLOSEOUT.md) | The last hour of an exercise: stop work, assemble, verify, hand over |
 | [AUDIT_EXPORT.md](AUDIT_EXPORT.md) | Verifying an exported audit log |
 | [PLUGIN_AUTHORING.md](PLUGIN_AUTHORING.md) | Writing a plugin, and checking one you received |
 
