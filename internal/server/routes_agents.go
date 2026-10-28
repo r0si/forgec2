@@ -18,6 +18,8 @@ func (s *Server) registerAgentRoutes(auth *gin.RouterGroup) {
 		// Full /api path: the group prefix here is "/", and the coverage guard only compares /api paths.
 		agentsRead.GET("/api/engagements/expiry", s.handleEngagementExpiry)
 		agentsRead.GET("/api/engagements", s.handleListEngagements)
+		// "What did this exercise actually do" - a read-only roll-up over its own window.
+		agentsRead.GET("/api/engagements/:id/summary", s.handleEngagementSummary)
 		agentsRead.GET("/agents/:id", s.handleAgentDetail)
 		agentsRead.GET("/agents/:id/shell", s.handleShellPage)
 		agentsRead.GET("/agents/:id/files", s.handleFileBrowserPage)

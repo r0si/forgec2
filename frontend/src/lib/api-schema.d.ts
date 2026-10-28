@@ -1894,6 +1894,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/engagements/{id}/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What one engagement actually did
+         * @description A read-only roll-up over the engagement's own window: the fleet it covered and how those hosts ended up, the tasks run and their outcomes, and the audited actions taken while it was open. The window runs from `starts_at` to the earliest of `ends_at`, `closed_at` and now, because counting past the effective end would attribute the next engagement's work to this one. Tasks are counted only for agents linked to this engagement. Tenant-scoped; another tenant's engagement is a 404.
+         */
+        get: operations["engagementSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/engagements/expiry": {
         parameters: {
             query?: never;
@@ -14522,6 +14542,66 @@ export interface operations {
             };
             /** @description Already closed */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    engagementSummary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Fleet counts, task outcomes and the highest-count audited actions inside the window */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        data?: {
+                            engagement?: components["schemas"]["Engagement"];
+                            window?: {
+                                /** Format: date-time */
+                                starts_at?: string;
+                                /**
+                                 * Format: date-time
+                                 * @description earliest of agreed end
+                                 */
+                                ends_at?: string;
+                                open?: boolean;
+                            };
+                            agents?: {
+                                total?: number;
+                                online?: number;
+                                expired?: number;
+                            };
+                            tasks?: {
+                                pending?: number;
+                                running?: number;
+                                completed?: number;
+                                failed?: number;
+                            };
+                            /** @description Audited actions inside the window, highest count first (max 25) */
+                            actions?: {
+                                action?: string;
+                                count?: number;
+                            }[];
+                        };
+                    };
+                };
+            };
+            /** @description No such engagement in the caller's tenant */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

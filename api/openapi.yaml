@@ -3247,6 +3247,66 @@ paths:
           description: No such engagement in the caller's tenant
         '409':
           description: Already closed
+  /api/engagements/{id}/summary:
+    get:
+      tags: [Engagements]
+      summary: What one engagement actually did
+      description: >-
+        A read-only roll-up over the engagement's own window: the fleet it covered and how those hosts
+        ended up, the tasks run and their outcomes, and the audited actions taken while it was open. The
+        window runs from `starts_at` to the earliest of `ends_at`, `closed_at` and now, because counting
+        past the effective end would attribute the next engagement's work to this one. Tasks are counted
+        only for agents linked to this engagement. Tenant-scoped; another tenant's engagement is a 404.
+      operationId: engagementSummary
+      security:
+        - SessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: Fleet counts, task outcomes and the highest-count audited actions inside the window
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  data:
+                    type: object
+                    properties:
+                      engagement: {$ref: '#/components/schemas/Engagement'}
+                      window:
+                        type: object
+                        properties:
+                          starts_at: {type: string, format: date-time}
+                          ends_at: {type: string, format: date-time, description: earliest of agreed end, close time and now}
+                          open: {type: boolean}
+                      agents:
+                        type: object
+                        properties:
+                          total: {type: integer}
+                          online: {type: integer}
+                          expired: {type: integer}
+                      tasks:
+                        type: object
+                        properties:
+                          pending: {type: integer}
+                          running: {type: integer}
+                          completed: {type: integer}
+                          failed: {type: integer}
+                      actions:
+                        type: array
+                        description: Audited actions inside the window, highest count first (max 25)
+                        items:
+                          type: object
+                          properties:
+                            action: {type: string}
+                            count: {type: integer}
+        '404':
+          description: No such engagement in the caller's tenant
   /api/engagements/expiry:
     get:
       tags: [Engagements]
