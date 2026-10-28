@@ -20,6 +20,7 @@ func (s *Server) registerAgentRoutes(auth *gin.RouterGroup) {
 		agentsRead.GET("/agents/:id/screen", s.handleScreenMonitorPage)
 		agentsRead.GET("/agents/:id/tasks", s.handleGetAgentTasks)
 		agentsRead.GET("/agents/:id/tasks/:taskId", s.handleGetTaskStatus)
+		agentsRead.GET("/agents/:id/tasks/:taskId/output", s.handleDownloadTaskOutput)
 		agentsRead.GET("/api/agents", s.handleListAgents)
 		agentsRead.GET("/api/agents/unlinked", s.handleListUnlinkedAgents)
 		agentsRead.GET("/api/agents/:id/screenshots", s.handleListAgentScreenshots)
