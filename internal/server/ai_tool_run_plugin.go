@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
+	"github.com/forgec2/forgec2/internal/db"
 	"github.com/forgec2/forgec2/internal/plugin"
 )
 
@@ -126,15 +128,36 @@ func (s *Server) aiRunPluginTool(reqCtx *aiReqCtx, argsJSON string) string {
 	return string(out)
 }
 
-// pluginNamesForAI lists registered plugins so a wrong name can be corrected in one turn.
+// pluginNamesForAI lists the plugins the assistant could name, so a wrong name can be corrected in one
+// turn.
+//
+// It merges the loaded set with the database records on purpose: a record without a loaded package is a
+// normal state (a failed load, a package the operator removed by hand), and listing only the in-memory
+// ones told the model "none registered yet" while the console showed plugins.
 func (s *Server) pluginNamesForAI() []string {
-	plugins := s.pluginManager.List()
-	names := make([]string, 0, len(plugins))
-	for _, p := range plugins {
-		names = append(names, p.Name())
+	names := make([]string, 0, 16)
+	seen := make(map[string]bool, 16)
+	for _, p := range s.pluginManager.List() {
+		if !seen[p.Name()] {
+			seen[p.Name()] = true
+			names = append(names, p.Name())
+		}
+	}
+	var records []db.Plugin
+	if err := s.db.Model(&db.Plugin{}).Order("name asc").Limit(30).Find(&records).Error; err == nil {
+		for _, record := range records {
+			if !seen[record.Name] {
+				seen[record.Name] = true
+				names = append(names, record.Name)
+			}
+		}
 	}
 	if len(names) == 0 {
 		return []string{"(none registered yet - use create_plugin first)"}
+	}
+	sort.Strings(names)
+	if len(names) > 30 {
+		names = names[:30]
 	}
 	return names
 }

@@ -564,6 +564,23 @@ func (s *Server) buildTools() []toolDef {
 		{
 			Type: "function",
 			Function: toolFuncDef{
+				Name:        "delete_plugin",
+				Description: "Delete a plugin YOU wrote (author forgec2-ai): unloads it, removes its record and its package directory. A plugin the assistant did not author is refused - the installed set is the operator's inventory. Use it to clean up experiments; to iterate on a plugin keep it and use update_plugin.",
+				Parameters: map[string]interface{}{
+					"type": "object",
+					"properties": map[string]interface{}{
+						"name": map[string]string{
+							"type":        "string",
+							"description": "Plugin name to delete",
+						},
+					},
+					"required": []string{"name"},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: toolFuncDef{
 				Name:        "get_screenshot_summary",
 				Description: "Summarize screenshot captures within a look-back window: total count, per-agent breakdown, latest captures. Read-only analysis of collection activity.",
 				Parameters: map[string]interface{}{
@@ -863,6 +880,10 @@ authorize:
 	// Rewrites an assistant-authored package in place; a plugin it did not write is refused.
 	if name == "update_plugin" {
 		return s.aiUpdatePluginTool(reqCtx, normalizedArgs)
+	}
+	// Removes an assistant-authored package (unload + record + directory), with its own permission.
+	if name == "delete_plugin" {
+		return s.aiDeletePluginTool(reqCtx, normalizedArgs)
 	}
 	return s.executeToolSwitchCtx(reqCtx, name, normalizedArgs)
 }
