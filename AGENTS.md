@@ -242,6 +242,20 @@ Two habits produced all of these, and both are cheap:
   concurrent-duplicate test that exposed the poisoned-transfer bug). Read the real values
   before editing either side.
 
+## Coverage floors are ratchets
+
+Both sides carry a coverage floor, and **a floor that is never raised stops guarding anything**:
+
+| side | floor | measured (2026-10-28) | where |
+|---|---|---|---|
+| Go | **51.5%** | 52.8% (was 50 at a 50.4 measurement — a 2.8-point regression would have passed) | `.github/workflows/ci.yml` "Coverage floor" |
+| frontend | **33.5%** | 34.84% statements / 23 313 | `frontend/scripts/check-coverage.mjs` (override with `COVERAGE_FLOOR`) |
+
+Raise a floor in the same change that adds tests; lower it only as part of that change, never to make
+a regression pass. ~1 point of headroom is deliberate: it absorbs ordinary page work while a large
+new component shipping without tests still trips the check. The frontend floor had drifted 18 points
+below the measured figure, which meant roughly half the suite could be deleted unnoticed.
+
 ## Testing
 Backend test suite via CI (`.github/workflows/ci.yml`):
 ```
