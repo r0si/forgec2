@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -145,7 +146,17 @@ func (s *Server) executeAction(action RuleAction, evt Event) {
 			return
 		}
 		if params.URL != "" {
-			go s.executeWebhook(params, evt)
+			// Recover like the notification dispatcher does: a panic in a bare goroutine takes the
+			// whole process down, and this one does JSON marshalling, header construction and client
+			// setup on operator-supplied input.
+			go func() {
+				defer func() {
+					if r := recover(); r != nil {
+						slog.Error("Automation: webhook goroutine panicked", "panic", r, "stack", string(debug.Stack()))
+					}
+				}()
+				s.executeWebhook(params, evt)
+			}()
 		}
 	case ActionNotify:
 		var params struct {

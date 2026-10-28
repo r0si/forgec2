@@ -25,12 +25,10 @@ const DELIVERY_VERB = /\.(send|deliver|dispatch|notify|push|post|webhook|execute
 
 // Named functions that return an error and are ALWAYS delivery: a bare call to one of these drops the
 // result just as surely as "_ = " does.
-const BARE_FORBIDDEN = [
-  "sendNotificationRoute(",
-  "executeWebhook(",
-  "sendWebhook(",
-  "deliverNotification(",
-];
+// Only functions that RETURN AN ERROR belong here: a bare call to a void function discards nothing.
+// executeWebhook was listed here first and produced a false positive the moment it was wrapped in a
+// recovering goroutine - the gate has to be precise or it teaches people to ignore it.
+const BARE_FORBIDDEN = ["sendNotificationRoute(", "deliverNotificationSleep("];
 
 // Intentional discards, each with the reason it cannot fail in a way the operator needs to see.
 // (Currently empty: every delivery site in the tree either logs or returns its failure. Note that
