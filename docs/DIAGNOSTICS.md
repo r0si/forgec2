@@ -25,6 +25,27 @@ All four **execute nothing**. Each is audited, and using one costs no side effec
 | `GET /api/exports/capabilities` | What does the download and diagnostics surface accept? |
 | `GET /ready` | Is the process healthy — and are delivery, actions, retries, plugins? |
 
+### What the rule-health codes mean
+
+`GET /api/automation/health` returns findings with a stable `code`, so an operator can filter them without parsing prose. The
+codes are the vocabulary of the whole rule feature — a rule that "looks fine" and never fires is the failure this report
+exists to catch.
+
+| Code | Severity | Means |
+|---|---|---|
+| `unconditional_mutating_action` | error | the rule has **no conditions** but performs an action that changes something: every event of its type runs it |
+| `missing_agent` | error | an action targets an agent id that **does not exist** here |
+| `missing_script` | error | an action targets a script id that does not exist here |
+| `missing_macro` | error | an action targets a macro id that does not exist here |
+| `target_unavailable` | warning | the agent exists but **cannot accept tasks** — past its deadline, its engagement closed, or its window ended |
+| `duplicate_rule` | warning | two enabled rules fire on the same event with the same conditions; the second is usually an accident |
+| `action_failing` | error | the rule's actions have been dispatched and **never landed**; the last error is reported beside it |
+| `never_fired` | warning | enabled, and no event has matched it in the grace period — usually a mistyped condition |
+| `firing_often` | warning | it fires far more than a human-scaled rule should; a loop or an over-broad matcher |
+
+Severity is about **what to do first**, not about correctness: `never_fired` and `firing_often` are warnings even though they
+are the two most common ways a rule quietly does nothing.
+
 ## Two conventions every report follows
 
 **Scope: `?engagement=<id>` or `?engagement=none`.** The failure report, the failure-shape view and the duration report all
