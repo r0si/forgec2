@@ -260,7 +260,9 @@ func (s *Server) generateTokenStager(goos string, form *stagerGenerateForm) (str
 func (s *Server) handleGenerateStager(c *gin.Context) {
 	form, err := s.bindStagerForm(c)
 	if err != nil {
-		respondError(c, http.StatusBadRequest, sanitizeError(err, "Stager generation"))
+		// A validation message is the answer here: it names the field the caller got wrong, and replacing it with
+		// "Stager generation" told them nothing they could fix.
+		respondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -269,7 +271,9 @@ func (s *Server) handleGenerateStager(c *gin.Context) {
 	})
 	if err != nil {
 		s.logStagerBuild("windows", form, "failed", err.Error())
-		respondError(c, http.StatusInternalServerError, sanitizeError(err, "Stager generation"))
+		// buildFailureText, not sanitizeError: the stager error already carries the scrubbed toolchain output, and the sanitizer
+		// replaced it with the fallback sentence - the same defect that made a failed payload build read "Build failed".
+		respondError(c, http.StatusInternalServerError, buildFailureText(err))
 		return
 	}
 
@@ -282,7 +286,7 @@ func (s *Server) handleGenerateStager(c *gin.Context) {
 func (s *Server) handleGenerateStagerLinux(c *gin.Context) {
 	form, err := s.bindStagerForm(c)
 	if err != nil {
-		respondError(c, http.StatusBadRequest, sanitizeError(err, "Stager generation"))
+		respondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -291,7 +295,7 @@ func (s *Server) handleGenerateStagerLinux(c *gin.Context) {
 	})
 	if err != nil {
 		s.logStagerBuild("linux", form, "failed", err.Error())
-		respondError(c, http.StatusInternalServerError, sanitizeError(err, "Stager generation"))
+		respondError(c, http.StatusInternalServerError, buildFailureText(err))
 		return
 	}
 

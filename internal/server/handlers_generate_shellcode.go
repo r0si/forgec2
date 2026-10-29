@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"regexp"
 	"strings"
@@ -21,14 +22,18 @@ func (s *Server) handleGenerateDonut(c *gin.Context) {
 	}
 	f, err := file.Open()
 	if err != nil {
-		respondError(c, http.StatusInternalServerError, sanitizeError(err, "Shellcode generation"))
+		// An upload that could not be read is not a build failure and not an internal state leak: say which half failed, and keep the
+		// raw error in the log where it can be correlated.
+		slog.Error("Donut upload could not be opened", "err", err)
+		respondError(c, http.StatusInternalServerError, "could not read the uploaded assembly file")
 		return
 	}
 	defer f.Close()
 
 	data, err := io.ReadAll(io.LimitReader(f, MaxUploadSize))
 	if err != nil {
-		respondError(c, http.StatusInternalServerError, sanitizeError(err, "Shellcode generation"))
+		slog.Error("Donut upload could not be read", "err", err)
+		respondError(c, http.StatusInternalServerError, "could not read the uploaded assembly file")
 		return
 	}
 
@@ -63,7 +68,8 @@ func (s *Server) handleGenerateDonut(c *gin.Context) {
 		return string(out), nil
 	})
 	if err != nil {
-		respondError(c, http.StatusInternalServerError, sanitizeError(err, "Shellcode generation"))
+		// The toolchain output is the diagnosis; see build_failure.go for why the sanitizer is the wrong helper here.
+		respondError(c, http.StatusInternalServerError, buildFailureText(err))
 		return
 	}
 
@@ -81,7 +87,7 @@ func (s *Server) handleGenerateShellcode(c *gin.Context) {
 
 	sc, err := payload.GenerateBasicShellcode(cmd)
 	if err != nil {
-		respondError(c, http.StatusInternalServerError, sanitizeError(err, "Shellcode generation"))
+		respondError(c, http.StatusInternalServerError, buildFailureText(err))
 		return
 	}
 
