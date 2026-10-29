@@ -239,6 +239,11 @@ func TestEngagementBundle(t *testing.T) {
 			Pending int    `json:"pending"`
 			Running int    `json:"running"`
 			Note    string `json:"note"`
+			Backlog []struct {
+				AgentID              string `json:"agent_id"`
+				Pending              int    `json:"pending"`
+				OldestPendingSeconds int64  `json:"oldest_pending_seconds"`
+			} `json:"backlog"`
 		} `json:"unfinished"`
 		Shapes []struct {
 			Signature    string   `json:"signature"`
@@ -273,6 +278,11 @@ func TestEngagementBundle(t *testing.T) {
 	}
 	if failures.Unfinished.Note == "" {
 		t.Fatal("the unfinished block carries no note")
+	}
+	// This fixture finishes every task, so the per-host backlog must be empty and agree with the counts. The populated case has its
+	// own test (TestEngagementBacklogNamesTheHost), because adding a queued task here would change every row-count assertion above.
+	if len(failures.Unfinished.Backlog) != 0 {
+		t.Fatalf("backlog = %+v, want none when nothing is queued", failures.Unfinished.Backlog)
 	}
 
 	// iocs.json parses and says which bound it used, because its bound is looser than the other members.

@@ -3,6 +3,7 @@ package server
 import (
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/forgec2/forgec2/internal/db"
 )
@@ -36,6 +37,20 @@ type unfinishedWork struct {
 	Running    int    `json:"running"`
 	AgentsHeld int    `json:"agents_holding_work"`
 	Note       string `json:"note"`
+	// Backlog names the hosts holding that work. A count says the record is incomplete; the per-host split says WHICH host stopped
+	// consuming, which is the difference between "the exercise had loose ends" and "this beacon needed attention".
+	Backlog []beaconBacklog `json:"backlog,omitempty"`
+}
+
+// beaconBacklog is one host's unfinished work at handover.
+type beaconBacklog struct {
+	AgentID string `json:"agent_id"`
+	Host    string `json:"hostname,omitempty"`
+	Pending int    `json:"pending"`
+	Running int    `json:"running"`
+	// OldestPendingSeconds is the age of that host's oldest queued task, so a reader can tell "just queued" from "queued before the
+	// last handover".
+	OldestPendingSeconds int64 `json:"oldest_pending_seconds"`
 }
 
 // failureShape is one group of failures that look the same.
@@ -65,6 +80,18 @@ func buildEngagementFailures(tasks []db.Task, hostnames map[string]string) engag
 	heldBy := map[string]bool{}
 	pending, running := 0, 0
 	failed := 0
+	// Per-host counts, so the package can say which beacon was behind rather than only how much was outstanding.
+	perHostPending := map[string]int{}
+	perHostRunning := map[string]int{}
+	oldestQueued := map[string]int64{}
+	recordOldest := func(agentID string, age int64) {
+		if agentID == "" {
+			return
+		}
+		if current, ok := oldestQueued[agentID]; !ok || age > current {
+			oldestQueued[agentID] = age
+		}
+	}
 	for _, task := range tasks {
 		// Counted before the failure filter: a task that had not finished is not a failure, and it is exactly what a receiver
 		// needs to know the record is incomplete.
@@ -73,11 +100,15 @@ func buildEngagementFailures(tasks []db.Task, hostnames map[string]string) engag
 			pending++
 			if task.AgentID != "" {
 				heldBy[task.AgentID] = true
+				perHostPending[task.AgentID]++
+				recordOldest(task.AgentID, int64(time.Since(task.CreatedAt).Seconds()))
 			}
 		case "running":
 			running++
 			if task.AgentID != "" {
 				heldBy[task.AgentID] = true
+				perHostRunning[task.AgentID]++
+				recordOldest(task.AgentID, int64(time.Since(task.CreatedAt).Seconds()))
 			}
 		}
 		if task.Status != "failed" || strings.TrimSpace(task.Error) == "" {
@@ -134,6 +165,24 @@ func buildEngagementFailures(tasks []db.Task, hostnames map[string]string) engag
 	})
 
 	unfinished := unfinishedWork{Pending: pending, Running: running, AgentsHeld: len(heldBy)}
+	// One entry per host that was behind, busiest first, so a reader sees the problem host without sorting.
+	for agentID := range heldBy {
+		unfinished.Backlog = append(unfinished.Backlog, beaconBacklog{
+			AgentID:              agentID,
+			Host:                 hostnames[agentID],
+			Pending:              perHostPending[agentID],
+			Running:              perHostRunning[agentID],
+			OldestPendingSeconds: oldestQueued[agentID],
+		})
+	}
+	sort.SliceStable(unfinished.Backlog, func(i, j int) bool {
+		left := unfinished.Backlog[i].Pending + unfinished.Backlog[i].Running
+		right := unfinished.Backlog[j].Pending + unfinished.Backlog[j].Running
+		if left != right {
+			return left > right
+		}
+		return unfinished.Backlog[i].AgentID < unfinished.Backlog[j].AgentID
+	})
 	if pending+running == 0 {
 		unfinished.Note = "every task in the window had finished when this package was assembled"
 	} else {
