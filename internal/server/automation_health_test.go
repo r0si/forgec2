@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -313,5 +314,75 @@ func TestAutomationHealth(t *testing.T) {
 	// Errors come first, so the report opens with what will bite.
 	if len(resp.Data.Findings) > 0 && resp.Data.Findings[0].Severity != "error" {
 		t.Fatalf("first finding is %q, want an error", resp.Data.Findings[0].Severity)
+	}
+}
+
+// TestAutomationHealthFlagsAnUnfirableCondition covers the finding that keeps the fail-closed change from hiding rules.
+//
+// Before the matcher failed closed, a misspelled operator matched every event, so a rule looked like it worked. After the change the same
+// rule never fires - and "never fires" is indistinguishable from "nothing happened yet" unless the health report says which. A rule stored
+// before validation existed is exactly the case this finds.
+func TestAutomationHealthFlagsAnUnfirableCondition(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	s := mustTenantServer(t)
+
+	// Stored directly, bypassing the save-time validation: this is what an older rule looks like.
+	conditions, _ := json.Marshal([]RuleCondition{
+		{Field: "hint_code", Operator: "equal", Value: "toolchain_missing"}, // "equal", not "equals"
+	})
+	actions, _ := json.Marshal([]RuleAction{{Type: ActionNotify, Params: json.RawMessage(`{"message":"build failed"}`)}})
+	if err := s.db.Create(&db.AutomationRule{
+		ID: "legacy-typo", Name: "legacy typo", Enabled: true, EventType: string(EventBuildFailed),
+		Conditions: string(conditions), Actions: string(actions), TenantID: 1,
+	}).Error; err != nil {
+		t.Fatalf("seed rule: %v", err)
+	}
+	s.invalidateAutomationCache()
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/automation/health", nil)
+	c.Set("user", "op")
+	c.Set("user_role", db.RoleAdmin)
+	c.Set("user_id", uint(1))
+	c.Set(middleware.TenantIDContextKey, uint(1))
+	s.handleAutomationHealth(c)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d (%s)", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		Data struct {
+			Findings []struct {
+				RuleID   string `json:"rule_id"`
+				Severity string `json:"severity"`
+				Code     string `json:"code"`
+				Detail   string `json:"detail"`
+			} `json:"findings"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v (%s)", err, w.Body.String())
+	}
+
+	found := false
+	for _, finding := range resp.Data.Findings {
+		if finding.Code != "invalid_condition" {
+			continue
+		}
+		found = true
+		if finding.RuleID != "legacy-typo" {
+			t.Fatalf("the finding names the wrong rule: %+v", finding)
+		}
+		if finding.Severity != "error" {
+			t.Fatalf("severity = %q: a rule that can never fire is an error, not a warning", finding.Severity)
+		}
+		// The detail must say what to do, not only what is wrong.
+		if !strings.Contains(finding.Detail, "equal") || !strings.Contains(finding.Detail, "contains, equals or regex") {
+			t.Fatalf("detail does not name the bad operator and the fix: %q", finding.Detail)
+		}
+	}
+	if !found {
+		t.Fatalf("an unfirable rule produced no finding: %+v", resp.Data.Findings)
 	}
 }

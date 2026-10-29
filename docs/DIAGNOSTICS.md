@@ -46,6 +46,7 @@ exists to catch.
 
 | Code | Severity | Means |
 |---|---|---|
+| `invalid_condition` | error | a condition names a field that is empty, or an operator the matcher does not implement — the rule **can never fire**, and it fails silently |
 | `unconditional_mutating_action` | error | the rule has **no conditions** but performs an action that changes something: every event of its type runs it |
 | `missing_agent` | error | an action targets an agent id that **does not exist** here |
 | `missing_script` | error | an action targets a script id that does not exist here |

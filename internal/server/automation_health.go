@@ -61,6 +61,12 @@ func (s *Server) handleAutomationHealth(c *gin.Context) {
 			})
 		}
 
+		// 0. A condition the matcher cannot honour: the rule can never fire, and after the fail-closed change it fails SILENTLY. That is
+		// the case worth naming first, because the operator's rule was accepted at a time when a typo matched everything.
+		if err := validateRuleConditions(rule.Conditions); err != nil {
+			add("error", "invalid_condition", err.Error()+" - the rule cannot fire as written; edit it to use contains, equals or regex")
+		}
+
 		// 1. No conditions + an action that changes something = fires on everything.
 		if len(rule.Conditions) == 0 {
 			if mutating, ok := firstMutatingAction(rule.Actions); ok {
