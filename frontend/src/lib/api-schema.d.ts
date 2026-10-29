@@ -13952,8 +13952,8 @@ export interface operations {
                 since?: string;
                 /** @description Upper time bound, same spellings as since; must not precede it */
                 until?: string;
-                /** @description ndjson (default) streams one row per line; json returns a single document with count, truncated, filtered and rows. Both carry the same row objects, with both hashes and every hashed field - **projection is deliberately not offered here**, because a verifier needs all of them and a projected export would look verifiable while being unverifiable. The format is part of the ETag. */
-                format?: "ndjson" | "json";
+                /** @description ndjson (default) streams one row per line; json returns a single document with count, truncated, filtered and rows. Both carry the same row objects, with both hashes and every hashed field - they are the VERIFIABLE artefact, and the format is part of the ETag. `ecs` and `cef` are SIEM **projections** for tools that ingest security events: they carry the ECS vocabulary (event.action/outcome, user.name, source.ip, host.id, message) or the CEF header plus extensions, but they **drop the hash chain**, so a file in either format cannot verify the log. Both say so in a 199 Warning header and are delivered under their own extension (`.ecs.ndjson`, `.cef`) so a collector globbing for the verifiable export cannot pick up a projection by mistake. */
+                format?: "ndjson" | "json" | "ecs" | "cef";
             };
             header?: never;
             path?: never;

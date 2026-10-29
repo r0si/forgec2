@@ -229,8 +229,8 @@ func (s *Server) handleExportAuditChain(c *gin.Context) {
 		return
 	}
 	format := strings.ToLower(strings.TrimSpace(c.DefaultQuery("format", "ndjson")))
-	if format != "ndjson" && format != "json" {
-		respondError(c, http.StatusBadRequest, `invalid format (expected "ndjson" or "json")`)
+	if format != "ndjson" && format != "json" && format != "ecs" && format != "cef" {
+		respondError(c, http.StatusBadRequest, `invalid format (expected "ndjson", "json", "ecs" or "cef")`)
 		return
 	}
 	limit := atoiDefault(c.Query("limit"), 50000)
@@ -373,6 +373,38 @@ func (s *Server) handleExportAuditChain(c *gin.Context) {
 		c.Header(auditExportScopeHeader, "all")
 		applyExportScope(c, "all")
 	}
+	// SIEM projections come BEFORE the json branch: they are alternatives to the verifiable export, not variants of it.
+	if format == "ecs" || format == "cef" {
+		name = strings.TrimSuffix(name, ".ndjson") + siemFormatFilename(format)
+		c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, name))
+		// Stated as a header, not only in the docs: a projection looks like an export and cannot verify anything.
+		c.Header("Warning", fmt.Sprintf(`199 - %s"`, siemProjectionNote(format)))
+		var buf strings.Builder
+		for i := range rows {
+			row := auditChainExportRow{
+				ID: rows[i].ID, TenantID: rows[i].TenantID, User: rows[i].User,
+				Action: rows[i].Action, Resource: rows[i].Resource, AgentID: rows[i].AgentID,
+				IP: rows[i].IP, Success: rows[i].Success, Error: rows[i].Error,
+				Details: rows[i].Details, PrevHash: rows[i].PrevHash, EntryHash: rows[i].EntryHash,
+				CreatedAt: rows[i].CreatedAt.UTC().Format(time.RFC3339Nano),
+			}
+			if format == "cef" {
+				buf.WriteString(auditToCEF(row, ServerVersion))
+				buf.WriteByte('\n')
+				continue
+			}
+			encoded, err := json.Marshal(auditToECS(row))
+			if err != nil {
+				handleQueryError(c, err, "Failed to encode the ECS projection")
+				return
+			}
+			buf.Write(encoded)
+			buf.WriteByte('\n')
+		}
+		c.Data(http.StatusOK, siemContentType(format), []byte(buf.String()))
+		return
+	}
+
 	if format == "json" {
 		// One document instead of newline-delimited rows, for tools that do not stream. The rows are the SAME
 		// objects, with both hashes: projection is deliberately not offered here, because a verifier needs every
