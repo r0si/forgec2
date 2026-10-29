@@ -141,6 +141,56 @@ func TestFailureSignatures(t *testing.T) {
 		t.Fatalf("the hint does not carry the window the rows came from: %+v", resp.Data.Rerun.Body)
 	}
 
+	// 2c. The same scope the failure report takes: an exercise with no hosts selects nothing, an unusable value is a 400, and
+	// the answer echoes the scope it applied.
+	engagement := db.Engagement{TenantID: 1, Name: "DMZ", StartsAt: now.Add(-4 * time.Hour), EndsAt: now.Add(time.Hour)}
+	if err := s.db.Create(&engagement).Error; err != nil {
+		t.Fatalf("seed engagement: %v", err)
+	}
+	w3 := httptest.NewRecorder()
+	c3, _ := gin.CreateTestContext(w3)
+	c3.Request = httptest.NewRequest(http.MethodGet,
+		"/api/stats/failures/signatures?since=7d&engagement="+itoaUint(engagement.ID), nil)
+	c3.Set("user", "op")
+	c3.Set("user_role", db.RoleAdmin)
+	c3.Set("user_id", uint(1))
+	c3.Set(middleware.TenantIDContextKey, uint(1))
+	s.handleFailureSignatures(c3)
+	if w3.Code != http.StatusOK {
+		t.Fatalf("scoped signatures = %d (%s)", w3.Code, w3.Body.String())
+	}
+	var scoped struct {
+		Data struct {
+			Engagement     string `json:"engagement"`
+			TaskFailures   int    `json:"task_failures"`
+			TaskSignatures []struct {
+				Count int `json:"count"`
+			} `json:"task_signatures"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w3.Body.Bytes(), &scoped); err != nil {
+		t.Fatalf("decode scoped: %v", err)
+	}
+	if scoped.Data.Engagement != itoaUint(engagement.ID) {
+		t.Fatalf("the answer does not echo the scope: %q", scoped.Data.Engagement)
+	}
+	// No host belongs to that exercise, so nothing is selected - which is different from "no filter".
+	if scoped.Data.TaskFailures != 0 || len(scoped.Data.TaskSignatures) != 0 {
+		t.Fatalf("a scoped report returned %d failure(s): %v", scoped.Data.TaskFailures, scoped.Data.TaskSignatures)
+	}
+
+	w4 := httptest.NewRecorder()
+	c4, _ := gin.CreateTestContext(w4)
+	c4.Request = httptest.NewRequest(http.MethodGet, "/api/stats/failures/signatures?engagement=nope", nil)
+	c4.Set("user", "op")
+	c4.Set("user_role", db.RoleAdmin)
+	c4.Set("user_id", uint(1))
+	c4.Set(middleware.TenantIDContextKey, uint(1))
+	s.handleFailureSignatures(c4)
+	if w4.Code != http.StatusBadRequest {
+		t.Fatalf("invalid engagement = %d, want 400", w4.Code)
+	}
+
 	// 3. A bad window is refused rather than defaulted.
 	w2 := httptest.NewRecorder()
 	c2, _ := gin.CreateTestContext(w2)

@@ -28083,6 +28083,8 @@ export interface operations {
             query?: {
                 /** @description Window for the task half, e.g. 24h or 7d (default 7d) */
                 since?: string;
+                /** @description Scope the task half to one exercise (numeric id) or, with `none`, to hosts in no exercise - the same scope the failure report takes, so the two reports cannot disagree about which failures they are looking at. Echoed back as `engagement` so a caller can tell a scoped answer from an unscoped one. */
+                engagement?: string;
             };
             header?: never;
             path?: never;
@@ -28100,6 +28102,8 @@ export interface operations {
                         success?: boolean;
                         data?: {
                             since?: string;
+                            /** @description The scope that was applied */
+                            engagement?: string;
                             task_failures?: number;
                             note?: string;
                             /** @description What to do with a row: `POST /api/tasks/rerun-by-signature` re-dispatches the failed tasks that share one shape, and the row signature IS the request body. Carried in the answer so a client does not have to know the second endpoint exists. */

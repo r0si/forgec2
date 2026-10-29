@@ -13200,6 +13200,13 @@ paths:
           in: query
           description: Window for the task half, e.g. 24h or 7d (default 7d)
           schema: {type: string, default: 7d}
+        - name: engagement
+          in: query
+          description: >-
+            Scope the task half to one exercise (numeric id) or, with `none`, to hosts in no exercise - the same scope the
+            failure report takes, so the two reports cannot disagree about which failures they are looking at. Echoed back as
+            `engagement` so a caller can tell a scoped answer from an unscoped one.
+          schema: {type: string}
       responses:
         '200':
           description: The dominant shapes, tasks and notifications
@@ -13213,6 +13220,7 @@ paths:
                     type: object
                     properties:
                       since: {type: string}
+                      engagement: {type: string, description: The scope that was applied, empty when unscoped}
                       task_failures: {type: integer}
                       note: {type: string}
                       rerun:

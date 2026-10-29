@@ -34,19 +34,30 @@ func (s *Server) handleFailureSignatures(c *gin.Context) {
 	}
 	cutoff := time.Now().Add(-window)
 
+	// The same scope the failure report takes, so "what went wrong in this exercise" and "what SHAPE dominates in this
+	// exercise" cannot disagree about which failures they are looking at.
+	engagementAgents, scopedByEngagement, engagementErr := s.taskEngagementFilter(c)
+	if engagementErr != nil {
+		respondError(c, http.StatusBadRequest, engagementErr.Error())
+		return
+	}
+
 	// Tasks: every failed task in the window, not just the unclassified ones. The grouping is by SHAPE, so a reason code is
 	// no longer the axis.
 	var rows []struct {
 		Type  string
 		Error string
 	}
-	if err := s.tenantScope(s.db.WithContext(s.ctx).Model(&db.Task{}), c).
+	taskQuery := s.tenantScope(s.db.WithContext(s.ctx).Model(&db.Task{}), c).
 		Select("type, error").
 		Where("status = ?", "failed").
 		Where("updated_at >= ?", cutoff).
 		Order("updated_at DESC").
-		Limit(failureStatsSampleLimit).
-		Scan(&rows).Error; err != nil {
+		Limit(failureStatsSampleLimit)
+	if scopedByEngagement {
+		taskQuery = taskQuery.Where("agent_id IN ?", engagementAgents)
+	}
+	if err := taskQuery.Scan(&rows).Error; err != nil {
 		handleQueryError(c, err, "Failed to load failed tasks")
 		return
 	}
@@ -135,6 +146,7 @@ func (s *Server) handleFailureSignatures(c *gin.Context) {
 
 	respond(c, gin.H{
 		"since":                   since,
+		"engagement":              c.Query("engagement"),
 		"task_failures":           len(rows),
 		"task_signatures":         taskSignatures,
 		"notification_signatures": notificationSignatures,
