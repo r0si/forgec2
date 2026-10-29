@@ -78,6 +78,8 @@ func (s *Server) registerAutomationRoutes(auth *gin.RouterGroup) {
 		autoWrite.POST("/api/automation/rules/import", s.handleImportAutomationRule)
 		// Clearing a rule's action counters: a fixed rule must not keep an error-level finding forever.
 		autoWrite.POST("/api/automation/action-stats/reset", s.handleResetAutomationActionStats)
+		// Test-fire one rule's actions now; it EXECUTES, so it needs confirm and is rate-limited per rule.
+		autoWrite.POST("/api/automation/rules/:id/test", s.handleTestAutomationRule)
 		autoWrite.PUT("/api/automation/rules/:id", s.handleUpdateAutomationRule)
 		autoWrite.DELETE("/api/automation/rules/:id", s.handleDeleteAutomationRule)
 		autoWrite.POST("/api/automation/rules/:id/toggle", s.handleToggleAutomationRule)

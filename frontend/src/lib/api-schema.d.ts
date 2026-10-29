@@ -1410,6 +1410,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/automation/rules/{id}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run one rule's actions now
+         * @description The previews answer "would this fire" and the notification route test answers "does this channel deliver"; nothing answered **do this rule's actions actually work**, which an operator otherwise learns when the event they cared about finally arrives. This EXECUTES the rule's actions against a synthetic event built from the rule (its event type and, where it names one, its agent), and reports per-action dispatch failures with their reasons - the failures the dispatcher itself knows. **Three deliberate guards:** the body must say `{"confirm": true}` (it dispatches tasks and sends messages), it is rate-limited per rule (10 s, `Retry-After` on 429), and every executed test is audited as `automation_rule_test`. Every outcome is also counted into the rule's action statistics, so a test that fails shows up in the health report and a test that succeeds after a fix clears it. **What it cannot promise:** a webhook action is sent in a goroutine, so its delivery result arrives after the response and is counted on the route - the `note` in the answer says so rather than implying otherwise.
+         */
+        post: operations["testAutomationRule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/automation/rules/export": {
         parameters: {
             query?: never;
@@ -14217,6 +14237,70 @@ export interface operations {
             };
             /** @description No such rule */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    testAutomationRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Must be true; this executes the rule */
+                    confirm: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description What ran, what failed, and against which synthetic event */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        data?: {
+                            rule_id?: string;
+                            executed?: number;
+                            failed?: number;
+                            errors?: string[];
+                            event?: {
+                                event_type?: string;
+                                agent_id?: string;
+                                hostname?: string;
+                            };
+                            note?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Missing confirm */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such rule in the caller's tenant */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description This rule was tested moments ago; see Retry-After */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };
