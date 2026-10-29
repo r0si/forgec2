@@ -104,6 +104,15 @@ func (s *Server) handleReadyCheck(c *gin.Context) {
 			retrySummary += ", last " + lastRetry.UTC().Format(time.RFC3339)
 		}
 		checks["auto_retries"] = retrySummary
+		// Bundle signing is informational, never a warning: an unsigned bundle is a legitimate choice, and a probe that warns
+		// about it would be muted within a day. What matters is that an operator can SEE which one this deployment produces
+		// without grepping the startup log.
+		if bundleSigner() != nil {
+			checks["bundle_signing"] = "configured: handover bundles are signed (ed25519)"
+		} else {
+			checks["bundle_signing"] = "not configured: handover bundles are unsigned (" +
+				bundleSigningKeyEnv + " is unset or malformed)"
+		}
 		if retries >= autoRetryReadyWarningThreshold {
 			warnings = append(warnings,
 				fmt.Sprintf("%d task(s) were re-issued automatically; enumerations are timing out on this link", retries))

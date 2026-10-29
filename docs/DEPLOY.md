@@ -276,6 +276,11 @@ Two checks are the opposite: they answer **not ready** (503), because the proces
 | `database` | the handle is missing, or a probe query fails | the message distinguishes *unavailable* (never initialised) from *error* (the probe failed) |
 | `listeners` | the listener registry cannot be read | usually the same cause as `database`; a listener count of `0` is **ready**, because a console with no C2 listener running still works |
 
+One check is neither: `bundle_signing` reports whether handover bundles will be signed (`FORGEC2_BUNDLE_SIGNING_KEY`
+configured) and **never** warns, because an unsigned bundle is a legitimate choice and a probe that warns about one is a
+probe that gets muted. It exists so an operator can see which artefact this deployment produces without reading the startup
+log.
+
 The distinction is the point of this section: `database` and `listeners` are **liveness of function**, while the warnings
 above are **health of features**. A monitor that restarts on a warning restarts a working server; one that ignores the first
 two reports a broken one as healthy.

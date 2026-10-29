@@ -52,6 +52,9 @@ func TestReadyReportsDeliveryAndActionHealth(t *testing.T) {
 	if checks["notification_delivery"] == nil || checks["automation_actions"] == nil {
 		t.Fatalf("the readiness checks do not include delivery and action health: %v", checks)
 	}
+	if checks["bundle_signing"] == nil {
+		t.Fatalf("the readiness checks do not report the bundle signing state: %v", checks)
+	}
 	if checks["auto_retries"] == nil {
 		t.Fatalf("the readiness checks do not include the auto-retry count: %v", checks)
 	}
@@ -85,6 +88,15 @@ func TestReadyReportsDeliveryAndActionHealth(t *testing.T) {
 		t.Fatalf("the plugin check does not report the rejection: %q", got)
 	}
 	s.pluginManager = nil
+
+	// 1b2. Bundle signing is reported and never warns: an unsigned bundle is a legitimate choice.
+	signing, _ := checks["bundle_signing"].(string)
+	if !strings.Contains(signing, "unsigned") && !strings.Contains(signing, "signed") {
+		t.Fatalf("the signing state is unreadable: %q", signing)
+	}
+	if payload := ready(); payload["warnings"] != nil {
+		t.Fatalf("the signing state raised a warning: %v", payload["warnings"])
+	}
 
 	// 1c. A BURST of automatic retries is a link-health warning; one retry is the feature working, not an alarm.
 	resetAutoRetryCounter()
