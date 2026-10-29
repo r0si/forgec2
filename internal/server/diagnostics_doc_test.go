@@ -65,6 +65,19 @@ func TestDiagnosticsDocPathsExist(t *testing.T) {
 			t.Fatalf("the diagnostics page no longer states %q", needle)
 		}
 	}
+	// The triage table is the page's entry point: a reader who does not know which endpoint answers their question starts
+	// there, so it must keep pointing at the four surfaces it names.
+	triage := doc[strings.Index(doc, "## Start here"):]
+	if !strings.HasPrefix(triage, "## Start here") {
+		t.Fatal("the diagnostics page has no triage table")
+	}
+	for _, needle := range []string{"Is anything broken right now?", "Why do tasks fail?",
+		"Is this one problem or many?", "Did my rule fire", "Which plugin is not loading?"} {
+		if !strings.Contains(triage, needle) {
+			t.Fatalf("the triage table no longer answers %q", needle)
+		}
+	}
+
 	// The two conventions are the page's other load-bearing content: a scope that every report takes, and exports that name
 	// what they contain. A page that drops either is describing a system nobody runs.
 	for _, needle := range []string{"engagement=none", taskExportScopeHeader, auditExportScopeHeader, "X-Audit-Export-Filtered"} {

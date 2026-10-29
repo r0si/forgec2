@@ -3,6 +3,19 @@
 The endpoints that answer questions and change nothing — plus the few that do change something, kept apart on purpose. Every
 path on this page is checked by a test against the router, so a renamed endpoint cannot leave this page lying.
 
+## Start here: symptom to next step
+
+The fastest path through this page, for the question you actually have:
+
+| You are asking | Ask | Then |
+|---|---|---|
+| "Is anything broken right now?" | `GET /ready` | a warning names its feature; a 503 names `database` or `listeners` |
+| "Why do tasks fail?" | `GET /api/stats/tasks/failures` | the reason table below turns a code into a cause |
+| "Is this one problem or many?" | `GET /api/stats/failures/signatures` | one row per shape; the answer carries the rerun request |
+| "Did my rule fire, and if not why?" | `GET /api/automation/health` | the code table below; `never_fired` is the usual answer |
+| "Which plugin is not loading?" | `GET /api/plugins/failures` | the hint table below names the next command |
+| "Would this rule fire at all?" | `POST /api/automation/rules/{id}/preview` | executes nothing |
+
 ## Preview: what would happen
 
 | Endpoint | The question it answers |
