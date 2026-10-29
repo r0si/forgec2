@@ -109,7 +109,13 @@ func (s *Server) previewRuleVerdict(rule AutomationRule, event Event) gin.H {
 		ok := s.matchCondition(cond, event)
 		if !ok {
 			matched = false
-			reasons = append(reasons, fmt.Sprintf("%s %s %q did not match %q", cond.Field, cond.Operator, cond.Value, actual))
+			// "did not match" and "can never match" are different answers, and a preview that gives the first for the second sends the
+			// operator looking at the event instead of the rule. The condition is validated first so the reason can say which it is.
+			if condErr := validateRuleConditions([]RuleCondition{cond}); condErr != nil {
+				reasons = append(reasons, fmt.Sprintf("%s: %s", condErr.Error(), "this condition can never match, so the rule cannot fire"))
+			} else {
+				reasons = append(reasons, fmt.Sprintf("%s %s %q did not match %q", cond.Field, cond.Operator, cond.Value, actual))
+			}
 		}
 		results = append(results, conditionResult{
 			Field: cond.Field, Operator: cond.Operator, Value: cond.Value, Actual: actual, Matched: ok,
@@ -242,13 +248,20 @@ func storedRuleToAutomationRule(stored db.AutomationRule) AutomationRule {
 // Getting this wrong produced a false negative in the one tool built to explain false negatives: the preview
 // said a matching rule would not fire.
 func flattenPreviewEventData(raw map[string]interface{}) map[string]interface{} {
-	out := make(map[string]interface{}, len(raw)+4)
+	out := make(map[string]interface{}, len(raw)*2+4)
 	for key, value := range raw {
 		if strings.Contains(key, ".") {
 			out[key] = value
 			continue
 		}
+		// BOTH spellings, deliberately. The live event path (a build.failed event, for instance) stores its payload as a bare key, so a
+		// rule written as `hint_code` fires in production; the preview used to flatten to `data.hint_code` only, which made the same rule
+		// preview as "would not fire". A preview that disagrees with the live path is worse than no preview - it teaches the operator to
+		// rewrite a rule that was already correct.
 		out["data."+key] = value
+		if _, exists := out[key]; !exists {
+			out[key] = value
+		}
 	}
 	return out
 }
