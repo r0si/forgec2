@@ -18,6 +18,8 @@ func (s *Server) registerTaskRoutes(auth *gin.RouterGroup) {
 		tasksRead.GET("/api/stats/tasks/failures", s.handleTaskFailureStats)
 		// The same normalisation, across tasks and notifications: what shape of failure dominates right now.
 		tasksRead.GET("/api/stats/failures/signatures", s.handleFailureSignatures)
+		// Which beacon is backed up - a queue question, not a failure question.
+		tasksRead.GET("/api/stats/tasks/queue", s.handleTaskQueueStats)
 		tasksRead.GET("/tasks/:taskId", s.handleGetTaskStatus)
 		// A file is what an operator wants for a large result; the JSON detail stays for the UI.
 		tasksRead.GET("/tasks/:taskId/output", s.handleDownloadTaskOutput)

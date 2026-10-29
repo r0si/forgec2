@@ -1,0 +1,114 @@
+package server
+
+import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
+	"github.com/forgec2/forgec2/internal/db"
+	"github.com/forgec2/forgec2/internal/server/middleware"
+	"github.com/gin-gonic/gin"
+)
+
+// TestTaskQueueStats covers the per-beacon backlog view.
+//
+// The question it answers is not "how many tasks failed" but "which host is not consuming work", and that is a QUEUE question. A
+// stalled queue means the beacon is not polling - a different problem from a slow command, needing a different response - so the
+// stall test compares the age of the OLDEST pending task against the beacon's own sleep plus a grace period, not against a count.
+func TestTaskQueueStats(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	s := mustTenantServer(t)
+
+	now := time.Now().Truncate(time.Second)
+	// One beacon that sleeps 10s and has a fresh queue; one that sleeps 10s but has a task pending for an hour.
+	for _, agent := range []db.Implant{
+		{ID: "a-1", TenantID: 1, Hostname: "web-01", Status: "online", LastSeen: now, CurrentInterval: 10},
+		{ID: "a-2", TenantID: 1, Hostname: "db-02", Status: "online", LastSeen: now, CurrentInterval: 10},
+	} {
+		agent := agent
+		if err := s.db.Create(&agent).Error; err != nil {
+			t.Fatalf("seed agent: %v", err)
+		}
+	}
+	seed := func(agentID, status string, age time.Duration) {
+		task := db.Task{
+			AgentID: agentID, TenantID: 1, Type: "ps", Command: "ps", Status: status,
+			CreatedAt: now.Add(-age), UpdatedAt: now.Add(-age),
+		}
+		if err := s.db.Create(&task).Error; err != nil {
+			t.Fatalf("seed task: %v", err)
+		}
+	}
+	seed("a-1", "pending", 5*time.Second)
+	seed("a-1", "running", 3*time.Second)
+	seed("a-2", "pending", time.Hour)
+	// A second pending row for a-2, so the two beacons carry the SAME queued count and the age has to break the tie.
+	seed("a-2", "pending", 10*time.Second)
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/stats/tasks/queue", nil)
+	c.Set("user", "op")
+	c.Set("user_role", db.RoleAdmin)
+	c.Set("user_id", uint(1))
+	c.Set(middleware.TenantIDContextKey, uint(1))
+	s.handleTaskQueueStats(c)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d (%s)", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		Data struct {
+			Queued         int `json:"queued"`
+			StalledAgents  int `json:"stalled_agents"`
+			StallGraceSecs int `json:"stall_grace_seconds"`
+			Agents         []struct {
+				AgentID       string `json:"agent_id"`
+				Hostname      string `json:"hostname"`
+				Pending       int    `json:"pending"`
+				Running       int    `json:"running"`
+				OldestPending int64  `json:"oldest_pending_seconds"`
+				Stalled       bool   `json:"stalled"`
+			} `json:"agents"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	// 1. Both beacons are represented, with their counts.
+	if len(resp.Data.Agents) != 2 {
+		t.Fatalf("agents = %+v, want both beacons", resp.Data.Agents)
+	}
+	if resp.Data.Queued != 4 {
+		t.Fatalf("queued = %d, want the four pending/running tasks", resp.Data.Queued)
+	}
+	if resp.Data.StallGraceSecs != 120 {
+		t.Fatalf("stall grace = %d, want the documented two minutes", resp.Data.StallGraceSecs)
+	}
+
+	byAgent := map[string]bool{}
+	for _, agent := range resp.Data.Agents {
+		byAgent[agent.AgentID] = agent.Stalled
+		if agent.Hostname == "" {
+			t.Fatalf("%s has no hostname; an id alone is not actionable", agent.AgentID)
+		}
+	}
+	// 2. Exactly the beacon with the hour-old pending task is stalled.
+	if !byAgent["a-2"] {
+		t.Fatalf("the beacon with an hour-old pending task is not stalled: %+v", resp.Data.Agents)
+	}
+	if byAgent["a-1"] {
+		t.Fatalf("a beacon with a five-second-old queue was called stalled: %+v", resp.Data.Agents)
+	}
+	if resp.Data.StalledAgents != 1 {
+		t.Fatalf("stalled_agents = %d, want 1", resp.Data.StalledAgents)
+	}
+
+	// 3. With equal queued counts the tie-break is age, so the beacon holding the hour-old row sorts above.
+	if resp.Data.Agents[0].AgentID != "a-2" {
+		t.Fatalf("ordering = %s first, want the oldest queue", resp.Data.Agents[0].AgentID)
+	}
+}

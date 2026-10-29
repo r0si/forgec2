@@ -11157,6 +11157,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/stats/tasks/queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Which beacon is backed up
+         * @description Per-beacon backlog: pending and running counts, and the age of the OLDEST pending task. The question this answers is not "how many tasks failed" but **which host is not consuming work**, and that is a queue question - the console otherwise shows a stuck beacon as "pending" one page at a time. A queue is called **stalled** when its oldest pending task is older than the beacon's own sleep interval plus a **two-minute** grace period: a beacon sleeping five minutes is not stalled at four, and a stalled queue means the beacon is not polling rather than a command being slow. Rows are ordered by queued work, then by age, then by id, so two runs over the same data agree.
+         */
+        get: operations["taskQueueStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/stats/failures/signatures": {
         parameters: {
             query?: never;
@@ -28102,6 +28122,43 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    taskQueueStats: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The backlog, busiest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        data?: {
+                            queued?: number;
+                            stalled_agents?: number;
+                            stall_grace_seconds?: number;
+                            note?: string;
+                            agents?: {
+                                agent_id?: string;
+                                hostname?: string;
+                                pending?: number;
+                                running?: number;
+                                oldest_pending_seconds?: number;
+                                sleep_seconds?: number;
+                                stalled?: boolean;
+                            }[];
+                        };
+                    };
+                };
             };
         };
     };
