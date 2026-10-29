@@ -71,15 +71,20 @@ func (s *Server) handleFailureSignatures(c *gin.Context) {
 		// Agents is how many DISTINCT hosts produced this shape. Eleven rows from one beacon is a flaky link; eleven rows from
 		// eleven beacons is a bad command, and the count alone cannot tell them apart. The bundle's failures.json already
 		// reports this, so the live view agreeing with the handover is not optional.
-		Agents  int      `json:"agents_affected"`
-		Reasons []string `json:"reasons"`
-		Sample  string   `json:"sample"`
+		Agents int `json:"agents_affected"`
+		// TopAgent names the host that produced the most of them, and TopAgentCount says how many. A count of "one host" is
+		// actionable only once you know WHICH host, and the operator's next question is always "which beacon is the flaky one".
+		TopAgent      string   `json:"top_agent,omitempty"`
+		TopAgentCount int      `json:"top_agent_failures,omitempty"`
+		Reasons       []string `json:"reasons"`
+		Sample        string   `json:"sample"`
 	}
 	type accumulator struct {
-		count   int
-		agents  map[string]bool
-		reasons map[string]bool
-		sample  string
+		count    int
+		agents   map[string]bool
+		perAgent map[string]int
+		reasons  map[string]bool
+		sample   string
 	}
 	bytaskSignature := map[string]*accumulator{}
 	for _, row := range rows {
@@ -90,15 +95,17 @@ func (s *Server) handleFailureSignatures(c *gin.Context) {
 		entry, exists := bytaskSignature[signature]
 		if !exists {
 			entry = &accumulator{
-				agents:  map[string]bool{},
-				reasons: map[string]bool{},
-				sample:  truncateString(strings.TrimSpace(row.Error), failureSampleMaxChars),
+				agents:   map[string]bool{},
+				perAgent: map[string]int{},
+				reasons:  map[string]bool{},
+				sample:   truncateString(strings.TrimSpace(row.Error), failureSampleMaxChars),
 			}
 			bytaskSignature[signature] = entry
 		}
 		entry.count++
 		if row.AgentID != "" {
 			entry.agents[row.AgentID] = true
+			entry.perAgent[row.AgentID]++
 		}
 		if reason := classifyFailure(row.Error); reason != "" {
 			entry.reasons[reason] = true
@@ -113,8 +120,16 @@ func (s *Server) handleFailureSignatures(c *gin.Context) {
 		}
 		// Stable order inside a signature, so the same input always renders the same row.
 		sort.Strings(reasons)
+		// The busiest host, chosen deterministically: highest count, then lowest id, so two runs over the same data agree.
+		topAgent, topCount := "", 0
+		for agentID, count := range entry.perAgent {
+			if count > topCount || (count == topCount && agentID < topAgent) {
+				topAgent, topCount = agentID, count
+			}
+		}
 		taskSignatures = append(taskSignatures, taskSignature{
 			Signature: signature, Count: entry.count, Agents: len(entry.agents),
+			TopAgent: topAgent, TopAgentCount: topCount,
 			Reasons: reasons, Sample: entry.sample,
 		})
 	}
@@ -165,7 +180,7 @@ func (s *Server) handleFailureSignatures(c *gin.Context) {
 	if strings.EqualFold(strings.TrimSpace(c.Query("format")), "csv") {
 		var buf strings.Builder
 		writer := csv.NewWriter(&buf)
-		header := []string{"Signature", "Count", "Agents", "Reasons", "Example"}
+		header := []string{"Signature", "Count", "Agents", "Top Agent", "Top Agent Failures", "Reasons", "Example"}
 		if err := writer.Write(header); err != nil {
 			handleQueryError(c, err, "Failed to encode the failure shapes")
 			return
@@ -175,6 +190,8 @@ func (s *Server) handleFailureSignatures(c *gin.Context) {
 				row.Signature,
 				strconv.Itoa(row.Count),
 				strconv.Itoa(row.Agents),
+				row.TopAgent,
+				strconv.Itoa(row.TopAgentCount),
 				strings.Join(row.Reasons, "|"),
 				row.Sample,
 			}); err != nil {
