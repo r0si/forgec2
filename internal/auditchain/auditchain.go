@@ -71,7 +71,17 @@ type Verdict struct {
 	SelectionKnown bool `json:"selection_known"`
 	// Filtered reports the file's own admission that the rows are a selection rather than the whole chain.
 	Filtered bool `json:"filtered"`
+	// SignatureKind says which of this product's four "signatures" this verdict is about. The word is overloaded enough that a
+	// reader can take this chain - an UNKEYED hash - for a keyed signature, and then believe the log is authenticated when it
+	// is only partially tamper-evident. Carried in the verdict so the correction travels with the data.
+	SignatureKind string `json:"signature_kind"`
 }
+
+// SignatureKind is the description every audit verdict carries.
+//
+// It lives here, beside the verifier, because both the server and cmd/verify-audit report this verdict and neither should have
+// to import the other to say the same sentence.
+const SignatureKind = "audit hash chain entry: unkeyed, detects partial edits, does not resist a full rewrite"
 
 // Verify walks the rows in id order and checks every digest and every link.
 //

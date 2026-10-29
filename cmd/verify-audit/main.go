@@ -58,6 +58,7 @@ func main() {
 	}
 
 	verdict := auditchain.Verify(rows)
+	verdict.SignatureKind = auditchain.SignatureKind
 	verdict.SelectionKnown = meta.Known
 	verdict.Filtered = meta.Filtered
 	if *quiet {

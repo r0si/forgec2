@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/forgec2/forgec2/internal/auditchain"
@@ -99,5 +101,33 @@ func TestParseAcceptsBothExportShapes(t *testing.T) {
 
 	if _, _, err := parse([]byte("not json")); err == nil {
 		t.Fatal("a non-JSON file was accepted")
+	}
+}
+
+// TestJSONOutputNamesTheSignatureKind pins the caveat that travels with an audit verdict.
+//
+// The chain is an UNKEYED hash: it detects a row edited, removed or rewritten in place, and it does not resist someone who
+// recomputes every hash. A JSON consumer that treats this as a keyed signature will describe the log as authenticated, so the
+// verdict carries the description and this test keeps it there.
+func TestJSONOutputNamesTheSignatureKind(t *testing.T) {
+	verdict := auditchain.Verify(nil)
+	verdict.SignatureKind = auditchain.SignatureKind
+
+	encoded, err := json.Marshal(verdict)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var decoded map[string]interface{}
+	if err := json.Unmarshal(encoded, &decoded); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	kind, _ := decoded["signature_kind"].(string)
+	if kind != auditchain.SignatureKind {
+		t.Fatalf("signature_kind = %q, want the shared constant", kind)
+	}
+	for _, needle := range []string{"unkeyed", "does not resist"} {
+		if !strings.Contains(kind, needle) {
+			t.Fatalf("the kind no longer states %q: %q", needle, kind)
+		}
 	}
 }

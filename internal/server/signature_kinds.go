@@ -1,5 +1,7 @@
 package server
 
+import "github.com/forgec2/forgec2/internal/auditchain"
+
 // The four things this system calls a "signature", named so a response can say which one it means.
 //
 // The word is overloaded: an audit chain entry, an Ed25519 signature over a handover bundle, an Ed25519 signature over a plugin
@@ -11,7 +13,7 @@ package server
 // docs/TERMINOLOGY.md.
 const (
 	// auditSignatureKind is the unkeyed hash chain. It detects partial edits and does not resist a full rewrite.
-	auditSignatureKind = "audit hash chain entry: unkeyed, detects partial edits, does not resist a full rewrite"
+	auditSignatureKind = auditchain.SignatureKind
 
 	// bundleSignatureKind is the handover manifest signature.
 	bundleSignatureKind = "ed25519 signature over the bundle manifest: keyed, proves the signer held the private key"
