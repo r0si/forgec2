@@ -72,6 +72,25 @@ func TestEveryRuleHealthCodeIsDocumented(t *testing.T) {
 		t.Fatalf("docs/DIAGNOSTICS.md does not explain the failure reasons: %s", strings.Join(missingReasons, ", "))
 	}
 
+	// Plugin rejection hints are the third vocabulary: each hint the implementation returns must appear on the page, so the
+	// advice an operator reads in the console can be looked up rather than taken on faith.
+	hintSource, err := os.ReadFile("plugin_failures.go")
+	if err != nil {
+		t.Fatalf("the plugin failure helper is missing: %v", err)
+	}
+	hintPattern := regexp.MustCompile(`return "([^"]{20,})"`)
+	hints := hintPattern.FindAllStringSubmatch(string(hintSource), -1)
+	if len(hints) < 3 {
+		t.Fatalf("only %d plugin hints found; this guard is not reading the helper", len(hints))
+	}
+	for _, match := range hints {
+		// The page may reflow the sentence, so match on the first clause rather than the whole string.
+		clause := strings.SplitN(match[1], ":", 2)[0]
+		if !strings.Contains(string(doc), clause) {
+			t.Fatalf("docs/DIAGNOSTICS.md does not carry the plugin hint %q", clause)
+		}
+	}
+
 	// And the page keeps the distinction that makes the severities usable.
 	if !strings.Contains(string(doc), "what to do first") {
 		t.Fatal("the page no longer explains what severity means")

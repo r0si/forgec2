@@ -68,6 +68,22 @@ beside it, and anything unmatched is collected as `other` with an example rather
 Two of these are worth reading twice: `cancelled` is not a fault, and `unsupported` usually means the **agent binary is older
 than the console**, which no amount of retrying fixes.
 
+### What a plugin rejection tells you to do
+
+`GET /api/plugins/failures` lists packages that are on disk but were **rejected at load**, with the loader's reason and a hint.
+The hint is matched on the same words the validator uses, so it points at the actual cause rather than at "the plugin is
+broken":
+
+| The reason mentions | The hint says |
+|---|---|
+| `signature`, `digest` | the package was modified after signing — re-stamp it with `cmd/sign-plugin` and check `plugins.trusted_keys` |
+| `manifest`, `yaml` | the manifest is invalid — run `go run ./cmd/plugin-check <dir>` and fix the error-level findings |
+| `entry`, `interpreter` | the entry file or interpreter is missing — check `manifest.entry` and the interpreter tier |
+| `untrusted`, `unknown signing key` | the signing key is not in plugins.trusted_keys — add the key, or re-sign with one that is |
+
+Anything else gets **no invented advice**: a hint that guesses is worse than an empty one, because it sends the operator to the
+wrong place with confidence.
+
 ## Two conventions every report follows
 
 **Scope: `?engagement=<id>` or `?engagement=none`.** The failure report, the failure-shape view and the duration report all
