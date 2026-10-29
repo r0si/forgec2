@@ -54,6 +54,17 @@ never a filter that quietly selects everything.
 `/api/exports/capabilities` marks the first two with `side_effects: true`, so a client offering "run all diagnostics" can exclude
 them without guessing — and the test that enforces that requires **exactly** that set.
 
+### Reruns are idempotent, and that is why a double click is safe
+
+A rerun does not invent a new identity: it carries the original task's **idempotency key**, and an unkeyed original gets a
+deterministic `rerun:<id>` key derived from its own id. So a button pressed twice re-submits the **same** key and the queue
+returns the row it already created instead of stacking a duplicate — which matters most exactly where this endpoint is used,
+on a bulk action over dozens of failures. The response reports those as `already queued` in `skipped`, with the reason stated,
+so a `queued` count lower than `matched` is explained rather than mysterious.
+
+The same protection is what makes the bound meaningful: `limit` (default and maximum 100) caps how much **new** work one call
+can create, not how many times a client may ask.
+
 ## Clear: making a fixed problem stop looking broken
 
 | Endpoint | What it clears |

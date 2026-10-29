@@ -73,6 +73,14 @@ func TestDiagnosticsDocPathsExist(t *testing.T) {
 		}
 	}
 
+	// The rerun section explains behaviour that is otherwise invisible: the same task submitted twice returns the row it already
+	// created, which is what makes a double-clicked bulk button safe.
+	for _, needle := range []string{"idempotency key", "already queued", "rerun:<id>"} {
+		if !strings.Contains(doc, needle) {
+			t.Fatalf("the diagnostics page no longer explains %q", needle)
+		}
+	}
+
 	// And it must keep the instructions to exclude the side-effecting entries from a bulk call.
 	if !strings.Contains(doc, "run all diagnostics") {
 		t.Fatal("the diagnostics page no longer warns about running every diagnostic")
