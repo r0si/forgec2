@@ -28,20 +28,26 @@ type engagementFailures struct {
 
 // failureShape is one group of failures that look the same.
 type failureShape struct {
-	Signature string   `json:"signature"`
-	Count     int      `json:"count"`
-	Agents    int      `json:"agents_affected"`
-	Reasons   []string `json:"reasons"`
-	Sample    string   `json:"sample"`
+	Signature string `json:"signature"`
+	Count     int    `json:"count"`
+	Agents    int    `json:"agents_affected"`
+	// The busiest host, named. The live signature view reports the same three fields, so a reviewer comparing the package with
+	// the console is comparing like with like - and an id alone is not actionable, because hosts are listed by name.
+	TopAgent      string   `json:"top_agent,omitempty"`
+	TopAgentHost  string   `json:"top_agent_host,omitempty"`
+	TopAgentCount int      `json:"top_agent_failures,omitempty"`
+	Reasons       []string `json:"reasons"`
+	Sample        string   `json:"sample"`
 }
 
 // buildEngagementFailures groups the window's failed tasks by shape.
-func buildEngagementFailures(tasks []db.Task) engagementFailures {
+func buildEngagementFailures(tasks []db.Task, hostnames map[string]string) engagementFailures {
 	type accumulator struct {
-		count   int
-		agents  map[string]bool
-		reasons map[string]bool
-		sample  string
+		count    int
+		agents   map[string]bool
+		perAgent map[string]int
+		reasons  map[string]bool
+		sample   string
 	}
 	groups := map[string]*accumulator{}
 	failed := 0
@@ -57,15 +63,17 @@ func buildEngagementFailures(tasks []db.Task) engagementFailures {
 		entry, exists := groups[signature]
 		if !exists {
 			entry = &accumulator{
-				agents:  map[string]bool{},
-				reasons: map[string]bool{},
-				sample:  truncateString(strings.TrimSpace(task.Error), failureSampleMaxChars),
+				agents:   map[string]bool{},
+				perAgent: map[string]int{},
+				reasons:  map[string]bool{},
+				sample:   truncateString(strings.TrimSpace(task.Error), failureSampleMaxChars),
 			}
 			groups[signature] = entry
 		}
 		entry.count++
 		if task.AgentID != "" {
 			entry.agents[task.AgentID] = true
+			entry.perAgent[task.AgentID]++
 		}
 		entry.reasons[classifyFailure(task.Error)] = true
 	}
@@ -77,8 +85,16 @@ func buildEngagementFailures(tasks []db.Task) engagementFailures {
 			reasons = append(reasons, reason)
 		}
 		sort.Strings(reasons)
+		// Deterministic: highest count, then lowest id, so two builds of one dataset agree.
+		topAgent, topCount := "", 0
+		for agentID, count := range entry.perAgent {
+			if count > topCount || (count == topCount && agentID < topAgent) {
+				topAgent, topCount = agentID, count
+			}
+		}
 		shapes = append(shapes, failureShape{
 			Signature: signature, Count: entry.count, Agents: len(entry.agents),
+			TopAgent: topAgent, TopAgentHost: hostnames[topAgent], TopAgentCount: topCount,
 			Reasons: reasons, Sample: entry.sample,
 		})
 	}
@@ -96,4 +112,18 @@ func buildEngagementFailures(tasks []db.Task) engagementFailures {
 		Note: "grouped by normalised shape (paths, ids and digits collapsed); " +
 			"agents_affected counts distinct hosts",
 	}
+}
+
+// hostnamesForTasks builds the id->hostname map the failure shapes need.
+//
+// Taken from the preloaded Agent relation rather than a second query: the bundle already loads it for tasks.csv, and a second
+// lookup could see a different fleet than the rows being described.
+func hostnamesForTasks(tasks []db.Task) map[string]string {
+	hostnames := make(map[string]string, len(tasks))
+	for _, task := range tasks {
+		if task.Agent.Hostname != "" { // db.Task.Agent is a value, not a pointer: an unloaded one is simply empty
+			hostnames[task.AgentID] = task.Agent.Hostname
+		}
+	}
+	return hostnames
 }

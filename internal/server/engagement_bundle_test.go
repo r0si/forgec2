@@ -236,10 +236,12 @@ func TestEngagementBundle(t *testing.T) {
 	var failures struct {
 		FailedTasks int `json:"failed_tasks"`
 		Shapes      []struct {
-			Signature string   `json:"signature"`
-			Count     int      `json:"count"`
-			Agents    int      `json:"agents_affected"`
-			Reasons   []string `json:"reasons"`
+			Signature    string   `json:"signature"`
+			Count        int      `json:"count"`
+			Agents       int      `json:"agents_affected"`
+			TopAgent     string   `json:"top_agent"`
+			TopAgentHost string   `json:"top_agent_host"`
+			Reasons      []string `json:"reasons"`
 		} `json:"shapes"`
 	}
 	if err := json.Unmarshal(members["failures.json"], &failures); err != nil {
@@ -250,6 +252,10 @@ func TestEngagementBundle(t *testing.T) {
 	}
 	if !containsFold(failures.Shapes[0].Signature, "deadline") {
 		t.Fatalf("the shape does not describe the failure: %+v", failures.Shapes[0])
+	}
+	// The package names the host, like the live view: a reviewer comparing the two should not have to look an id up.
+	if failures.Shapes[0].TopAgent == "" || failures.Shapes[0].TopAgentHost == "" {
+		t.Fatalf("the bundle shape carries no top host: %+v", failures.Shapes[0])
 	}
 	if failures.Shapes[0].Agents != 1 || len(failures.Shapes[0].Reasons) == 0 {
 		t.Fatalf("the shape carries no host count or reason: %+v", failures.Shapes[0])

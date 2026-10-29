@@ -264,7 +264,7 @@ func (s *Server) handleEngagementBundle(c *gin.Context) {
 	// failures.json - the exercise's failures grouped by SHAPE, using the same normalisation as the live signature view, so a
 	// reviewer reads "eleven hosts timed out on the same scan" instead of eleven rows that happen to look similar.
 	if len(agentIDs) > 0 && !add("failures.json", func(w bundleWriter) error {
-		return writeJSONMember(w, "failures.json", buildEngagementFailures(windowTasks))
+		return writeJSONMember(w, "failures.json", buildEngagementFailures(windowTasks, hostnamesForTasks(windowTasks)))
 	}) {
 		fail()
 		return
@@ -419,7 +419,7 @@ func buildEngagementTimeline(engagement db.Engagement, tasks []db.Task, auditRow
 
 	// The failures come FIRST. A reviewer opening the narrative wants to know what went wrong before reading five hundred
 	// rows in order, and the summary is already computed for failures.json - one grouping, two renderings.
-	if failures := buildEngagementFailures(tasks); failures.FailedTasks > 0 {
+	if failures := buildEngagementFailures(tasks, hostnamesForTasks(tasks)); failures.FailedTasks > 0 {
 		body.WriteString("## What went wrong\n\n")
 		body.WriteString("| Failures | Hosts | Shape |\n|---|---|---|\n")
 		for i, shape := range failures.Shapes {
