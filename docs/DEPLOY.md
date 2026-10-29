@@ -269,6 +269,17 @@ not - so `status` stays `ok` and the condition travels in `warnings`.
 
 Alerting on `warnings` being non-empty is the intended integration; alerting on the status code alone will miss all three.
 
+Two checks are the opposite: they answer **not ready** (503), because the process cannot do its job without them.
+
+| Check | Not ready when | What to do |
+|---|---|---|
+| `database` | the handle is missing, or a probe query fails | the message distinguishes *unavailable* (never initialised) from *error* (the probe failed) |
+| `listeners` | the listener registry cannot be read | usually the same cause as `database`; a listener count of `0` is **ready**, because a console with no C2 listener running still works |
+
+The distinction is the point of this section: `database` and `listeners` are **liveness of function**, while the warnings
+above are **health of features**. A monitor that restarts on a warning restarts a working server; one that ignores the first
+two reports a broken one as healthy.
+
 Each warning is **also written to the audit log once per episode** - `observability_warning` when it starts (or its count
 rises) and `observability_recovered` when it returns to zero - so the trail records *when* a route started looking broken
 and *when* it was fixed. A row per poll would bury the trail in its own alarm, which is why the writes are tied to

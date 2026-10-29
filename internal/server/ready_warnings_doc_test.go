@@ -32,7 +32,10 @@ func TestDeployGuideDocumentsReadyWarnings(t *testing.T) {
 	}
 
 	// 1. Every check the probe writes is named there.
-	for _, check := range []string{"notification_delivery", "automation_actions", "auto_retries", "plugins", "audit_chain"} {
+	// Both halves of the contract: the checks that only warn, and the two that answer not-ready. A guide that documents one
+	// half teaches a monitor to restart a working server, or to ignore a broken one.
+	for _, check := range []string{"notification_delivery", "automation_actions", "auto_retries", "plugins", "audit_chain",
+		"`database`", "`listeners`"} {
 		if !strings.Contains(section, check) {
 			t.Fatalf("the monitoring section does not name the %s check", check)
 		}
