@@ -3874,6 +3874,18 @@ paths:
                           notes:
                             type: array
                             items: {type: string}
+                      signature_kinds:
+                        type: object
+                        description: >-
+                          The four things this system calls a "signature", published so a client compares against strings rather
+                          than prose: only the bundle and plugin kinds are keyed; the audit chain is an unkeyed hash and the
+                          failure shape is not cryptographic at all, so neither should be described as authenticated.
+                        properties:
+                          audit: {type: string}
+                          bundle: {type: string}
+                          plugin: {type: string}
+                          failure: {type: string}
+                          note: {type: string}
                       exposure:
                         type: object
                         description: >-

@@ -15471,6 +15471,14 @@ export interface operations {
                                 scope?: string;
                                 notes?: string[];
                             };
+                            /** @description The four things this system calls a "signature", published so a client compares against strings rather than prose: only the bundle and plugin kinds are keyed; the audit chain is an unkeyed hash and the failure shape is not cryptographic at all, so neither should be described as authenticated. */
+                            signature_kinds?: {
+                                audit?: string;
+                                bundle?: string;
+                                plugin?: string;
+                                failure?: string;
+                                note?: string;
+                            };
                             /** @description The response headers the two downloads use to say what they contain. A filtered export looks exactly like an unfiltered one, so each file carries its own scope; published by name because a client should not have to reverse-engineer a header from a changelog. */
                             exposure?: {
                                 task_export_scope_header?: string;

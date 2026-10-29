@@ -68,7 +68,8 @@ func TestExportCapabilities(t *testing.T) {
 				Scope         string   `json:"scope"`
 				Notes         []string `json:"notes"`
 			} `json:"diagnostic_rate_limit"`
-			Limits map[string]json.RawMessage `json:"limits"`
+			Limits         map[string]json.RawMessage `json:"limits"`
+			SignatureKinds map[string]string          `json:"signature_kinds"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
@@ -104,6 +105,19 @@ func TestExportCapabilities(t *testing.T) {
 
 	// 4. The audit byte cap comes from the variable, so a later tuning of it cannot leave this stale.
 	var maxBytes int64
+	// 6b. The four signature kinds are published so a client can compare against them instead of prose copied from a release
+	// note - and they must be the strings the responses actually report.
+	for name, want := range map[string]string{
+		"audit": auditSignatureKind, "bundle": bundleSignatureKind,
+		"plugin": pluginSignatureKind, "failure": failureSignatureKind,
+	} {
+		if got := resp.Data.SignatureKinds[name]; got != want {
+			t.Fatalf("published %s signature kind = %q, want the constant", name, got)
+		}
+	}
+	if len(resp.Data.SignatureKinds) != 5 { // four kinds plus the note
+		t.Fatalf("signature kinds = %v, want the four kinds and the note", resp.Data.SignatureKinds)
+	}
 	if raw, ok := resp.Data.Limits["audit_export_bytes"]; ok {
 		_ = json.Unmarshal(raw, &maxBytes)
 	}

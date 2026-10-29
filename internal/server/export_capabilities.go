@@ -268,6 +268,16 @@ func (s *Server) handleExportCapabilities(c *gin.Context) {
 			"audit_export_truncated_header": "X-Audit-Export-Truncated",
 			"audit_export_filtered_header":  "X-Audit-Export-Filtered",
 		},
+		// Four different objects here are called a "signature". Each response that reports one says which, and the strings are
+		// published so a client can compare against them instead of matching on prose it copied from a release note.
+		"signature_kinds": gin.H{
+			"audit":   auditSignatureKind,
+			"bundle":  bundleSignatureKind,
+			"plugin":  pluginSignatureKind,
+			"failure": failureSignatureKind,
+			"note": "only the bundle and plugin kinds are keyed; the audit chain is an unkeyed hash and the failure shape is " +
+				"not cryptographic at all, so neither should be described as authenticated",
+		},
 		"limits": gin.H{
 			"task_export_rows":   ExportTaskLimit,
 			"audit_export_rows":  200000,
