@@ -129,6 +129,17 @@ Without a configured signing key, bundles are produced **unsigned**, the startup
 - The bundle is tenant-scoped: asking for an engagement in another tenant answers 404.
 - Producing and verifying a bundle are both audited (`engagement_bundle`, `engagement_bundle_verify`).
 
+## Work that had not finished
+
+A package reports what **failed**; a package that reports only that implies the record is complete. `failures.json` carries an
+`unfinished` block and `timeline.md` a **"Unfinished at handover"** section, both stating how many tasks were still `pending` or
+`running` when the archive was assembled and how many hosts were holding them.
+
+This matters because those tasks are **absent from the archive** — they never ran, so they have no result to report, and an empty
+result looks exactly like a clean one. The counts are taken **before the failure filter** is applied, since a task that had not finished is
+not a failure. When everything finished, the block says `0` **with a note saying so**, rather than being omitted: a missing field
+would leave the reader to guess which of the two it meant.
+
 ## What the bundle does not contain
 
 `summary.md` ends with this list, because a handover that names only its inclusions invites the receiver to read it as the

@@ -41,6 +41,14 @@ func TestHandoverDocMatchesTheImplementation(t *testing.T) {
 		}
 	}
 
+	// 3a2. Unfinished work is a property of the record itself, and a receiver who does not know about it reads an absent result as
+	// a clean one.
+	for _, needle := range []string{"Work that had not finished", "unfinished", "Unfinished at handover", "before the failure filter"} {
+		if !strings.Contains(doc, needle) {
+			t.Fatalf("docs/HANDOVER_BUNDLE.md does not state %q", needle)
+		}
+	}
+
 	// 3b. The limitations section is part of the deliverable: the package states them in summary.md, and a guide that omits them
 	// leaves the reader to discover an absence the hard way.
 	for _, needle := range []string{"What the bundle does not contain", "Credential material",
