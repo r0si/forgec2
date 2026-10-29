@@ -93,7 +93,10 @@ func (s *Server) completeBuildJob(job *BuildJob, outputPath string, err error) {
 	if err != nil {
 		job.Status = "failed"
 		job.Phase = "failed"
-		job.Error = sanitizeError(err, "Build failed")
+		// NOT sanitizeError: that helper replaces an unrecognised error with a fallback sentence, and a build error IS the diagnosis.
+		// The old call turned a compiler failure into the literal text "Build failed", which the UI then showed beneath its own
+		// "Build failed" title - a report that names nothing and cannot be acted on.
+		job.Error = buildFailureText(err)
 	} else {
 		job.Status = "completed"
 		job.Phase = "completed"
