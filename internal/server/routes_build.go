@@ -17,6 +17,9 @@ func (s *Server) registerGenerateRoutes(auth *gin.RouterGroup) {
 		genRead.GET("/generate/builds/:id", s.handleBuildStatus)
 		genRead.GET("/generate/builds/:id/download", s.handleBuildDownload)
 		genRead.GET("/api/builds/effectiveness", s.handleBuildEffectiveness)
+		// What the SERVER needs in order to build, checked as the server's own user: these environment failures otherwise surface only
+		// as a failed compile.
+		genRead.GET("/api/generate/toolchain", s.handleBuildToolchain)
 	}
 	genWrite := auth.Group("/")
 	genWrite.Use(middleware.RequirePermission(db.PermAgentsWrite))

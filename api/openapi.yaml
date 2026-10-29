@@ -13186,6 +13186,59 @@ paths:
       security: [{SessionCookie: []}]
       responses:
         '200': {description: Heatmap rows}
+  /api/generate/toolchain:
+    get:
+      tags: [Builds]
+      summary: What the SERVER needs in order to build
+      description: >-
+        The environment check an operator should run BEFORE waiting for a compile. The most common payload-build failure is not a code
+        problem: the service account has no `go` on its PATH, its `GOCACHE` is unwritable, or the embedded agent tree is missing - and
+        all three previously surfaced only as a failed build. **Checked as the server's own user**, because a shell where `go` works
+        proves nothing about the account the process runs as: `exec.LookPath`, `go version` (5 s timeout), a real create-and-remove probe
+        in the cache directory, and a stat of the agent tree. `ok` is exactly "problems is empty", and every problem names the fix.
+      operationId: buildToolchain
+      security: [{SessionCookie: []}]
+      responses:
+        '200':
+          description: The probes and any problems
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  data:
+                    type: object
+                    properties:
+                      ok: {type: boolean, description: Exactly "problems is empty"}
+                      go:
+                        type: object
+                        properties:
+                          available: {type: boolean}
+                          path: {type: string}
+                          version: {type: string}
+                          error: {type: string, description: Found but not runnable}
+                      gocache:
+                        type: object
+                        properties:
+                          path: {type: string}
+                          source: {type: string}
+                          writable: {type: boolean}
+                          error: {type: string}
+                      garble:
+                        type: object
+                        properties:
+                          available: {type: boolean}
+                          path: {type: string}
+                      agents_dir:
+                        type: object
+                        properties:
+                          path: {type: string}
+                          present: {type: boolean}
+                      problems:
+                        type: array
+                        items: {type: string}
+                      note: {type: string}
   /api/builds/effectiveness:
     get:
       tags: [Builds]

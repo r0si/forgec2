@@ -11002,6 +11002,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/generate/toolchain": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What the SERVER needs in order to build
+         * @description The environment check an operator should run BEFORE waiting for a compile. The most common payload-build failure is not a code problem: the service account has no `go` on its PATH, its `GOCACHE` is unwritable, or the embedded agent tree is missing - and all three previously surfaced only as a failed build. **Checked as the server's own user**, because a shell where `go` works proves nothing about the account the process runs as: `exec.LookPath`, `go version` (5 s timeout), a real create-and-remove probe in the cache directory, and a stat of the agent tree. `ok` is exactly "problems is empty", and every problem names the fix.
+         */
+        get: operations["buildToolchain"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/builds/effectiveness": {
         parameters: {
             query?: never;
@@ -27982,6 +28002,55 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    buildToolchain: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The probes and any problems */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        data?: {
+                            /** @description Exactly "problems is empty" */
+                            ok?: boolean;
+                            go?: {
+                                available?: boolean;
+                                path?: string;
+                                version?: string;
+                                /** @description Found but not runnable */
+                                error?: string;
+                            };
+                            gocache?: {
+                                path?: string;
+                                source?: string;
+                                writable?: boolean;
+                                error?: string;
+                            };
+                            garble?: {
+                                available?: boolean;
+                                path?: string;
+                            };
+                            agents_dir?: {
+                                path?: string;
+                                present?: boolean;
+                            };
+                            problems?: string[];
+                            note?: string;
+                        };
+                    };
+                };
             };
         };
     };
