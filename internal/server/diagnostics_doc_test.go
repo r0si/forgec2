@@ -65,6 +65,14 @@ func TestDiagnosticsDocPathsExist(t *testing.T) {
 			t.Fatalf("the diagnostics page no longer states %q", needle)
 		}
 	}
+	// The two conventions are the page's other load-bearing content: a scope that every report takes, and exports that name
+	// what they contain. A page that drops either is describing a system nobody runs.
+	for _, needle := range []string{"engagement=none", taskExportScopeHeader, auditExportScopeHeader, "X-Audit-Export-Filtered"} {
+		if !strings.Contains(doc, needle) {
+			t.Fatalf("the diagnostics page no longer mentions %q", needle)
+		}
+	}
+
 	// And it must keep the instructions to exclude the side-effecting entries from a bulk call.
 	if !strings.Contains(doc, "run all diagnostics") {
 		t.Fatal("the diagnostics page no longer warns about running every diagnostic")

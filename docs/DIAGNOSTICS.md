@@ -25,6 +25,24 @@ All four **execute nothing**. Each is audited, and using one costs no side effec
 | `GET /api/exports/capabilities` | What does the download and diagnostics surface accept? |
 | `GET /ready` | Is the process healthy — and are delivery, actions, retries, plugins? |
 
+## Two conventions every report follows
+
+**Scope: `?engagement=<id>` or `?engagement=none`.** The failure report, the failure-shape view and the duration report all
+take it, resolved through the tenant scope, so "what went wrong in **this** exercise" cannot silently answer a different
+question. `none` is the inverse question an operator needs: hosts no deadline will ever stop. An unusable value is a **400**,
+never a filter that quietly selects everything.
+
+**Self-description: every export names what it contains.** A filtered file looks exactly like an unfiltered one, so:
+
+| header | on | says |
+|---|---|---|
+| `X-Task-Export-Scope` | task CSV/JSON | the filters that shaped the rows, sorted, or `all` |
+| `X-Task-Export-Truncated` | task CSV/JSON | whether the row cap cut the answer |
+| `X-Audit-Export-Scope` | audit NDJSON | the same, for the chain export |
+| `X-Audit-Export-Filtered` | audit NDJSON | whether the file is a selection (and therefore **not** a contiguous hash chain) |
+
+`GET /api/exports/capabilities` publishes these names, so a client reads them from the API rather than from this page.
+
 ## Act: the endpoints with side effects
 
 | Endpoint | What it does |
