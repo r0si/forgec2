@@ -421,12 +421,18 @@ func buildEngagementTimeline(engagement db.Engagement, tasks []db.Task, auditRow
 	// rows in order, and the summary is already computed for failures.json - one grouping, two renderings.
 	if failures := buildEngagementFailures(tasks, hostnamesForTasks(tasks)); failures.FailedTasks > 0 {
 		body.WriteString("## What went wrong\n\n")
-		body.WriteString("| Failures | Hosts | Shape |\n|---|---|---|\n")
+		body.WriteString("| Failures | Hosts | Busiest host | Shape |\n|---|---|---|---|\n")
 		for i, shape := range failures.Shapes {
 			if i >= 5 {
 				break
 			}
-			fmt.Fprintf(&body, "| %d | %d | %s |\n", shape.Count, shape.Agents,
+			busiest := shape.TopAgentHost
+			if busiest == "" {
+				// A deleted host still has an id, and naming it is better than an empty cell that reads like "none".
+				busiest = shape.TopAgent
+			}
+			fmt.Fprintf(&body, "| %d | %d | %s | %s |\n", shape.Count, shape.Agents,
+				strings.ReplaceAll(busiest, "|", "\u00a6"),
 				strings.ReplaceAll(shape.Signature, "|", "\u00a6"))
 		}
 		body.WriteString("\nFull detail in `failures.json`.\n\n")
