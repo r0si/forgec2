@@ -239,3 +239,26 @@ func exportNameAt(image []byte, offset int64) string {
 	}
 	return string(image[offset : offset+int64(end)])
 }
+
+// FileOffsetForRVA maps an RVA to a file offset for a whole image.
+//
+// Exported because the two parsers speak different units and that difference is invisible at the call site: FindExportRVA returns an
+// RVA, ExtractSSN reads bytes at a FILE OFFSET, and passing one where the other is expected produces a stub scan that starts in the
+// wrong place - which reads as "no stub found" rather than as a unit error.
+func FileOffsetForRVA(image []byte, rva uint32) (int64, error) {
+	if len(image) < dosLfanewOffset+4 {
+		return 0, &ErrNotPE{Reason: "image is too short to hold a DOS header"}
+	}
+	lfanew := int64(binary.LittleEndian.Uint32(image[dosLfanewOffset : dosLfanewOffset+4]))
+	if lfanew <= 0 || lfanew+24 > int64(len(image)) {
+		return 0, &ErrNotPE{Reason: "e_lfanew points outside the image"}
+	}
+	coff := lfanew + 4
+	sections := int(binary.LittleEndian.Uint16(image[coff+2 : coff+4]))
+	optionalSize := int(binary.LittleEndian.Uint16(image[coff+16 : coff+18]))
+	optional := coff + 20
+	if optionalSize < 2 || optional+int64(optionalSize) > int64(len(image)) {
+		return 0, &ErrNotPE{Reason: "optional header is missing or unreadable"}
+	}
+	return fileOffsetForRVA(image, optional, sections, rva)
+}
