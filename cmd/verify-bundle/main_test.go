@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/forgec2/forgec2/internal/bundle"
@@ -81,5 +83,29 @@ func TestExitCodeRequireComplete(t *testing.T) {
 	untrusted := &bundle.Report{OK: true, Signed: true, SignatureOK: true}
 	if exitCode(partial, true, true) == exitCode(untrusted, true, false) {
 		t.Fatal("incomplete and untrusted share an exit code")
+	}
+}
+
+// TestJSONOutputNamesTheSignatureKind pins the caveat that travels with a bundle verdict.
+//
+// The bundle signature is the KEYED one, so unlike the audit chain it does prove the signer held the private key - but only when
+// the caller supplied the key they trust, which is why `trusted` exists separately from `signature_valid`. A JSON consumer that
+// reports "signature verified" without saying which of the product's four signatures is meant is how the two get conflated.
+func TestJSONOutputNamesTheSignatureKind(t *testing.T) {
+	report := &bundle.Report{SignatureKind: bundle.SignatureKind}
+	encoded, err := json.Marshal(report)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var decoded map[string]interface{}
+	if err := json.Unmarshal(encoded, &decoded); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	kind, _ := decoded["signature_kind"].(string)
+	if kind != bundle.SignatureKind {
+		t.Fatalf("signature_kind = %q, want the shared constant", kind)
+	}
+	if !strings.Contains(kind, "keyed") || !strings.Contains(kind, "ed25519") {
+		t.Fatalf("the bundle kind no longer names its mechanism: %q", kind)
 	}
 }

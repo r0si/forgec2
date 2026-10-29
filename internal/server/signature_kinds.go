@@ -1,6 +1,9 @@
 package server
 
-import "github.com/forgec2/forgec2/internal/auditchain"
+import (
+	"github.com/forgec2/forgec2/internal/auditchain"
+	"github.com/forgec2/forgec2/internal/bundle"
+)
 
 // The four things this system calls a "signature", named so a response can say which one it means.
 //
@@ -16,7 +19,7 @@ const (
 	auditSignatureKind = auditchain.SignatureKind
 
 	// bundleSignatureKind is the handover manifest signature.
-	bundleSignatureKind = "ed25519 signature over the bundle manifest: keyed, proves the signer held the private key"
+	bundleSignatureKind = bundle.SignatureKind
 
 	// pluginSignatureKind is the plugin package signature.
 	pluginSignatureKind = "ed25519 signature over the plugin package digest: keyed, checked against plugins.trusted_keys"

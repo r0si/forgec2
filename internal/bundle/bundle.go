@@ -142,7 +142,17 @@ type Report struct {
 	// ServerVersion is the release that produced the archive, empty for a package made before it was recorded.
 	ServerVersion string `json:"server_version,omitempty"`
 	ArchiveSHA256 string `json:"archive_sha256"`
+	// SignatureKind says which of this product's four "signatures" this report is about: the KEYED Ed25519 signature over the
+	// manifest. Carried in the report because a JSON consumer will describe the result in a report of its own, and "signature
+	// verified" without saying which kind is how the unkeyed audit chain gets mistaken for an authenticated artefact.
+	SignatureKind string `json:"signature_kind"`
 }
+
+// SignatureKind is the description every bundle verdict carries.
+//
+// It lives in this package because both the server and cmd/verify-bundle report this verdict, and neither should import the
+// other to say the same sentence.
+const SignatureKind = "ed25519 signature over the bundle manifest: keyed, proves the signer held the private key"
 
 // Verify checks an archive against its own manifest.
 //
@@ -180,6 +190,7 @@ func Verify(raw []byte, trustedKey string) (*Report, error) {
 	}
 
 	report := &Report{
+		SignatureKind: SignatureKind,
 		Mismatched:    []Problem{},
 		Unverifiable:  []Problem{},
 		Extra:         []string{},
