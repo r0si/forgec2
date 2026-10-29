@@ -71,6 +71,7 @@ func writeEngagementMarkdown(body *bytes.Buffer, data gin.H) {
 	fmt.Fprintf(body, "## Audited actions\n\n")
 	if len(actions) == 0 {
 		fmt.Fprintf(body, "_No audited actions were recorded inside the window._\n")
+		fmt.Fprintf(body, "%s", bundleLimitsSection())
 		return
 	}
 	sort.SliceStable(actions, func(i, j int) bool {
@@ -83,6 +84,24 @@ func writeEngagementMarkdown(body *bytes.Buffer, data gin.H) {
 	for _, action := range actions {
 		fmt.Fprintf(body, "| `%s` | %d |\n", action.Action, action.Count)
 	}
+	fmt.Fprintf(body, "%s", bundleLimitsSection())
+}
+
+// bundleLimitsSection says what the package does NOT contain.
+//
+// A handover that lists only what it includes invites the reader to treat it as the whole record. Several things an operator
+// might look for are deliberately absent - and one of them is genuinely unavailable rather than withheld: the notification
+// delivery counters are in-memory and reset with the process, so a restart before handover loses them.
+func bundleLimitsSection() string {
+	var body strings.Builder
+	body.WriteString("\n## What this package does not contain\n\n")
+	body.WriteString("- **Credential material.** `credentials.json` lists what was captured, without passwords or hashes: a bundle " +
+		"leaves the console, and secrets stay in the system that audits their use.\n")
+	body.WriteString("- **Notification delivery history.** Route counters live in memory and reset with the process, so they are " +
+		"not part of a package; if delivery failures matter to the review, export them before restarting the server.\n")
+	body.WriteString("- **Anything outside the window.** Members are bounded by the engagement's start and end; a host that " +
+		"checked in before or after it is absent by construction, not by accident.\n")
+	return body.String()
 }
 
 // windowState words the window the way a reader needs it, rather than as a boolean.

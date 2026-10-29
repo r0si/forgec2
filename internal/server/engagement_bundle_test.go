@@ -221,6 +221,16 @@ func TestEngagementBundle(t *testing.T) {
 		}
 	}
 
+	// summary.md says what the package does NOT contain. A handover that lists only inclusions invites the reader to treat it as
+	// the whole record - and one of these is genuinely unavailable, not withheld: the delivery counters reset with the process.
+	summaryText := string(members["summary.md"])
+	for _, want := range []string{"## What this package does not contain", "Credential material",
+		"Notification delivery history", "Anything outside the window"} {
+		if !strings.Contains(summaryText, want) {
+			t.Fatalf("summary.md does not state %q:\n%s", want, summaryText)
+		}
+	}
+
 	// failures.json groups the window's failures by shape, with the reason codes and the hosts affected - the same
 	// normalisation the live signature view uses, so the reviewer can compare the package with what the console said.
 	var failures struct {
