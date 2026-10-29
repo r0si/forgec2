@@ -54,6 +54,18 @@ func TestDocsIndexListsEveryPage(t *testing.T) {
 		}
 	}
 
+	// The terminology page is the one place the overloaded words are disambiguated, and four of them are called "signature".
+	// A review that confuses the audit chain with a bundle signature reaches the wrong conclusion about what was proven.
+	terminology, err := os.ReadFile("../../docs/TERMINOLOGY.md")
+	if err != nil {
+		t.Fatalf("the terminology page is missing: %v", err)
+	}
+	for _, sense := range []string{"signature** (audit)", "signature** (bundle)", "signature** (plugin)", "signature** (failure)"} {
+		if !strings.Contains(string(terminology), sense) {
+			t.Fatalf("docs/TERMINOLOGY.md no longer separates %q from the other senses", sense)
+		}
+	}
+
 	// The other direction: an index entry pointing at a page that no longer exists sends a reader to a 404.
 	for _, line := range strings.Split(indexText, "\n") {
 		start := strings.Index(line, "](")

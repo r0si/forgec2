@@ -27,6 +27,26 @@ URLs say **beacons** since wave 2 (`/beacons/:id/…`), and only code that mirro
 API keeps the agent word (`agentId`, `lib/api-paths.ts`, detail sub-components). The
 vocabulary above governs **operator-facing copy and URLs**.
 
+## Words that mean more than one thing here
+
+Five terms are overloaded by design, and confusing two of them is how a review reaches the wrong conclusion. `signature` is
+the worst of them: it names **four** different objects in this system.
+
+| Term | Where it appears | What it actually is |
+|---|---|---|
+| **signature** (audit) | `audit.ndjson`, `/api/audit/verify` | an **unkeyed hash chain** entry — detects partial edits, not a rewrite |
+| **signature** (bundle) | `MANIFEST.json`, `X-Bundle-Signed`, `verify-bundle` | an **Ed25519 signature** over the canonical payload |
+| **signature** (plugin) | `manifest.yaml` `signature:`, `cmd/sign-plugin` | an **Ed25519 signature** over the package digest |
+| **signature** (failure) | `/api/stats/failures/signatures` | a **normalised error shape** — no cryptography at all |
+| **reason** | `/api/stats/tasks/failures` vs `/api/plugins/failures` | a **failure classification code** versus the **loader's rejection text** |
+| **scope** | `?engagement=`, `X-Task-Export-Scope` | which rows a **report** covers; it is not authorisation |
+| **state** | `automation/health` `action_state` vs a task's `status` | whether a rule's **actions are landing** versus where a **task** is in its lifecycle |
+| **health** | `/ready` vs `/api/automation/health` | **this process** serving traffic versus **a feature** doing its job |
+
+Two rules follow. **Never write "signature" without saying which of the four**, and never let `health` stand alone when the
+rule-health report is meant. The failure-shape signature is the one that surprises readers: it is a string deliberately built
+to *lose* detail (paths, ids and digits collapsed), which is the opposite of what the other three are for.
+
 ## Naming rules
 
 1. **A nav label equals its page title (h1).** The two exceptions are deliberate:
