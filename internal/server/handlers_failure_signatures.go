@@ -147,6 +147,7 @@ func (s *Server) handleFailureSignatures(c *gin.Context) {
 	respond(c, gin.H{
 		"since":                   since,
 		"engagement":              c.Query("engagement"),
+		"signature_kind":          failureSignatureKind,
 		"task_failures":           len(rows),
 		"task_signatures":         taskSignatures,
 		"notification_signatures": notificationSignatures,

@@ -409,6 +409,10 @@ type auditChainVerdict struct {
 	// Discontinuities counts purged gaps accepted at the window start (a purge
 	// removes rows by design; it is not tampering).
 	Discontinuities int `json:"discontinuities,omitempty"`
+	// SignatureKind says which of this system's four "signatures" this verdict is about. The word is overloaded - an audit
+	// chain entry, an Ed25519 bundle signature, a plugin package signature and a normalised failure shape - and a reader who
+	// takes this one for a keyed signature believes the chain proves more than it does.
+	SignatureKind string `json:"signature_kind"`
 }
 
 // auditHealthCacheTTL bounds how often the UI health endpoint re-walks the chain.
@@ -612,6 +616,8 @@ func (s *Server) handleAuditChainAnchor(c *gin.Context) {
 // it exists so an investigator can prove the log was not edited after the fact.
 func (s *Server) handleVerifyAuditChain(c *gin.Context) {
 	verdict := s.verifyAuditChain(atoiDefault(c.Query("limit"), 1000))
+	// Say which of the four "signatures" this verdict is about, so nobody reads it as a keyed signature.
+	verdict.SignatureKind = auditSignatureKind
 	if verdict.OK {
 		respond(c, verdict)
 		return

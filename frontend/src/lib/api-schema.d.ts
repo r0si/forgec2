@@ -28113,6 +28113,8 @@ export interface operations {
                             since?: string;
                             /** @description The scope that was applied */
                             engagement?: string;
+                            /** @description Which of this system's four "signatures" these rows are: a **failure shape** - normalised error text with paths, ids and digits collapsed, and no cryptography at all. Stated in the response because the word is overloaded and a reader who takes it for a keyed signature believes the wrong thing. */
+                            signature_kind?: string;
                             task_failures?: number;
                             note?: string;
                             /** @description What to do with a row: `POST /api/tasks/rerun-by-signature` re-dispatches the failed tasks that share one shape, and the row signature IS the request body. Carried in the answer so a client does not have to know the second endpoint exists. */

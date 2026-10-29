@@ -161,6 +161,8 @@ func (s *Server) handleVerifyEngagementBundle(c *gin.Context) {
 		"valid":   signatureValid,
 		"trusted": trusted,
 		"problem": signatureProblem,
+		// Which "signature" this is: the keyed one over the manifest, not the audit chain's unkeyed hash.
+		"kind": bundleSignatureKind,
 	}
 	if manifest.Signature != nil {
 		signatureReport["public_key"] = manifest.Signature.PublicKey
