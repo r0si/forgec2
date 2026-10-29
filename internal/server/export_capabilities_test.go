@@ -165,7 +165,9 @@ func TestExportCapabilities(t *testing.T) {
 	}
 	// Every entry must STATE whether it has side effects. A client that offers "run all diagnostics" has no way to
 	// know otherwise, and one of these really does send a notification.
-	sideEffecting := 0
+	// The entries with side effects are a NAMED set, not a count: a client that offers "run all diagnostics" must exclude
+	// exactly these, and the assertion says which rather than how many.
+	sideEffecting := map[string]bool{}
 	for _, entry := range resp.Data.Diagnostics {
 		if entry.Path == "" || entry.Method == "" || entry.Answers == "" {
 			t.Fatalf("an incomplete diagnostics entry: %+v", entry)
@@ -174,9 +176,9 @@ func TestExportCapabilities(t *testing.T) {
 			t.Fatalf("%s does not state side_effects", entry.Path)
 		}
 		if *entry.SideEffects {
-			sideEffecting++
+			sideEffecting[entry.Path] = true
 			if !strings.Contains(entry.Path, "/test") {
-				t.Fatalf("%s claims side effects but is not the test endpoint", entry.Path)
+				t.Fatalf("%s claims side effects but is not a test endpoint", entry.Path)
 			}
 		}
 		// The capabilities document uses gin's ":id" spelling; the spec uses "{id}".
@@ -203,8 +205,13 @@ func TestExportCapabilities(t *testing.T) {
 
 	// Exactly one diagnostic delivers something real, and it is the route test. More than one would make a batch runner
 	// dangerous; none would mean the flag is decoration.
-	if sideEffecting != 1 {
-		t.Fatalf("%d diagnostics claim external side effects, want exactly 1 (the route test)", sideEffecting)
+	for _, want := range []string{"/api/notification-routes/:id/test", "/api/automation/rules/:id/test"} {
+		if !sideEffecting[want] {
+			t.Fatalf("%s is not listed as side-effecting (got %v)", want, sideEffecting)
+		}
+	}
+	if len(sideEffecting) != 2 {
+		t.Fatalf("side-effecting diagnostics = %v, want exactly the two test endpoints", sideEffecting)
 	}
 
 	// 7c. The diagnostics budget is published from the same constants the limiter uses: a client that knows the ceiling

@@ -206,6 +206,20 @@ func (s *Server) handleExportCapabilities(c *gin.Context) {
 					"the reason for a failure is in the response, not only the status",
 				},
 			},
+			{
+				// The second entry with side effects: it runs the rule's actions. A client offering "run all diagnostics" must
+				// exclude this one too, which is why the flag is per entry rather than a property of the family.
+				"path":         "/api/automation/rules/:id/test",
+				"method":       "POST",
+				"answers":      "do this rule's actions actually work, right now",
+				"body":         []string{"confirm"},
+				"side_effects": true,
+				"notes": []string{
+					"EXECUTES the rule's actions against a synthetic event; confirm: true is mandatory",
+					"rate-limited per rule (10s, Retry-After on 429); every executed test is audited",
+					"webhook delivery is asynchronous: its result arrives after the response and is counted on the route",
+				},
+			},
 		},
 		// The clearing endpoints are deliberately NOT in the list above: every diagnostic answers a question, while these
 		// change what the report will say next. Keeping them apart means a client can offer "run all diagnostics" and a
