@@ -28193,6 +28193,8 @@ export interface operations {
                 /** @description Window, e.g. 24h or 7d (default 7d) */
                 since?: string;
                 group_by?: "reason" | "type" | "agent" | "engagement";
+                /** @description Scope the report to one exercise (numeric id) or, with `none`, to hosts in no exercise. The after-action question is usually about ONE exercise, and answering it by exporting and filtering by hand is how the wrong window gets reviewed. */
+                engagement?: string;
             };
             header?: never;
             path?: never;

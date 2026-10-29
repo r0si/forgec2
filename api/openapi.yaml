@@ -13327,6 +13327,13 @@ paths:
         - name: group_by
           in: query
           schema: {type: string, enum: [reason, type, agent, engagement], default: reason}
+        - name: engagement
+          in: query
+          description: >-
+            Scope the report to one exercise (numeric id) or, with `none`, to hosts in no exercise. The after-action question is
+            usually about ONE exercise, and answering it by exporting and filtering by hand is how the wrong window gets
+            reviewed.
+          schema: {type: string}
       responses:
         '200':
           description: Buckets, most common first

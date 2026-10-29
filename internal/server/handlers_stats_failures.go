@@ -77,6 +77,13 @@ func (s *Server) handleTaskFailureStats(c *gin.Context) {
 		return
 	}
 
+	// The after-action question is usually about ONE exercise, and answering it by exporting and filtering by hand is how the
+	// wrong window gets reviewed.
+	engagementAgents, scopedByEngagement, engagementErr := s.taskEngagementFilter(c)
+	if engagementErr != nil {
+		respondError(c, http.StatusBadRequest, engagementErr.Error())
+		return
+	}
 	cutoff := time.Now().Add(-window)
 	// Projection rather than Find: the classifier needs four columns, and pulling whole result blobs would make this
 	// endpoint expensive on the very datasets it is meant to explain.
@@ -91,6 +98,9 @@ func (s *Server) handleTaskFailureStats(c *gin.Context) {
 		Where("updated_at >= ?", cutoff).
 		Order("updated_at DESC").
 		Limit(failureStatsSampleLimit)
+	if scopedByEngagement {
+		query = query.Where("agent_id IN ?", engagementAgents)
+	}
 	if err := query.Scan(&rows).Error; err != nil {
 		handleQueryError(c, err, "Failed to load failed tasks")
 		return
@@ -170,11 +180,12 @@ func (s *Server) handleTaskFailureStats(c *gin.Context) {
 	}
 
 	payload := gin.H{
-		"since":     since,
-		"group_by":  groupBy,
-		"failed":    len(rows),
-		"truncated": len(rows) >= failureStatsSampleLimit,
-		"retried":   retried,
+		"since":      since,
+		"engagement": c.Query("engagement"),
+		"group_by":   groupBy,
+		"failed":     len(rows),
+		"truncated":  len(rows) >= failureStatsSampleLimit,
+		"retried":    retried,
 		"retry_note": func() string {
 			if retried == 0 {
 				return "no failures were re-issued automatically in this window"
