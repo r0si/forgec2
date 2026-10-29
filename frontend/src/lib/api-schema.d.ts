@@ -28443,6 +28443,8 @@ export interface operations {
             query?: {
                 /** @description draft|blocked|running|failed|complete */
                 state?: string;
+                /** @description `1` keeps only the runs that are waiting for a HUMAN - an approval step that has not been approved - because "blocked" alone makes the reader open each run to learn whether the blocker is a person or a dependency. Filtering happens after the steps are decoded, since blocked is a property of a step rather than of the row. */
+                attention?: "1";
             };
             header?: never;
             path?: never;

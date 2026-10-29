@@ -40,3 +40,39 @@ step on every run** (ids are visited in sorted order) so two diagnoses of one pl
 No scheduler, no retry policy, no approval UI. Those are the layers above: this package answers *"what may run, and what happened"*,
 nothing else. Retries in particular are a policy decision with a blast radius — the same reasoning that keeps automatic task retries
 limited to read-only enumerations.
+
+## The endpoints around it
+
+`internal/server` stores runs and records transitions. The routes:
+
+| Endpoint | Answers |
+|---|---|
+| `GET /api/playbooks/runs` | the runs, newest first, with `settled`/`total` and the two columns that matter: **`blocked_steps`** and **`next_step`** |
+| `GET /api/playbooks/runs/{id}` | one run: every step, its status, and the computed `ready` set |
+| `POST /api/playbooks/runs` | record a run (steps are normalised and cycle-checked; a refused definition is a 400) |
+| `POST /api/playbooks/runs/{id}/transitions` | move one step — `approve`, `start`, `succeed`, `fail`, `skip` |
+| `GET /api/playbooks/runs/{id}/history` | the run's audited transitions, oldest first |
+
+### `blocked_steps` and `next_step` exist because "blocked" is ambiguous
+
+A blocked **approval** is a request for an operator. A blocked **dependency** is a run that will unblock itself. Collapsing them into one
+word is how a queue of pending approvals goes unnoticed, so the list carries the distinction — and `?attention=1` keeps only the runs that
+want a human, because a caller that has to filter that itself usually will not.
+
+### A transition is refused, not corrected
+
+A transition the state machine refuses answers **409** with the reason. It is not applied partially and not reported as success: a
+checklist that accepts `succeed` on a `pending` step is a checklist that records things that never happened.
+
+### Nothing here dispatches anything
+
+No endpoint above starts a task, a listener or a beacon. Every write response carries a `note` saying so. Wiring an executor to this state
+machine is a separate decision with its own blast radius: a playbook that can run commands is an automation engine, and the approval step
+exists precisely because the machine is not trusted to decide alone.
+
+### Reading it
+
+- `GET /api/playbooks/runs?attention=1` — what needs a person right now.
+- `GET /api/playbooks/runs/{id}` — what may run next, and why not.
+- `GET /api/playbooks/runs/{id}/history` — who advanced it, and when. The rows are the audit log's, and each carries `entry_hash` so it can
+  be matched against `/api/audit/export`; this is a convenience view, not a second record.

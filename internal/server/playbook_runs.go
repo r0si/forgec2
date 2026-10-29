@@ -67,6 +67,9 @@ func (s *Server) loadPlaybookRun(c *gin.Context, id uint) (*db.PlaybookRun, play
 
 // handleListPlaybookRuns renders the run list.
 func (s *Server) handleListPlaybookRuns(c *gin.Context) {
+	// attentionOnly narrows the list to runs waiting for a human; it filters AFTER decoding the steps, because "blocked" is a property
+	// of a step, not of the row.
+	attentionOnly := strings.TrimSpace(c.Query("attention")) == "1" || strings.EqualFold(strings.TrimSpace(c.Query("attention")), "true")
 	query := s.tenantScope(s.db.WithContext(s.ctx).Model(&db.PlaybookRun{}), c)
 	if state := strings.TrimSpace(c.Query("state")); state != "" {
 		query = query.Where("state = ?", state)
@@ -109,6 +112,11 @@ func (s *Server) handleListPlaybookRuns(c *gin.Context) {
 		}
 		if ready := run.Ready(); len(ready) > 0 {
 			summary.NextStep = ready[0].ID
+		}
+		// ?attention=1 keeps only the runs a PERSON has to act on. The same information is in blocked_steps, but a caller that has to
+		// filter it itself will usually not - and "which runs need me" is the question a queue of approvals is answered by.
+		if attentionOnly && len(summary.BlockedSteps) == 0 {
+			continue
 		}
 		out = append(out, summary)
 	}

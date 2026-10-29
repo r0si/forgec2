@@ -102,6 +102,35 @@ func TestPlaybookRunPersistence(t *testing.T) {
 		t.Fatalf("next_step = %q, want exploit", listed.Data.Runs[0].NextStep)
 	}
 
+	// ?attention=1 keeps only the runs a person has to act on, so "which approvals are waiting" is one request rather than a client-side
+	// filter that a caller will usually skip.
+	attentionRecorder := httptest.NewRecorder()
+	cAttention, _ := gin.CreateTestContext(attentionRecorder)
+	cAttention.Request = httptest.NewRequest(http.MethodGet, "/api/playbooks/runs?attention=1", nil)
+	cAttention.Set("user", "op")
+	cAttention.Set("user_role", db.RoleAdmin)
+	cAttention.Set("user_id", uint(1))
+	cAttention.Set(middleware.TenantIDContextKey, uint(1))
+	s.handleListPlaybookRuns(cAttention)
+	var attention struct {
+		Data struct {
+			Count int `json:"count"`
+			Runs  []struct {
+				ID           uint     `json:"id"`
+				BlockedSteps []string `json:"blocked_steps"`
+			} `json:"runs"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(attentionRecorder.Body.Bytes(), &attention); err != nil {
+		t.Fatalf("decode attention: %v", err)
+	}
+	if attention.Data.Count != 1 || len(attention.Data.Runs) != 1 {
+		t.Fatalf("attention list = %+v, want the one waiting run", attention.Data.Runs)
+	}
+	if len(attention.Data.Runs[0].BlockedSteps) == 0 {
+		t.Fatal("the attention list returned a run with nothing blocked")
+	}
+
 	// 3. The detail names what may run next, and nothing that is waiting for a human.
 	detail := call(http.MethodGet, "/api/playbooks/runs/"+uitoa(record.ID), 1)
 	if detail.Code != http.StatusOK {
