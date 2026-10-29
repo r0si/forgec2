@@ -128,3 +128,17 @@ Without a configured signing key, bundles are produced **unsigned**, the startup
   is stated in the file itself.
 - The bundle is tenant-scoped: asking for an engagement in another tenant answers 404.
 - Producing and verifying a bundle are both audited (`engagement_bundle`, `engagement_bundle_verify`).
+
+## What the bundle does not contain
+
+`summary.md` ends with this list, because a handover that names only its inclusions invites the receiver to read it as the
+whole record — and an absence looks exactly like a clean result. The three are deliberate, and only the second is a
+limitation rather than a decision:
+
+- **Credential material.** `credentials.json` records *what* was captured, never a password or a hash. Secrets stay in the
+  system that audits their use.
+- **Notification delivery history.** Route counters live in **memory** and reset with the process, so they are not part of a
+  package. If delivery failures matter to the review, export them **before** restarting the server — this is the only item here
+  that a bundle cannot carry at all.
+- **Anything outside the window.** Members are bounded by the engagement's start and end; a host that checked in before or
+  after it is absent by construction, not by accident.

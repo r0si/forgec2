@@ -41,6 +41,15 @@ func TestHandoverDocMatchesTheImplementation(t *testing.T) {
 		}
 	}
 
+	// 3b. The limitations section is part of the deliverable: the package states them in summary.md, and a guide that omits them
+	// leaves the reader to discover an absence the hard way.
+	for _, needle := range []string{"What the bundle does not contain", "Credential material",
+		"Notification delivery history", "Anything outside the window"} {
+		if !strings.Contains(doc, needle) {
+			t.Fatalf("docs/HANDOVER_BUNDLE.md does not state %q", needle)
+		}
+	}
+
 	// 4. The distinction the implementation makes is the distinction the document explains in words.
 	for _, needle := range []string{"valid", "trusted", "unsigned"} {
 		if !strings.Contains(doc, needle) {
