@@ -32,6 +32,7 @@ nobody reads.
 | [DIAGNOSTICS.md](DIAGNOSTICS.md) | The endpoints that answer questions and change nothing, and the few that do |
 | [MCP.md](MCP.md) | The read-only MCP server: what an external assistant may see, and why it cannot write |
 | [PLAYBOOKS.md](PLAYBOOKS.md) | The playbook state machine: which steps may run, and what a failure settles |
+| [AUTOMATION_RULES.md](AUTOMATION_RULES.md) | Writing a rule: which events exist, how payload fields are addressed, and why matching fails closed |
 | [DIRECT_SYSCALLS.md](DIRECT_SYSCALLS.md) | The syscall parsers that exist, what is deliberately not wired, and the two switching options |
 | [HANDOVER_BUNDLE.md](HANDOVER_BUNDLE.md) | Producing and checking an engagement handover |
 | [ENGAGEMENT_CLOSEOUT.md](ENGAGEMENT_CLOSEOUT.md) | The last hour of an exercise: stop work, assemble, verify, hand over |
