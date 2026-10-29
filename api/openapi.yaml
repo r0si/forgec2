@@ -13427,6 +13427,49 @@ paths:
       responses:
         '200': {description: The run, its state and the ready set}
         '400': {description: The definition cannot finish, or the body is malformed}
+  /api/playbooks/runs/{id}/history:
+    get:
+      tags: [Playbooks]
+      summary: The audited history of one run
+      description: >-
+        The transitions of one run, oldest first, read from the **audit log** rather than kept separately - every create and transition is
+        already audited. "Who advanced this run, and when" is what a handover or an incident review asks about a checklist, and answering it
+        by searching the global audit page is how the two get separated. Each entry carries `entry_hash` so the rows can be matched
+        against `/api/audit/export`; this is a convenience view, not a second source of truth.
+      operationId: getPlaybookRunHistory
+      security: [{SessionCookie: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200':
+          description: The run's audited entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  data:
+                    type: object
+                    properties:
+                      run_id: {type: integer}
+                      count: {type: integer}
+                      note: {type: string}
+                      entries:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            action: {type: string}
+                            user: {type: string}
+                            details: {type: string}
+                            success: {type: boolean}
+                            at: {type: string, format: date-time}
+                            entry_hash: {type: string, description: Matches the row in the audit export}
+        '404': {description: No such run - an empty history would read as "nothing happened yet"}
   /api/playbooks/runs/{id}/transitions:
     post:
       tags: [Automation]

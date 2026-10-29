@@ -11220,6 +11220,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/playbooks/runs/{id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The audited history of one run
+         * @description The transitions of one run, oldest first, read from the **audit log** rather than kept separately - every create and transition is already audited. "Who advanced this run, and when" is what a handover or an incident review asks about a checklist, and answering it by searching the global audit page is how the two get separated. Each entry carries `entry_hash` so the rows can be matched against `/api/audit/export`; this is a convenience view, not a second source of truth.
+         */
+        get: operations["getPlaybookRunHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/playbooks/runs/{id}/transitions": {
         parameters: {
             query?: never;
@@ -28365,6 +28385,52 @@ export interface operations {
             };
             /** @description The definition cannot finish */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getPlaybookRunHistory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The run's audited entries */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        data?: {
+                            run_id?: number;
+                            count?: number;
+                            note?: string;
+                            entries?: {
+                                action?: string;
+                                user?: string;
+                                details?: string;
+                                success?: boolean;
+                                /** Format: date-time */
+                                at?: string;
+                                /** @description Matches the row in the audit export */
+                                entry_hash?: string;
+                            }[];
+                        };
+                    };
+                };
+            };
+            /** @description No such run - an empty history would read as "nothing happened yet" */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

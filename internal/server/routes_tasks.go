@@ -23,6 +23,8 @@ func (s *Server) registerTaskRoutes(auth *gin.RouterGroup) {
 		// Playbook runs are read-only here: the transitions live in internal/playbook, and nothing yet dispatches them.
 		tasksRead.GET("/api/playbooks/runs", s.handleListPlaybookRuns)
 		tasksRead.GET("/api/playbooks/runs/:id", s.handleGetPlaybookRun)
+		// The run's audited transitions, where the question is asked instead of on the global audit page.
+		tasksRead.GET("/api/playbooks/runs/:id/history", s.handlePlaybookRunHistory)
 		tasksRead.GET("/tasks/:taskId", s.handleGetTaskStatus)
 		// A file is what an operator wants for a large result; the JSON detail stays for the UI.
 		tasksRead.GET("/tasks/:taskId/output", s.handleDownloadTaskOutput)
