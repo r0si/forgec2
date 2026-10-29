@@ -11,27 +11,42 @@ import (
 // cannot drift silently.
 
 // automationEventCatalogue is the published set, in the order a menu should show them.
+//
+// Fields is what makes this usable rather than merely correct: a console can offer "write a condition on hint_code" without a reader
+// looking it up, and a field the event no longer carries is a condition that can never match. The documentation carries the same list in
+// prose and a test requires the two to agree.
 var automationEventCatalogue = []struct {
 	Event   EventType
 	Answers string
+	// Fields are the payload keys a condition may reference, in addition to agent.hostname, which every event resolves.
+	Fields []string
 }{
-	{EventImplantCheckin, "a beacon checked in"},
-	{EventImplantDisconnect, "a beacon went offline"},
-	{EventTaskComplete, "a task finished successfully"},
-	{EventTaskFail, "a task finished badly"},
-	{EventCredentialFound, "a credential was harvested"},
-	{EventAlertTriggered, "an alert rule fired"},
-	{EventBuildFailed, "a payload build failed"},
-	{EventBuildSucceeded, "a payload build finished"},
+	{EventImplantCheckin, "a beacon checked in", nil},
+	{EventImplantDisconnect, "a beacon went offline", nil},
+	{EventTaskComplete, "a task finished successfully", nil},
+	{EventTaskFail, "a task finished badly", nil},
+	{EventCredentialFound, "a credential was harvested", nil},
+	{EventAlertTriggered, "an alert rule fired", nil},
+	{EventBuildFailed, "a payload build failed",
+		[]string{"build_id", "platform", "format", "filename", "error", "hint_code"}},
+	{EventBuildSucceeded, "a payload build finished",
+		[]string{"build_id", "platform", "format", "filename"}},
 }
 
 // handleAutomationEvents lists the event types a rule may be written against.
 func (s *Server) handleAutomationEvents(c *gin.Context) {
 	out := make([]gin.H, 0, len(automationEventCatalogue))
 	for _, entry := range automationEventCatalogue {
+		fields := entry.Fields
+		if fields == nil {
+			// Not empty: an event with no payload fields still resolves agent.hostname, and a consumer that receives "" cannot tell that
+			// from "unknown".
+			fields = []string{}
+		}
 		out = append(out, gin.H{
 			"event_type": string(entry.Event),
 			"answers":    entry.Answers,
+			"fields":     fields,
 		})
 	}
 	respond(c, gin.H{

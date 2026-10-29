@@ -2815,6 +2815,13 @@ paths:
                           properties:
                             event_type: {type: string}
                             answers: {type: string, description: What the event means, in one phrase}
+                            fields:
+                              type: array
+                              description: >-
+                                Payload keys a condition may reference, besides agent.hostname which every event resolves. Always an array:
+                                an empty list means "this event carries no payload fields", which a caller must be able to tell from
+                                "unknown".
+                              items: {type: string}
   /api/automation/health:
     get:
       tags: [Automation]

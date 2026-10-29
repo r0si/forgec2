@@ -14614,6 +14614,8 @@ export interface operations {
                                 event_type?: string;
                                 /** @description What the event means */
                                 answers?: string;
+                                /** @description Payload keys a condition may reference, besides agent.hostname which every event resolves. Always an array: an empty list means "this event carries no payload fields", which a caller must be able to tell from "unknown". */
+                                fields?: string[];
                             }[];
                         };
                     };

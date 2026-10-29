@@ -40,8 +40,9 @@ func TestAutomationEventCatalogueMatchesEverything(t *testing.T) {
 		Data struct {
 			Count  int `json:"count"`
 			Events []struct {
-				EventType string `json:"event_type"`
-				Answers   string `json:"answers"`
+				EventType string   `json:"event_type"`
+				Answers   string   `json:"answers"`
+				Fields    []string `json:"fields"`
 			} `json:"events"`
 			Note string `json:"note"`
 		} `json:"data"`
@@ -83,6 +84,28 @@ func TestAutomationEventCatalogueMatchesEverything(t *testing.T) {
 		if !strings.Contains(string(raw), "`"+eventType+"`") {
 			t.Fatalf("docs/AUTOMATION_RULES.md does not list %q", eventType)
 		}
+	}
+
+	// 3b. The payload fields travel with each event, and each one is named in the documentation: a console can offer "write a condition
+	// on hint_code" without a reader looking it up, and a field the event no longer carries is a condition that can never match.
+	fieldsByEvent := map[string][]string{}
+	for _, event := range resp.Data.Events {
+		if event.Fields == nil {
+			t.Fatalf("%s serves a null field list; an empty list means 'no payload fields' and null means 'unknown'", event.EventType)
+		}
+		fieldsByEvent[event.EventType] = event.Fields
+		for _, field := range event.Fields {
+			if !strings.Contains(string(raw), "`"+field+"`") && !strings.Contains(string(raw), field) {
+				t.Fatalf("%s publishes the field %q, which the page does not mention", event.EventType, field)
+			}
+		}
+	}
+	build := fieldsByEvent[string(EventBuildFailed)]
+	if len(build) != 6 {
+		t.Fatalf("build.failed fields = %v, want the six the event carries", build)
+	}
+	if fieldsByEvent[string(EventCredentialFound)] == nil || len(fieldsByEvent[string(EventCredentialFound)]) != 0 {
+		t.Fatalf("an event with no payload fields should serve an empty list, got %v", fieldsByEvent[string(EventCredentialFound)])
 	}
 
 	// 4. The note points at the two things a rule author needs next, rather than repeating them badly.
