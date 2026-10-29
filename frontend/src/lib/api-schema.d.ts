@@ -12257,6 +12257,16 @@ export interface operations {
                 os?: string;
                 /** @description Filter by P2P linkage (direct = no parent, chained = has parent) */
                 linked?: "direct" | "chained";
+                /** @description `host` groups the rows by hostname, so several agents on one machine collapse into one row. Any other value lists agents individually. */
+                group?: "host";
+                /** @description Only agents carrying this tag */
+                tag_id?: number;
+                /** @description Include the screenshot count per agent. Off by default because it costs a filesystem walk per host, which is not what a list request should spend its time on. */
+                include_screenshots?: string;
+                /** @description Include agents with no parent in the chained view; ignored when `linked=direct` */
+                include_unlinked?: string;
+                /** @description csv returns the fleet as a file (ID, Hostname, IP, OS, Username, Status, Protocol, Last Seen, Engagement) with X-Task-Export-Scope and X-Export-Truncated when the page is not the whole fleet. The per-agent /api/agents/{id}/export packages ONE host, which is a different document from the inventory. */
+                format?: "json" | "csv";
                 /** @description Page number */
                 page?: number;
                 /** @description Items per page */
@@ -27384,7 +27394,8 @@ export interface operations {
     getAgentTimeline: {
         parameters: {
             query?: {
-                types?: string;
+                /** @description Comma-separated kinds to include - task, screenshot, credential, status. The operation previously documented a `types` parameter that the handler never read, so a client following the spec filtered nothing at all. */
+                kinds?: string;
                 limit?: number;
                 /** @description csv returns the same events, newest first, as a downloadable file (Time,Kind,Type,Title,Detail,Status, Ref ID). The timeline is the one list read IN ORDER, which is what a spreadsheet is good at; the default is JSON. */
                 format?: "json" | "csv";

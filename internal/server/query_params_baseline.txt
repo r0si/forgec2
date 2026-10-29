@@ -16,12 +16,8 @@ error
 expiry
 filter
 force
-group
 include_private
-include_screenshots
-include_unlinked
 interval
-kinds
 lang
 lifecycle
 listener_id
@@ -37,7 +33,6 @@ reason
 session
 session_id
 severity
-tag_id
 task_ids
 technique
 template

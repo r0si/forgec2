@@ -226,6 +226,41 @@ paths:
             type: string
             enum: [direct, chained]
           description: Filter by P2P linkage (direct = no parent, chained = has parent)
+        - name: group
+          in: query
+          schema:
+            type: string
+            enum: [host]
+          description: >-
+            `host` groups the rows by hostname, so several agents on one machine collapse into one row. Any other value lists
+            agents individually.
+        - name: tag_id
+          in: query
+          schema:
+            type: integer
+          description: Only agents carrying this tag
+        - name: include_screenshots
+          in: query
+          schema:
+            type: string
+          description: >-
+            Include the screenshot count per agent. Off by default because it costs a filesystem walk per host, which is not what
+            a list request should spend its time on.
+        - name: include_unlinked
+          in: query
+          schema:
+            type: string
+          description: Include agents with no parent in the chained view; ignored when `linked=direct`
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [json, csv]
+            default: json
+          description: >-
+            csv returns the fleet as a file (ID, Hostname, IP, OS, Username, Status, Protocol, Last Seen, Engagement) with
+            X-Task-Export-Scope and X-Export-Truncated when the page is not the whole fleet. The per-agent
+            /api/agents/{id}/export packages ONE host, which is a different document from the inventory.
         - name: page
           in: query
           schema:
@@ -12841,7 +12876,12 @@ paths:
       security: [{SessionCookie: []}]
       parameters:
         - {name: id, in: path, required: true, schema: {type: string}}
-        - {name: types, in: query, schema: {type: string}}
+        - name: kinds
+          in: query
+          schema: {type: string}
+          description: >-
+            Comma-separated kinds to include - task, screenshot, credential, status. The operation previously documented a
+            `types` parameter that the handler never read, so a client following the spec filtered nothing at all.
         - {name: limit, in: query, schema: {type: integer}}
         - name: format
           in: query
