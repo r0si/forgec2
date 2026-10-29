@@ -31,6 +31,7 @@ nobody reads.
 | [VERIFIERS.md](VERIFIERS.md) | The three offline verifiers, their shared exit codes, and what none of them can prove |
 | [DIAGNOSTICS.md](DIAGNOSTICS.md) | The endpoints that answer questions and change nothing, and the few that do |
 | [MCP.md](MCP.md) | The read-only MCP server: what an external assistant may see, and why it cannot write |
+| [PLAYBOOKS.md](PLAYBOOKS.md) | The playbook state machine: which steps may run, and what a failure settles |
 | [HANDOVER_BUNDLE.md](HANDOVER_BUNDLE.md) | Producing and checking an engagement handover |
 | [ENGAGEMENT_CLOSEOUT.md](ENGAGEMENT_CLOSEOUT.md) | The last hour of an exercise: stop work, assemble, verify, hand over |
 | [TASK_RETRIES.md](TASK_RETRIES.md) | Which task types are re-issued automatically after a failure, and why the rest never are |
