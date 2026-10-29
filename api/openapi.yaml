@@ -13300,6 +13300,69 @@ paths:
         '200': {description: Accepted collector payload shape}
 
   /api/playbooks/runs:
+    post:
+      tags: [Automation]
+      summary: Create a playbook run
+      description: >-
+        Stores a validated run. `Normalise` refuses what can never finish - a cycle, a duplicate id, a dangling dependency - so an
+        impossible playbook cannot be stored for every later report to inherit. The run starts `blocked` when any step needs
+        approval, because waiting for a person is a state, not an absence of progress.
+      operationId: createPlaybookRun
+      security: [{SessionCookie: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: {type: string}
+                steps:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id: {type: string}
+                      title: {type: string}
+                      needs: {type: array, items: {type: string}}
+                      approval: {type: boolean}
+      responses:
+        '200': {description: The run, its state and the ready set}
+        '400': {description: The definition cannot finish, or the body is malformed}
+  /api/playbooks/runs/{id}/transitions:
+    post:
+      tags: [Automation]
+      summary: Record a transition on a playbook run
+      description: >-
+        Applies `start`, `succeed`, `fail`, `skip` or `approve` to one step **through the state machine in `internal/playbook`** -
+        this handler never decides whether a step may start. A transition the state refuses answers **409**, because the request is
+        well formed and the state is the reason; an unknown `action` is **400** rather than a guess. **Nothing is dispatched:** this
+        endpoint records what an operator did, so an empty result is unfinished work rather than a clean one. Both this and creation
+        are audited (`playbook_run_create`, `playbook_run_transition`).
+      operationId: transitionPlaybookRun
+      security: [{SessionCookie: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: integer}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [step, action]
+              properties:
+                step: {type: string}
+                action: {type: string, enum: [start, succeed, fail, skip, approve]}
+                reason: {type: string}
+      responses:
+        '200': {description: The run after the transition, with the recomputed ready set}
+        '400': {description: Missing step, unknown action, or a malformed body}
+        '404': {description: No such run in the caller's tenant}
+        '409': {description: The state refuses this transition}
+
     get:
       tags: [Automation]
       summary: List playbook runs
@@ -15179,3 +15242,4 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
+

@@ -33,6 +33,8 @@ func (s *Server) registerTaskRoutes(auth *gin.RouterGroup) {
 	tasksWrite.Use(middleware.RequirePermission(db.PermAgentsWrite))
 	{
 		tasksWrite.POST("/tasks/:taskId/approve", s.handleApproveTask)
+		tasksWrite.POST("/api/playbooks/runs", s.handleCreatePlaybookRun)
+		tasksWrite.POST("/api/playbooks/runs/:id/transitions", s.handleTransitionPlaybookRun)
 		tasksWrite.POST("/tasks/:taskId/reject", s.handleRejectTask)
 		// Re-run only the failures that share one shape: after fixing a link, "the timeouts" is the useful set.
 		tasksWrite.POST("/tasks/rerun-by-signature", s.handleRerunBySignature)

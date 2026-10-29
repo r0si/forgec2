@@ -11164,13 +11164,37 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        get?: never;
+        put?: never;
+        /**
+         * Create a playbook run
+         * @description Stores a validated run. `Normalise` refuses what can never finish - a cycle, a duplicate id, a dangling dependency - so an impossible playbook cannot be stored for every later report to inherit. The run starts `blocked` when any step needs approval, because waiting for a person is a state, not an absence of progress.
+         */
+        post: operations["createPlaybookRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/playbooks/runs/{id}/transitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
         /**
          * List playbook runs
          * @description Read-only view of structured playbook runs. The transitions live in `internal/playbook` and are exhaustive there; this endpoint persists what that package produced and renders it. `settled`/`total` come from the stored steps, so a list can show progress without a reader opening each run. `?state=` filters on the value the machine computed at save time.
          */
         get: operations["listPlaybookRuns"];
         put?: never;
-        post?: never;
+        /**
+         * Record a transition on a playbook run
+         * @description Applies `start`, `succeed`, `fail`, `skip` or `approve` to one step **through the state machine in `internal/playbook`** - this handler never decides whether a step may start. A transition the state refuses answers **409**, because the request is well formed and the state is the reason; an unknown `action` is **400** rather than a guess. **Nothing is dispatched:** this endpoint records what an operator did, so an empty result is unfinished work rather than a clean one. Both this and creation are audited (`playbook_run_create`, `playbook_run_transition`).
+         */
+        post: operations["transitionPlaybookRun"];
         delete?: never;
         options?: never;
         head?: never;
@@ -28186,6 +28210,43 @@ export interface operations {
             };
         };
     };
+    createPlaybookRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    steps?: {
+                        id?: string;
+                        title?: string;
+                        needs?: string[];
+                        approval?: boolean;
+                    }[];
+                };
+            };
+        };
+        responses: {
+            /** @description The run */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The definition cannot finish */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     listPlaybookRuns: {
         parameters: {
             query?: {
@@ -28220,6 +28281,56 @@ export interface operations {
                         };
                     };
                 };
+            };
+        };
+    };
+    transitionPlaybookRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    step: string;
+                    /** @enum {string} */
+                    action: "start" | "succeed" | "fail" | "skip" | "approve";
+                    reason?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The run after the transition */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing step */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such run in the caller's tenant */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The state refuses this transition */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
