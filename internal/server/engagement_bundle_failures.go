@@ -21,6 +21,9 @@ type engagementFailures struct {
 	FailedTasks int            `json:"failed_tasks"`
 	Shapes      []failureShape `json:"shapes"`
 	Note        string         `json:"note"`
+	// SignatureKind says which of this product's four "signatures" the rows below carry. Without it, a reader of the archive
+	// finds a field named `signature` and has to guess whether it involves cryptography - and this one does not.
+	SignatureKind string `json:"signature_kind"`
 }
 
 // failureShape is one group of failures that look the same.
@@ -87,8 +90,9 @@ func buildEngagementFailures(tasks []db.Task) engagementFailures {
 	})
 
 	return engagementFailures{
-		FailedTasks: failed,
-		Shapes:      shapes,
+		SignatureKind: failureSignatureKind,
+		FailedTasks:   failed,
+		Shapes:        shapes,
 		Note: "grouped by normalised shape (paths, ids and digits collapsed); " +
 			"agents_affected counts distinct hosts",
 	}
