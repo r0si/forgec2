@@ -1,8 +1,11 @@
 package server
 
 import (
+	"encoding/csv"
+	"fmt"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -177,6 +180,49 @@ func (s *Server) handleTaskFailureStats(c *gin.Context) {
 		Where("updated_at >= ?", cutoff).
 		Count(&retried).Error; err != nil {
 		retried = 0 // a report without the count is still useful; failing the whole answer for it is not
+	}
+
+	// ?format=csv takes the breakdown away. This is the oldest of the failure reports and the one most likely to be pasted into
+	// a review; it was the only one of the four with no export at all.
+	if strings.EqualFold(strings.TrimSpace(c.Query("format")), "csv") {
+		var buf strings.Builder
+		writer := csv.NewWriter(&buf)
+		header := []string{"Key", "Count", "Distinct types", "Example"}
+		if err := writer.Write(header); err != nil {
+			handleQueryError(c, err, "Failed to encode the failure breakdown")
+			return
+		}
+		for _, bucket := range buckets {
+			if err := writer.Write([]string{
+				bucket.Key,
+				strconv.Itoa(bucket.Count),
+				strconv.Itoa(bucket.Types),
+				bucket.Sample,
+			}); err != nil {
+				handleQueryError(c, err, "Failed to encode the failure breakdown")
+				return
+			}
+		}
+		writer.Flush()
+		if err := writer.Error(); err != nil {
+			handleQueryError(c, err, "Failed to encode the failure breakdown")
+			return
+		}
+		name := fmt.Sprintf("forgec2_failures-%s_%s.csv", groupBy, time.Now().Format("2006-01-02_150405"))
+		c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, name))
+		// A truncated sample must not read as a complete one, in the file as well as in the JSON.
+		if len(rows) >= failureStatsSampleLimit {
+			c.Header("X-Export-Truncated", "true")
+		}
+		if scope := taskExportScope(c); scope != "" {
+			c.Header(taskExportScopeHeader, scope)
+			applyExportScope(c, scope)
+		} else {
+			c.Header(taskExportScopeHeader, "all")
+			applyExportScope(c, "all")
+		}
+		c.Data(http.StatusOK, "text/csv; charset=utf-8", []byte(buf.String()))
+		return
 	}
 
 	payload := gin.H{

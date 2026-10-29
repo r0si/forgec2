@@ -28231,6 +28231,8 @@ export interface operations {
                 group_by?: "reason" | "type" | "agent" | "engagement";
                 /** @description Scope the report to one exercise (numeric id) or, with `none`, to hosts in no exercise. The after-action question is usually about ONE exercise, and answering it by exporting and filtering by hand is how the wrong window gets reviewed. */
                 engagement?: string;
+                /** @description csv returns the breakdown as a downloadable file (Key, Count, Distinct types, Example) with X-Task-Export-Scope and X-Export-Truncated when the 5000-row sample cut the answer. A truncated sample must not read as a complete one just because it left as a file. */
+                format?: "json" | "csv";
             };
             header?: never;
             path?: never;

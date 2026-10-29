@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -196,6 +197,33 @@ func TestTaskFailureStats(t *testing.T) {
 	typeBuckets, _ := byType["buckets"].([]interface{})
 	if len(typeBuckets) != 3 {
 		t.Fatalf("type buckets = %v, want shell/ps/lsass", typeBuckets)
+	}
+
+	// The breakdown can be taken away as a file: this is the oldest of the failure reports and the one most likely to be
+	// pasted into a review, and it was the only one of the four with no export at all.
+	csvRecorder := httptest.NewRecorder()
+	cCsv, _ := gin.CreateTestContext(csvRecorder)
+	cCsv.Request = httptest.NewRequest(http.MethodGet, "/api/stats/tasks/failures?since=7d&format=csv", nil)
+	cCsv.Set("user", "op")
+	cCsv.Set("user_role", db.RoleAdmin)
+	cCsv.Set("user_id", uint(1))
+	cCsv.Set(middleware.TenantIDContextKey, uint(1))
+	s.handleTaskFailureStats(cCsv)
+	if csvRecorder.Code != http.StatusOK {
+		t.Fatalf("csv = %d (%s)", csvRecorder.Code, csvRecorder.Body.String())
+	}
+	csvRows, err := csv.NewReader(strings.NewReader(csvRecorder.Body.String())).ReadAll()
+	if err != nil {
+		t.Fatalf("csv: %v", err)
+	}
+	if len(csvRows) < 2 {
+		t.Fatalf("rows = %d, want a header and at least one reason", len(csvRows))
+	}
+	if got := strings.Join(csvRows[0], ","); got != "Key,Count,Distinct types,Example" {
+		t.Fatalf("header = %q", got)
+	}
+	if scope := csvRecorder.Header().Get(taskExportScopeHeader); !strings.Contains(scope, "since=7d") {
+		t.Fatalf("scope header = %q, want the window", scope)
 	}
 
 	// Bad input is refused rather than silently defaulted.

@@ -13413,6 +13413,13 @@ paths:
             usually about ONE exercise, and answering it by exporting and filtering by hand is how the wrong window gets
             reviewed.
           schema: {type: string}
+        - name: format
+          in: query
+          description: >-
+            csv returns the breakdown as a downloadable file (Key, Count, Distinct types, Example) with X-Task-Export-Scope and
+            X-Export-Truncated when the 5000-row sample cut the answer. A truncated sample must not read as a complete one just
+            because it left as a file.
+          schema: {type: string, enum: [json, csv], default: json}
       responses:
         '200':
           description: Buckets, most common first
