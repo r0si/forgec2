@@ -67,6 +67,13 @@ func TestDeployGuideDocumentsReadyWarnings(t *testing.T) {
 		}
 	}
 
+	// 3c. The snapshot download exists so a probe result can be filed; a feature nobody documents is one nobody uses.
+	for _, needle := range []string{"?download=1", "probed_at", "ready_<instant>.json"} {
+		if !strings.Contains(section, needle) {
+			t.Fatalf("the monitoring section does not mention %q", needle)
+		}
+	}
+
 	// 4. And the guidance an operator needs: alert on warnings, not only on the status code.
 	if !strings.Contains(section, "warnings") {
 		t.Fatal("the guide does not tell an operator to alert on warnings")

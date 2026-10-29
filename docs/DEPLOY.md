@@ -269,6 +269,11 @@ not - so `status` stays `ok` and the condition travels in `warnings`.
 
 Alerting on `warnings` being non-empty is the intended integration; alerting on the status code alone will miss all three.
 
+`GET /ready?download=1` files the snapshot instead of polling it: the same payload with
+`Content-Disposition: attachment; filename="ready_<instant>.json"`, `X-Export-Scope: probe at <RFC3339>` and a `probed_at`
+field. Use it when a probe result is going into a ticket — the instant appears in three places because a snapshot without one is
+not evidence — and leave the plain `/ready` for the monitor, which is the cheaper request.
+
 Two checks are the opposite: they answer **not ready** (503), because the process cannot do its job without them.
 
 | Check | Not ready when | What to do |
