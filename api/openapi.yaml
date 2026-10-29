@@ -13240,7 +13240,7 @@ paths:
         - name: format
           in: query
           description: >-
-            csv returns the task half as a downloadable file (Signature, Count, Reasons, Example) - every other list in the
+            csv returns the task half as a downloadable file (Signature, Count, Agents, Reasons, Example) - every other list in the
             console can be exported, and this is the analysis an operator pastes into a review. The notification half is left
             out because it is process state rather than a window. The file carries `X-Task-Export-Scope` like the other exports.
           schema: {type: string, enum: [json, csv], default: json}
@@ -13285,6 +13285,12 @@ paths:
                           properties:
                             signature: {type: string}
                             count: {type: integer}
+                            agents_affected:
+                              type: integer
+                              description: >-
+                                Distinct hosts that produced this shape - eleven rows from one beacon is a flaky link, eleven from
+                                eleven beacons is a bad command, and the count alone cannot tell them apart. Matches the field
+                                failures.json reports, so the live view and the handover agree.
                             reasons:
                               type: array
                               items: {type: string}

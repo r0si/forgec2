@@ -47,11 +47,12 @@ func (s *Server) handleFailureSignatures(c *gin.Context) {
 	// Tasks: every failed task in the window, not just the unclassified ones. The grouping is by SHAPE, so a reason code is
 	// no longer the axis.
 	var rows []struct {
-		Type  string
-		Error string
+		Type    string
+		AgentID string
+		Error   string
 	}
 	taskQuery := s.tenantScope(s.db.WithContext(s.ctx).Model(&db.Task{}), c).
-		Select("type, error").
+		Select("type, agent_id, error").
 		Where("status = ?", "failed").
 		Where("updated_at >= ?", cutoff).
 		Order("updated_at DESC").
@@ -65,13 +66,18 @@ func (s *Server) handleFailureSignatures(c *gin.Context) {
 	}
 
 	type taskSignature struct {
-		Signature string   `json:"signature"`
-		Count     int      `json:"count"`
-		Reasons   []string `json:"reasons"`
-		Sample    string   `json:"sample"`
+		Signature string `json:"signature"`
+		Count     int    `json:"count"`
+		// Agents is how many DISTINCT hosts produced this shape. Eleven rows from one beacon is a flaky link; eleven rows from
+		// eleven beacons is a bad command, and the count alone cannot tell them apart. The bundle's failures.json already
+		// reports this, so the live view agreeing with the handover is not optional.
+		Agents  int      `json:"agents_affected"`
+		Reasons []string `json:"reasons"`
+		Sample  string   `json:"sample"`
 	}
 	type accumulator struct {
 		count   int
+		agents  map[string]bool
 		reasons map[string]bool
 		sample  string
 	}
@@ -83,10 +89,17 @@ func (s *Server) handleFailureSignatures(c *gin.Context) {
 		}
 		entry, exists := bytaskSignature[signature]
 		if !exists {
-			entry = &accumulator{reasons: map[string]bool{}, sample: truncateString(strings.TrimSpace(row.Error), failureSampleMaxChars)}
+			entry = &accumulator{
+				agents:  map[string]bool{},
+				reasons: map[string]bool{},
+				sample:  truncateString(strings.TrimSpace(row.Error), failureSampleMaxChars),
+			}
 			bytaskSignature[signature] = entry
 		}
 		entry.count++
+		if row.AgentID != "" {
+			entry.agents[row.AgentID] = true
+		}
 		if reason := classifyFailure(row.Error); reason != "" {
 			entry.reasons[reason] = true
 		}
@@ -101,7 +114,8 @@ func (s *Server) handleFailureSignatures(c *gin.Context) {
 		// Stable order inside a signature, so the same input always renders the same row.
 		sort.Strings(reasons)
 		taskSignatures = append(taskSignatures, taskSignature{
-			Signature: signature, Count: entry.count, Reasons: reasons, Sample: entry.sample,
+			Signature: signature, Count: entry.count, Agents: len(entry.agents),
+			Reasons: reasons, Sample: entry.sample,
 		})
 	}
 	sort.SliceStable(taskSignatures, func(i, j int) bool {
@@ -151,7 +165,7 @@ func (s *Server) handleFailureSignatures(c *gin.Context) {
 	if strings.EqualFold(strings.TrimSpace(c.Query("format")), "csv") {
 		var buf strings.Builder
 		writer := csv.NewWriter(&buf)
-		header := []string{"Signature", "Count", "Reasons", "Example"}
+		header := []string{"Signature", "Count", "Agents", "Reasons", "Example"}
 		if err := writer.Write(header); err != nil {
 			handleQueryError(c, err, "Failed to encode the failure shapes")
 			return
@@ -160,6 +174,7 @@ func (s *Server) handleFailureSignatures(c *gin.Context) {
 			if err := writer.Write([]string{
 				row.Signature,
 				strconv.Itoa(row.Count),
+				strconv.Itoa(row.Agents),
 				strings.Join(row.Reasons, "|"),
 				row.Sample,
 			}); err != nil {

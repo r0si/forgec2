@@ -70,6 +70,7 @@ func TestFailureSignatures(t *testing.T) {
 			TaskSignatures []struct {
 				Signature string   `json:"signature"`
 				Count     int      `json:"count"`
+				Agents    int      `json:"agents_affected"`
 				Reasons   []string `json:"reasons"`
 				Sample    string   `json:"sample"`
 			} `json:"task_signatures"`
@@ -105,6 +106,12 @@ func TestFailureSignatures(t *testing.T) {
 			t.Fatalf("the signature still carries %q: %q", leak, top.Signature)
 		}
 	}
+	// Distinct hosts travel with the shape: eleven rows from one beacon is a flaky link, eleven from eleven beacons is a bad
+	// command, and the count alone cannot tell them apart.
+	if top.Agents != 1 {
+		t.Fatalf("agents_affected = %d, want the one seeded host", top.Agents)
+	}
+
 	// The reason codes travel with the shape, so a reader can see it is an access problem.
 	found := false
 	for _, reason := range top.Reasons {
@@ -215,7 +222,7 @@ func TestFailureSignatures(t *testing.T) {
 	if len(rows) < 2 {
 		t.Fatalf("rows = %d, want a header and the seeded shape", len(rows))
 	}
-	if got := strings.Join(rows[0], ","); got != "Signature,Count,Reasons,Example" {
+	if got := strings.Join(rows[0], ","); got != "Signature,Count,Agents,Reasons,Example" {
 		t.Fatalf("header = %q", got)
 	}
 	if rows[1][1] != "3" {

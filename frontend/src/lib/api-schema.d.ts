@@ -28102,7 +28102,7 @@ export interface operations {
                 since?: string;
                 /** @description Scope the task half to one exercise (numeric id) or, with `none`, to hosts in no exercise - the same scope the failure report takes, so the two reports cannot disagree about which failures they are looking at. Echoed back as `engagement` so a caller can tell a scoped answer from an unscoped one. */
                 engagement?: string;
-                /** @description csv returns the task half as a downloadable file (Signature, Count, Reasons, Example) - every other list in the console can be exported, and this is the analysis an operator pastes into a review. The notification half is left out because it is process state rather than a window. The file carries `X-Task-Export-Scope` like the other exports. */
+                /** @description csv returns the task half as a downloadable file (Signature, Count, Agents, Reasons, Example) - every other list in the console can be exported, and this is the analysis an operator pastes into a review. The notification half is left out because it is process state rather than a window. The file carries `X-Task-Export-Scope` like the other exports. */
                 format?: "json" | "csv";
             };
             header?: never;
@@ -28137,6 +28137,8 @@ export interface operations {
                             task_signatures?: {
                                 signature?: string;
                                 count?: number;
+                                /** @description Distinct hosts that produced this shape - eleven rows from one beacon is a flaky link, eleven from eleven beacons is a bad command, and the count alone cannot tell them apart. Matches the field failures.json reports, so the live view and the handover agree. */
+                                agents_affected?: number;
                                 reasons?: string[];
                                 sample?: string;
                             }[];
