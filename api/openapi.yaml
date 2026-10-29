@@ -2783,6 +2783,38 @@ paths:
         '400': {description: Missing name, missing event type, no actions, or a malformed body}
         '409': {description: A rule with that name already exists and overwrite was not set}
 
+  /api/automation/events:
+    get:
+      tags: [Automation]
+      summary: The event types a rule may listen to
+      description: >-
+        The published registry, so a console can build its event dropdown instead of hardcoding strings. A test ties this list to the
+        registry constants **and** to `docs/AUTOMATION_RULES.md`, because three surfaces describing one set is how a console ends up
+        offering an event no rule can receive. Payload fields per event are documented on the page rather than repeated here; the
+        operators are `contains`, `equals` and `regex`, and anything else is refused at save time.
+      operationId: listAutomationEvents
+      security: [{SessionCookie: []}]
+      responses:
+        '200':
+          description: The catalogue
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  data:
+                    type: object
+                    properties:
+                      count: {type: integer}
+                      note: {type: string}
+                      events:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            event_type: {type: string}
+                            answers: {type: string, description: What the event means, in one phrase}
   /api/automation/health:
     get:
       tags: [Automation]

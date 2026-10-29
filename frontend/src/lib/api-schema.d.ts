@@ -1490,6 +1490,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/automation/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The event types a rule may listen to
+         * @description The published registry, so a console can build its event dropdown instead of hardcoding strings. A test ties this list to the registry constants **and** to `docs/AUTOMATION_RULES.md`, because three surfaces describing one set is how a console ends up offering an event no rule can receive. Payload fields per event are documented on the page rather than repeated here; the operators are `contains`, `equals` and `regex`, and anything else is refused at save time.
+         */
+        get: operations["listAutomationEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/automation/health": {
         parameters: {
             query?: never;
@@ -14567,6 +14587,37 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    listAutomationEvents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The catalogue */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        data?: {
+                            count?: number;
+                            note?: string;
+                            events?: {
+                                event_type?: string;
+                                /** @description What the event means */
+                                answers?: string;
+                            }[];
+                        };
+                    };
+                };
             };
         };
     };

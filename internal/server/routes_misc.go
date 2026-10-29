@@ -50,6 +50,9 @@ func (s *Server) registerAutomationRoutes(auth *gin.RouterGroup) {
 	{
 		autoRead.GET("/automation", s.handleAutomationPage)
 		autoRead.GET("/api/automation/rules", s.handleListAutomationRules)
+		// The event types a rule may be written against, so a console does not hardcode them. On the READ group: it publishes a
+		// catalogue and changes nothing, so requiring automation.write for it would be the wrong cost.
+		autoRead.GET("/api/automation/events", s.handleAutomationEvents)
 		// Rules are configuration an operator rebuilds every exercise: export one in a portable shape.
 		autoRead.GET("/api/automation/rules/export", s.handleExportAutomationRules)
 		autoRead.GET("/api/automation/rules/:id/export", s.handleExportAutomationRule)
@@ -68,6 +71,7 @@ func (s *Server) registerAutomationRoutes(auth *gin.RouterGroup) {
 	{
 		// Static health of the rule set: unconditional mutating actions, dangling targets, duplicates.
 		autoDiagnose.GET("/api/automation/health", s.handleAutomationHealth)
+
 	}
 
 	autoWrite := auth.Group("/")
