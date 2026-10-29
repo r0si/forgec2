@@ -13237,6 +13237,13 @@ paths:
             failure report takes, so the two reports cannot disagree about which failures they are looking at. Echoed back as
             `engagement` so a caller can tell a scoped answer from an unscoped one.
           schema: {type: string}
+        - name: format
+          in: query
+          description: >-
+            csv returns the task half as a downloadable file (Signature, Count, Reasons, Example) - every other list in the
+            console can be exported, and this is the analysis an operator pastes into a review. The notification half is left
+            out because it is process state rather than a window. The file carries `X-Task-Export-Scope` like the other exports.
+          schema: {type: string, enum: [json, csv], default: json}
       responses:
         '200':
           description: The dominant shapes, tasks and notifications

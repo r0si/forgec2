@@ -1,6 +1,8 @@
 package server
 
 import (
+	"encoding/csv"
+	"fmt"
 	"net/http"
 	"sort"
 	"strconv"
@@ -142,6 +144,44 @@ func (s *Server) handleFailureSignatures(c *gin.Context) {
 	})
 	if len(notificationSignatures) > failureSignatureTopN {
 		notificationSignatures = notificationSignatures[:failureSignatureTopN]
+	}
+
+	// ?format=csv takes the shapes away. Every other list in the console can be exported, and this one is the analysis an
+	// operator pastes into a review - the task half only, because the notification half is process state rather than a window.
+	if strings.EqualFold(strings.TrimSpace(c.Query("format")), "csv") {
+		var buf strings.Builder
+		writer := csv.NewWriter(&buf)
+		header := []string{"Signature", "Count", "Reasons", "Example"}
+		if err := writer.Write(header); err != nil {
+			handleQueryError(c, err, "Failed to encode the failure shapes")
+			return
+		}
+		for _, row := range taskSignatures {
+			if err := writer.Write([]string{
+				row.Signature,
+				strconv.Itoa(row.Count),
+				strings.Join(row.Reasons, "|"),
+				row.Sample,
+			}); err != nil {
+				handleQueryError(c, err, "Failed to encode the failure shapes")
+				return
+			}
+		}
+		writer.Flush()
+		if err := writer.Error(); err != nil {
+			handleQueryError(c, err, "Failed to encode the failure shapes")
+			return
+		}
+		name := "forgec2_failure-shapes_" + time.Now().Format("2006-01-02_150405") + ".csv"
+		c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, name))
+		// The file carries its own scope, like every other export here.
+		if scope := taskExportScope(c); scope != "" {
+			c.Header(taskExportScopeHeader, scope)
+		} else {
+			c.Header(taskExportScopeHeader, "all")
+		}
+		c.Data(http.StatusOK, "text/csv; charset=utf-8", []byte(buf.String()))
+		return
 	}
 
 	respond(c, gin.H{

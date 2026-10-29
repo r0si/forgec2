@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -189,6 +190,41 @@ func TestFailureSignatures(t *testing.T) {
 	s.handleFailureSignatures(c4)
 	if w4.Code != http.StatusBadRequest {
 		t.Fatalf("invalid engagement = %d, want 400", w4.Code)
+	}
+
+	// 2d. The shapes can be taken away as a file. Every other list here is exportable, and this is the analysis an operator
+	// pastes into a review - the task half only, because the notification half is process state rather than a window.
+	csvRecorder := httptest.NewRecorder()
+	cCsv, _ := gin.CreateTestContext(csvRecorder)
+	cCsv.Request = httptest.NewRequest(http.MethodGet, "/api/stats/failures/signatures?since=7d&format=csv", nil)
+	cCsv.Set("user", "op")
+	cCsv.Set("user_role", db.RoleAdmin)
+	cCsv.Set("user_id", uint(1))
+	cCsv.Set(middleware.TenantIDContextKey, uint(1))
+	s.handleFailureSignatures(cCsv)
+	if csvRecorder.Code != http.StatusOK {
+		t.Fatalf("csv = %d (%s)", csvRecorder.Code, csvRecorder.Body.String())
+	}
+	if ct := csvRecorder.Header().Get("Content-Type"); !strings.HasPrefix(ct, "text/csv") {
+		t.Fatalf("Content-Type = %q", ct)
+	}
+	rows, err := csv.NewReader(strings.NewReader(csvRecorder.Body.String())).ReadAll()
+	if err != nil {
+		t.Fatalf("csv: %v", err)
+	}
+	if len(rows) < 2 {
+		t.Fatalf("rows = %d, want a header and the seeded shape", len(rows))
+	}
+	if got := strings.Join(rows[0], ","); got != "Signature,Count,Reasons,Example" {
+		t.Fatalf("header = %q", got)
+	}
+	if rows[1][1] != "3" {
+		t.Fatalf("the top shape count = %q, want the three permission failures", rows[1][1])
+	}
+	// The file says what it covers, like every other export: the window, and not the format (which is not a filter).
+	scope := csvRecorder.Header().Get(taskExportScopeHeader)
+	if !strings.Contains(scope, "since=7d") || strings.Contains(scope, "format") {
+		t.Fatalf("scope header = %q, want the window and not the format", scope)
 	}
 
 	// 3. A bad window is refused rather than defaulted.
