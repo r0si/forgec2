@@ -16033,7 +16033,14 @@ export interface operations {
     };
     listPlugins: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description csv returns the inventory as a downloadable file (ID, Name, Version, Type, Category, Author, Enabled) with X-Task-Export-Scope and X-Export-Truncated when the 200-row cap cut the answer. The per-plugin /api/plugins/{id}/export packages ONE plugin, which is a different artefact from what is installed at what version. */
+                format?: "json" | "csv";
+                /** @description Match name, description or author */
+                search?: string;
+                category?: string;
+                type?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
