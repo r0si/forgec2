@@ -132,6 +132,37 @@ func TestTaskDurationStats(t *testing.T) {
 		t.Fatalf("types are not ordered by p95 desc: %+v", resp.Data.Types)
 	}
 
+	// The engagement scope narrows the same report: a review asks "how slow was THIS exercise", and an unscoped answer to that
+	// is the wrong answer. No host belongs to the seeded exercise, so the sample drops to zero - which is different from
+	// "no filter applied".
+	scopedEngagement := db.Engagement{TenantID: 1, Name: "DMZ",
+		StartsAt: time.Now().Add(-2 * time.Hour), EndsAt: time.Now().Add(2 * time.Hour)}
+	if err := s.db.Create(&scopedEngagement).Error; err != nil {
+		t.Fatalf("seed engagement: %v", err)
+	}
+	scoped := call("?engagement="+itoaUint(scopedEngagement.ID), 1)
+	if scoped.Code != http.StatusOK {
+		t.Fatalf("scoped duration = %d (%s)", scoped.Code, scoped.Body.String())
+	}
+	var scopedResp struct {
+		Data struct {
+			Engagement string `json:"engagement"`
+			Sampled    int    `json:"sampled"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(scoped.Body.Bytes(), &scopedResp); err != nil {
+		t.Fatalf("decode scoped: %v", err)
+	}
+	if scopedResp.Data.Engagement != itoaUint(scopedEngagement.ID) {
+		t.Fatalf("the answer does not echo the scope: %q", scopedResp.Data.Engagement)
+	}
+	if scopedResp.Data.Sampled != 0 {
+		t.Fatalf("the scope did not narrow anything: sampled = %d", scopedResp.Data.Sampled)
+	}
+	if bad := call("?engagement=nope", 1); bad.Code != http.StatusBadRequest {
+		t.Fatalf("invalid engagement = %d, want 400", bad.Code)
+	}
+
 	// A tenant sees only its own rows; tenant 2's 5000 ms sample must not appear.
 	if got := call("", 2); got.Code != http.StatusOK {
 		t.Fatalf("tenant 2 status = %d", got.Code)

@@ -28260,6 +28260,8 @@ export interface operations {
                 group_by?: "type" | "agent";
                 /** @description Add a time series (hourly or daily) so a regression's start can be located. Empty buckets are omitted rather than emitted as zeros. */
                 bucket?: "hour" | "day";
+                /** @description Scope the report to one exercise (numeric id) or, with `none`, to hosts in no exercise - the same scope the failure reports take. "How slow was THIS exercise" is a review question, and an unscoped answer to it is the wrong answer. It is part of the cache identity, so two consumers looking at different exercises cannot be served each other's cached answer. */
+                engagement?: string;
             };
             header?: never;
             path?: never;

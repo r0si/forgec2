@@ -21,6 +21,9 @@ type durationStatsQuery struct {
 	Type    string
 	GroupBy string
 	Bucket  string
+	// Engagement scopes the report to one exercise. It is part of the identity, so two consumers looking at different
+	// exercises cannot be served each other's cached answer.
+	Engagement string
 }
 
 // key renders the cache identity. fmt prints every field, including any added later.

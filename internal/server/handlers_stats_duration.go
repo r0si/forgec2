@@ -44,13 +44,22 @@ func (s *Server) handleTaskDurationStats(c *gin.Context) {
 	// One struct holds the whole identity of the request, so a parameter that shapes the query is also
 	// part of the cache key (see durationStatsQuery).
 	request := durationStatsQuery{
-		Tenant:  s.currentTenantID(c),
-		Since:   c.DefaultQuery("since", "24h"),
-		Type:    c.Query("type"),
-		GroupBy: c.DefaultQuery("group_by", "type"),
-		Bucket:  c.Query("bucket"),
+		Tenant:     s.currentTenantID(c),
+		Since:      c.DefaultQuery("since", "24h"),
+		Type:       c.Query("type"),
+		GroupBy:    c.DefaultQuery("group_by", "type"),
+		Bucket:     c.Query("bucket"),
+		Engagement: c.Query("engagement"),
 	}
 	since, filterType, groupBy, bucket := request.Since, request.Type, request.GroupBy, request.Bucket
+
+	// The engagement scope is validated BEFORE the cache lookup: an unusable value must answer 400, not be cached under a key
+	// that ignores it.
+	engagementAgents, scopedByEngagement, engagementErr := s.taskEngagementFilter(c)
+	if engagementErr != nil {
+		respondError(c, http.StatusBadRequest, engagementErr.Error())
+		return
+	}
 	// Serve a fresh copy when one exists: the read costs ~28 ms per call for a 5000-row window
 	// (BenchmarkDurationStatsWindow) and the console polls while an operator watches the page.
 	cacheKey := request.key()
@@ -80,6 +89,11 @@ func (s *Server) handleTaskDurationStats(c *gin.Context) {
 		Where("updated_at > created_at")
 	if filterType != "" {
 		query = query.Where("type = ?", filterType)
+	}
+	// Scoped like the failure reports: "how slow was THIS exercise" is a review question, and an unscoped answer to it is the
+	// wrong answer.
+	if scopedByEngagement {
+		query = query.Where("agent_id IN ?", engagementAgents)
 	}
 
 	var rows []db.Task
@@ -155,12 +169,13 @@ func (s *Server) handleTaskDurationStats(c *gin.Context) {
 		stats = s.labelDurationGroups(c, stats)
 	}
 	resp := gin.H{
-		"since":     c.DefaultQuery("since", "24h"),
-		"group_by":  groupBy,
-		"window_ms": window.Milliseconds(),
-		"sampled":   len(rows),
-		"truncated": len(rows) >= taskDurationSampleLimit,
-		rowsField:   stats,
+		"since":      c.DefaultQuery("since", "24h"),
+		"group_by":   groupBy,
+		"engagement": c.Query("engagement"),
+		"window_ms":  window.Milliseconds(),
+		"sampled":    len(rows),
+		"truncated":  len(rows) >= taskDurationSampleLimit,
+		rowsField:    stats,
 	}
 	if bucket != "" {
 		resp["bucket"] = bucket
