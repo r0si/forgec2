@@ -2064,3 +2064,20 @@ type APIKey struct {
 }
 
 func (APIKey) TableName() string { return "api_keys" }
+
+// PlaybookRun is one structured playbook execution.
+//
+// The steps live as JSON rather than in their own table on purpose: a step is only meaningful inside its run, the state machine in
+// internal/playbook is the only writer, and a second table would invite a second implementation of the same transitions. The
+// column is the serialised `playbook.Run`, so a resumed run is the same value the tests already cover.
+type PlaybookRun struct {
+	ID       uint   `gorm:"primaryKey" json:"id"`
+	TenantID uint   `gorm:"index" json:"tenant_id"`
+	Name     string `gorm:"size:200" json:"name"`
+	// State mirrors playbook.Run.State() at save time, so a list can filter without decoding every run.
+	State     string    `gorm:"size:32;index" json:"state"`
+	StepsJSON string    `gorm:"type:text" json:"-"`
+	CreatedBy string    `gorm:"size:100" json:"created_by"`
+	CreatedAt time.Time `gorm:"index" json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}

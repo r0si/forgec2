@@ -11157,6 +11157,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/playbooks/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List playbook runs
+         * @description Read-only view of structured playbook runs. The transitions live in `internal/playbook` and are exhaustive there; this endpoint persists what that package produced and renders it. `settled`/`total` come from the stored steps, so a list can show progress without a reader opening each run. `?state=` filters on the value the machine computed at save time.
+         */
+        get: operations["listPlaybookRuns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/playbooks/runs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One playbook run, with what may run next
+         * @description The run, its steps, and `ready` - the steps that may start now, computed from the current state rather than stored, because a stored copy would be a second answer that drifts the first time a transition forgets to update it. An approval step is **absent** from `ready` until it is approved: waiting for a person is a state, not progress.
+         */
+        get: operations["getPlaybookRun"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/stats/tasks/queue": {
         parameters: {
             query?: never;
@@ -28139,6 +28179,77 @@ export interface operations {
         responses: {
             /** @description Collection dispatched */
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listPlaybookRuns: {
+        parameters: {
+            query?: {
+                /** @description draft|blocked|running|failed|complete */
+                state?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Runs, most recently updated first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        data?: {
+                            count?: number;
+                            runs?: {
+                                id?: number;
+                                name?: string;
+                                state?: string;
+                                created_by?: string;
+                                updated_at?: string;
+                                settled?: number;
+                                total?: number;
+                            }[];
+                        };
+                    };
+                };
+            };
+        };
+    };
+    getPlaybookRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The run */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The id is not a number */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such run in the caller's tenant */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -13299,6 +13299,65 @@ paths:
       responses:
         '200': {description: Accepted collector payload shape}
 
+  /api/playbooks/runs:
+    get:
+      tags: [Automation]
+      summary: List playbook runs
+      description: >-
+        Read-only view of structured playbook runs. The transitions live in `internal/playbook` and are exhaustive there; this
+        endpoint persists what that package produced and renders it. `settled`/`total` come from the stored steps, so a list can
+        show progress without a reader opening each run. `?state=` filters on the value the machine computed at save time.
+      operationId: listPlaybookRuns
+      security: [{SessionCookie: []}]
+      parameters:
+        - name: state
+          in: query
+          description: draft|blocked|running|failed|complete
+          schema: {type: string}
+      responses:
+        '200':
+          description: Runs, most recently updated first
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  data:
+                    type: object
+                    properties:
+                      count: {type: integer}
+                      runs:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id: {type: integer}
+                            name: {type: string}
+                            state: {type: string}
+                            created_by: {type: string}
+                            updated_at: {type: string}
+                            settled: {type: integer}
+                            total: {type: integer}
+  /api/playbooks/runs/{id}:
+    get:
+      tags: [Automation]
+      summary: One playbook run, with what may run next
+      description: >-
+        The run, its steps, and `ready` - the steps that may start now, computed from the current state rather than stored, because
+        a stored copy would be a second answer that drifts the first time a transition forgets to update it. An approval step is
+        **absent** from `ready` until it is approved: waiting for a person is a state, not progress.
+      operationId: getPlaybookRun
+      security: [{SessionCookie: []}]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: integer}
+      responses:
+        '200': {description: The run, its steps and the ready set}
+        '400': {description: The id is not a number}
+        '404': {description: No such run in the caller's tenant}
   /api/stats/tasks/queue:
     get:
       tags: [Statistics]
