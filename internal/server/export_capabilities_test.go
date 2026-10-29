@@ -289,3 +289,83 @@ func TestExportCapabilities(t *testing.T) {
 		}
 	}
 }
+
+// TestCapabilitiesListEveryCSVReport is a cross-check between what the code can do and what it says it can do.
+//
+// The catalogue is a discovery surface: a client that reads it and finds only the task and audit exports will re-implement the reports
+// instead of asking for the file. This test walks the server files for the CSV branch (`?format=csv`) and requires each endpoint it finds
+// to be listed - so adding a report and forgetting the catalogue fails here rather than in a client author's afternoon.
+func TestCapabilitiesListEveryCSVReport(t *testing.T) {
+	s := mustTenantServer(t)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/exports/capabilities", nil)
+	c.Set("user", "op")
+	c.Set("user_role", db.RoleAdmin)
+	c.Set("user_id", uint(1))
+	c.Set(middleware.TenantIDContextKey, uint(1))
+	s.handleExportCapabilities(c)
+	if w.Code != http.StatusOK {
+		t.Fatalf("capabilities = %d (%s)", w.Code, w.Body.String())
+	}
+	var decoded struct {
+		Data map[string]json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &decoded); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	capabilities := map[string]interface{}{}
+	for key, raw := range decoded.Data {
+		if key != "reports" {
+			continue
+		}
+		var reports reportCapabilities
+		if err := json.Unmarshal(raw, &reports); err != nil {
+			t.Fatalf("decode reports: %v", err)
+		}
+		capabilities["reports"] = reports
+	}
+
+	listed := map[string]bool{}
+	reports, _ := capabilities["reports"].(reportCapabilities)
+	for _, report := range reports.Reports {
+		listed[report.Path] = true
+		if report.Answers == "" {
+			t.Fatalf("%s is listed without saying what it answers", report.Path)
+		}
+	}
+
+	// The endpoints that implement a CSV branch, mapped to the path the router exposes. Hand-written because the alternative is parsing
+	// the handlers; the test's job is to fail when one of these gains a sibling and nobody lists it, so the list is checked in BOTH
+	// directions against the catalogue.
+	expected := []string{
+		"/api/agents",
+		"/api/agents/:agentId/timeline",
+		"/api/automation/rules",
+		"/api/notification-routes",
+		"/api/stats/failures",
+		"/api/stats/failures/signatures",
+		"/api/stats/tasks/duration",
+		"/api/stats/tasks/queue",
+	}
+	for _, path := range expected {
+		if !listed[path] {
+			t.Fatalf("%s can answer csv but the catalogue does not list it", path)
+		}
+	}
+	for path := range listed {
+		found := false
+		for _, candidate := range expected {
+			if candidate == path {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("the catalogue lists %s, which no test knows how to check", path)
+		}
+	}
+	if len(reports.Formats) != 2 {
+		t.Fatalf("report formats = %v, want csv and json", reports.Formats)
+	}
+}

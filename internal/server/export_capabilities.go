@@ -65,7 +65,27 @@ func (s *Server) handleExportCapabilities(c *gin.Context) {
 				"a preset must be the whole fields value; mixing one with column names is a 400",
 			},
 		},
-		"audit_export": exportCapabilities{
+		// The CSV reports, listed because a client that can discover the download endpoints but not the reports will re-implement the
+		// queries instead of asking for the file. Every entry here was verified against the handler that implements it; a path invented
+		// for symmetry would be worse than an absent one.
+		"reports": reportCapabilities{
+			Formats: []string{"csv", "json"},
+			Notes: []string{
+				"each path takes ?format=csv; without it the endpoint answers its normal JSON",
+				"reports are read-only snapshots: they answer what the data looks like now, not what it looked like at a past time",
+				"engagement-scoped reports echo the scope in a response header, so a scoped table and an unscoped one stay distinguishable",
+			},
+			Reports: []reportCapability{
+				{Path: "/api/agents", Answers: "the fleet, one row per beacon"},
+				{Path: "/api/agents/:agentId/timeline", Answers: "one beacon's activity, one row per entry"},
+				{Path: "/api/automation/rules", Answers: "the automation rules and what each last did"},
+				{Path: "/api/notification-routes", Answers: "where alerts go, and whether each route was tested"},
+				{Path: "/api/stats/failures", Answers: "failed tasks with their error text"},
+				{Path: "/api/stats/failures/signatures", Answers: "failures grouped by what they look like"},
+				{Path: "/api/stats/tasks/duration", Answers: "how long tasks take, by type"},
+				{Path: "/api/stats/tasks/queue", Answers: "which beacon is not draining its queue, with its oldest pending age"},
+			},
+		}, "audit_export": exportCapabilities{
 			Path:       "/api/audit/export",
 			Formats:    []string{"ndjson", "json"},
 			Parameters: []string{"limit", "since_id", "since", "until", "user", "action", "agent_id", "format"},
@@ -308,4 +328,17 @@ func bundlePublicKeyHex() string {
 		return ""
 	}
 	return hex.EncodeToString(key.Public().(ed25519.PublicKey))
+}
+
+// reportCapability is one read-only report that can be taken away as a file.
+type reportCapability struct {
+	Path    string `json:"path"`
+	Answers string `json:"answers"`
+}
+
+// reportCapabilities groups them, with the constraints a client cannot infer.
+type reportCapabilities struct {
+	Formats []string           `json:"formats"`
+	Notes   []string           `json:"notes"`
+	Reports []reportCapability `json:"reports"`
 }
