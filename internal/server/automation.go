@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"regexp"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -98,23 +99,50 @@ func (s *Server) evaluateRule(evt Event, rule AutomationRule) {
 	})
 }
 
+// matchCondition reports whether one condition matches, failing CLOSED.
+//
+// Two defaults here used to fail open and are the reason this comment exists: an unrecognised operator returned true, and an empty field
+// resolved to "" so `contains` matched everything. A misspelled operator therefore made a rule fire on every event of its type, which
+// reads to an operator as "the rule works". Definitions are also refused at save time (validateRuleConditions); this is the second line,
+// for rules stored before that check existed.
 func (s *Server) matchCondition(cond RuleCondition, evt Event) bool {
+	field := strings.TrimSpace(cond.Field)
+	if field == "" {
+		return false
+	}
 	var val string
-	switch cond.Field {
+	resolved := true
+	switch field {
 	case "agent.hostname":
 		val = evt.AgentHost
 	default:
-		if v, ok := evt.Data[cond.Field]; ok {
+		// An ABSENT key is not an empty value: with the value defaulting to "", `contains ""` matched every event that did not carry the
+		// field at all, which is the same fail-open shape as an unknown operator.
+		if v, ok := evt.Data[field]; ok {
 			val = fmt.Sprintf("%v", v)
+		} else {
+			resolved = false
 		}
 	}
-	switch cond.Operator {
+	if !resolved {
+		return false
+	}
+	switch strings.ToLower(strings.TrimSpace(cond.Operator)) {
 	case "contains":
 		return strings.Contains(strings.ToLower(val), strings.ToLower(cond.Value))
 	case "equals":
 		return val == cond.Value
+	case "regex":
+		// Compiled per evaluation: rules are few and events are not hot enough to justify a cache that would then need invalidation when
+		// a rule is edited. A bad pattern is a false, not a panic and not a match.
+		pattern, err := regexp.Compile(cond.Value)
+		if err != nil {
+			slog.Warn("Automation: condition has an invalid regex, treating it as non-matching", "pattern", cond.Value, "error", err)
+			return false
+		}
+		return pattern.MatchString(val)
 	default:
-		return true
+		return false
 	}
 }
 

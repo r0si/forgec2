@@ -186,6 +186,12 @@ func (s *Server) handleSaveAutomationRule(c *gin.Context) {
 		// rule in the same tick must not collide on the primary key.
 		rule.ID = "rule_" + uuid.NewString()
 	}
+	// A condition with no field, no operator or an unrecognised operator would have matched every event of the rule's type: refuse the
+	// definition while the operator is looking at it, rather than letting a typo become "the rule works".
+	if err := validateRuleConditions(rule.Conditions); err != nil {
+		respondError(c, http.StatusBadRequest, err.Error())
+		return
+	}
 	// New rules belong to the operator's tenant; the body must not set it.
 	rule.TenantID = s.currentTenantID(c)
 	if rule.CreatedAt == "" {

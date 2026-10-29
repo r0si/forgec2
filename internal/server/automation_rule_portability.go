@@ -204,6 +204,10 @@ func (s *Server) importOneRule(c *gin.Context, rule portableRule, overwrite, dry
 		outcome.Status, outcome.Reason = "invalid", "the rule needs an event_type; a rule without one never fires"
 		return outcome
 	}
+	if err := validateRuleConditions(rule.Conditions); err != nil {
+		outcome.Status, outcome.Reason = "invalid", err.Error()
+		return outcome
+	}
 	if len(rule.Actions) == 0 {
 		outcome.Status, outcome.Reason = "invalid", "the rule needs at least one action"
 		return outcome

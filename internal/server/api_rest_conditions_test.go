@@ -31,7 +31,12 @@ func TestMatchCondition(t *testing.T) {
 		{"data field contains", RuleCondition{Field: "severity", Operator: "contains", Value: "high"}, true},
 		{"numeric data field", RuleCondition{Field: "count", Operator: "equals", Value: "3"}, true},
 		{"missing data field is empty", RuleCondition{Field: "absent", Operator: "contains", Value: "x"}, false},
-		{"unknown operator allows", RuleCondition{Field: "severity", Operator: "regex", Value: "[a-z"}, true},
+		// This case used to be called "unknown operator allows" and expected TRUE: it codified the fail-open default, and it passed
+		// because `regex` was never implemented. Both halves are now right - the operator works, and an invalid pattern fails closed.
+		{"regex matches", RuleCondition{Field: "severity", Operator: "regex", Value: "^H"}, true},
+		{"regex miss", RuleCondition{Field: "severity", Operator: "regex", Value: "^z"}, false},
+		{"invalid regex fails closed", RuleCondition{Field: "severity", Operator: "regex", Value: "[a-z"}, false},
+		{"unknown operator fails closed", RuleCondition{Field: "severity", Operator: "startswith", Value: "H"}, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
