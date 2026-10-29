@@ -13215,6 +13215,18 @@ paths:
                       since: {type: string}
                       task_failures: {type: integer}
                       note: {type: string}
+                      rerun:
+                        type: object
+                        description: >-
+                          What to do with a row: `POST /api/tasks/rerun-by-signature` re-dispatches the failed tasks that share
+                          one shape, and the row signature IS the request body. Carried in the answer so a client does not have
+                          to know the second endpoint exists.
+                        properties:
+                          method: {type: string}
+                          path: {type: string}
+                          body:
+                            type: object
+                          note: {type: string}
                       task_signatures:
                         type: array
                         items:

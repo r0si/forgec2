@@ -28102,6 +28102,13 @@ export interface operations {
                             since?: string;
                             task_failures?: number;
                             note?: string;
+                            /** @description What to do with a row: `POST /api/tasks/rerun-by-signature` re-dispatches the failed tasks that share one shape, and the row signature IS the request body. Carried in the answer so a client does not have to know the second endpoint exists. */
+                            rerun?: {
+                                method?: string;
+                                path?: string;
+                                body?: Record<string, never>;
+                                note?: string;
+                            };
                             task_signatures?: {
                                 signature?: string;
                                 count?: number;

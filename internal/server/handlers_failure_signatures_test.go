@@ -72,6 +72,11 @@ func TestFailureSignatures(t *testing.T) {
 				Reasons   []string `json:"reasons"`
 				Sample    string   `json:"sample"`
 			} `json:"task_signatures"`
+			Rerun struct {
+				Method string            `json:"method"`
+				Path   string            `json:"path"`
+				Body   map[string]string `json:"body"`
+			} `json:"rerun"`
 			NotificationSignatures []struct {
 				Signature string   `json:"signature"`
 				Routes    []string `json:"routes"`
@@ -125,6 +130,15 @@ func TestFailureSignatures(t *testing.T) {
 		if strings.Contains(notification.Signature, leak) {
 			t.Fatalf("the notification signature carries %q: %q", leak, notification.Signature)
 		}
+	}
+
+	// 2b. The answer says what to DO with a row: the signature text is the request body, so a client can wire the button
+	// from the response without knowing the second endpoint exists.
+	if resp.Data.Rerun.Method != "POST" || resp.Data.Rerun.Path != "/api/tasks/rerun-by-signature" {
+		t.Fatalf("rerun hint = %+v", resp.Data.Rerun)
+	}
+	if resp.Data.Rerun.Body["since"] != "7d" {
+		t.Fatalf("the hint does not carry the window the rows came from: %+v", resp.Data.Rerun.Body)
 	}
 
 	// 3. A bad window is refused rather than defaulted.
