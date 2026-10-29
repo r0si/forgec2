@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -8,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -719,6 +721,69 @@ func (s *Server) writeAgentListJSON(c *gin.Context) {
 	if groupHost {
 		out["group"] = "host"
 	}
+
+	// ?format=csv takes the fleet away. "Who was in scope" is the most-requested artifact of a review, and the per-agent export
+	// packages one host - which is a different document from the inventory. The page size still bounds it (the console asks for
+	// 20 at a time), so the file says when it was cut.
+	if strings.EqualFold(strings.TrimSpace(c.Query("format")), "csv") {
+		var buf strings.Builder
+		writer := csv.NewWriter(&buf)
+		header := []string{"ID", "Hostname", "IP", "OS", "Username", "Status", "Protocol", "Last Seen", "Engagement"}
+		if err := writer.Write(header); err != nil {
+			handleQueryError(c, err, "Failed to encode the fleet list")
+			return
+		}
+		for _, item := range resp {
+			lastSeen := ""
+			if !item.LastSeen.IsZero() {
+				lastSeen = item.LastSeen.UTC().Format(time.RFC3339)
+			}
+			protocolVersion := strconv.FormatUint(uint64(item.ProtocolVersion), 10)
+			if item.ProtocolOutdated {
+				// Marked in the file, because an operator reading it cannot be expected to know the current version.
+				protocolVersion += " (outdated)"
+			}
+			engagement := ""
+			if item.EngagementID != nil {
+				engagement = strconv.FormatUint(uint64(*item.EngagementID), 10)
+			}
+			if err := writer.Write([]string{
+				item.ID,
+				item.Hostname,
+				item.IP,
+				item.OS,
+				item.Username,
+				item.Status,
+				protocolVersion,
+				lastSeen,
+				engagement,
+			}); err != nil {
+				handleQueryError(c, err, "Failed to encode the fleet list")
+				return
+			}
+		}
+		writer.Flush()
+		if err := writer.Error(); err != nil {
+			handleQueryError(c, err, "Failed to encode the fleet list")
+			return
+		}
+		name := "forgec2_fleet_" + time.Now().Format("2006-01-02_150405") + ".csv"
+		c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, name))
+		// A page is not the fleet: say so rather than letting a paged file look complete.
+		if int64(page*pageSize) < total {
+			c.Header("X-Export-Truncated", "true")
+		}
+		if scope := taskExportScope(c); scope != "" {
+			c.Header(taskExportScopeHeader, scope)
+			applyExportScope(c, scope)
+		} else {
+			c.Header(taskExportScopeHeader, "all")
+			applyExportScope(c, "all")
+		}
+		c.Data(http.StatusOK, "text/csv; charset=utf-8", []byte(buf.String()))
+		return
+	}
+
 	respond(c, out)
 }
 
