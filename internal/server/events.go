@@ -19,6 +19,10 @@ const (
 	EventTaskFail          EventType = "task.fail"
 	EventCredentialFound   EventType = "credential.found"
 	EventAlertTriggered    EventType = "alert.triggered"
+	// Build outcomes are events because a failed build is a thing an operator wants told about, not a thing they discover by
+	// refreshing a page. The payload carries the hint code, so a rule can route on the CAUSE rather than on the message text.
+	EventBuildFailed    EventType = "build.failed"
+	EventBuildSucceeded EventType = "build.succeeded"
 )
 
 type Event struct {

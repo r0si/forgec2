@@ -382,6 +382,47 @@ func (s *Server) runBuildAndUpdateJob(job *BuildJob, buildFn func() (string, err
 		event["completed_at"] = job.CompletedAt
 	}
 	s.broadcastOperatorEvent(event)
+
+	s.emitBuildOutcomeEvent(job, err, platform, format, filename)
+}
+
+// emitBuildOutcomeEvent publishes the build outcome on the automation bus.
+//
+// Kept separate from the websocket broadcast so a test can drive it with a job and an error without a live build: the event is the part
+// a rule depends on, and it should be verifiable without a toolchain.
+func (s *Server) emitBuildOutcomeEvent(job *BuildJob, err error, platform, format, filename string) {
+	if s.eventManager == nil {
+		return
+	}
+	s.eventManager.Emit(buildOutcomeEvent(job, err, platform, format, filename))
+}
+
+// buildOutcomeEvent builds the event a rule receives.
+//
+// Pure, and separate from the emit, because this payload is the contract a rule writes conditions against: a test can pin the type, the
+// hint code and the fields a condition may reference without a running event bus. Delivery stays one call.
+func buildOutcomeEvent(job *BuildJob, err error, platform, format, filename string) Event {
+	buildType := EventBuildSucceeded
+	buildData := map[string]interface{}{
+		"build_id": job.ID,
+		"platform": platform,
+		"format":   format,
+		"filename": filename,
+	}
+	if err != nil {
+		buildType = EventBuildFailed
+		buildData["error"] = job.Error
+		if job.ErrorHint.Code != "" {
+			buildData["hint_code"] = job.ErrorHint.Code
+		}
+	}
+	return Event{
+		Type:     buildType,
+		TenantID: job.TenantID,
+		// BuildJob carries no operator field; the log helper records it separately, so leave the actor empty rather than invent one.
+		Timestamp: time.Now(),
+		Data:      buildData,
+	}
 }
 
 // Build queue: binary generation runs the Go/garble toolchain, which is
