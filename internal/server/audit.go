@@ -368,8 +368,10 @@ func (s *Server) handleExportAuditChain(c *gin.Context) {
 	// guessing which of six filters produced the file. Same shape as the task export's header.
 	if scope := auditExportScope(c); scope != "" {
 		c.Header(auditExportScopeHeader, scope)
+		applyExportScope(c, scope)
 	} else {
 		c.Header(auditExportScopeHeader, "all")
+		applyExportScope(c, "all")
 	}
 	if format == "json" {
 		// One document instead of newline-delimited rows, for tools that do not stream. The rows are the SAME

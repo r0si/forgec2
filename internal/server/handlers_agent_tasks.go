@@ -269,8 +269,10 @@ func (s *Server) handleExportTasks(c *gin.Context) {
 	// know it covers one exercise or one host, or they will read a scoped sample as the whole picture.
 	if scope := taskExportScope(c); scope != "" {
 		c.Header(taskExportScopeHeader, scope)
+		applyExportScope(c, scope)
 	} else {
 		c.Header(taskExportScopeHeader, "all")
+		applyExportScope(c, "all")
 	}
 	c.Header("Content-Type", "text/csv; charset=utf-8")
 	// The timestamp keeps two exports from the same day from overwriting each other in the browser.

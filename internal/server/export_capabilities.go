@@ -261,7 +261,10 @@ func (s *Server) handleExportCapabilities(c *gin.Context) {
 		// here because a client should not have to reverse-engineer a header name from a changelog.
 		"exposure": gin.H{
 			"task_export_scope_header":  taskExportScopeHeader,
+			"export_scope_header":       exportScopeHeader,
 			"audit_export_scope_header": auditExportScopeHeader,
+			"export_scope_note": "X-Export-Scope is set alongside every specific scope header, including the failure-shape and " +
+				"duration downloads, because those are not task exports; both names always carry the same value",
 			"scope_format": "name=value;name=value (sorted by name), or \"all\" when nothing was filtered - " +
 				"so a file carries its own scope and a filtered sample cannot be read as the whole picture",
 			"task_export_truncated_header":  "X-Task-Export-Truncated",

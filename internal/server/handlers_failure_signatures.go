@@ -177,8 +177,10 @@ func (s *Server) handleFailureSignatures(c *gin.Context) {
 		// The file carries its own scope, like every other export here.
 		if scope := taskExportScope(c); scope != "" {
 			c.Header(taskExportScopeHeader, scope)
+			applyExportScope(c, scope)
 		} else {
 			c.Header(taskExportScopeHeader, "all")
+			applyExportScope(c, "all")
 		}
 		c.Data(http.StatusOK, "text/csv; charset=utf-8", []byte(buf.String()))
 		return

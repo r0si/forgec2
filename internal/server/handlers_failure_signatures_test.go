@@ -222,6 +222,11 @@ func TestFailureSignatures(t *testing.T) {
 		t.Fatalf("the top shape count = %q, want the three permission failures", rows[1][1])
 	}
 	// The file says what it covers, like every other export: the window, and not the format (which is not a filter).
+	// Both names: the specific one for an existing consumer, and the generic one because this is not a task export.
+	if generic := csvRecorder.Header().Get(exportScopeHeader); generic == "" || generic != csvRecorder.Header().Get(taskExportScopeHeader) {
+		t.Fatalf("generic scope = %q, specific = %q; they must agree",
+			generic, csvRecorder.Header().Get(taskExportScopeHeader))
+	}
 	scope := csvRecorder.Header().Get(taskExportScopeHeader)
 	if !strings.Contains(scope, "since=7d") || strings.Contains(scope, "format") {
 		t.Fatalf("scope header = %q, want the window and not the format", scope)

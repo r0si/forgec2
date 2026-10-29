@@ -11,6 +11,21 @@ import (
 // document publishes the same name, and two spellings of one header is how a client ends up reading a header nobody sets.
 const taskExportScopeHeader = "X-Task-Export-Scope"
 
+// exportScopeHeader is the name that applies to EVERY download here.
+//
+// `X-Task-Export-Scope` was accurate when the task export was the only scoped file; it now also appears on the failure-shape and
+// duration reports, which are not task exports. The generic name is set alongside it (not instead of it) so an existing consumer
+// keeps working while a new one reads the name that matches what it downloaded.
+const exportScopeHeader = "X-Export-Scope"
+
+// applyExportScope sets the generic header, leaving the specific one to the caller that knows its own name.
+func applyExportScope(c *gin.Context, scope string) {
+	if c == nil || scope == "" {
+		return
+	}
+	c.Header(exportScopeHeader, scope)
+}
+
 // The filters a task export applied, as one header.
 //
 // The export already announces that it was truncated, because a capped file that looks complete is a lie of omission. A

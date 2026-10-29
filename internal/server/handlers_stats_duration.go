@@ -224,8 +224,10 @@ func (s *Server) handleTaskDurationStats(c *gin.Context) {
 		c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, name))
 		if scope := taskExportScope(c); scope != "" {
 			c.Header(taskExportScopeHeader, scope)
+			applyExportScope(c, scope)
 		} else {
 			c.Header(taskExportScopeHeader, "all")
+			applyExportScope(c, "all")
 		}
 		c.Data(http.StatusOK, "text/csv; charset=utf-8", []byte(buf.String()))
 		return
