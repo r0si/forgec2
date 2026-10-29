@@ -262,6 +262,7 @@ them are about things that keep working while being useless, which is why they a
 | `plugins` | one or more packages were **rejected at load** | `GET /api/plugins/failures` names them and suggests the next step |
 | `auto_retries` | a **burst** of read-only tasks was re-issued automatically (>20 since start) | the link is timing out, not the task: check the beacon's connectivity before the report's reasons |
 | `audit_chain` | the chain does not verify in the ready window | treat as an incident: `docs/AUDIT_EXPORT.md` explains what it can and cannot prove |
+| `task_queue` | a beacon holds a pending task older than **its own sleep interval plus two minutes** | the beacon is not polling, not slow: `GET /api/stats/tasks/queue` names the host and the age |
 
 Both delivery checks use "never delivered", not "anything failed": one failure after a hundred successes is a blip, and a
 probe that warns on blips gets muted. Neither makes the server **unready** - the process is fine, the notification path is

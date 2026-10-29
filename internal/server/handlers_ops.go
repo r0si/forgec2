@@ -124,6 +124,18 @@ func (s *Server) handleReadyCheck(c *gin.Context) {
 		if failingRules > 0 {
 			warnings = append(warnings, fmt.Sprintf("%d automation rule(s) are firing without their actions landing", failingRules))
 		}
+
+		// A stalled queue is a beacon that is not polling: the work is accepted and never consumed, which the task list shows
+		// only as rows an operator has to scroll through. Counted here because the probe is the thing that runs when nobody is
+		// watching the console.
+		if s.db != nil {
+			stalledBeacons, queued := s.stalledQueueSummary(c)
+			checks["task_queue"] = fmt.Sprintf("%d task(s) queued, %d beacon(s) not draining", queued, stalledBeacons)
+			if stalledBeacons > 0 {
+				warnings = append(warnings,
+					fmt.Sprintf("%d beacon(s) have tasks they are not consuming; the queue depth report names them", stalledBeacons))
+			}
+		}
 	}
 
 	status := "ok"

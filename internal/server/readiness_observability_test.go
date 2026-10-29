@@ -52,6 +52,9 @@ func TestReadyReportsDeliveryAndActionHealth(t *testing.T) {
 	if checks["notification_delivery"] == nil || checks["automation_actions"] == nil {
 		t.Fatalf("the readiness checks do not include delivery and action health: %v", checks)
 	}
+	if checks["task_queue"] == nil {
+		t.Fatalf("the readiness checks do not report the task queue: %v", checks)
+	}
 	if checks["bundle_signing"] == nil {
 		t.Fatalf("the readiness checks do not report the bundle signing state: %v", checks)
 	}

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -110,5 +111,71 @@ func TestTaskQueueStats(t *testing.T) {
 	// 3. With equal queued counts the tie-break is age, so the beacon holding the hour-old row sorts above.
 	if resp.Data.Agents[0].AgentID != "a-2" {
 		t.Fatalf("ordering = %s first, want the oldest queue", resp.Data.Agents[0].AgentID)
+	}
+}
+
+// TestReadyReportsAStalledQueue closes the loop between the queue report and the probe.
+//
+// The probe is what runs when nobody is watching the console, which is exactly when a beacon stops polling: work keeps being
+// accepted and nothing says so. The warning must use the same rule as the detail page, and a probe that cannot count must say
+// "unknown" rather than reporting a reassuring zero.
+func TestReadyReportsAStalledQueue(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	s := mustTenantServer(t)
+	resetNotificationStats()
+	resetRuleActionStats()
+	resetAutoRetryCounter()
+	t.Cleanup(func() {
+		resetNotificationStats()
+		resetRuleActionStats()
+		resetAutoRetryCounter()
+	})
+
+	now := time.Now().Truncate(time.Second)
+	if err := s.db.Create(&db.Implant{
+		ID: "a-stalled", TenantID: 1, Hostname: "db-02", Status: "online", LastSeen: now, CurrentInterval: 10,
+	}).Error; err != nil {
+		t.Fatalf("seed agent: %v", err)
+	}
+	if err := s.db.Create(&db.Task{
+		AgentID: "a-stalled", TenantID: 1, Type: "ps", Command: "ps", Status: "pending",
+		CreatedAt: now.Add(-time.Hour), UpdatedAt: now.Add(-time.Hour),
+	}).Error; err != nil {
+		t.Fatalf("seed task: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/ready", nil)
+	c.Set("user", "op")
+	c.Set("user_role", db.RoleAdmin)
+	c.Set("user_id", uint(1))
+	c.Set(middleware.TenantIDContextKey, uint(1))
+	s.handleReadyCheck(c)
+
+	// checks is not homogeneous: `listeners` is a count, everything else is prose.
+	var payload struct {
+		Checks   map[string]interface{} `json:"checks"`
+		Warnings []string               `json:"warnings"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	queueCheck, _ := payload.Checks["task_queue"].(string)
+	if !strings.Contains(queueCheck, "1 beacon(s) not draining") {
+		t.Fatalf("task_queue check = %q, want the stalled beacon counted", queueCheck)
+	}
+	found := false
+	for _, warning := range payload.Warnings {
+		if strings.Contains(warning, "not consuming") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("warnings = %v, want one naming the stalled beacon", payload.Warnings)
+	}
+	// The probe warns; it does not become unready - a beacon that is not polling is a feature failing, not this process.
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want ready with a warning", w.Code)
 	}
 }
