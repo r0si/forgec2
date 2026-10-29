@@ -4679,7 +4679,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Generate build detail */
+        /**
+         * Generate build detail
+         * @description Poll one build. On failure the answer carries `error` (the human diagnosis: the toolchain's own words, with ldflags and key-shaped assignments redacted, both ends kept when the log is long) and `error_hint` - a closed-set `code` (`toolchain_missing`, `cache_unwritable`, `disk_full`, `compile_error`, `unknown`) with one stable sentence. Switch on the code: the message changes with every compiler version, and `unknown` deliberately carries no advice rather than inventing some.
+         */
         get: operations["generateBuildGet"];
         put?: never;
         post?: never;

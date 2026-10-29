@@ -16,11 +16,13 @@ import (
 
 // BuildJob tracks an asynchronous binary build.
 type BuildJob struct {
-	ID          string
-	Status      string // "building", "completed", "failed"
-	Phase       string // "queued", "building", "completed", "failed"
-	Output      string // file path on success
-	Error       string // error message on failure
+	ID     string
+	Status string // "building", "completed", "failed"
+	Phase  string // "queued", "building", "completed", "failed"
+	Output string // file path on success
+	Error  string // error message on failure
+	// ErrorHint is the machine-readable next step for the same failure, so a client can offer an action without parsing the message.
+	ErrorHint   BuildFailureHint
 	Platform    string // "windows", "linux", "macos"
 	Format      string // "exe", "dll", "elf", "binary"
 	C2URL       string
@@ -97,6 +99,7 @@ func (s *Server) completeBuildJob(job *BuildJob, outputPath string, err error) {
 		// The old call turned a compiler failure into the literal text "Build failed", which the UI then showed beneath its own
 		// "Build failed" title - a report that names nothing and cannot be acted on.
 		job.Error = buildFailureText(err)
+		job.ErrorHint = hintOrEmpty(buildFailureHint(err))
 	} else {
 		job.Status = "completed"
 		job.Phase = "completed"
@@ -225,6 +228,11 @@ func (s *Server) handleBuildStatus(c *gin.Context) {
 		}
 	} else if job.Status == "failed" {
 		resp["error"] = job.Error
+		// A code plus a sentence: the console can map the code to an action or a translation, and a client that does not care can ignore
+		// it without the error text becoming unparseable.
+		if job.ErrorHint.Code != "" {
+			resp["error_hint"] = job.ErrorHint
+		}
 		resp["completed_at"] = job.CompletedAt
 	}
 	s.buildJobsMu.RUnlock()

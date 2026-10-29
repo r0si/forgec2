@@ -85,3 +85,47 @@ func TestBuildFailureTextDoesNotLeakThroughSanitizer(t *testing.T) {
 		t.Fatal("buildFailureText fell back to the generic sentence")
 	}
 }
+
+// TestBuildFailureHint covers the machine-readable next step.
+//
+// The error text is for a human and changes with every compiler version; the hint is a closed set of codes with one stable sentence each,
+// so a console can offer an action without parsing prose - and a client can switch on it exhaustively.
+func TestBuildFailureHint(t *testing.T) {
+	cases := []struct {
+		name string
+		err  error
+		want string
+	}{
+		{"missing toolchain", errors.New(`go build failed: exec: "go": executable file not found in %PATH%`), HintToolchainMissing},
+		{"unwritable cache", errors.New(`go: creating work dir: mkdir C:\tmp\go-build123: permission denied`), HintCacheUnwritable},
+		{"disk full", errors.New("write /tmp/a: no space left on device"), HintDiskFull},
+		{"compiler rejected the source", errors.New("go build failed: exit status 1\n./agent.go:42:2: undefined: ResolveNtSyscalls"), HintCompileError},
+		{"unclassifiable", errors.New("something nobody has seen before"), HintUnknown},
+	}
+	for _, testCase := range cases {
+		hint := buildFailureHint(testCase.err)
+		if hint.Code != testCase.want {
+			t.Fatalf("%s: code = %q, want %q", testCase.name, hint.Code, testCase.want)
+		}
+		// Every code except "unknown" must carry the sentence that says what to do; "unknown" must NOT invent advice.
+		if testCase.want == HintUnknown {
+			if hint.Text != "" {
+				t.Fatalf("%s: invented advice for an unclassifiable failure: %q", testCase.name, hint.Text)
+			}
+			continue
+		}
+		if len(hint.Text) < 20 {
+			t.Fatalf("%s: hint text is too terse to act on: %q", testCase.name, hint.Text)
+		}
+	}
+
+	// A long hint is bounded, so the status JSON cannot become a second copy of the log.
+	long := hintOrEmpty(BuildFailureHint{Code: HintCompileError, Text: strings.Repeat("x", hintMaxChars*2)})
+	if len(long.Text) != hintMaxChars {
+		t.Fatalf("hint text = %d chars, want the bound %d", len(long.Text), hintMaxChars)
+	}
+	// nil is not a hint.
+	if hint := buildFailureHint(nil); hint.Code != HintUnknown {
+		t.Fatalf("nil error classified as %q", hint.Code)
+	}
+}

@@ -114,3 +114,67 @@ func itoaInt(value int) string {
 	}
 	return string(digits[index:])
 }
+
+// BuildFailureHint is the machine-readable next step for a failed build.
+//
+// The error text is for a human; this is for the console and for any client that wants to offer an action ("install Go", "free space")
+// without parsing English prose. The codes are a closed set so a caller can switch on them exhaustively, and every code carries the same
+// sentence the text version appends, so the two cannot drift apart in meaning.
+type BuildFailureHint struct {
+	Code string `json:"code"`
+	Text string `json:"text"`
+}
+
+// Hint codes. Stable identifiers: a client may key styling or a link on them.
+const (
+	HintToolchainMissing = "toolchain_missing"
+	HintCacheUnwritable  = "cache_unwritable"
+	HintDiskFull         = "disk_full"
+	HintCompileError     = "compile_error"
+	HintUnknown          = "unknown"
+)
+
+// Bounded so a hint cannot become a second copy of the log.
+const hintMaxChars = 200
+
+// buildFailureHint classifies err into the next step an operator should take.
+func buildFailureHint(err error) BuildFailureHint {
+	if err == nil {
+		return BuildFailureHint{Code: HintUnknown, Text: ""}
+	}
+	lowered := strings.ToLower(err.Error())
+	switch {
+	case strings.Contains(lowered, "executable file not found") || strings.Contains(lowered, "exec: \"go\"") ||
+		strings.Contains(lowered, "cannot find go"):
+		return BuildFailureHint{
+			Code: HintToolchainMissing,
+			Text: "Install Go on the server host and make sure the server process's PATH includes it; check with GET /api/generate/toolchain.",
+		}
+	case strings.Contains(lowered, "go-build") && strings.Contains(lowered, "permission denied"):
+		return BuildFailureHint{
+			Code: HintCacheUnwritable,
+			Text: "Point GOCACHE at a directory the server's account can write; check with GET /api/generate/toolchain.",
+		}
+	case strings.Contains(lowered, "no space left on device"):
+		return BuildFailureHint{
+			Code: HintDiskFull,
+			Text: "Free space on the build volume (the binary plus the module cache can be hundreds of megabytes).",
+		}
+	case strings.Contains(lowered, "undefined:") || strings.Contains(lowered, "syntax error") ||
+		strings.Contains(lowered, "cannot use") || strings.Contains(lowered, "exit status 1"):
+		// The toolchain ran and rejected the code: the compiler output in the message IS the next step.
+		return BuildFailureHint{
+			Code: HintCompileError,
+			Text: "The compiler rejected the generated source - the message above names the file and line.",
+		}
+	}
+	return BuildFailureHint{Code: HintUnknown, Text: ""}
+}
+
+// hintOrEmpty truncates a hint text, so the JSON stays small even if a code's text grows.
+func hintOrEmpty(hint BuildFailureHint) BuildFailureHint {
+	if len(hint.Text) > hintMaxChars {
+		hint.Text = hint.Text[:hintMaxChars]
+	}
+	return hint
+}
