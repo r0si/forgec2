@@ -40,6 +40,20 @@ func TestDocsIndexListsEveryPage(t *testing.T) {
 		}
 	}
 
+	// The index is grouped by what the reader is trying to do, not alphabetically. That grouping is the reason a person can
+	// find the page at all, and a flat rewrite would still pass the link checks above - so it is pinned here.
+	for _, section := range []string{
+		"## Using the console",
+		"## Running it",
+		"## Handing evidence to someone else",
+		"## Extending it",
+		"## The console frontend",
+	} {
+		if !strings.Contains(indexText, section) {
+			t.Fatalf("docs/README.md lost the %q section; the index is organised by reader intent", strings.TrimPrefix(section, "## "))
+		}
+	}
+
 	// The other direction: an index entry pointing at a page that no longer exists sends a reader to a 404.
 	for _, line := range strings.Split(indexText, "\n") {
 		start := strings.Index(line, "](")
