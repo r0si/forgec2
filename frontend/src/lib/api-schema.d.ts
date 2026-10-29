@@ -11177,6 +11177,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/tasks/rerun-by-signature": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Re-run the failures that share one shape
+         * @description After fixing a link, the useful action is "re-run the timeouts" - not "re-run every failure on this host", which would re-dispatch permission errors that will fail again, and not forty manual clicks. The selector is the **same normalisation** the failure report and the handover bundle use, so the row an operator is looking at and the rows this re-dispatches are the same set by construction. Tasks that cannot be re-run are excluded and reported, and a signature that matches nothing answers **200 with a note** rather than looking like a failed request. Bounded by `limit` (default and maximum 100) and audited as `tasks_rerun_by_signature`.
+         */
+        post: operations["rerunTasksBySignature"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/stats/tasks/failures": {
         parameters: {
             query?: never;
@@ -28098,6 +28118,60 @@ export interface operations {
                 };
             };
             /** @description Invalid since */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    rerunTasksBySignature: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description A row from GET /api/stats/failures/signatures */
+                    signature: string;
+                    /** @default 24h */
+                    since?: string;
+                    /** @description Maximum tasks to re-dispatch (default and cap 100) */
+                    limit?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description What matched, what was queued, and why anything was skipped */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        data?: {
+                            signature?: string;
+                            since?: string;
+                            matched?: number;
+                            queued?: number;
+                            task_ids?: number[];
+                            skipped?: {
+                                id?: number;
+                                type?: string;
+                                reason?: string;
+                            }[];
+                            /** @description Present when nothing matched */
+                            note?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Missing signature or an invalid window */
             400: {
                 headers: {
                     [name: string]: unknown;

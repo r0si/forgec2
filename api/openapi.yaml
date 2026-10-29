@@ -13238,6 +13238,59 @@ paths:
                               items: {type: string}
         '400':
           description: Invalid since
+  /api/tasks/rerun-by-signature:
+    post:
+      tags: [Tasks]
+      summary: Re-run the failures that share one shape
+      description: >-
+        After fixing a link, the useful action is "re-run the timeouts" - not "re-run every failure on this host", which would
+        re-dispatch permission errors that will fail again, and not forty manual clicks. The selector is the **same
+        normalisation** the failure report and the handover bundle use, so the row an operator is looking at and the rows this
+        re-dispatches are the same set by construction. Tasks that cannot be re-run are excluded and reported, and a
+        signature that matches nothing answers **200 with a note** rather than looking like a failed request. Bounded by
+        `limit` (default and maximum 100) and audited as `tasks_rerun_by_signature`.
+      operationId: rerunTasksBySignature
+      security: [{SessionCookie: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [signature]
+              properties:
+                signature: {type: string, description: A row from GET /api/stats/failures/signatures}
+                since: {type: string, default: 24h}
+                limit: {type: integer, description: Maximum tasks to re-dispatch (default and cap 100)}
+      responses:
+        '200':
+          description: What matched, what was queued, and why anything was skipped
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  data:
+                    type: object
+                    properties:
+                      signature: {type: string}
+                      since: {type: string}
+                      matched: {type: integer}
+                      queued: {type: integer}
+                      task_ids:
+                        type: array
+                        items: {type: integer}
+                      skipped:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id: {type: integer}
+                            type: {type: string}
+                            reason: {type: string}
+                      note: {type: string, description: Present when nothing matched}
+        '400': {description: Missing signature or an invalid window}
   /api/stats/tasks/failures:
     get:
       tags: [Stats]
