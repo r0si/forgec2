@@ -1,6 +1,7 @@
 package server
 
 import (
+	"net/http"
 	"sort"
 	"time"
 
@@ -37,6 +38,14 @@ type queueEntry struct {
 func (s *Server) handleTaskQueueStats(c *gin.Context) {
 	now := time.Now()
 
+	// The same exercise scope the failure, shape and duration reports take: "which host in THIS exercise is not draining" is a
+	// review question, and every other report on the same page answers it.
+	engagementAgents, scopedByEngagement, engagementErr := s.taskEngagementFilter(c)
+	if engagementErr != nil {
+		respondError(c, http.StatusBadRequest, engagementErr.Error())
+		return
+	}
+
 	var rows []struct {
 		AgentID   string
 		Pending   int
@@ -52,6 +61,9 @@ func (s *Server) handleTaskQueueStats(c *gin.Context) {
 			now.UTC().Format("2006-01-02 15:04:05")).
 		Where("status IN ?", []string{"pending", "running"}).
 		Group("agent_id")
+	if scopedByEngagement {
+		query = query.Where("agent_id IN ?", engagementAgents)
+	}
 	if err := query.Scan(&rows).Error; err != nil {
 		handleQueryError(c, err, "Failed to compute the task queue")
 		return
@@ -97,6 +109,8 @@ func (s *Server) handleTaskQueueStats(c *gin.Context) {
 		"queued":              queued,
 		"stalled_agents":      stalled,
 		"stall_grace_seconds": int(queueStallGrace.Seconds()),
+		// Echoed like every other scoped report, so a caller can tell a scoped answer from an unscoped one.
+		"engagement": c.Query("engagement"),
 		"note": "a pending task older than the beacon's sleep plus the grace period means it is not polling: " +
 			"a queue problem, not a slow command",
 	})

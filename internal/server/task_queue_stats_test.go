@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -106,6 +107,47 @@ func TestTaskQueueStats(t *testing.T) {
 	}
 	if resp.Data.StalledAgents != 1 {
 		t.Fatalf("stalled_agents = %d, want 1", resp.Data.StalledAgents)
+	}
+
+	// 2b. The same exercise scope every other report takes: an exercise with no hosts answers zero, an unusable value is a 400,
+	// and the answer echoes the scope it applied.
+	engagement := db.Engagement{TenantID: 1, Name: "DMZ", StartsAt: now.Add(-time.Hour), EndsAt: now.Add(time.Hour)}
+	if err := s.db.Create(&engagement).Error; err != nil {
+		t.Fatalf("seed engagement: %v", err)
+	}
+	scopedRecorder := httptest.NewRecorder()
+	cScoped, _ := gin.CreateTestContext(scopedRecorder)
+	cScoped.Request = httptest.NewRequest(http.MethodGet, "/api/stats/tasks/queue?engagement="+strconv.FormatUint(uint64(engagement.ID), 10), nil)
+	cScoped.Set("user", "op")
+	cScoped.Set("user_role", db.RoleAdmin)
+	cScoped.Set("user_id", uint(1))
+	cScoped.Set(middleware.TenantIDContextKey, uint(1))
+	s.handleTaskQueueStats(cScoped)
+	if scopedRecorder.Code != http.StatusOK {
+		t.Fatalf("scoped = %d (%s)", scopedRecorder.Code, scopedRecorder.Body.String())
+	}
+	var scoped struct {
+		Data struct {
+			Engagement string `json:"engagement"`
+			Queued     int    `json:"queued"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(scopedRecorder.Body.Bytes(), &scoped); err != nil {
+		t.Fatalf("decode scoped: %v", err)
+	}
+	if scoped.Data.Engagement == "" || scoped.Data.Queued != 0 {
+		t.Fatalf("scoped queue = %+v, want the scope echoed and no work for an exercise with no hosts", scoped.Data)
+	}
+	badRecorder := httptest.NewRecorder()
+	cBad, _ := gin.CreateTestContext(badRecorder)
+	cBad.Request = httptest.NewRequest(http.MethodGet, "/api/stats/tasks/queue?engagement=nope", nil)
+	cBad.Set("user", "op")
+	cBad.Set("user_role", db.RoleAdmin)
+	cBad.Set("user_id", uint(1))
+	cBad.Set(middleware.TenantIDContextKey, uint(1))
+	s.handleTaskQueueStats(cBad)
+	if badRecorder.Code != http.StatusBadRequest {
+		t.Fatalf("invalid engagement = %d, want 400", badRecorder.Code)
 	}
 
 	// 3. With equal queued counts the tie-break is age, so the beacon holding the hour-old row sorts above.

@@ -28127,7 +28127,10 @@ export interface operations {
     };
     taskQueueStats: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Scope the queue to one exercise (numeric id) or, with `none`, to hosts in no exercise - the same scope the failure, shape and duration reports take, so "which host in THIS exercise is not draining" is answerable. Echoed back as `engagement` so a caller can tell a scoped answer from an unscoped one. */
+                engagement?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
