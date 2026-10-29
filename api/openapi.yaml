@@ -13461,6 +13461,16 @@ paths:
                             updated_at: {type: string}
                             settled: {type: integer}
                             total: {type: integer}
+                            blocked_steps:
+                              type: array
+                              description: >-
+                                Steps waiting for a HUMAN (an approval step that has not been approved). On the list on purpose: a run that
+                                only says "blocked" makes the reader open each one to learn whether the blocker is a person or a
+                                dependency, and those need different people.
+                              items: {type: string}
+                            next_step:
+                              type: string
+                              description: The first step that may run now, empty when nothing can
   /api/playbooks/runs/{id}:
     get:
       tags: [Automation]

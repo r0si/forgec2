@@ -28349,6 +28349,10 @@ export interface operations {
                                 updated_at?: string;
                                 settled?: number;
                                 total?: number;
+                                /** @description Steps waiting for a HUMAN (an approval step that has not been approved). On the list on purpose: a run that only says "blocked" makes the reader open each one to learn whether the blocker is a person or a dependency, and those need different people. */
+                                blocked_steps?: string[];
+                                /** @description The first step that may run now, empty when nothing can */
+                                next_step?: string;
                             }[];
                         };
                     };

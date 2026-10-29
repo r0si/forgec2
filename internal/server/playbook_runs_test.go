@@ -78,10 +78,12 @@ func TestPlaybookRunPersistence(t *testing.T) {
 		Data struct {
 			Count int `json:"count"`
 			Runs  []struct {
-				ID      uint   `json:"id"`
-				State   string `json:"state"`
-				Settled int    `json:"settled"`
-				Total   int    `json:"total"`
+				ID           uint     `json:"id"`
+				State        string   `json:"state"`
+				Settled      int      `json:"settled"`
+				Total        int      `json:"total"`
+				BlockedSteps []string `json:"blocked_steps"`
+				NextStep     string   `json:"next_step"`
 			} `json:"runs"`
 		} `json:"data"`
 	}
@@ -90,6 +92,14 @@ func TestPlaybookRunPersistence(t *testing.T) {
 	}
 	if listed.Data.Count != 1 || listed.Data.Runs[0].Settled != 1 || listed.Data.Runs[0].Total != 3 {
 		t.Fatalf("list = %+v", listed.Data)
+	}
+	// "What needs me now" is on the list, not only in the detail: a reader should not have to open every run to find out whether the
+	// blocker is a person (an approval step) or a dependency.
+	if len(listed.Data.Runs[0].BlockedSteps) != 1 || listed.Data.Runs[0].BlockedSteps[0] != "exfil" {
+		t.Fatalf("blocked_steps = %v, want [exfil]", listed.Data.Runs[0].BlockedSteps)
+	}
+	if listed.Data.Runs[0].NextStep != "exploit" {
+		t.Fatalf("next_step = %q, want exploit", listed.Data.Runs[0].NextStep)
 	}
 
 	// 3. The detail names what may run next, and nothing that is waiting for a human.

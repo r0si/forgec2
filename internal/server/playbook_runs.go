@@ -86,6 +86,10 @@ func (s *Server) handleListPlaybookRuns(c *gin.Context) {
 		// Settled/Total come from the stored steps, so the list can show "2/4" without a reader opening the run.
 		Settled int `json:"settled"`
 		Total   int `json:"total"`
+		// BlockedSteps and NextStep are the "what needs me now" columns. A list of runs that only says "blocked" makes the reader open
+		// each one to find out whether the blocker is a person or a dependency - and those need different people.
+		BlockedSteps []string `json:"blocked_steps,omitempty"`
+		NextStep     string   `json:"next_step,omitempty"`
 	}
 	out := make([]runSummary, 0, len(records))
 	for _, record := range records {
@@ -94,10 +98,19 @@ func (s *Server) handleListPlaybookRuns(c *gin.Context) {
 		if err := json.Unmarshal([]byte(record.StepsJSON), &run); err == nil {
 			settled, total = run.Progress()
 		}
-		out = append(out, runSummary{
+		summary := runSummary{
 			ID: record.ID, Name: record.Name, State: record.State, CreatedBy: record.CreatedBy,
 			UpdatedAt: record.UpdatedAt.UTC().Format("2006-01-02T15:04:05Z"), Settled: settled, Total: total,
-		})
+		}
+		for _, step := range run.Steps {
+			if step.Status == playbook.StatusBlocked {
+				summary.BlockedSteps = append(summary.BlockedSteps, step.ID)
+			}
+		}
+		if ready := run.Ready(); len(ready) > 0 {
+			summary.NextStep = ready[0].ID
+		}
+		out = append(out, summary)
 	}
 	respond(c, gin.H{"runs": out, "count": len(out)})
 }
