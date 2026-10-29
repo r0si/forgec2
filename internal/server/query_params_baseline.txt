@@ -1,15 +1,12 @@
 # Query parameters read by a handler but documented in no operation.
 # SHRINK-ONLY: document a parameter, delete its line. Never add a line to make a build pass.
 after
-archived
 before
 browser
 campaign_id
 channel
 claimed_by
 confirmed
-cursor
-days
 domain
 encrypt
 error
@@ -37,4 +34,3 @@ task_ids
 technique
 template
 width
-window_hours

@@ -11950,6 +11950,15 @@ paths:
       operationId: get__ai_sessions
       security:
         - SessionCookie: []
+      parameters:
+        - name: archived
+          in: query
+          description: "`true` or `1` lists archived sessions only; anything else lists the active ones"
+          schema: {type: string}
+        - name: cursor
+          in: query
+          description: Return sessions with an id below this value (keyset pagination)
+          schema: {type: integer}
       responses:
         '200':
           description: OK
@@ -13180,6 +13189,15 @@ paths:
       summary: Build success rates and implant survival by profile
       operationId: getBuildEffectiveness
       security: [{SessionCookie: []}]
+      parameters:
+        - name: days
+          in: query
+          description: Window for the success-rate sample, in days (1-365, default 30)
+          schema: {type: integer, default: 30}
+        - name: window_hours
+          in: query
+          description: Window used for the implant-survival calculation, in hours (default 72)
+          schema: {type: integer, default: 72}
       responses:
         '200': {description: Effectiveness metrics}
   /api/topology/network:

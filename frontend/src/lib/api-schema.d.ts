@@ -25710,7 +25710,12 @@ export interface operations {
     };
     get__ai_sessions: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description `true` or `1` lists archived sessions only; anything else lists the active ones */
+                archived?: string;
+                /** @description Return sessions with an id below this value (keyset pagination) */
+                cursor?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -27918,7 +27923,12 @@ export interface operations {
     };
     getBuildEffectiveness: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Window for the success-rate sample, in days (1-365, default 30) */
+                days?: number;
+                /** @description Window used for the implant-survival calculation, in hours (default 72) */
+                window_hours?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
