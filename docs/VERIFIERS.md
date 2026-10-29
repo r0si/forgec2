@@ -47,6 +47,20 @@ thing with one of them.
 
 `-quiet` prints nothing and leaves the answer to the exit code. `-json` prints a machine-readable report.
 
+## Which signature each tool is talking about
+
+This product calls four different things a "signature", and only two of them involve a key. A verifier's output now says which
+one it means, and this table is the map (`docs/TERMINOLOGY.md` defines the vocabulary itself):
+
+| Sense | Reported by | Keyed? | What it proves |
+|---|---|---|---|
+| audit hash chain entry | `verify-audit -json`, `POST /api/audit/verify` | **no** | rows were not partially edited; a full rewrite is invisible |
+| bundle manifest signature | `verify-bundle -json`, `POST /api/engagements/{id}/bundle/verify` | **yes** (ed25519) | the signer held the private key — `trusted` only when you supply the key you already trust |
+| plugin package signature | `verify-plugin -json`, `cmd/plugin-check -json` | **yes** (ed25519) | the package was stamped by a key, checked against `plugins.trusted_keys` |
+| failure shape | `GET /api/stats/failures/signatures`, `failures.json` | **no** | nothing cryptographic: a normalised error string with paths, ids and digits collapsed |
+
+Reading this the other way round is the useful part: **the only two senses that authenticate anything are the two ed25519 ones**,
+and both of them authenticate against a key you brought with you.
 ## What none of them can prove
 
 Stated once, here, because all three share it:
