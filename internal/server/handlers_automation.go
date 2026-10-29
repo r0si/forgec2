@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -372,7 +373,57 @@ func (s *Server) handlePluginList(c *gin.Context) {
 		slog.Error("Failed to list marketplace plugins", "err", err)
 	}
 
-	s.marketplace.BatchEnrichPlugins(plugins)
+	// The marketplace enriches ratings and download counts; a server built without it (a partial init, or a test) still has an
+	// inventory to list, so a nil guard here keeps the list usable rather than panicking.
+	if s.marketplace != nil {
+		s.marketplace.BatchEnrichPlugins(plugins)
+	}
+
+	// ?format=csv takes the inventory away. Every other list in the console can be exported, and the plugin set is the one an
+	// operator is asked to produce for a review ("what was installed, and what version").
+	if strings.EqualFold(strings.TrimSpace(c.Query("format")), "csv") {
+		var buf strings.Builder
+		writer := csv.NewWriter(&buf)
+		header := []string{"ID", "Name", "Version", "Type", "Category", "Author", "Enabled"}
+		if err := writer.Write(header); err != nil {
+			handleQueryError(c, err, "Failed to encode the plugin inventory")
+			return
+		}
+		for _, plugin := range plugins {
+			if err := writer.Write([]string{
+				strconv.FormatUint(uint64(plugin.ID), 10),
+				plugin.Name,
+				plugin.Version,
+				plugin.Type,
+				plugin.Category,
+				plugin.Author,
+				strconv.FormatBool(plugin.Enabled),
+			}); err != nil {
+				handleQueryError(c, err, "Failed to encode the plugin inventory")
+				return
+			}
+		}
+		writer.Flush()
+		if err := writer.Error(); err != nil {
+			handleQueryError(c, err, "Failed to encode the plugin inventory")
+			return
+		}
+		name := "forgec2_plugins_" + time.Now().Format("2006-01-02_150405") + ".csv"
+		c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, name))
+		// The list is capped at 200 rows, and a capped inventory that looks complete is the same lie as a capped export.
+		if len(plugins) >= 200 {
+			c.Header("X-Export-Truncated", "true")
+		}
+		if scope := taskExportScope(c); scope != "" {
+			c.Header(taskExportScopeHeader, scope)
+			applyExportScope(c, scope)
+		} else {
+			c.Header(taskExportScopeHeader, "all")
+			applyExportScope(c, "all")
+		}
+		c.Data(http.StatusOK, "text/csv; charset=utf-8", []byte(buf.String()))
+		return
+	}
 
 	respond(c, plugins)
 }
