@@ -5,6 +5,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -163,7 +164,65 @@ func (s *Server) handleListNotificationRoutes(c *gin.Context) {
 	}
 	// Delivery counters travel with the list: "is this route still working" is not answerable from the configuration,
 	// and the fan-out logs each failure where nobody reads it line by line.
-	respond(c, gin.H{"routes": routes, "stats": notificationRouteStatsView(), "stats_since": "process start"})
+	stats := notificationRouteStatsView()
+
+	// ?format=csv takes the delivery status away. "Which routes are not delivering" is a question that gets pasted into an
+	// incident note, and the counters are the part of it that is not in the configuration.
+	if strings.EqualFold(strings.TrimSpace(c.Query("format")), "csv") {
+		var buf strings.Builder
+		writer := csv.NewWriter(&buf)
+		header := []string{"Route ID", "Name", "Channel", "Enabled", "Delivered", "Failed", "State", "Last Attempt", "Last Error"}
+		if err := writer.Write(header); err != nil {
+			handleQueryError(c, err, "Failed to encode the delivery status")
+			return
+		}
+		for _, route := range routes {
+			delivered, failed, state, lastAttempt, lastError := 0, 0, "never delivered", "", ""
+			if view, ok := stats[strconv.FormatUint(uint64(route.ID), 10)]; ok {
+				// The view is built from counters that may be int or int64 depending on where they were incremented, and a
+				// failed type assertion here would silently print zero - which reads as "never delivered", the opposite claim.
+				delivered = intFromView(view["delivered"])
+				failed = intFromView(view["failed"])
+				if value, isString := view["state"].(string); isString && value != "" {
+					state = value
+				}
+				if value, isString := view["last_attempt"].(string); isString {
+					lastAttempt = value
+				}
+				// The signature, not the raw error: the raw one can carry a credential-bearing path.
+				if value, isString := view["last_error_signature"].(string); isString {
+					lastError = value
+				}
+			}
+			if err := writer.Write([]string{
+				strconv.FormatUint(uint64(route.ID), 10),
+				route.Name,
+				string(route.Channel),
+				strconv.FormatBool(route.Enabled),
+				strconv.Itoa(delivered),
+				strconv.Itoa(failed),
+				state,
+				lastAttempt,
+				lastError,
+			}); err != nil {
+				handleQueryError(c, err, "Failed to encode the delivery status")
+				return
+			}
+		}
+		writer.Flush()
+		if err := writer.Error(); err != nil {
+			handleQueryError(c, err, "Failed to encode the delivery status")
+			return
+		}
+		name := "forgec2_notification-routes_" + time.Now().Format("2006-01-02_150405") + ".csv"
+		c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, name))
+		// The counters start with the process, so the file says so rather than implying a window it does not have.
+		applyExportScope(c, "counters since process start")
+		c.Data(http.StatusOK, "text/csv; charset=utf-8", []byte(buf.String()))
+		return
+	}
+
+	respond(c, gin.H{"routes": routes, "stats": stats, "stats_since": "process start"})
 }
 
 func validNotificationChannel(ch string) bool {
@@ -468,4 +527,21 @@ func notificationTargetHost(target string) string {
 		return strings.TrimSpace(target)
 	}
 	return parsed.Host
+}
+
+// intFromView coerces a counter out of a stats view.
+//
+// A silent zero is the dangerous failure mode: "delivered: 0" in an export reads as "this route never delivered", which is a
+// stronger claim than "the value did not have the type I expected".
+func intFromView(value interface{}) int {
+	switch typed := value.(type) {
+	case int:
+		return typed
+	case int64:
+		return int(typed)
+	case float64:
+		return int(typed)
+	default:
+		return 0
+	}
 }
