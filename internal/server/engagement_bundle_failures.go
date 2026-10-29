@@ -24,6 +24,18 @@ type engagementFailures struct {
 	// SignatureKind says which of this product's four "signatures" the rows below carry. Without it, a reader of the archive
 	// finds a field named `signature` and has to guess whether it involves cryptography - and this one does not.
 	SignatureKind string `json:"signature_kind"`
+	// Unfinished is work the exercise had queued when the package was assembled. A handover that reports only what FAILED
+	// implies the record is complete; a receiver who does not know there were pending tasks will read an incomplete operation as
+	// a finished one - and those tasks are absent from the archive because they never ran.
+	Unfinished unfinishedWork `json:"unfinished"`
+}
+
+// unfinishedWork counts the tasks that had not finished at handover.
+type unfinishedWork struct {
+	Pending    int    `json:"pending"`
+	Running    int    `json:"running"`
+	AgentsHeld int    `json:"agents_holding_work"`
+	Note       string `json:"note"`
 }
 
 // failureShape is one group of failures that look the same.
@@ -50,8 +62,24 @@ func buildEngagementFailures(tasks []db.Task, hostnames map[string]string) engag
 		sample   string
 	}
 	groups := map[string]*accumulator{}
+	heldBy := map[string]bool{}
+	pending, running := 0, 0
 	failed := 0
 	for _, task := range tasks {
+		// Counted before the failure filter: a task that had not finished is not a failure, and it is exactly what a receiver
+		// needs to know the record is incomplete.
+		switch task.Status {
+		case "pending":
+			pending++
+			if task.AgentID != "" {
+				heldBy[task.AgentID] = true
+			}
+		case "running":
+			running++
+			if task.AgentID != "" {
+				heldBy[task.AgentID] = true
+			}
+		}
 		if task.Status != "failed" || strings.TrimSpace(task.Error) == "" {
 			continue
 		}
@@ -105,8 +133,16 @@ func buildEngagementFailures(tasks []db.Task, hostnames map[string]string) engag
 		return shapes[i].Signature < shapes[j].Signature
 	})
 
+	unfinished := unfinishedWork{Pending: pending, Running: running, AgentsHeld: len(heldBy)}
+	if pending+running == 0 {
+		unfinished.Note = "every task in the window had finished when this package was assembled"
+	} else {
+		unfinished.Note = "these tasks had not run when the package was assembled: the archive cannot contain their " +
+			"results, so an absent result is unfinished work rather than a clean one"
+	}
 	return engagementFailures{
 		SignatureKind: failureSignatureKind,
+		Unfinished:    unfinished,
 		FailedTasks:   failed,
 		Shapes:        shapes,
 		Note: "grouped by normalised shape (paths, ids and digits collapsed); " +

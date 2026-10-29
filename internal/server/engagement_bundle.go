@@ -438,6 +438,15 @@ func buildEngagementTimeline(engagement db.Engagement, tasks []db.Task, auditRow
 		body.WriteString("\nFull detail in `failures.json`.\n\n")
 	}
 
+	// Unfinished work comes before the chronology for the same reason the failures do: a receiver who does not know the
+	// exercise had tasks still queued will read the record as complete, and those results are absent because they never ran.
+	if unfinished := buildEngagementFailures(tasks, hostnamesForTasks(tasks)).Unfinished; unfinished.Pending+unfinished.Running > 0 {
+		fmt.Fprintf(&body, "## Unfinished at handover\n\n%d task(s) were still queued when this package was assembled "+
+			"(%d pending, %d running across %d host(s)). Their results are absent because they never ran: treat an empty "+
+			"result as unfinished work, not a clean one.\n\n",
+			unfinished.Pending+unfinished.Running, unfinished.Pending, unfinished.Running, unfinished.AgentsHeld)
+	}
+
 	fmt.Fprintf(&body, "| Time (UTC) | Kind | Detail |\n|---|---|---|\n")
 	shown := 0
 	for _, item := range entries {

@@ -235,7 +235,12 @@ func TestEngagementBundle(t *testing.T) {
 	// normalisation the live signature view uses, so the reviewer can compare the package with what the console said.
 	var failures struct {
 		FailedTasks int `json:"failed_tasks"`
-		Shapes      []struct {
+		Unfinished  struct {
+			Pending int    `json:"pending"`
+			Running int    `json:"running"`
+			Note    string `json:"note"`
+		} `json:"unfinished"`
+		Shapes []struct {
 			Signature    string   `json:"signature"`
 			Count        int      `json:"count"`
 			Agents       int      `json:"agents_affected"`
@@ -259,6 +264,15 @@ func TestEngagementBundle(t *testing.T) {
 	}
 	if failures.Shapes[0].Agents != 1 || len(failures.Shapes[0].Reasons) == 0 {
 		t.Fatalf("the shape carries no host count or reason: %+v", failures.Shapes[0])
+	}
+
+	// Unfinished work is declared, so a receiver does not read an incomplete record as a complete one. This fixture finishes
+	// every task, so the honest answer here is zero with the note that says so.
+	if failures.Unfinished.Pending != 0 || failures.Unfinished.Running != 0 {
+		t.Fatalf("unfinished = %+v, want zero for a window whose tasks all finished", failures.Unfinished)
+	}
+	if failures.Unfinished.Note == "" {
+		t.Fatal("the unfinished block carries no note")
 	}
 
 	// iocs.json parses and says which bound it used, because its bound is looser than the other members.
