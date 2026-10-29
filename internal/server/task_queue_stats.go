@@ -1,8 +1,12 @@
 package server
 
 import (
+	"encoding/csv"
+	"fmt"
 	"net/http"
 	"sort"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/forgec2/forgec2/internal/db"
@@ -103,6 +107,48 @@ func (s *Server) handleTaskQueueStats(c *gin.Context) {
 
 	// Busiest first: the executor is the host with the most queued work, and that is the row an operator wants.
 	sortQueueEntries(entries)
+
+	// ?format=csv takes the backlog away. Every other stats report here exports (failures, shapes, duration, routes, agents), and the
+	// backlog is the one an operator attaches to "why is this host not responding" - so it should not be the exception.
+	if strings.EqualFold(strings.TrimSpace(c.Query("format")), "csv") {
+		var buf strings.Builder
+		writer := csv.NewWriter(&buf)
+		header := []string{"Agent ID", "Hostname", "Pending", "Running", "Oldest pending (s)", "Sleep (s)", "Stalled"}
+		if err := writer.Write(header); err != nil {
+			handleQueryError(c, err, "Failed to encode the queue")
+			return
+		}
+		for _, entry := range entries {
+			if err := writer.Write([]string{
+				entry.AgentID,
+				entry.Hostname,
+				strconv.Itoa(entry.Pending),
+				strconv.Itoa(entry.Running),
+				strconv.FormatInt(entry.OldestPending, 10),
+				strconv.Itoa(entry.SleepSeconds),
+				strconv.FormatBool(entry.Stalled),
+			}); err != nil {
+				handleQueryError(c, err, "Failed to encode the queue")
+				return
+			}
+		}
+		writer.Flush()
+		if err := writer.Error(); err != nil {
+			handleQueryError(c, err, "Failed to encode the queue")
+			return
+		}
+		c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="forgec2_task-queue_%s.csv"`,
+			time.Now().Format("2006-01-02_150405")))
+		if scope := taskExportScope(c); scope != "" {
+			c.Header(taskExportScopeHeader, scope)
+			applyExportScope(c, scope)
+		} else {
+			c.Header(taskExportScopeHeader, "all")
+			applyExportScope(c, "all")
+		}
+		c.Data(http.StatusOK, "text/csv; charset=utf-8", []byte(buf.String()))
+		return
+	}
 
 	respond(c, gin.H{
 		"agents":              entries,

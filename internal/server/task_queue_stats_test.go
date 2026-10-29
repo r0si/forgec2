@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -148,6 +149,46 @@ func TestTaskQueueStats(t *testing.T) {
 	s.handleTaskQueueStats(cBad)
 	if badRecorder.Code != http.StatusBadRequest {
 		t.Fatalf("invalid engagement = %d, want 400", badRecorder.Code)
+	}
+
+	// 2c. The backlog can be taken away as a file: every other stats report exports, and this one is what an operator attaches to
+	// "why is this host not responding".
+	csvRecorder := httptest.NewRecorder()
+	cCsv, _ := gin.CreateTestContext(csvRecorder)
+	cCsv.Request = httptest.NewRequest(http.MethodGet, "/api/stats/tasks/queue?format=csv", nil)
+	cCsv.Set("user", "op")
+	cCsv.Set("user_role", db.RoleAdmin)
+	cCsv.Set("user_id", uint(1))
+	cCsv.Set(middleware.TenantIDContextKey, uint(1))
+	s.handleTaskQueueStats(cCsv)
+	if csvRecorder.Code != http.StatusOK {
+		t.Fatalf("csv = %d (%s)", csvRecorder.Code, csvRecorder.Body.String())
+	}
+	if ct := csvRecorder.Header().Get("Content-Type"); !strings.HasPrefix(ct, "text/csv") {
+		t.Fatalf("Content-Type = %q", ct)
+	}
+	csvRows, err := csv.NewReader(strings.NewReader(csvRecorder.Body.String())).ReadAll()
+	if err != nil {
+		t.Fatalf("csv: %v", err)
+	}
+	if len(csvRows) < 2 {
+		t.Fatalf("rows = %d, want a header and the backlog", len(csvRows))
+	}
+	if got := strings.Join(csvRows[0], ","); got != "Agent ID,Hostname,Pending,Running,Oldest pending (s),Sleep (s),Stalled" {
+		t.Fatalf("header = %q", got)
+	}
+	// The stalled column must agree with the JSON view: two renderings of one answer.
+	stalledRows := 0
+	for _, row := range csvRows[1:] {
+		if row[6] == "true" {
+			stalledRows++
+		}
+	}
+	if stalledRows != 1 {
+		t.Fatalf("stalled rows = %d, want the one the JSON view flags", stalledRows)
+	}
+	if scope := csvRecorder.Header().Get(exportScopeHeader); scope != "all" {
+		t.Fatalf("scope header = %q, want all", scope)
 	}
 
 	// 3. With equal queued counts the tie-break is age, so the beacon holding the hour-old row sorts above.

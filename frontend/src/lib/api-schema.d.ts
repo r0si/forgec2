@@ -28502,6 +28502,8 @@ export interface operations {
             query?: {
                 /** @description Scope the queue to one exercise (numeric id) or, with `none`, to hosts in no exercise - the same scope the failure, shape and duration reports take, so "which host in THIS exercise is not draining" is answerable. Echoed back as `engagement` so a caller can tell a scoped answer from an unscoped one. */
                 engagement?: string;
+                /** @description csv returns the backlog as a file (Agent ID, Hostname, Pending, Running, Oldest pending, Sleep, Stalled) with X-Task-Export-Scope. Every other stats report exports; the backlog is the one an operator attaches to "why is this host not responding", so it should not be the exception. */
+                format?: "json" | "csv";
             };
             header?: never;
             path?: never;
