@@ -75,6 +75,7 @@ func (s *Server) handleFailureSignatures(c *gin.Context) {
 		// TopAgent names the host that produced the most of them, and TopAgentCount says how many. A count of "one host" is
 		// actionable only once you know WHICH host, and the operator's next question is always "which beacon is the flaky one".
 		TopAgent      string   `json:"top_agent,omitempty"`
+		TopAgentHost  string   `json:"top_agent_host,omitempty"`
 		TopAgentCount int      `json:"top_agent_failures,omitempty"`
 		Reasons       []string `json:"reasons"`
 		Sample        string   `json:"sample"`
@@ -143,6 +144,31 @@ func (s *Server) handleFailureSignatures(c *gin.Context) {
 		taskSignatures = taskSignatures[:failureSignatureTopN]
 	}
 
+	// An id is not actionable on its own: the operator's next step is to open that host, and the console lists hosts by name.
+	// One query for the few top agents, not one per row.
+	topAgentIDs := make([]string, 0, len(taskSignatures))
+	for _, row := range taskSignatures {
+		if row.TopAgent != "" {
+			topAgentIDs = append(topAgentIDs, row.TopAgent)
+		}
+	}
+	if len(topAgentIDs) > 0 {
+		var hosts []struct {
+			ID       string
+			Hostname string
+		}
+		if err := s.tenantScope(s.db.WithContext(s.ctx).Model(&db.Implant{}), c).
+			Select("id, hostname").Where("id IN ?", topAgentIDs).Scan(&hosts).Error; err == nil {
+			hostnames := make(map[string]string, len(hosts))
+			for _, host := range hosts {
+				hostnames[host.ID] = host.Hostname
+			}
+			for i := range taskSignatures {
+				taskSignatures[i].TopAgentHost = hostnames[taskSignatures[i].TopAgent]
+			}
+		}
+	}
+
 	// Notifications: the in-memory counters, grouped by the same normalisation. The message is redacted first, because the
 	// signature is shown in a table and a webhook path is a credential.
 	type notificationSignature struct {
@@ -180,7 +206,7 @@ func (s *Server) handleFailureSignatures(c *gin.Context) {
 	if strings.EqualFold(strings.TrimSpace(c.Query("format")), "csv") {
 		var buf strings.Builder
 		writer := csv.NewWriter(&buf)
-		header := []string{"Signature", "Count", "Agents", "Top Agent", "Top Agent Failures", "Reasons", "Example"}
+		header := []string{"Signature", "Count", "Agents", "Top Agent", "Top Agent Host", "Top Agent Failures", "Reasons", "Example"}
 		if err := writer.Write(header); err != nil {
 			handleQueryError(c, err, "Failed to encode the failure shapes")
 			return
@@ -191,6 +217,7 @@ func (s *Server) handleFailureSignatures(c *gin.Context) {
 				strconv.Itoa(row.Count),
 				strconv.Itoa(row.Agents),
 				row.TopAgent,
+				row.TopAgentHost,
 				strconv.Itoa(row.TopAgentCount),
 				strings.Join(row.Reasons, "|"),
 				row.Sample,

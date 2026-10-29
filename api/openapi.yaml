@@ -13240,7 +13240,7 @@ paths:
         - name: format
           in: query
           description: >-
-            csv returns the task half as a downloadable file (Signature, Count, Agents, Top Agent, Top Agent Failures, Reasons, Example) - every other list in the
+            csv returns the task half as a downloadable file (Signature, Count, Agents, Top Agent, Top Agent Host, Top Agent Failures, Reasons, Example) - every other list in the
             console can be exported, and this is the analysis an operator pastes into a review. The notification half is left
             out because it is process state rather than a window. The file carries `X-Task-Export-Scope` like the other exports.
           schema: {type: string, enum: [json, csv], default: json}
@@ -13296,6 +13296,12 @@ paths:
                               description: >-
                                 The host that produced the most of this shape - "one host" only becomes actionable once it is
                                 named, and the next question is always which beacon is the flaky one.
+                            top_agent_host:
+                              type: string
+                              description: >-
+                                The hostname for top_agent. An id is not actionable on its own - the console lists hosts by
+                                name, and the next step for an operator is to open that host. Resolved for the few rows
+                                returned, not per failure.
                             top_agent_failures:
                               type: integer
                               description: How many of this shape the top agent produced

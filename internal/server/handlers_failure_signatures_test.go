@@ -72,6 +72,7 @@ func TestFailureSignatures(t *testing.T) {
 				Count         int      `json:"count"`
 				Agents        int      `json:"agents_affected"`
 				TopAgent      string   `json:"top_agent"`
+				TopAgentHost  string   `json:"top_agent_host"`
 				TopAgentCount int      `json:"top_agent_failures"`
 				Reasons       []string `json:"reasons"`
 				Sample        string   `json:"sample"`
@@ -114,6 +115,10 @@ func TestFailureSignatures(t *testing.T) {
 		t.Fatalf("agents_affected = %d, want the one seeded host", top.Agents)
 	}
 	// And WHICH host: "one host" only becomes actionable once it is named.
+	// And its NAME: an id is not actionable, because the console lists hosts by name.
+	if top.TopAgentHost != "web-01" {
+		t.Fatalf("top agent host = %q, want the seeded hostname", top.TopAgentHost)
+	}
 	if top.TopAgent != "a-1" || top.TopAgentCount != 3 {
 		t.Fatalf("top agent = %q with %d failure(s), want a-1 with the three", top.TopAgent, top.TopAgentCount)
 	}
@@ -228,7 +233,7 @@ func TestFailureSignatures(t *testing.T) {
 	if len(rows) < 2 {
 		t.Fatalf("rows = %d, want a header and the seeded shape", len(rows))
 	}
-	if got := strings.Join(rows[0], ","); got != "Signature,Count,Agents,Top Agent,Top Agent Failures,Reasons,Example" {
+	if got := strings.Join(rows[0], ","); got != "Signature,Count,Agents,Top Agent,Top Agent Host,Top Agent Failures,Reasons,Example" {
 		t.Fatalf("header = %q", got)
 	}
 	if rows[1][1] != "3" {

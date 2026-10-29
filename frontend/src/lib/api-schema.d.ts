@@ -28102,7 +28102,7 @@ export interface operations {
                 since?: string;
                 /** @description Scope the task half to one exercise (numeric id) or, with `none`, to hosts in no exercise - the same scope the failure report takes, so the two reports cannot disagree about which failures they are looking at. Echoed back as `engagement` so a caller can tell a scoped answer from an unscoped one. */
                 engagement?: string;
-                /** @description csv returns the task half as a downloadable file (Signature, Count, Agents, Top Agent, Top Agent Failures, Reasons, Example) - every other list in the console can be exported, and this is the analysis an operator pastes into a review. The notification half is left out because it is process state rather than a window. The file carries `X-Task-Export-Scope` like the other exports. */
+                /** @description csv returns the task half as a downloadable file (Signature, Count, Agents, Top Agent, Top Agent Host, Top Agent Failures, Reasons, Example) - every other list in the console can be exported, and this is the analysis an operator pastes into a review. The notification half is left out because it is process state rather than a window. The file carries `X-Task-Export-Scope` like the other exports. */
                 format?: "json" | "csv";
             };
             header?: never;
@@ -28141,6 +28141,8 @@ export interface operations {
                                 agents_affected?: number;
                                 /** @description The host that produced the most of this shape - "one host" only becomes actionable once it is named, and the next question is always which beacon is the flaky one. */
                                 top_agent?: string;
+                                /** @description The hostname for top_agent. An id is not actionable on its own - the console lists hosts by name, and the next step for an operator is to open that host. Resolved for the few rows returned, not per failure. */
+                                top_agent_host?: string;
                                 /** @description How many of this shape the top agent produced */
                                 top_agent_failures?: number;
                                 reasons?: string[];
