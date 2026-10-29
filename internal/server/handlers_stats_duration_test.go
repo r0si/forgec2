@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -161,6 +162,37 @@ func TestTaskDurationStats(t *testing.T) {
 	}
 	if bad := call("?engagement=nope", 1); bad.Code != http.StatusBadRequest {
 		t.Fatalf("invalid engagement = %d, want 400", bad.Code)
+	}
+
+	// The table can be taken away as a file: the console shows it as a sortable table, and the next thing an operator does is
+	// paste it into a report.
+	csvRecorder := httptest.NewRecorder()
+	cCsv, _ := gin.CreateTestContext(csvRecorder)
+	cCsv.Request = httptest.NewRequest(http.MethodGet, "/api/stats/tasks/duration?format=csv", nil)
+	cCsv.Set("user", "op")
+	cCsv.Set("user_role", db.RoleAdmin)
+	cCsv.Set("user_id", uint(1))
+	cCsv.Set(middleware.TenantIDContextKey, uint(1))
+	s.handleTaskDurationStats(cCsv)
+	if csvRecorder.Code != http.StatusOK {
+		t.Fatalf("csv = %d (%s)", csvRecorder.Code, csvRecorder.Body.String())
+	}
+	if ct := csvRecorder.Header().Get("Content-Type"); !strings.HasPrefix(ct, "text/csv") {
+		t.Fatalf("Content-Type = %q", ct)
+	}
+	csvRows, err := csv.NewReader(strings.NewReader(csvRecorder.Body.String())).ReadAll()
+	if err != nil {
+		t.Fatalf("csv: %v", err)
+	}
+	if len(csvRows) < 2 {
+		t.Fatalf("rows = %d, want a header and the seeded type", len(csvRows))
+	}
+	if got := strings.Join(csvRows[0], ","); got != "Key,Hostname,Count,Mean ms,p50 ms,p95 ms,Max ms,Completed,Failed,Success rate" {
+		t.Fatalf("header = %q", got)
+	}
+	// The file says what it covers, like every other export here.
+	if scope := csvRecorder.Header().Get(taskExportScopeHeader); scope != "all" {
+		t.Fatalf("scope header = %q, want all for an unfiltered export", scope)
 	}
 
 	// A tenant sees only its own rows; tenant 2's 5000 ms sample must not appear.

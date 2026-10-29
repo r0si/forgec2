@@ -1,9 +1,12 @@
 package server
 
 import (
+	"encoding/csv"
 	"fmt"
 	"net/http"
 	"sort"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/forgec2/forgec2/internal/db"
@@ -62,8 +65,11 @@ func (s *Server) handleTaskDurationStats(c *gin.Context) {
 	}
 	// Serve a fresh copy when one exists: the read costs ~28 ms per call for a 5000-row window
 	// (BenchmarkDurationStatsWindow) and the console polls while an operator watches the page.
+	// A CSV answer must never be served from a JSON cache entry, and the cache key does not carry the format (the format is
+	// not a filter, it is a rendering). So a CSV request bypasses the cache entirely rather than poisoning it or being poisoned.
+	wantCSV := strings.EqualFold(strings.TrimSpace(c.Query("format")), "csv")
 	cacheKey := request.key()
-	if payload, hit := s.statsCache().get(cacheKey); hit {
+	if payload, hit := s.statsCache().get(cacheKey); hit && !wantCSV {
 		if s.metrics != nil {
 			s.metrics.StatsCacheHitsTotal.Inc()
 		}
@@ -181,8 +187,53 @@ func (s *Server) handleTaskDurationStats(c *gin.Context) {
 		resp["bucket"] = bucket
 		resp["buckets"] = buildDurationBuckets(rows, bucket)
 	}
+	// ?format=csv takes the table away. The console shows this as a table an operator sorts by p95, and the next thing they do
+	// is paste it into a report - which is what a CSV is for. Only the successful answer is cached above, so a CSV request is a
+	// cache hit or a normal computation.
+	if wantCSV {
+		var buf strings.Builder
+		writer := csv.NewWriter(&buf)
+		header := []string{"Key", "Hostname", "Count", "Mean ms", "p50 ms", "p95 ms", "Max ms", "Completed", "Failed", "Success rate"}
+		if err := writer.Write(header); err != nil {
+			handleQueryError(c, err, "Failed to encode the duration report")
+			return
+		}
+		for _, row := range stats {
+			if err := writer.Write([]string{
+				row.Type,
+				row.Hostname,
+				strconv.Itoa(row.Count),
+				strconv.FormatFloat(row.MeanMs, 'f', 1, 64),
+				strconv.FormatFloat(row.P50Ms, 'f', 1, 64),
+				strconv.FormatFloat(row.P95Ms, 'f', 1, 64),
+				strconv.FormatFloat(row.MaxMs, 'f', 1, 64),
+				strconv.Itoa(row.Completed),
+				strconv.Itoa(row.Failed),
+				strconv.FormatFloat(row.SuccessRate, 'f', 2, 64),
+			}); err != nil {
+				handleQueryError(c, err, "Failed to encode the duration report")
+				return
+			}
+		}
+		writer.Flush()
+		if err := writer.Error(); err != nil {
+			handleQueryError(c, err, "Failed to encode the duration report")
+			return
+		}
+		name := fmt.Sprintf("forgec2_duration_%s_%s.csv", groupBy, time.Now().Format("2006-01-02_150405"))
+		c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, name))
+		if scope := taskExportScope(c); scope != "" {
+			c.Header(taskExportScopeHeader, scope)
+		} else {
+			c.Header(taskExportScopeHeader, "all")
+		}
+		c.Data(http.StatusOK, "text/csv; charset=utf-8", []byte(buf.String()))
+		return
+	}
 	// Only successful answers are cached; an error must never be remembered as the current state.
-	s.statsCache().put(cacheKey, resp)
+	if !wantCSV {
+		s.statsCache().put(cacheKey, resp)
+	}
 	respond(c, resp)
 }
 

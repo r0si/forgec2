@@ -28283,6 +28283,8 @@ export interface operations {
                 bucket?: "hour" | "day";
                 /** @description Scope the report to one exercise (numeric id) or, with `none`, to hosts in no exercise - the same scope the failure reports take. "How slow was THIS exercise" is a review question, and an unscoped answer to it is the wrong answer. It is part of the cache identity, so two consumers looking at different exercises cannot be served each other's cached answer. */
                 engagement?: string;
+                /** @description csv returns the table as a downloadable file (Key, Hostname, Count, Mean, p50, p95, Max, Completed, Failed, Success rate) with `X-Task-Export-Scope`. A CSV request **bypasses the cache**: the cache key does not carry the format (it is a rendering, not a filter), so serving one rendering from another would be a silent mismatch. */
+                format?: "json" | "csv";
             };
             header?: never;
             path?: never;

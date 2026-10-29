@@ -13471,6 +13471,13 @@ paths:
             wrong answer. It is part of the cache identity, so two consumers looking at different exercises cannot be served
             each other's cached answer.
           schema: {type: string}
+        - name: format
+          in: query
+          description: >-
+            csv returns the table as a downloadable file (Key, Hostname, Count, Mean, p50, p95, Max, Completed, Failed,
+            Success rate) with `X-Task-Export-Scope`. A CSV request **bypasses the cache**: the cache key does not carry the
+            format (it is a rendering, not a filter), so serving one rendering from another would be a silent mismatch.
+          schema: {type: string, enum: [json, csv], default: json}
       responses:
         '200':
           description: >-
