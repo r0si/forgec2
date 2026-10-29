@@ -7,6 +7,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// taskExportScopeHeader names the header that carries a task export's filters. It is a constant because the capabilities
+// document publishes the same name, and two spellings of one header is how a client ends up reading a header nobody sets.
+const taskExportScopeHeader = "X-Task-Export-Scope"
+
 // The filters a task export applied, as one header.
 //
 // The export already announces that it was truncated, because a capped file that looks complete is a lie of omission. A

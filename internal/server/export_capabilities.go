@@ -248,6 +248,17 @@ func (s *Server) handleExportCapabilities(c *gin.Context) {
 				"a 429 carries Retry-After",
 			},
 		},
+		// A filtered export looks exactly like an unfiltered one, so both downloads name the filters that shaped them. Published
+		// here because a client should not have to reverse-engineer a header name from a changelog.
+		"exposure": gin.H{
+			"task_export_scope_header":  taskExportScopeHeader,
+			"audit_export_scope_header": auditExportScopeHeader,
+			"scope_format": "name=value;name=value (sorted by name), or \"all\" when nothing was filtered - " +
+				"so a file carries its own scope and a filtered sample cannot be read as the whole picture",
+			"task_export_truncated_header":  "X-Task-Export-Truncated",
+			"audit_export_truncated_header": "X-Audit-Export-Truncated",
+			"audit_export_filtered_header":  "X-Audit-Export-Filtered",
+		},
 		"limits": gin.H{
 			"task_export_rows":   ExportTaskLimit,
 			"audit_export_rows":  200000,

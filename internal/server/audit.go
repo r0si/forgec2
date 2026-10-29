@@ -367,9 +367,9 @@ func (s *Server) handleExportAuditChain(c *gin.Context) {
 	// The boolean above says a selection was made; the scope says WHICH selection, so an investigator can reproduce it instead of
 	// guessing which of six filters produced the file. Same shape as the task export's header.
 	if scope := auditExportScope(c); scope != "" {
-		c.Header("X-Audit-Export-Scope", scope)
+		c.Header(auditExportScopeHeader, scope)
 	} else {
-		c.Header("X-Audit-Export-Scope", "all")
+		c.Header(auditExportScopeHeader, "all")
 	}
 	if format == "json" {
 		// One document instead of newline-delimited rows, for tools that do not stream. The rows are the SAME

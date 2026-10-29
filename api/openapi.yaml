@@ -3874,6 +3874,19 @@ paths:
                           notes:
                             type: array
                             items: {type: string}
+                      exposure:
+                        type: object
+                        description: >-
+                          The response headers the two downloads use to say what they contain. A filtered export looks exactly
+                          like an unfiltered one, so each file carries its own scope; published by name because a client
+                          should not have to reverse-engineer a header from a changelog.
+                        properties:
+                          task_export_scope_header: {type: string}
+                          audit_export_scope_header: {type: string}
+                          scope_format: {type: string}
+                          task_export_truncated_header: {type: string}
+                          audit_export_truncated_header: {type: string}
+                          audit_export_filtered_header: {type: string}
                       limits:
                         type: object
                         properties:

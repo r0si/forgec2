@@ -15471,6 +15471,15 @@ export interface operations {
                                 scope?: string;
                                 notes?: string[];
                             };
+                            /** @description The response headers the two downloads use to say what they contain. A filtered export looks exactly like an unfiltered one, so each file carries its own scope; published by name because a client should not have to reverse-engineer a header from a changelog. */
+                            exposure?: {
+                                task_export_scope_header?: string;
+                                audit_export_scope_header?: string;
+                                scope_format?: string;
+                                task_export_truncated_header?: string;
+                                audit_export_truncated_header?: string;
+                                audit_export_filtered_header?: string;
+                            };
                             limits?: {
                                 task_export_rows?: number;
                                 audit_export_rows?: number;

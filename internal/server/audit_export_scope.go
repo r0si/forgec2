@@ -7,6 +7,9 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// auditExportScopeHeader names the header that carries an audit export's filters, published by the capabilities document.
+const auditExportScopeHeader = "X-Audit-Export-Scope"
+
 // The filters an audit export applied, as one header.
 //
 // `X-Audit-Export-Filtered` already says that a selection was made - and the 199 warning says a filtered file is not a

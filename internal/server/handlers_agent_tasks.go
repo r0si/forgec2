@@ -268,9 +268,9 @@ func (s *Server) handleExportTasks(c *gin.Context) {
 	// The same problem one layer out: a filtered export looks exactly like an unfiltered one. Whoever receives the file needs to
 	// know it covers one exercise or one host, or they will read a scoped sample as the whole picture.
 	if scope := taskExportScope(c); scope != "" {
-		c.Header("X-Task-Export-Scope", scope)
+		c.Header(taskExportScopeHeader, scope)
 	} else {
-		c.Header("X-Task-Export-Scope", "all")
+		c.Header(taskExportScopeHeader, "all")
 	}
 	c.Header("Content-Type", "text/csv; charset=utf-8")
 	// The timestamp keeps two exports from the same day from overwriting each other in the browser.
