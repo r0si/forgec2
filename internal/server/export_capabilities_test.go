@@ -190,8 +190,9 @@ func TestExportCapabilities(t *testing.T) {
 	// The maintenance endpoints are listed apart from the diagnostics: every diagnostic answers a question, while these
 	// change what the report will say next. Both must name the audit action they write, because "the counter was cleared"
 	// is a change someone will look for later.
-	if len(resp.Data.Maintenance) != 2 {
-		t.Fatalf("maintenance entries = %d, want the two reset endpoints", len(resp.Data.Maintenance))
+	if len(resp.Data.Maintenance) != 3 {
+		// Three: the two counter resets and the signature rerun, which changes what the reports say next in the same way.
+		t.Fatalf("maintenance entries = %d, want three", len(resp.Data.Maintenance))
 	}
 	for _, entry := range resp.Data.Maintenance {
 		if entry.Path == "" || entry.Method != "POST" || entry.Clears == "" || entry.Audited == "" {

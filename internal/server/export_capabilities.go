@@ -239,6 +239,15 @@ func (s *Server) handleExportCapabilities(c *gin.Context) {
 				"audited": "automation_action_stats_reset",
 				"params":  []string{"id (optional)"},
 			},
+			{
+				// Not a counter reset, but the same thing from a client's point of view: it changes what the reports will say
+				// next. Listed here rather than under diagnostics because it dispatches work.
+				"path":    "/api/tasks/rerun-by-signature",
+				"method":  "POST",
+				"clears":  "re-dispatches the failed tasks that share one failure shape (bounded to 100)",
+				"audited": "tasks_rerun_by_signature",
+				"params":  []string{"signature (required)", "since", "limit"},
+			},
 		}, "diagnostic_rate_limit": gin.H{
 			"requests":       diagnosticRateLimitRequests,
 			"window_seconds": int(diagnosticRateLimitWindow.Seconds()),
