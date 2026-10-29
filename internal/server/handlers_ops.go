@@ -136,6 +136,19 @@ func (s *Server) handleReadyCheck(c *gin.Context) {
 					fmt.Sprintf("%d beacon(s) have tasks they are not consuming; the queue depth report names them", stalledBeacons))
 			}
 		}
+		// A deployment that cannot build a payload is broken in a way nobody notices until they need one. The probe is the thing
+		// running when nobody is watching, so it reports the toolchain state from its short-lived cache rather than by shelling out on
+		// every poll.
+		// Informational, never a warning - the same reasoning as bundle_signing. A probe whose answer depends on the process
+		// environment (PATH, GOCACHE) would fire on a transient state and get muted, and the endpoint that owns the detail
+		// (/api/generate/toolchain) says exactly what is missing and how to fix it.
+		if problems, probed := s.toolchainProblems(); probed {
+			if len(problems) == 0 {
+				checks["build_toolchain"] = "ok"
+			} else {
+				checks["build_toolchain"] = fmt.Sprintf("%d problem(s): %s (see /api/generate/toolchain)", len(problems), problems[0])
+			}
+		}
 	}
 
 	status := "ok"

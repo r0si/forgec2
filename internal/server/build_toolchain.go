@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -81,7 +82,7 @@ func (s *Server) handleBuildToolchain(c *gin.Context) {
 		}
 	}
 
-	respond(c, gin.H{
+	report := gin.H{
 		"ok":         len(problems) == 0,
 		"go":         goReport,
 		"gocache":    cacheReport,
@@ -89,7 +90,10 @@ func (s *Server) handleBuildToolchain(c *gin.Context) {
 		"agents_dir": agentsReport,
 		"problems":   problems,
 		"note":       "checked as the SERVER's own user: a shell where `go` works proves nothing about the account this process runs as",
-	})
+	}
+	// Cache it for the readiness probe, then answer the caller with the same values: two readers of one probe cannot disagree.
+	s.cacheToolchainReport(report)
+	respond(c, report)
 }
 
 // commandOutput runs one short command and returns its combined output.
@@ -136,4 +140,57 @@ func directoryWritable(dir string) (bool, string) {
 	_ = probe.Close()
 	_ = os.Remove(probeName)
 	return true, ""
+}
+
+// toolchainReportCache holds the last probe result.
+//
+// The readiness probe runs every few seconds and `go version` is an exec; caching for a short window keeps /ready cheap while still
+// noticing an environment change within a couple of minutes. There is one cache for the process because the environment is a property
+// of the process, not of a tenant.
+var (
+	toolchainReportMu       sync.Mutex
+	toolchainReportCached   gin.H
+	toolchainReportProblems []string
+	toolchainReportAt       time.Time
+)
+
+// toolchainReportTTL is how long a probe result is reused.
+const toolchainReportTTL = 2 * time.Minute
+
+// cacheToolchainReport stores a fresh probe for the readiness probe to reuse.
+func (s *Server) cacheToolchainReport(report gin.H) {
+	toolchainReportMu.Lock()
+	defer toolchainReportMu.Unlock()
+	toolchainReportCached = report
+	if problems, ok := report["problems"].([]string); ok {
+		toolchainReportProblems = problems
+	}
+	toolchainReportAt = time.Now()
+}
+
+// toolchainProblems returns the cached problems, refreshing when the snapshot is stale.
+//
+// A refresh failure is not itself a problem: the report is advisory, and a probe that cannot run should not turn /ready unready.
+func (s *Server) toolchainProblems() ([]string, bool) { //nolint:gocritic // (problems, probed)
+	toolchainReportMu.Lock()
+	cached, at := toolchainReportProblems, toolchainReportAt
+	toolchainReportMu.Unlock()
+	if !at.IsZero() && time.Since(at) < toolchainReportTTL {
+		return cached, true
+	}
+
+	// Stale or never probed: run it once, outside the lock so a slow `go version` does not block other probes.
+	//
+	// The readiness probe asks ONE question - can this process build at all - so it checks only for the toolchain itself. A cache
+	// directory that is momentarily unwritable is a build-time detail that the detailed endpoint reports and the build itself reports
+	// precisely; promoting it to a /ready warning made the probe sensitive to an environment another test had just changed, which is a
+	// warning nobody can act on.
+	problems := make([]string, 0, 1)
+	if _, err := exec.LookPath("go"); err != nil {
+		problems = append(problems, "`go` is not on the server process's PATH: payload builds will fail")
+	}
+	s.cacheToolchainReport(gin.H{"problems": problems})
+	// probed is TRUE when the snapshot was taken, whatever it found: the earlier version returned len(problems)==0, which skipped the
+	// check exactly when there WAS a problem.
+	return problems, true
 }

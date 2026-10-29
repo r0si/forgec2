@@ -76,7 +76,24 @@ func TestBuildToolchainPreflight(t *testing.T) {
 		t.Fatalf("the note does not explain whose environment was checked: %q", resp.Data.Note)
 	}
 
-	// 4. When go IS available here, its version is reported: a bare path without a version cannot be compared against go.mod.
+	// 4. The probe is cached: /ready polls every few seconds and `go version` is an exec, so the second call must reuse the snapshot.
+	first, firstProbed := s.toolchainProblems()
+	second, secondProbed := s.toolchainProblems()
+	if firstProbed != secondProbed || len(first) != len(second) {
+		t.Fatalf("the cached probe changed between calls: %v then %v", first, second)
+	}
+	toolchainReportMu.Lock()
+	cachedAt := toolchainReportAt
+	toolchainReportMu.Unlock()
+	if cachedAt.IsZero() {
+		t.Fatal("the probe result was not cached, so /ready would exec on every poll")
+	}
+	// The check is informational: a process-environment answer must not become a /ready warning that fires on a transient state.
+	if _, probed := s.toolchainProblems(); !probed {
+		t.Fatal("a probed snapshot reported itself as not probed")
+	}
+
+	// 5. When go IS available here, its version is reported: a bare path without a version cannot be compared against go.mod.
 	if available, _ := resp.Data.Go["available"].(bool); available {
 		if _, ok := resp.Data.Go["version"]; !ok {
 			if _, failed := resp.Data.Go["error"]; !failed {
