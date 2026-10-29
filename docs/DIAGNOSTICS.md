@@ -46,6 +46,28 @@ exists to catch.
 Severity is about **what to do first**, not about correctness: `never_fired` and `firing_often` are warnings even though they
 are the two most common ways a rule quietly does nothing.
 
+### What the failure reasons mean
+
+`GET /api/stats/tasks/failures` groups by a `reason` code derived from the error text. The classification is **first-match on
+substrings**, most specific first, and it is a starting point for investigation rather than a verdict — the raw error travels
+beside it, and anything unmatched is collected as `other` with an example rather than dropped.
+
+| Reason | Matched on | Usually means |
+|---|---|---|
+| `timeout` | timeout, timed out, deadline exceeded | the beacon did not answer in time — check the link before the command |
+| `access_denied` | access denied, permission denied, privileges, 401/403 | the host refused: wrong privilege level, not a broken task |
+| `defender` | defender, antivirus, AMSI, quarantine | an endpoint-protection product interfered |
+| `not_found` | not found, no such file, does not exist | the path or binary is not there |
+| `network` | connection refused/reset, unreachable, broken pipe | the connection failed in transit |
+| `dns` | no such host, name resolution | resolution failed before any connection |
+| `tls` | TLS, certificate, x509, SSL | a certificate or handshake problem |
+| `unsupported` | unsupported, unimplemented, unknown command, invalid task type | the agent does not implement what was asked — often a version mismatch |
+| `disk` | no space, disk full, read-only file system | the write could not land |
+| `cancelled` | cancelled/canceled, aborted, killed | someone or something stopped it; not a failure of the task |
+
+Two of these are worth reading twice: `cancelled` is not a fault, and `unsupported` usually means the **agent binary is older
+than the console**, which no amount of retrying fixes.
+
 ## Two conventions every report follows
 
 **Scope: `?engagement=<id>` or `?engagement=none`.** The failure report, the failure-shape view and the duration report all

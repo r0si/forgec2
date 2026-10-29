@@ -50,6 +50,28 @@ func TestEveryRuleHealthCodeIsDocumented(t *testing.T) {
 		t.Fatalf("docs/DIAGNOSTICS.md does not explain: %s", strings.Join(missing, ", "))
 	}
 
+	// The failure reasons are the same kind of vocabulary, and the same guard keeps them defined: they are what an operator
+	// filters on, and a code the page omits is a filter nobody can justify.
+	reasonSource, err := os.ReadFile("handlers_stats_failures.go")
+	if err != nil {
+		t.Fatalf("the failure classifier is missing: %v", err)
+	}
+	reasonPattern := regexp.MustCompile(`\{"([a-z_]+)", \[\]string\{`)
+	reasons := reasonPattern.FindAllStringSubmatch(string(reasonSource), -1)
+	if len(reasons) < 8 {
+		t.Fatalf("only %d failure reasons found; this guard is not reading the classifier", len(reasons))
+	}
+	missingReasons := make([]string, 0, len(reasons))
+	for _, match := range reasons {
+		if !strings.Contains(string(doc), "`"+match[1]+"`") {
+			missingReasons = append(missingReasons, match[1])
+		}
+	}
+	if len(missingReasons) > 0 {
+		sort.Strings(missingReasons)
+		t.Fatalf("docs/DIAGNOSTICS.md does not explain the failure reasons: %s", strings.Join(missingReasons, ", "))
+	}
+
 	// And the page keeps the distinction that makes the severities usable.
 	if !strings.Contains(string(doc), "what to do first") {
 		t.Fatal("the page no longer explains what severity means")
