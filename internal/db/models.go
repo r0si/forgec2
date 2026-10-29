@@ -172,6 +172,10 @@ type Implant struct {
 	CurrentJitter   int    `json:"current_jitter"`                  // current jitter percentage
 	AutoAdapt       bool   `gorm:"default:false" json:"auto_adapt"` // operator-enabled traffic auto-adaptation
 	ActiveWindow    string `json:"active_window"`                   // foreground window title (reported each beacon)
+	// TLSProfile is the uTLS fingerprint the agent was BUILT with, reported at check-in. It is a CONFIGURED fact, not an observed
+	// handshake: the server cannot see a client hello, so an empty value means "this agent has not reported one", never "no TLS".
+	// A JA3 hash would need the handshake itself; the profile name is what can be proven from the build.
+	TLSProfile string `gorm:"size:64;default:'" json:"tls_profile,omitempty"`
 	// Working hours (server-side tracking)
 	WorkingHoursStart string `gorm:"size:5" json:"working_hours_start"` // HH:MM
 	WorkingHoursEnd   string `gorm:"size:5" json:"working_hours_end"`   // HH:MM

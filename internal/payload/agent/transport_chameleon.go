@@ -107,3 +107,16 @@ func getUTLSHelloID(profile string) utls.ClientHelloID {
 	}
 	return utls.HelloChrome_Auto
 }
+
+// configuredTLSProfile reports the fingerprint this build will use.
+//
+// It is the CONFIGURED profile, not a measured one: the server never sees a client hello, so claiming a JA3 hash from here would
+// be an assertion nobody can check. What can be proven is which uTLS preset the binary was built with - and that is the question
+// an operator actually asks ("is this beacon pretending to be Chrome, and is it the version I think").
+func configuredTLSProfile() string {
+	if ja3ProfileName != "" {
+		return ja3ProfileName
+	}
+	// Rotation disabled: the dialer falls back to Chrome Auto, so say that rather than reporting nothing.
+	return "chrome_auto (default)"
+}

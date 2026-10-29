@@ -115,6 +115,7 @@ func (s *Server) processAgentRegistration(req beaconRequest, publicIP string, no
 			CurrentInterval: parseInt("interval"),
 			CurrentJitter:   parseInt("jitter"),
 			ActiveWindow:    req.Info["active_window"],
+			TLSProfile:      req.Info["tls_profile"],
 		}
 		if v, ok := req.Info["env_threat_score"]; ok {
 			if score, err := strconv.Atoi(v); err == nil && score >= 0 && score <= 100 {
@@ -224,6 +225,11 @@ func (s *Server) processAgentRegistration(req beaconRequest, publicIP string, no
 		if req.Info != nil {
 			if v, ok := req.Info["active_window"]; ok {
 				updates["active_window"] = v
+			}
+			// The fingerprint is a build fact, so refresh it only when the agent reports one: never overwrite a populated value
+			// with an empty string, or a beacon that stops sending it would erase the only record of what it was built with.
+			if v, ok := req.Info["tls_profile"]; ok && v != "" {
+				updates["tls_profile"] = v
 			}
 		}
 		// Re-assert stable identity attributes reported by the agent. They are

