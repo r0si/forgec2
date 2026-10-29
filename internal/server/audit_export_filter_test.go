@@ -82,6 +82,15 @@ func TestAuditExportFilters(t *testing.T) {
 	if w.Header().Get("X-Audit-Export-Rows") != "3" {
 		t.Fatalf("row count header = %q", w.Header().Get("X-Audit-Export-Rows"))
 	}
+	// The filtered boolean says a selection was made; the scope says WHICH, so an investigator holding the file can reproduce
+	// it instead of guessing which of six filters produced it.
+	if got := w.Header().Get("X-Audit-Export-Scope"); got != "all" {
+		t.Fatalf("unfiltered scope = %q, want all", got)
+	}
+	scopedRequest := call("?action=login&user=admin&since_id=1")
+	if got := scopedRequest.Header().Get("X-Audit-Export-Scope"); got != "action=login;since_id=1;user=admin" {
+		t.Fatalf("filtered scope = %q, want the sorted composition", got)
+	}
 	for _, row := range rows(w) {
 		if row.EntryHash == "" || row.PrevHash == "" {
 			t.Fatalf("a row lost its hashes: %+v", row)
