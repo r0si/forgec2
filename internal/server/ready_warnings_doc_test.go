@@ -73,6 +73,55 @@ func TestDeployGuideDocumentsReadyWarnings(t *testing.T) {
 	}
 }
 
+// TestEveryReadyCheckIsDocumented closes the set: whatever /\u200bready writes into `checks`, the guide names it.
+//
+// The test above pins the keys it knows about, which is a list somebody maintains; this one reads the probe's own answer, so a
+// check added without a line in the guide fails here rather than living in the dark. A check that exists and is undocumented is
+// worse than a missing one: the monitor sees a key it cannot interpret and either ignores all of them or alerts on all of them.
+func TestEveryReadyCheckIsDocumented(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	s := mustTenantServer(t)
+	resetNotificationStats()
+	resetRuleActionStats()
+	resetAutoRetryCounter()
+	t.Cleanup(func() {
+		resetNotificationStats()
+		resetRuleActionStats()
+		resetAutoRetryCounter()
+	})
+
+	raw, err := os.ReadFile("../../docs/DEPLOY.md")
+	if err != nil {
+		t.Fatalf("the deploy guide is missing: %v", err)
+	}
+	section := string(raw)[strings.Index(string(raw), "## Monitoring what the server says about itself"):]
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/ready", nil)
+	c.Set("user", "op")
+	c.Set("user_role", db.RoleAdmin)
+	c.Set("user_id", uint(1))
+	c.Set(middleware.TenantIDContextKey, uint(1))
+	s.handleReadyCheck(c)
+	// The values are not all strings: `listeners` is a count, which is the shape a monitor wants to compare against a
+	// threshold. Decoding into interface{} keeps this guard about the KEY set rather than the value types.
+	var payload struct {
+		Checks map[string]interface{} `json:"checks"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode ready: %v", err)
+	}
+	if len(payload.Checks) < 5 {
+		t.Fatalf("the probe reported only %d checks; this guard is not reading them", len(payload.Checks))
+	}
+	for name := range payload.Checks {
+		if !strings.Contains(section, name) {
+			t.Fatalf("the monitoring section does not document the %q check", name)
+		}
+	}
+}
+
 // TestClearingCountersClearsTheReadyWarning closes the loop between the reset endpoints and the probe: the whole point of
 // clearing a counter is that a fixed route stops looking broken, and the probe must agree.
 func TestClearingCountersClearsTheReadyWarning(t *testing.T) {
