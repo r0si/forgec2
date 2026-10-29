@@ -3,6 +3,7 @@ package server
 import (
 	"github.com/forgec2/forgec2/internal/auditchain"
 	"github.com/forgec2/forgec2/internal/bundle"
+	"github.com/forgec2/forgec2/internal/plugin"
 )
 
 // The four things this system calls a "signature", named so a response can say which one it means.
@@ -22,7 +23,7 @@ const (
 	bundleSignatureKind = bundle.SignatureKind
 
 	// pluginSignatureKind is the plugin package signature.
-	pluginSignatureKind = "ed25519 signature over the plugin package digest: keyed, checked against plugins.trusted_keys"
+	pluginSignatureKind = plugin.SignatureKind
 
 	// failureSignatureKind is the normalised error shape. It is not a cryptographic signature at all.
 	failureSignatureKind = "failure shape: normalised error text with paths, ids and digits collapsed - not a cryptographic signature"

@@ -3,6 +3,8 @@ package main
 import (
 	"archive/zip"
 	"bytes"
+	"encoding/json"
+	"github.com/forgec2/forgec2/internal/plugin"
 	"os"
 	"path/filepath"
 	"strings"
@@ -101,4 +103,30 @@ func writeZip(t *testing.T, files map[string]string) string {
 		t.Fatalf("write archive: %v", err)
 	}
 	return path
+}
+
+// TestJSONOutputNamesTheSignatureKind pins the caveat that travels with a plugin verdict.
+//
+// Plugin signing is the KEYED kind: a valid signature proves the package was stamped by whoever holds the key, and whether that
+// key is trusted is a separate question answered by plugins.trusted_keys. A JSON consumer that reports "signature verified"
+// without saying which of the product's four signatures is meant is how the unkeyed audit chain gets confused with this one.
+func TestJSONOutputNamesTheSignatureKind(t *testing.T) {
+	report := &plugin.CheckReport{Dir: "x", SignatureKind: plugin.SignatureKind}
+	encoded, err := json.Marshal(report)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var decoded map[string]interface{}
+	if err := json.Unmarshal(encoded, &decoded); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	kind, _ := decoded["signature_kind"].(string)
+	if kind != plugin.SignatureKind {
+		t.Fatalf("signature_kind = %q, want the shared constant", kind)
+	}
+	for _, needle := range []string{"keyed", "trusted_keys"} {
+		if !strings.Contains(kind, needle) {
+			t.Fatalf("the plugin kind no longer states %q: %q", needle, kind)
+		}
+	}
 }

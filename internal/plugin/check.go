@@ -77,7 +77,15 @@ type CheckReport struct {
 	Stderr   string `json:"stderr,omitempty"`
 	Errors   int    `json:"errors"`
 	Warnings int    `json:"warnings"`
+	// SignatureKind says which of this product's four "signatures" a signing finding is about: the KEYED Ed25519 signature over
+	// the package digest. Carried here because `verify-plugin -json` and the server's plugin failure report both describe
+	// signing results, and "the signature did not verify" without saying which kind is how the unkeyed audit chain gets
+	// mistaken for an authenticated artefact.
+	SignatureKind string `json:"signature_kind"`
 }
+
+// SignatureKind is the description every plugin verdict carries.
+const SignatureKind = "ed25519 signature over the plugin package digest: keyed, checked against plugins.trusted_keys"
 
 // OK reports whether the package passed every error-level check.
 func (r *CheckReport) OK() bool { return r.Errors == 0 }
@@ -96,7 +104,7 @@ func (r *CheckReport) add(level, code, format string, args ...interface{}) {
 // optionally runs it once. It never modifies the package.
 func CheckPlugin(opts CheckOptions) *CheckReport {
 	opts.Dir = strings.TrimSpace(opts.Dir)
-	rep := &CheckReport{Dir: opts.Dir}
+	rep := &CheckReport{Dir: opts.Dir, SignatureKind: SignatureKind}
 	if opts.Dir == "" {
 		rep.add(DiagError, "package.no_dir", "no package directory given")
 		return rep
