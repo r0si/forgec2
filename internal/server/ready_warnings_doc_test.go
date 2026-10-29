@@ -122,6 +122,58 @@ func TestEveryReadyCheckIsDocumented(t *testing.T) {
 	}
 }
 
+// TestReadySnapshotCanBeDownloaded covers ?download=1.
+//
+// A probe result is read once and pasted into a ticket, and "what did it say at 02:14" is not answerable from a browser tab that
+// has since re-polled. The file names its instant, both in the filename and in the scope header.
+func TestReadySnapshotCanBeDownloaded(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	s := mustTenantServer(t)
+	resetNotificationStats()
+	resetRuleActionStats()
+	resetAutoRetryCounter()
+	t.Cleanup(func() {
+		resetNotificationStats()
+		resetRuleActionStats()
+		resetAutoRetryCounter()
+	})
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/ready?download=1", nil)
+	c.Set("user", "op")
+	c.Set("user_role", db.RoleAdmin)
+	c.Set("user_id", uint(1))
+	c.Set(middleware.TenantIDContextKey, uint(1))
+	s.handleReadyCheck(c)
+
+	if cd := w.Header().Get("Content-Disposition"); !strings.HasPrefix(cd, `attachment; filename="ready_`) {
+		t.Fatalf("Content-Disposition = %q", cd)
+	}
+	if scope := w.Header().Get(exportScopeHeader); !strings.HasPrefix(scope, "probe at ") {
+		t.Fatalf("scope header = %q, want the instant of the probe", scope)
+	}
+	var payload map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if probed, _ := payload["probed_at"].(string); probed == "" {
+		t.Fatal("the snapshot does not record when it was taken")
+	}
+	// Without the parameter the response is the probe a monitor polls: no attachment headers.
+	plain := httptest.NewRecorder()
+	c2, _ := gin.CreateTestContext(plain)
+	c2.Request = httptest.NewRequest(http.MethodGet, "/ready", nil)
+	c2.Set("user", "op")
+	c2.Set("user_role", db.RoleAdmin)
+	c2.Set("user_id", uint(1))
+	c2.Set(middleware.TenantIDContextKey, uint(1))
+	s.handleReadyCheck(c2)
+	if cd := plain.Header().Get("Content-Disposition"); cd != "" {
+		t.Fatalf("the poll variant answers with attachment headers: %q", cd)
+	}
+}
+
 // TestClearingCountersClearsTheReadyWarning closes the loop between the reset endpoints and the probe: the whole point of
 // clearing a counter is that a fixed route stops looking broken, and the probe must agree.
 func TestClearingCountersClearsTheReadyWarning(t *testing.T) {

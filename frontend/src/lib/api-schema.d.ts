@@ -8999,7 +8999,7 @@ export interface paths {
         };
         /**
          * Readiness probe
-         * @description Readiness for load balancers 鈥?no authentication required
+         * @description Readiness for load balancers - no authentication required
          */
         get: operations["ready"];
         put?: never;
@@ -24864,7 +24864,10 @@ export interface operations {
     };
     ready: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Any value turns the snapshot into a file: Content-Disposition attachment ready_<instant>.json, an X-Export-Scope of "probe at <RFC3339>", and a probed_at field in the body. A probe result is read once and pasted into a ticket, and "what did it say at 02:14" is not answerable from a tab that has since re-polled. */
+                download?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;

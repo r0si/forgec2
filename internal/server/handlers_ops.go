@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/forgec2/forgec2/internal/db"
@@ -138,6 +139,15 @@ func (s *Server) handleReadyCheck(c *gin.Context) {
 	}
 	if len(warnings) > 0 {
 		payload["warnings"] = warnings
+	}
+	// ?download=1 turns the snapshot into a file. A probe result is read once and pasted into a ticket, and "what did it say at
+	// 02:14" is not answerable from a browser tab that has since re-polled. The filename carries the instant for the same reason.
+	if strings.TrimSpace(c.Query("download")) != "" {
+		at := time.Now().UTC()
+		payload["probed_at"] = at.Format(time.RFC3339)
+		c.Header("Content-Disposition",
+			fmt.Sprintf(`attachment; filename="ready_%s.json"`, at.Format("2006-01-02_150405")))
+		applyExportScope(c, "probe at "+at.Format(time.RFC3339))
 	}
 	c.JSON(code, payload)
 }
