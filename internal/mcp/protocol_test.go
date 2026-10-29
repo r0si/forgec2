@@ -71,7 +71,8 @@ func TestMCPProtocolAndTools(t *testing.T) {
 			t.Fatalf("tool %q is advertised without a description or schema", tool.Name)
 		}
 	}
-	for _, want := range []string{"list_sessions", "failure_signatures", "queue_depth", "session_timeline"} {
+	for _, want := range []string{"list_sessions", "failure_signatures", "queue_depth", "session_timeline",
+		"build_environment", "playbook_runs"} {
 		if !names[want] {
 			t.Fatalf("tool %q is not advertised (got %v)", want, names)
 		}

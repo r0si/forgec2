@@ -244,6 +244,104 @@ func RegisterReadOnlyTools(s *Server, client *Client) error {
 				return strings.TrimSpace(summary.String()), payload.Events, nil
 			},
 		},
+		{
+			tool: Tool{
+				Name: "build_environment",
+				Description: "What the SERVER needs in order to build a payload: is `go` on its PATH, is the build cache writable, is the " +
+					"agent source tree present. Answers 'why would a build fail here' before one is started.",
+				InputSchema: json.RawMessage(`{"type":"object","properties":{},"additionalProperties":false}`),
+			},
+			handler: func(arguments map[string]interface{}) (string, interface{}, error) {
+				var payload struct {
+					OK       bool     `json:"ok"`
+					Problems []string `json:"problems"`
+					Go       struct {
+						Version string `json:"version"`
+					} `json:"go"`
+				}
+				ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
+				defer cancel()
+				if err := client.get(ctx, "/api/generate/toolchain", nil, &payload); err != nil {
+					return "", nil, err
+				}
+				if payload.OK {
+					version := payload.Go.Version
+					if version == "" {
+						version = "unknown version"
+					}
+					return fmt.Sprintf("Build environment is usable (%s, cache writable).", version), payload, nil
+				}
+				var summary strings.Builder
+				summary.WriteString("Payload builds will fail:\n")
+				for _, problem := range payload.Problems {
+					fmt.Fprintf(&summary, "- %s\n", problem)
+				}
+				return strings.TrimSpace(summary.String()), payload, nil
+			},
+		},
+		{
+			tool: Tool{
+				Name: "playbook_runs",
+				Description: "Structured playbook runs, and with `run_id` the steps that may run next. Answers 'where did the " +
+					"post-exploitation path stop'. Read-only: it reports state, it does not advance a run.",
+				InputSchema: json.RawMessage(`{"type":"object","properties":{"state":{"type":"string"},"run_id":{"type":"integer"}},"additionalProperties":false}`),
+			},
+			handler: func(arguments map[string]interface{}) (string, interface{}, error) {
+				ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
+				defer cancel()
+				// The run id selects a different ENDPOINT rather than filtering client-side: the detail carries the ready set, which the
+				// list does not, and "what may run next" is the question this tool exists to answer.
+				if runID, isNumber := arguments["run_id"].(float64); isNumber && runID > 0 {
+					var run struct {
+						ID      uint   `json:"id"`
+						Name    string `json:"name"`
+						State   string `json:"state"`
+						Settled int    `json:"settled"`
+						Total   int    `json:"total"`
+						Ready   []struct {
+							ID string `json:"id"`
+						} `json:"ready"`
+					}
+					if err := client.get(ctx, fmt.Sprintf("/api/playbooks/runs/%d", int(runID)), nil, &run); err != nil {
+						return "", nil, err
+					}
+					summary := fmt.Sprintf("Run %d %q: %s, %d/%d settled.", run.ID, run.Name, run.State, run.Settled, run.Total)
+					if len(run.Ready) > 0 {
+						ready := make([]string, 0, len(run.Ready))
+						for _, step := range run.Ready {
+							ready = append(ready, step.ID)
+						}
+						summary += " Ready: " + strings.Join(ready, ", ") + "."
+					} else {
+						summary += " Nothing is ready (waiting for a person, or finished)."
+					}
+					return summary, run, nil
+				}
+				query := url.Values{}
+				if state, isString := arguments["state"].(string); isString && state != "" {
+					query.Set("state", state)
+				}
+				var payload struct {
+					Count int `json:"count"`
+					Runs  []struct {
+						ID      uint   `json:"id"`
+						Name    string `json:"name"`
+						State   string `json:"state"`
+						Settled int    `json:"settled"`
+						Total   int    `json:"total"`
+					} `json:"runs"`
+				}
+				if err := client.get(ctx, "/api/playbooks/runs", query, &payload); err != nil {
+					return "", nil, err
+				}
+				var summary strings.Builder
+				fmt.Fprintf(&summary, "%d playbook run(s):\n", payload.Count)
+				for _, run := range payload.Runs {
+					fmt.Fprintf(&summary, "- %d %q %s (%d/%d)\n", run.ID, run.Name, run.State, run.Settled, run.Total)
+				}
+				return strings.TrimSpace(summary.String()), payload.Runs, nil
+			},
+		},
 	}
 	for _, entry := range tools {
 		if err := s.Register(entry.tool, entry.handler); err != nil {

@@ -20,6 +20,8 @@ service identity to leak and no second authorization path to keep in step with t
 | `session_timeline` | what happened on this host, in order | `GET /api/agents/{id}/timeline` |
 | `failure_signatures` | is this one problem or many | `GET /api/stats/failures/signatures` |
 | `queue_depth` | which beacon is not draining its queue | `GET /api/stats/tasks/queue` |
+| `build_environment` | why a build would fail here, before starting one | `GET /api/generate/toolchain` |
+| `playbook_runs` | where a post-exploitation path stopped, and what may run next | `GET /api/playbooks/runs[/{id}]` |
 
 Every tool is a **thin proxy**. Tenant scope, permissions and rate limits are enforced by the endpoint that already owns them;
 re-implementing any of that here would create the duplication this codebase has paid for repeatedly.
