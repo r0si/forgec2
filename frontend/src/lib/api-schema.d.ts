@@ -1279,7 +1279,7 @@ export interface paths {
         };
         /**
          * Export tasks
-         * @description Export task history as CSV, optionally bounded by time, engagement and a row limit. `since`/`until` accept the dashboard relative form (`24h`, `7d`) or an RFC3339 instant, from the same parser the audit export uses, so "since 24h" cannot mean two different things depending on which export is open. A relative bound is measured backwards from now. `engagement=<id>` selects one exercise and `engagement=none` the tasks of agents that belong to none. Responses carry `X-Task-Export-Truncated` and support `If-None-Match`, so a re-fetch of an unchanged window is a bodiless 304.
+         * @description Export task history as CSV, optionally bounded by time, engagement and a row limit. `since`/`until` accept the dashboard relative form (`24h`, `7d`) or an RFC3339 instant, from the same parser the audit export uses, so "since 24h" cannot mean two different things depending on which export is open. A relative bound is measured backwards from now. `engagement=<id>` selects one exercise and `engagement=none` the tasks of agents that belong to none. Responses carry `X-Task-Export-Truncated`, `X-Task-Export-Scope` (every filter that shaped the rows, semicolon-separated and sorted, or `all`) and support `If-None-Match`, so a re-fetch of an unchanged window is a bodiless 304. The scope header exists because a filtered file looks exactly like an unfiltered one: the receiver has no other way to tell a scoped sample from the whole picture.
          */
         get: operations["exportTasks"];
         put?: never;

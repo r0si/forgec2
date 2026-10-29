@@ -178,6 +178,13 @@ func TestTaskExportIsSentWhole(t *testing.T) {
 	if cd := w.Header().Get("Content-Disposition"); !regexp.MustCompile(`forgec2_tasks_[0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{6}\.csv`).MatchString(cd) {
 		t.Fatalf("Content-Disposition = %q, want a timestamped filename", cd)
 	}
+	// An unfiltered export says `all`, and a filtered one names every filter: the receiver of the file has no other way to tell
+	// a scoped sample from the whole picture.
+	if got := w.Header().Get("X-Task-Export-Scope"); got != "all" {
+		t.Fatalf("X-Task-Export-Scope = %q, want all", got)
+	}
+	assertScopeHeader(t, s, "/api/tasks/export?status=failed&engagement=none", "engagement=none;status=failed")
+	assertScopeHeader(t, s, "/api/tasks/export?agent=web-01&type=ps", "agent=web-01;type=ps")
 }
 
 // TestTaskExportReportsTruncation covers the silent-truncation case: with a cap that cuts the answer,
@@ -215,5 +222,24 @@ func TestTaskExportReportsTruncation(t *testing.T) {
 	}
 	if len(records) != 2 {
 		t.Fatalf("records = %d, want header + 1 row", len(records))
+	}
+}
+
+// assertScopeHeader drives the task export with a query and checks the scope header it reports.
+func assertScopeHeader(t *testing.T, s *Server, path, want string) {
+	t.Helper()
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, path, nil)
+	c.Set("user", "admin")
+	c.Set("user_role", db.RoleAdmin)
+	c.Set("user_id", uint(1))
+	c.Set(middleware.TenantIDContextKey, uint(1))
+	s.handleExportTasks(c)
+	if w.Code != http.StatusOK {
+		t.Fatalf("%s = %d (%s)", path, w.Code, w.Body.String())
+	}
+	if got := w.Header().Get("X-Task-Export-Scope"); got != want {
+		t.Fatalf("%s scope = %q, want %q", path, got, want)
 	}
 }

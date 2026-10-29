@@ -265,6 +265,13 @@ func (s *Server) handleExportTasks(c *gin.Context) {
 	} else {
 		c.Header("X-Task-Export-Truncated", "false")
 	}
+	// The same problem one layer out: a filtered export looks exactly like an unfiltered one. Whoever receives the file needs to
+	// know it covers one exercise or one host, or they will read a scoped sample as the whole picture.
+	if scope := taskExportScope(c); scope != "" {
+		c.Header("X-Task-Export-Scope", scope)
+	} else {
+		c.Header("X-Task-Export-Scope", "all")
+	}
 	c.Header("Content-Type", "text/csv; charset=utf-8")
 	// The timestamp keeps two exports from the same day from overwriting each other in the browser.
 	c.Header("Content-Disposition", `attachment; filename="forgec2_tasks_`+time.Now().Format("2006-01-02_150405")+`.csv"`)
