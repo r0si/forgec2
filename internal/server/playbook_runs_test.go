@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/forgec2/forgec2/internal/db"
 	"github.com/forgec2/forgec2/internal/playbook"
@@ -181,4 +182,89 @@ func playbookTenantContext(tenant uint) *gin.Context {
 	c.Set("user_id", uint(1))
 	c.Set(middleware.TenantIDContextKey, tenant)
 	return c
+}
+
+// TestPlaybookRunStalledStep covers the other way a checklist dies: a step was started and nobody closed it.
+//
+// The state machine is right to call such a run "running" - the step IS running - so nothing in the model is wrong, and nothing draws
+// attention either. Measured from the run's updated_at with a twelve-hour grace, and counted by ?attention=1, for the same reason the
+// task queue calls a beacon with an hour-old task stalled.
+func TestPlaybookRunStalledStep(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	s := mustTenantServer(t)
+
+	// A run whose only step is running, last touched 13 hours ago.
+	fresh := playbook.Run{Name: "stalled", Steps: []playbook.Step{{ID: "exfil", Status: playbook.StatusRunning}}}
+	if err := fresh.Normalise(); err != nil {
+		t.Fatalf("normalise: %v", err)
+	}
+	record, err := s.savePlaybookRun(playbookTenantContext(1), fresh, "op")
+	if err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	old := time.Now().Add(-13 * time.Hour)
+	if err := s.db.Model(&db.PlaybookRun{}).Where("id = ?", record.ID).Update("updated_at", old).Error; err != nil {
+		t.Fatalf("age the run: %v", err)
+	}
+
+	// A second run, also running, touched a minute ago: the control that proves the grace is applied rather than the state alone.
+	recent := playbook.Run{Name: "in progress", Steps: []playbook.Step{{ID: "recon", Status: playbook.StatusRunning}}}
+	if err := recent.Normalise(); err != nil {
+		t.Fatalf("normalise recent: %v", err)
+	}
+	if _, err := s.savePlaybookRun(playbookTenantContext(1), recent, "op"); err != nil {
+		t.Fatalf("save recent: %v", err)
+	}
+
+	read := func(query string) map[uint]bool {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest(http.MethodGet, query, nil)
+		c.Set("user", "op")
+		c.Set("user_role", db.RoleAdmin)
+		c.Set("user_id", uint(1))
+		c.Set(middleware.TenantIDContextKey, uint(1))
+		s.handleListPlaybookRuns(c)
+		if w.Code != http.StatusOK {
+			t.Fatalf("%s = %d (%s)", query, w.Code, w.Body.String())
+		}
+		var resp struct {
+			Data struct {
+				GraceSeconds int `json:"stall_grace_seconds"`
+				Runs         []struct {
+					ID       uint     `json:"id"`
+					Stalled  bool     `json:"stalled"`
+					RunSteps []string `json:"running_steps"`
+					NextStep string   `json:"next_step"`
+				} `json:"runs"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if resp.Data.GraceSeconds != int(playbookStallGrace.Seconds()) {
+			t.Fatalf("grace = %d seconds", resp.Data.GraceSeconds)
+		}
+		out := map[uint]bool{}
+		for _, run := range resp.Data.Runs {
+			out[run.ID] = run.Stalled
+			if run.ID == record.ID && len(run.RunSteps) != 1 {
+				t.Fatalf("running_steps = %v, want the one started step", run.RunSteps)
+			}
+		}
+		return out
+	}
+
+	all := read("/api/playbooks/runs")
+	if !all[record.ID] {
+		t.Fatalf("a step untouched for 13 hours is not reported stalled: %+v", all)
+	}
+	if stalled, present := all[record.ID+1]; present && stalled {
+		t.Fatal("a run touched a minute ago was reported stalled")
+	}
+
+	// And the attention filter keeps a stalled run, which is the point of the flag.
+	if attention := read("/api/playbooks/runs?attention=1"); !attention[record.ID] {
+		t.Fatalf("the attention list dropped the stalled run: %+v", attention)
+	}
 }

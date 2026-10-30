@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/forgec2/forgec2/internal/db"
 	"github.com/forgec2/forgec2/internal/playbook"
@@ -19,6 +20,12 @@ import (
 // cover), and the State column is written from playbook.Run.State() rather than computed a second time here.
 
 // playbookListLimit bounds the list: a run list is a menu, not an archive.
+// playbookStallGrace is how long a running step may sit untouched before the list calls the run stalled.
+//
+// Twelve hours on purpose: an operator starting a step and finishing it after lunch is normal, while a step started yesterday and never
+// closed is a checklist that has quietly stopped - which the state machine reports accurately (it IS running) and nobody notices.
+const playbookStallGrace = 12 * time.Hour
+
 const playbookListLimit = 100
 
 // savePlaybookRun persists one run, creating or updating by id.
@@ -93,6 +100,11 @@ func (s *Server) handleListPlaybookRuns(c *gin.Context) {
 		// each one to find out whether the blocker is a person or a dependency - and those need different people.
 		BlockedSteps []string `json:"blocked_steps,omitempty"`
 		NextStep     string   `json:"next_step,omitempty"`
+		// RunningSteps and Stalled are the other way a checklist dies: a step was started and the operator went home. The run sits in
+		// "running" forever, which the state machine reports accurately and nobody notices - the same shape as a beacon holding tasks it
+		// never consumes, which the queue report already names.
+		RunningSteps []string `json:"running_steps,omitempty"`
+		Stalled      bool     `json:"stalled,omitempty"`
 	}
 	out := make([]runSummary, 0, len(records))
 	for _, record := range records {
@@ -109,18 +121,24 @@ func (s *Server) handleListPlaybookRuns(c *gin.Context) {
 			if step.Status == playbook.StatusBlocked {
 				summary.BlockedSteps = append(summary.BlockedSteps, step.ID)
 			}
+			if step.Status == playbook.StatusRunning {
+				summary.RunningSteps = append(summary.RunningSteps, step.ID)
+			}
 		}
 		if ready := run.Ready(); len(ready) > 0 {
 			summary.NextStep = ready[0].ID
 		}
-		// ?attention=1 keeps only the runs a PERSON has to act on. The same information is in blocked_steps, but a caller that has to
-		// filter it itself will usually not - and "which runs need me" is the question a queue of approvals is answered by.
-		if attentionOnly && len(summary.BlockedSteps) == 0 {
+		// Stalled: a step is running and the run has not moved for longer than the grace. Measured from updated_at rather than from a
+		// per-step timestamp, because the store has one clock per run and inventing a second would let the two disagree.
+		summary.Stalled = len(summary.RunningSteps) > 0 && time.Since(record.UpdatedAt) > playbookStallGrace
+		// ?attention=1 keeps only the runs a PERSON has to act on: blocked on an approval, or stalled in a step somebody forgot. The same
+		// information is in the columns, but a caller that has to filter it itself will usually not.
+		if attentionOnly && len(summary.BlockedSteps) == 0 && !summary.Stalled {
 			continue
 		}
 		out = append(out, summary)
 	}
-	respond(c, gin.H{"runs": out, "count": len(out)})
+	respond(c, gin.H{"runs": out, "count": len(out), "stall_grace_seconds": int(playbookStallGrace.Seconds())})
 }
 
 // handleGetPlaybookRun renders one run, including what may run next.

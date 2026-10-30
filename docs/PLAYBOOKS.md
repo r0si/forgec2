@@ -59,6 +59,14 @@ A blocked **approval** is a request for an operator. A blocked **dependency** is
 word is how a queue of pending approvals goes unnoticed, so the list carries the distinction — and `?attention=1` keeps only the runs that
 want a human, because a caller that has to filter that itself usually will not.
 
+### A run can die two ways, and both are named
+
+A blocked approval is the obvious one. The other is a step that was **started and never closed**: the state machine is right to call the
+run `running`, so nothing is wrong and nothing draws attention either. The list therefore carries `running_steps` and a **`stalled`** flag
+for a running step untouched for **12 hours** — long enough that finishing after lunch is normal, short enough that a checklist stopped
+yesterday is visible. `?attention=1` keeps stalled runs alongside the ones waiting on an approval, for the same reason the queue report
+names a beacon that is not draining its tasks.
+
 ### A transition is refused, not corrected
 
 A transition the state machine refuses answers **409** with the reason. It is not applied partially and not reported as success: a

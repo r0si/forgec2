@@ -28494,7 +28494,12 @@ export interface operations {
                                 blocked_steps?: string[];
                                 /** @description The first step that may run now, empty when nothing can */
                                 next_step?: string;
+                                /** @description Steps currently in progress */
+                                running_steps?: string[];
+                                /** @description A running step untouched for more than 12 hours. The state machine is right to call the run "running", so nothing is wrong and nothing draws attention - which is why the flag exists. attention=1 keeps these runs too. */
+                                stalled?: boolean;
                             }[];
+                            stall_grace_seconds?: number;
                         };
                     };
                 };
