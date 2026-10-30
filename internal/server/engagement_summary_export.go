@@ -68,6 +68,32 @@ func writeEngagementMarkdown(body *bytes.Buffer, data gin.H) {
 	fmt.Fprintf(body, "## Tasks inside the window\n\n%d task(s): %d completed, %d failed, %d pending, %d running\n\n",
 		total, tasks.Completed, tasks.Failed, tasks.Pending, tasks.Running)
 
+	// Failures grouped by shape: "eleven hosts timed out on the same scan" instead of eleven rows that
+	// happen to look similar. Same computation as failures.json in the bundle - one grouping, two renderings.
+	if failures, ok := data["failures"].(engagementFailures); ok && failures.FailedTasks > 0 {
+		fmt.Fprintf(body, "## What went wrong\n\n")
+		fmt.Fprintf(body, "%d task(s) failed inside the window, grouped by cause:\n\n", failures.FailedTasks)
+		fmt.Fprintf(body, "| Failures | Hosts | Busiest host | Shape |\n|---|---|---|---|\n")
+		shown := 0
+		for _, shape := range failures.Shapes {
+			if shown >= 5 {
+				break
+			}
+			busiest := shape.TopAgentHost
+			if busiest == "" {
+				busiest = shape.TopAgent
+			}
+			fmt.Fprintf(body, "| %d | %d | %s | %s |\n", shape.Count, shape.Agents,
+				strings.ReplaceAll(busiest, "|", "\u00a6"),
+				strings.ReplaceAll(shape.Signature, "|", "\u00a6"))
+			shown++
+		}
+		if len(failures.Shapes) > 5 {
+			fmt.Fprintf(body, "| ... | ... | ... | %d more shapes not shown |\n", len(failures.Shapes)-5)
+		}
+		fmt.Fprintf(body, "\nFull detail in `failures.json`.\n\n")
+	}
+
 	fmt.Fprintf(body, "## Audited actions\n\n")
 	if len(actions) == 0 {
 		fmt.Fprintf(body, "_No audited actions were recorded inside the window._\n")
@@ -141,7 +167,7 @@ func (s *Server) buildEngagementSummary(c *gin.Context) (gin.H, db.Engagement, b
 	var agents []db.Implant
 	if err := s.tenantScope(s.db.WithContext(s.ctx).Model(&db.Implant{}), c).
 		Where("engagement_id = ?", engagement.ID).
-		Select("id, status, last_seen, expires_at").
+		Select("id, status, last_seen, expires_at, hostname").
 		Find(&agents).Error; err != nil {
 		handleQueryError(c, err, "Failed to summarise the engagement fleet")
 		return nil, zero, false
@@ -201,5 +227,24 @@ func (s *Server) buildEngagementSummary(c *gin.Context) (gin.H, db.Engagement, b
 		return nil, zero, false
 	}
 
-	return engagementSummaryPayload(engagement, now, windowEnd, counts, tasks, actionRows), engagement, true
+	// Failed tasks inside the window, grouped by shape for the narrative. The same computation as
+	// failures.json in the bundle - one grouping, two renderings.
+	hostnames := make(map[string]string, len(agents))
+	for _, agent := range agents {
+		hostnames[agent.ID] = agent.Hostname
+	}
+	var failedTasks []db.Task
+	if len(agentIDs) > 0 {
+		if err := s.db.WithContext(s.ctx).Model(&db.Task{}).
+			Where("agent_id IN ?", agentIDs).
+			Where("status = ? AND error != ?", "failed", "").
+			Where("created_at >= ? AND created_at <= ?", engagement.StartsAt, windowEnd).
+			Find(&failedTasks).Error; err != nil {
+			handleQueryError(c, err, "Failed to summarise engagement failures")
+			return nil, zero, false
+		}
+	}
+	failures := buildEngagementFailures(failedTasks, hostnames)
+
+	return engagementSummaryPayload(engagement, now, windowEnd, counts, tasks, actionRows, failures), engagement, true
 }

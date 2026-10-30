@@ -110,3 +110,87 @@ func TestEngagementSummaryExport(t *testing.T) {
 		t.Fatalf("cross-tenant export = %d, want 404", got.Code)
 	}
 }
+
+// TestEngagementSummaryExportIncludesFailureShapes covers that failed tasks are rendered as a
+// grouped narrative in the Markdown export, using the same computation as failures.json in the bundle.
+func TestEngagementSummaryExportIncludesFailureShapes(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	s := mustTenantServer(t)
+
+	now := time.Now().UTC().Truncate(time.Second)
+	day := 24 * time.Hour
+
+	engagement := db.Engagement{
+		TenantID: 1, Name: "failure exercise", Notes: "scoped to failures", CreatedBy: "op",
+		StartsAt: now.Add(-3 * day), EndsAt: now.Add(-day), ClosedAt: ptrTime(now.Add(-day)),
+	}
+	if err := s.db.Create(&engagement).Error; err != nil {
+		t.Fatalf("seed engagement: %v", err)
+	}
+	// Two agents, one with many failures, one with one.
+	if err := s.db.Create(&db.Implant{
+		ID: "a-1", TenantID: 1, Hostname: "web-01", Status: "online",
+		LastSeen: now.Add(-s.offlineThreshold() / 2), EngagementID: &engagement.ID,
+	}).Error; err != nil {
+		t.Fatalf("seed agent a-1: %v", err)
+	}
+	if err := s.db.Create(&db.Implant{
+		ID: "a-2", TenantID: 1, Hostname: "db-02", Status: "online",
+		LastSeen: now.Add(-s.offlineThreshold() / 2), EngagementID: &engagement.ID,
+	}).Error; err != nil {
+		t.Fatalf("seed agent a-2: %v", err)
+	}
+	// a-1 has 3 failures of the same shape; a-2 has 1 of a different shape.
+	for i := 0; i < 3; i++ {
+		if err := s.db.Create(&db.Task{
+			AgentID: "a-1", Type: "shell", Command: "whoami", Status: "failed",
+			Error: "connection refused", CreatedAt: now.Add(-2 * day), UpdatedAt: now.Add(-2 * day),
+		}).Error; err != nil {
+			t.Fatalf("seed task a-1/%d: %v", i, err)
+		}
+	}
+	if err := s.db.Create(&db.Task{
+		AgentID: "a-2", Type: "shell", Command: "whoami", Status: "failed",
+		Error: "access denied", CreatedAt: now.Add(-2 * day), UpdatedAt: now.Add(-2 * day),
+	}).Error; err != nil {
+		t.Fatalf("seed task a-2: %v", err)
+	}
+
+	call := func(query string, tenant uint) *httptest.ResponseRecorder {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest(http.MethodGet, "/api/engagements/"+itoaUintTest(engagement.ID)+"/summary/export"+query, nil)
+		c.Params = gin.Params{{Key: "id", Value: itoaUintTest(engagement.ID)}}
+		c.Set("user", "op")
+		c.Set("user_role", db.RoleAdmin)
+		c.Set("user_id", uint(1))
+		c.Set(middleware.TenantIDContextKey, tenant)
+		s.handleEngagementSummaryExport(c)
+		return w
+	}
+
+	w := call("", 1)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d (%s)", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+
+	// The narrative must name the two shapes, the counts, and the hosts.
+	for _, want := range []string{
+		"## What went wrong",
+		"4 task(s) failed inside the window, grouped by cause:",
+		"| Failures | Hosts | Busiest host | Shape |",
+		"| 3 | 1 | web-01 | connection refused |",
+		"| 1 | 1 | db-02 | access denied |",
+		"Full detail in `failures.json`.",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("the report is missing %q:\n%s", want, body)
+		}
+	}
+
+	// Cross-tenant cannot export this engagement.
+	if got := call("", 2); got.Code != http.StatusNotFound {
+		t.Fatalf("cross-tenant export = %d, want 404", got.Code)
+	}
+}

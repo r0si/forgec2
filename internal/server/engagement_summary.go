@@ -38,7 +38,7 @@ func (s *Server) handleEngagementSummary(c *gin.Context) {
 
 // engagementSummaryPayload is the one place the summary shape is built, shared by the JSON endpoint and the
 // Markdown export so the two cannot describe the same exercise differently.
-func engagementSummaryPayload(engagement db.Engagement, now, windowEnd time.Time, agents engagementSummaryAgentCounts, tasks db.TaskStats, actions []engagementActionCount) gin.H {
+func engagementSummaryPayload(engagement db.Engagement, now, windowEnd time.Time, agents engagementSummaryAgentCounts, tasks db.TaskStats, actions []engagementActionCount, failures engagementFailures) gin.H {
 	if actions == nil {
 		actions = []engagementActionCount{}
 	}
@@ -49,9 +49,10 @@ func engagementSummaryPayload(engagement db.Engagement, now, windowEnd time.Time
 			"ends_at":   windowEnd.UTC().Format(time.RFC3339),
 			"open":      now.Before(windowEnd),
 		},
-		"agents":  agents,
-		"tasks":   tasks,
-		"actions": actions,
+		"agents":   agents,
+		"tasks":    tasks,
+		"actions":  actions,
+		"failures": failures,
 	}
 }
 
