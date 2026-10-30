@@ -183,6 +183,7 @@ export interface GenerateState {
   busy: boolean;
   result: ReactNode;
   signature?: BuildSignature;
+  hint?: { code: string; text: string };
 }
 
 export interface PS1Result extends GenerateResult {
@@ -269,7 +270,7 @@ export function createDefaultForms(): PayloadForms {
 export function createDefaultStates(): PayloadStates {
   const keys: PayloadKey[] = ["exe", "dll", "ps1", "linux", "macos", "stager", "stager_linux", "shellcode", "donut", "oneliner"];
   const states = {} as PayloadStates;
-  for (const k of keys) states[k] = { busy: false, result: "" };
+  for (const k of keys) states[k] = { busy: false, result: "", hint: undefined };
   return states;
 }
 

@@ -1,1 +1,0 @@
-import{w as e}from"./index-C_L7BsML.js";function t({mode:t=`any`,perms:n,fallback:r=null,children:i}){let{permissions:a,canAny:o,canAll:s}=e(),c=Array.isArray(n)?n:[n];if(a==null)return typeof i==`function`?i(!0):i;let l=t===`all`?s(c):o(c);return typeof i==`function`?i(l):l?i:r}export{t};

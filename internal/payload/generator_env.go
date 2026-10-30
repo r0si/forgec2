@@ -336,9 +336,9 @@ func buildAgentBinary(goCmd, workDir, ldflags, outPath string, obfuscate bool, g
 		cmd.Stderr = &stderr
 		if err := cmd.Run(); err != nil {
 			if ctx.Err() == context.DeadlineExceeded {
-				return fmt.Errorf("garble build timed out after %s: %w", buildCompileTimeout, err)
+				return fmt.Errorf("garble build timed out after %s (goos=%s goarch=%s): %w", buildCompileTimeout, goos, goarch, err)
 			}
-			return fmt.Errorf("garble build failed: %w\n%s\n(re-run without obfuscation or fix the garble install)", err, scrubBuildLog(stderr.String(), ldflags))
+			return fmt.Errorf("garble build failed (obfuscation=on, goos=%s, goarch=%s): %w\n%s\n(re-run without obfuscation or fix the garble install)", goos, goarch, err, scrubBuildLog(stderr.String(), ldflags))
 		}
 		return nil
 	}
@@ -360,9 +360,9 @@ func buildAgentBinary(goCmd, workDir, ldflags, outPath string, obfuscate bool, g
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
-			return fmt.Errorf("go build timed out after %s: %w", buildCompileTimeout, err)
+			return fmt.Errorf("go build timed out after %s (goos=%s, goarch=%s): %w", buildCompileTimeout, goos, goarch, err)
 		}
-		return fmt.Errorf("go build failed: %w\n%s", err, scrubBuildLog(stderr.String(), ldflags))
+		return fmt.Errorf("go build failed (goos=%s, goarch=%s, obfuscation=off): %w\n%s", goos, goarch, err, scrubBuildLog(stderr.String(), ldflags))
 	}
 	return nil
 }

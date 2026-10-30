@@ -74,7 +74,7 @@ export function BuildSignatureBadge({ signature }: { signature?: BuildSignature 
  * busy → compiling strip with progress · result → success/error alert, plus
  * the Authenticode classification for Windows EXE/DLL builds.
  */
-export function BuildResult({ busy, result, signature }: { busy?: boolean; result?: ReactNode; signature?: BuildSignature }) {
+export function BuildResult({ busy, result, signature, hint }: { busy?: boolean; result?: ReactNode; signature?: BuildSignature; hint?: { code: string; text: string } }) {
   const { t } = useI18n();
   if (busy) {
     return (
@@ -98,6 +98,15 @@ export function BuildResult({ busy, result, signature }: { busy?: boolean; resul
             <pre className="max-h-48 overflow-y-auto font-mono text-xs leading-5 whitespace-pre-wrap [scrollbar-width:thin]">{result}</pre>
           </AlertDescription>
         </Alert>
+      )}
+      {hint && (
+        <div className="mt-2 rounded-lg border border-hint/20 bg-hint/5 p-3 text-xs text-hint-ink shadow-sm">
+          <div className="flex items-center gap-2 mb-1">
+            <ShieldAlert className="size-4 text-hint-ink" />
+            <span className="font-semibold">{t("generate.build_hint_title", { code: hint.code })}</span>
+          </div>
+          <pre className="max-h-32 overflow-y-auto font-mono text-[11px] leading-4 whitespace-pre-wrap">{hint.text}</pre>
+        </div>
       )}
       <BuildSignatureBadge signature={signature} />
     </>

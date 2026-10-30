@@ -2184,6 +2184,7 @@ export const zh: Record<string, string> = {
     "generate.badge_done": "已完成",
     "generate.badge_failed": "失败",
     "generate.badge_ready": "就绪",
+    "generate.build_hint_title": "构建提示 ({code}):",
     "generate.signature.valid": "签名有效",
     "generate.signature.self_signed": "自签名 / 不受信任",
     "generate.signature.untrusted_root": "根证书不受信任",

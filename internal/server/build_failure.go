@@ -60,6 +60,15 @@ func buildFailureText(err error) string {
 			"\n(hint: set a writable GOCACHE for the server's account, or run it as the operator who owns the cache)"
 	case strings.Contains(lowered, "no space left on device"):
 		return "The disk ran out of space while building: " + message
+	case strings.Contains(lowered, "module lookup") || strings.Contains(lowered, "module proxy") ||
+		strings.Contains(lowered, "network error") || strings.Contains(lowered, "unreachable") ||
+		strings.Contains(lowered, "timeout") && strings.Contains(lowered, "proxy"):
+		return "The module proxy is unreachable while building: " + message +
+			"\n(hint: check GOPROXY or set implant.goproxy in config.yaml; the server may not reach proxy.golang.org)"
+	case strings.Contains(lowered, "missing go.sum entry") || strings.Contains(lowered, "go.sum") &&
+		strings.Contains(lowered, "missing"):
+		return "The Go module sum file is incomplete while building: " + message +
+			"\n(hint: run `go mod tidy` in the forgec2 root to regenerate go.sum)"
 	}
 	return message
 }
@@ -88,7 +97,6 @@ func buildFailureIsToolchainMissing(err error) bool {
 		strings.Contains(lowered, "exec: \"go\"") ||
 		errors.Is(err, errToolchainMissing)
 }
-
 // errToolchainMissing exists so a caller can wrap the case explicitly instead of relying on message matching.
 var errToolchainMissing = errors.New("build toolchain is not available")
 
@@ -131,6 +139,8 @@ const (
 	HintCacheUnwritable  = "cache_unwritable"
 	HintDiskFull         = "disk_full"
 	HintCompileError     = "compile_error"
+	HintModuleProxy      = "module_proxy"
+	HintGoSumMissing     = "go_sum_missing"
 	HintUnknown          = "unknown"
 )
 
@@ -159,6 +169,18 @@ func buildFailureHint(err error) BuildFailureHint {
 		return BuildFailureHint{
 			Code: HintDiskFull,
 			Text: "Free space on the build volume (the binary plus the module cache can be hundreds of megabytes).",
+		}
+	case strings.Contains(lowered, "module lookup") || strings.Contains(lowered, "module proxy") ||
+		strings.Contains(lowered, "network error") || strings.Contains(lowered, "unreachable"):
+		return BuildFailureHint{
+			Code: HintModuleProxy,
+			Text: "The module proxy is unreachable while building; check GOPROXY or set implant.goproxy in config.yaml.",
+		}
+	case strings.Contains(lowered, "missing go.sum entry") || strings.Contains(lowered, "go.sum") &&
+		strings.Contains(lowered, "missing"):
+		return BuildFailureHint{
+			Code: HintGoSumMissing,
+			Text: "The Go module sum file is incomplete; run `go mod tidy` in the forgec2 root to regenerate go.sum.",
 		}
 	case strings.Contains(lowered, "undefined:") || strings.Contains(lowered, "syntax error") ||
 		strings.Contains(lowered, "cannot use") || strings.Contains(lowered, "exit status 1"):

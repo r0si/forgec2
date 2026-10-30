@@ -29,6 +29,7 @@ const BUILD_SIGNATURE_STATUSES: BuildSignatureStatus[] = ["valid", "untrusted_ro
 type BuildOutcome = {
   status: "completed" | "failed" | "timeout" | "aborted";
   error?: string;
+  errorHint?: { code: string; text: string };
   signature?: BuildSignature;
 };
 
@@ -43,6 +44,17 @@ function readBuildSignature(data: Record<string, unknown>): BuildSignature | und
     issuer: str("signature_issuer"),
     error: str("signature_error"),
   };
+}
+
+/** Read the machine-readable failure hint from a build status/WS payload. */
+function readBuildErrorHint(data: Record<string, unknown>): { code: string; text: string } | undefined {
+  const hint = data.error_hint;
+  if (!hint || typeof hint !== "object") return undefined;
+  const h = hint as Record<string, unknown>;
+  const code = typeof h.code === "string" ? h.code : undefined;
+  const text = typeof h.text === "string" ? h.text : undefined;
+  if (!code) return undefined;
+  return { code, text: text || "" };
 }
 
 // The backend budget is 6 minutes for module resolution plus 15 minutes for
@@ -321,7 +333,7 @@ export function usePayloadGenerator() {
         try {
           const pollData = await api.get<Record<string, unknown>>(paths.generate.buildStatus(buildId), { signal });
           if (pollData.status === "completed") finish({ status: "completed", signature: readBuildSignature(pollData) });
-          else if (pollData.status === "failed") finish({ status: "failed", error: typeof pollData.error === "string" ? pollData.error : undefined });
+          else if (pollData.status === "failed") finish({ status: "failed", error: typeof pollData.error === "string" ? pollData.error : undefined, errorHint: readBuildErrorHint(pollData) });
           else fallback = setTimeout(poll, 2000);
         } catch {
           fallback = setTimeout(poll, 2000);
@@ -330,7 +342,7 @@ export function usePayloadGenerator() {
       unsub = subscribe((msg) => {
         if (msg.type !== "build_update" || msg.build_id !== buildId) return;
         if (msg.status === "completed") finish({ status: "completed", signature: readBuildSignature(msg) });
-        else if (msg.status === "failed") finish({ status: "failed", error: typeof msg.error === "string" ? msg.error : undefined });
+        else if (msg.status === "failed") finish({ status: "failed", error: typeof msg.error === "string" ? msg.error : undefined, errorHint: readBuildErrorHint(msg) });
       });
       timeout = setTimeout(() => finish({ status: "timeout" }), BUILD_WAIT_TIMEOUT_MS);
       signal.addEventListener("abort", onAbort);
@@ -403,7 +415,12 @@ export function usePayloadGenerator() {
       try {
         const outcome = await waitForBuildResult(buildId, ac.signal);
         if (outcome.status === "aborted" || ac.signal.aborted) return { error: t("generate.toast.build_cancelled") };
-        if (outcome.status === "failed") return { error: outcome.error || t("generate.toast.build_failed") };
+        if (outcome.status === "failed") {
+          // Prefer the machine-readable hint text (actionable, stable across compiler versions),
+          // then the raw compiler output, then the generic toast.
+          const hintMsg = outcome.errorHint?.text;
+          return { error: hintMsg || outcome.error || t("generate.toast.build_failed"), hint: outcome.errorHint };
+        }
         if (outcome.status === "timeout") return { error: t("generate.toast.build_timed_out") };
 
         // 3) Download the result
@@ -487,15 +504,15 @@ export function usePayloadGenerator() {
     successMsg: string,
     isAsync = false,
   ) => {
-    setStates((s) => ({ ...s, [key]: { busy: true, result: "" } }));
+    setStates((s) => ({ ...s, [key]: { busy: true, result: "", hint: undefined } }));
     const result = await handleGenerate(endpoint, defaultFilename, { extra, async: isAsync });
     if (result?.error) {
-      setStates((s) => ({ ...s, [key]: { busy: false, result: result.error! } }));
+      setStates((s) => ({ ...s, [key]: { busy: false, result: result.error!, hint: result.errorHint } }));
     } else if (result?.success) {
       toast.success(successMsg);
       setStates((s) => ({ ...s, [key]: { busy: false, result: "", signature: result.signature } }));
     } else {
-      setStates((s) => ({ ...s, [key]: { busy: false, result: "" } }));
+      setStates((s) => ({ ...s, [key]: { busy: false, result: "", hint: undefined } }));
     }
   }, [handleGenerate, ]);
 

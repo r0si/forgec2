@@ -150,9 +150,9 @@ export default function GeneratePayloadWorkspace() {
   const formatPanel = (key: PayloadFormat) => {
     switch (key) {
       case "exe":
-        return <BinaryPanel variant="exe" form={g.forms.exe} setForm={makeDispatch("exe")} busy={g.states.exe.busy} result={g.states.exe.result} signature={g.states.exe.signature} onGenerate={g.handlerMap.exe} canGenerate={canGenerate} agentModules={g.agentModules} />;
+        return <BinaryPanel variant="exe" form={g.forms.exe} setForm={makeDispatch("exe")} busy={g.states.exe.busy} result={g.states.exe.result} signature={g.states.exe.signature} hint={g.states.exe.hint} onGenerate={g.handlerMap.exe} canGenerate={canGenerate} agentModules={g.agentModules} />;
       case "dll":
-        return <BinaryPanel variant="dll" form={g.forms.dll} setForm={makeDispatch("dll")} busy={g.states.dll.busy} result={g.states.dll.result} signature={g.states.dll.signature} onGenerate={g.handlerMap.dll} canGenerate={canGenerate} agentModules={g.agentModules} />;
+        return <BinaryPanel variant="dll" form={g.forms.dll} setForm={makeDispatch("dll")} busy={g.states.dll.busy} result={g.states.dll.result} signature={g.states.dll.signature} hint={g.states.dll.hint} onGenerate={g.handlerMap.dll} canGenerate={canGenerate} agentModules={g.agentModules} />;
       case "ps1":
         return <PS1Panel form={g.forms.ps1} setForm={makeDispatch("ps1")} busy={g.states.ps1.busy} result={g.states.ps1.result} code={g.extras.ps1?.code} originalLen={g.extras.ps1?.original_length} obfuscatedLen={g.extras.ps1?.obfuscated_len} onGenerate={g.handlerMap.ps1} canGenerate={canGenerate} />;
       case "linux":

@@ -31,6 +31,12 @@ func ValidateImplantBuild(goos, format string, cfg *ImplantConfig) error {
 	if cfg == nil {
 		return fmt.Errorf("nil implant config")
 	}
+	// Fail fast if the Go toolchain itself is unavailable: better to return a
+	// 400 immediately than to queue a build that will fail after minutes in the
+	// queue.
+	if err := CheckGoToolchain(); err != nil {
+		return err
+	}
 	switch goos {
 	case "windows", "linux", "darwin":
 	default:

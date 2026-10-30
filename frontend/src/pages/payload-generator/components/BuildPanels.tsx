@@ -104,6 +104,7 @@ interface BinaryPanelProps {
   busy: boolean;
   result: ReactNode;
   signature?: BuildSignature;
+  hint?: { code: string; text: string };
   onGenerate: () => void;
   canGenerate?: boolean;
   agentModules?: AgentModuleInfo[];
@@ -114,7 +115,7 @@ const VARIANT_CONFIG: Record<BinaryVariant, { tint: string; icon: ReactNode; tit
   dll: { tint: "bg-destructive/10 text-destructive-ink", icon: <Puzzle className="size-5" />, titleKey: "generate.panel.dll_title", subtitleKey: "generate.panel.dll_subtitle", btnKey: "generate.panel.generate_dll", showP2P: false },
 };
 
-export const BinaryPanel = React.memo(function BinaryPanel({ variant, form, setForm, busy, result, signature, onGenerate, canGenerate = true, agentModules }: BinaryPanelProps) {
+export const BinaryPanel = React.memo(function BinaryPanel({ variant, form, setForm, busy, result, signature, hint, onGenerate, canGenerate = true, agentModules }: BinaryPanelProps) {
   const { t } = useI18n();
   const cfg = VARIANT_CONFIG[variant];
   const id = `binary-${variant}`;
@@ -130,7 +131,7 @@ export const BinaryPanel = React.memo(function BinaryPanel({ variant, form, setF
           <Button type="button" onClick={onGenerate} disabled={busy || !canGenerate} title={!canGenerate ? t("generate.toast.select_listener_first") : undefined} className={BTN_CLASS}>
             {busy ? <><Spinner /> {t("generate.panel.generating")}</> : <><Download className="size-4" /> {t(cfg.btnKey)}</>}
           </Button>
-          <BuildResult busy={busy} result={result} signature={signature} />
+          <BuildResult busy={busy} result={result} signature={signature} hint={hint} />
         </>
       }
     >
@@ -473,6 +474,7 @@ interface UnixPanelProps {
   setForm: React.Dispatch<React.SetStateAction<UnixForm>>;
   busy: boolean;
   result: ReactNode;
+  hint?: { code: string; text: string };
   onGenerate: () => void;
   canGenerate?: boolean;
   agentModules?: AgentModuleInfo[];
@@ -483,7 +485,7 @@ const UNIX_CONFIG: Record<UnixVariant, { tint: string; icon: ReactNode; titleKey
   macos: { tint: "bg-primary/10 text-primary", icon: <Apple className="size-5" />, titleKey: "generate.panel.macos_title", subtitleKey: "generate.panel.unix_subtitle", btnKey: "generate.panel.generate_macos" },
 };
 
-export const UnixPanel = React.memo(function UnixPanel({ variant, form, setForm, busy, result, onGenerate, canGenerate = true, agentModules }: UnixPanelProps) {
+export const UnixPanel = React.memo(function UnixPanel({ variant, form, setForm, busy, result, hint, onGenerate, canGenerate = true, agentModules }: UnixPanelProps) {
   const { t } = useI18n();
   const cfg = UNIX_CONFIG[variant];
   const id = `unix-${variant}`;
@@ -499,7 +501,7 @@ export const UnixPanel = React.memo(function UnixPanel({ variant, form, setForm,
           <Button type="button" onClick={onGenerate} disabled={busy || !canGenerate} title={!canGenerate ? t("generate.toast.select_listener_first") : undefined} className={BTN_CLASS}>
             {busy ? <><Spinner /> {t("generate.panel.generating")}</> : <><Download className="size-4" /> {t(cfg.btnKey)}</>}
           </Button>
-          <BuildResult busy={busy} result={result} />
+          <BuildResult busy={busy} result={result} hint={hint} />
         </>
       }
     >

@@ -2184,6 +2184,7 @@ export const en: Record<string, string> = {
     "generate.badge_done": "Done",
     "generate.badge_failed": "Failed",
     "generate.badge_ready": "Ready",
+    "generate.build_hint_title": "Build hint ({code}):",
     "generate.signature.valid": "Signature valid",
     "generate.signature.self_signed": "Self-signed / untrusted",
     "generate.signature.untrusted_root": "Untrusted root",
