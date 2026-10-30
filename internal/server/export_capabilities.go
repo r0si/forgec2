@@ -140,6 +140,9 @@ func (s *Server) handleExportCapabilities(c *gin.Context) {
 				"MANIFEST.json always travels and is not selectable: without it the archive cannot be verified",
 				"a bundle over the size cap is refused with 413 rather than truncated",
 				"signing needs FORGEC2_BUNDLE_SIGNING_KEY (hex 32-byte Ed25519 seed); unsigned is honest, not silent",
+				// The one a receiver most needs before opening the file: a bundle leaves the console, so this member describes use rather
+				// than carrying secrets.
+				"credentials.json is METADATA only - a bundle leaves the console, so passwords and hashes stay behind, in the system that audits their use",
 			},
 		},
 		// The diagnostics surface: endpoints that answer "what would happen" and execute nothing. They were added over
@@ -240,6 +243,46 @@ func (s *Server) handleExportCapabilities(c *gin.Context) {
 					"rate-limited per rule (10s, Retry-After on 429); every executed test is audited",
 					"webhook delivery is asynchronous: its result arrives after the response and is counted on the route",
 				},
+			},
+			// The read-only questions added after this section was written. Same list, because a second list of "answers something and
+			// changes nothing" is exactly how one of them goes stale while the other stays right.
+			{
+				"path":         "/api/generate/toolchain",
+				"method":       "GET",
+				"answers":      "can this server build a payload at all - go, the cache and the agent tree, checked as the server's own user",
+				"side_effects": false,
+				"notes":        []string{"a shell where go works proves nothing about the service account, which is why this runs in-process"},
+			},
+			{
+				"path":         "/api/automation/events",
+				"method":       "GET",
+				"answers":      "which event types a rule may listen to, and the payload fields each carries",
+				"side_effects": false,
+				"notes":        []string{"the same list a test checks against the registry and against docs/AUTOMATION_RULES.md"},
+			},
+			{
+				"path":         "/api/playbooks/runs",
+				"method":       "GET",
+				"answers":      "where each structured playbook stopped, and - with attention=1 - which are waiting for a person",
+				"side_effects": false,
+				"notes": []string{
+					"blocked_steps distinguishes an approval (a person must act) from a dependency (the run unblocks itself)",
+					"nothing here dispatches a task; a transition only records that a step changed",
+				},
+			},
+			{
+				"path":         "/api/playbooks/runs/:id/history",
+				"method":       "GET",
+				"answers":      "who advanced one run, and when",
+				"side_effects": false,
+				"notes":        []string{"read from the audit log, with entry_hash so the rows match /api/audit/export"},
+			},
+			{
+				"path":         "/api/stats/builds/failures",
+				"method":       "GET",
+				"answers":      "why builds failed, grouped by cause - an environment problem or a code problem",
+				"side_effects": false,
+				"notes":        []string{"classified with the same helper that produces error_hint for one build, so the two cannot disagree"},
 			},
 		},
 		// The clearing endpoints are deliberately NOT in the list above: every diagnostic answers a question, while these

@@ -370,3 +370,66 @@ func TestCapabilitiesListEveryCSVReport(t *testing.T) {
 		t.Fatalf("report formats = %v, want csv and json", reports.Formats)
 	}
 }
+
+// TestDiagnosticsListTheReadOnlyQuestions covers the diagnostics section as a discovery surface.
+//
+// A client that can see the previews but not the newer read-only questions will re-derive their answers from the lists - which is what the
+// section exists to prevent. The assertions are structural for every entry (a path, what it answers, and whether it has side effects) and
+// then specific for the questions added since the section was written.
+func TestDiagnosticsListTheReadOnlyQuestions(t *testing.T) {
+	s := mustTenantServer(t)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/exports/capabilities", nil)
+	c.Set("user", "op")
+	c.Set("user_role", db.RoleAdmin)
+	c.Set("user_id", uint(1))
+	c.Set(middleware.TenantIDContextKey, uint(1))
+	s.handleExportCapabilities(c)
+	if w.Code != http.StatusOK {
+		t.Fatalf("capabilities = %d (%s)", w.Code, w.Body.String())
+	}
+
+	var decoded struct {
+		Data struct {
+			Diagnostics []gin.H `json:"diagnostics"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &decoded); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(decoded.Data.Diagnostics) < 10 {
+		t.Fatalf("diagnostics = %d entries, want the whole set", len(decoded.Data.Diagnostics))
+	}
+
+	byPath := map[string]gin.H{}
+	for _, entry := range decoded.Data.Diagnostics {
+		path, _ := entry["path"].(string)
+		answers, _ := entry["answers"].(string)
+		if path == "" || answers == "" {
+			t.Fatalf("an entry is incomplete: %v", entry)
+		}
+		if _, has := entry["side_effects"]; !has {
+			t.Fatalf("%s does not state whether it has side effects", path)
+		}
+		byPath[path] = entry
+	}
+
+	// The questions added after the section was written, each with side_effects false - the property that makes the list trustworthy
+	// enough for a client to call them all.
+	for _, path := range []string{
+		"/api/generate/toolchain",
+		"/api/automation/events",
+		"/api/playbooks/runs",
+		"/api/playbooks/runs/:id/history",
+		"/api/stats/builds/failures",
+	} {
+		entry, listed := byPath[path]
+		if !listed {
+			t.Fatalf("%s answers a question but is not listed", path)
+		}
+		if sideEffects, _ := entry["side_effects"].(bool); sideEffects {
+			t.Fatalf("%s is listed as a diagnostic but reports side effects", path)
+		}
+	}
+}
