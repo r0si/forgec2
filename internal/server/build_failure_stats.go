@@ -1,7 +1,9 @@
 package server
 
 import (
+	"encoding/csv"
 	"errors"
+	"fmt"
 	"net/http"
 	"sort"
 	"strconv"
@@ -106,6 +108,47 @@ func (s *Server) handleBuildFailureStats(c *gin.Context) {
 		if out[0].Advice != "" {
 			summary += " - " + out[0].Advice
 		}
+	}
+
+	// ?format=csv takes the table away: this is the report an operator pastes into a ticket when the toolchain is broken on a build host,
+	// and every other stats report here exports. One row per (cause, platform) keeps the platform column meaningful - a single row with a
+	// comma-joined list would need parsing again at the other end.
+	if strings.EqualFold(strings.TrimSpace(c.Query("format")), "csv") {
+		var buf strings.Builder
+		writer := csv.NewWriter(&buf)
+		if err := writer.Write([]string{"Cause", "Advice", "Count", "Platforms", "Example"}); err != nil {
+			handleQueryError(c, err, "Failed to encode the build failures")
+			return
+		}
+		for _, group := range out {
+			platforms := strings.Join(group.Platforms, " ")
+			for _, platform := range group.Platforms {
+				if err := writer.Write([]string{
+					group.Code, group.Advice, strconv.Itoa(group.Count), platform, group.Example,
+				}); err != nil {
+					handleQueryError(c, err, "Failed to encode the build failures")
+					return
+				}
+			}
+			if platforms == "" {
+				// A cause with no platform recorded still deserves a row, or the totals silently stop adding up.
+				if err := writer.Write([]string{
+					group.Code, group.Advice, strconv.Itoa(group.Count), "", group.Example,
+				}); err != nil {
+					handleQueryError(c, err, "Failed to encode the build failures")
+					return
+				}
+			}
+		}
+		writer.Flush()
+		if err := writer.Error(); err != nil {
+			handleQueryError(c, err, "Failed to encode the build failures")
+			return
+		}
+		c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="forgec2_build-failures_%s.csv"`,
+			time.Now().Format("2006-01-02_150405")))
+		c.Data(http.StatusOK, "text/csv; charset=utf-8", []byte(buf.String()))
+		return
 	}
 
 	respond(c, gin.H{

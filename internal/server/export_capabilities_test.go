@@ -347,6 +347,7 @@ func TestCapabilitiesListEveryCSVReport(t *testing.T) {
 		"/api/stats/failures/signatures",
 		"/api/stats/tasks/duration",
 		"/api/stats/tasks/queue",
+		"/api/stats/builds/failures",
 	}
 	for _, path := range expected {
 		if !listed[path] {

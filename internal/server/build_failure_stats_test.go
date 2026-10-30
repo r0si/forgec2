@@ -1,9 +1,12 @@
 package server
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -111,7 +114,9 @@ func TestBuildFailureStatsGroupsByCause(t *testing.T) {
 	// 5. A window with no failures says so, rather than serving an empty object and leaving the caller to guess.
 	empty := httptest.NewRecorder()
 	c2, _ := gin.CreateTestContext(empty)
-	c2.Request = httptest.NewRequest(http.MethodGet, "/api/stats/builds/failures?since=1h", nil)
+	// One minute, not one hour: the newest seeded failure is exactly an hour old, so a 1h window sits ON the boundary and the row is
+	// included or excluded depending on microseconds - a flake that would be read as a product bug.
+	c2.Request = httptest.NewRequest(http.MethodGet, "/api/stats/builds/failures?since=1m", nil)
 	c2.Set("user", "op")
 	c2.Set("user_role", db.RoleAdmin)
 	c2.Set("user_id", uint(1))
@@ -144,6 +149,46 @@ func TestBuildFailureStatsGroupsByCause(t *testing.T) {
 	s.handleBuildFailureStats(c3)
 	if bad.Code != http.StatusBadRequest {
 		t.Fatalf("malformed since = %d, want 400", bad.Code)
+	}
+
+	// 6b. The table can be taken away as a file, one row per (cause, platform), so the counts add up at the other end without a
+	// caller splitting a comma-joined list again.
+	csvRecorder := httptest.NewRecorder()
+	cCsv, _ := gin.CreateTestContext(csvRecorder)
+	cCsv.Request = httptest.NewRequest(http.MethodGet, "/api/stats/builds/failures?format=csv", nil)
+	cCsv.Set("user", "op")
+	cCsv.Set("user_role", db.RoleAdmin)
+	cCsv.Set("user_id", uint(1))
+	cCsv.Set(middleware.TenantIDContextKey, uint(1))
+	s.handleBuildFailureStats(cCsv)
+	if csvRecorder.Code != http.StatusOK {
+		t.Fatalf("csv = %d (%s)", csvRecorder.Code, csvRecorder.Body.String())
+	}
+	csvRows, err := csv.NewReader(strings.NewReader(csvRecorder.Body.String())).ReadAll()
+	if err != nil {
+		t.Fatalf("csv: %v", err)
+	}
+	if len(csvRows) < 2 || strings.Join(csvRows[0], ",") != "Cause,Advice,Count,Platforms,Example" {
+		t.Fatalf("csv header = %v", csvRows[0])
+	}
+	// The environment cause happened on two platforms, so it must occupy two rows - and their counts must sum to the group count.
+	rowsForToolchain, sum := 0, 0
+	for _, row := range csvRows[1:] {
+		if row[0] != HintToolchainMissing {
+			continue
+		}
+		rowsForToolchain++
+		count, convErr := strconv.Atoi(row[2])
+		if convErr != nil {
+			t.Fatalf("count %q: %v", row[2], convErr)
+		}
+		sum += count
+	}
+	if rowsForToolchain != 2 {
+		t.Fatalf("the two-platform cause occupies %d row(s), want 2", rowsForToolchain)
+	}
+	if sum != 4 {
+		t.Fatalf("the per-platform counts sum to %d, want the group total 4 (each cause is repeated per platform)", sum)
 	}
 
 	// 7. Both window spellings are accepted: a bare hour count and a duration.

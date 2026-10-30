@@ -13900,6 +13900,12 @@ paths:
           in: query
           description: Window, as a duration (`24h`) or a bare number of hours (`12`). Default 24h, capped at 720h.
           schema: {type: string, default: 24h}
+        - name: format
+          in: query
+          description: >-
+            csv returns the table as a file with one row per (cause, platform) - a comma-joined platform list would need parsing again
+            at the other end, and the counts would stop adding up.
+          schema: {type: string, enum: [json, csv], default: json}
       responses:
         '200':
           description: Failure causes in the window

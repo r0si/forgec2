@@ -28817,6 +28817,8 @@ export interface operations {
             query?: {
                 /** @description Window, as a duration (`24h`) or a bare number of hours (`12`). Default 24h, capped at 720h. */
                 since?: string;
+                /** @description csv returns the table as a file with one row per (cause, platform) - a comma-joined platform list would need parsing again at the other end, and the counts would stop adding up. */
+                format?: "json" | "csv";
             };
             header?: never;
             path?: never;
