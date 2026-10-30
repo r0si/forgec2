@@ -101,6 +101,12 @@ func bundleLimitsSection() string {
 		"not part of a package; if delivery failures matter to the review, export them before restarting the server.\n")
 	body.WriteString("- **Anything outside the window.** Members are bounded by the engagement's start and end; a host that " +
 		"checked in before or after it is absent by construction, not by accident.\n")
+	// The one absence a reader is most likely to misread as "nothing was planned": structured playbook runs exist, have progress and
+	// owners, and are simply NOT scoped to an engagement - so they cannot be selected into this archive without an invented link.
+	// Saying so is the difference between "the checklist was empty" and "the checklist is somewhere else".
+	body.WriteString("- **Structured playbook runs.** These are tenant-scoped, not engagement-scoped, so they cannot be selected into a " +
+		"package without an engagement link that does not exist. They are not empty and not lost: read them with " +
+		"`GET /api/playbooks/runs` (and `?attention=1` for the ones waiting on a person) or export them with `?format=csv`.\n")
 	return body.String()
 }
 
