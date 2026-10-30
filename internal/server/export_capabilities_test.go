@@ -348,6 +348,7 @@ func TestCapabilitiesListEveryCSVReport(t *testing.T) {
 		"/api/stats/tasks/duration",
 		"/api/stats/tasks/queue",
 		"/api/stats/builds/failures",
+		"/api/playbooks/runs",
 	}
 	for _, path := range expected {
 		if !listed[path] {
@@ -423,6 +424,7 @@ func TestDiagnosticsListTheReadOnlyQuestions(t *testing.T) {
 		"/api/playbooks/runs",
 		"/api/playbooks/runs/:id/history",
 		"/api/stats/builds/failures",
+		"/api/playbooks/runs",
 	} {
 		entry, listed := byPath[path]
 		if !listed {

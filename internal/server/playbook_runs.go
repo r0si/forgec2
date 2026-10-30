@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -138,6 +139,49 @@ func (s *Server) handleListPlaybookRuns(c *gin.Context) {
 		}
 		out = append(out, summary)
 	}
+
+	// ?format=csv takes the checklist away: a handover that includes tasks.csv and audit.ndjson but not "where the structured path stood"
+	// leaves the receiver to rebuild it from screenshots. One row per run, with the columns that answer the three questions the JSON adds:
+	// how far, what is blocked on a person, and whether it has stalled.
+	if strings.EqualFold(strings.TrimSpace(c.Query("format")), "csv") {
+		var buf strings.Builder
+		writer := csv.NewWriter(&buf)
+		if err := writer.Write([]string{
+			"Run ID", "Name", "State", "Created by", "Updated", "Settled", "Total",
+			"Blocked steps", "Next step", "Running steps", "Stalled",
+		}); err != nil {
+			handleQueryError(c, err, "Failed to encode the playbook runs")
+			return
+		}
+		for _, summary := range out {
+			if err := writer.Write([]string{
+				strconv.FormatUint(uint64(summary.ID), 10),
+				summary.Name,
+				summary.State,
+				summary.CreatedBy,
+				summary.UpdatedAt,
+				strconv.Itoa(summary.Settled),
+				strconv.Itoa(summary.Total),
+				strings.Join(summary.BlockedSteps, " "),
+				summary.NextStep,
+				strings.Join(summary.RunningSteps, " "),
+				strconv.FormatBool(summary.Stalled),
+			}); err != nil {
+				handleQueryError(c, err, "Failed to encode the playbook runs")
+				return
+			}
+		}
+		writer.Flush()
+		if err := writer.Error(); err != nil {
+			handleQueryError(c, err, "Failed to encode the playbook runs")
+			return
+		}
+		c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="forgec2_playbook-runs_%s.csv"`,
+			time.Now().Format("2006-01-02_150405")))
+		c.Data(http.StatusOK, "text/csv; charset=utf-8", []byte(buf.String()))
+		return
+	}
+
 	respond(c, gin.H{"runs": out, "count": len(out), "stall_grace_seconds": int(playbookStallGrace.Seconds())})
 }
 

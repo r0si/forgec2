@@ -85,6 +85,7 @@ func (s *Server) handleExportCapabilities(c *gin.Context) {
 				{Path: "/api/stats/tasks/duration", Answers: "how long tasks take, by type"},
 				{Path: "/api/stats/tasks/queue", Answers: "which beacon is not draining its queue, with its oldest pending age"},
 				{Path: "/api/stats/builds/failures", Answers: "why builds failed, grouped by cause - an environment problem or a code problem"},
+				{Path: "/api/playbooks/runs", Answers: "where each structured checklist stood: progress, what waits for a person, and what stalled"},
 			},
 		}, "audit_export": exportCapabilities{
 			Path:       "/api/audit/export",

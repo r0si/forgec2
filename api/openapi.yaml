@@ -13518,6 +13518,13 @@ paths:
           in: query
           description: draft|blocked|running|failed|complete
           schema: {type: string}
+        - name: format
+          in: query
+          description: >-
+            csv returns the checklist as a file with one row per run: progress, what waits for a person, and what stalled. A handover
+            that carries tasks.csv and audit.ndjson but not this leaves the receiver rebuilding "where the structured path stood" from
+            screenshots.
+          schema: {type: string, enum: [json, csv], default: json}
         - name: attention
           in: query
           description: >-

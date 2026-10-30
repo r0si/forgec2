@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -266,5 +267,73 @@ func TestPlaybookRunStalledStep(t *testing.T) {
 	// And the attention filter keeps a stalled run, which is the point of the flag.
 	if attention := read("/api/playbooks/runs?attention=1"); !attention[record.ID] {
 		t.Fatalf("the attention list dropped the stalled run: %+v", attention)
+	}
+}
+
+// TestPlaybookRunsCSVKeepsTheThreeQuestions covers the export of the checklist list.
+//
+// The columns are the JSON's three answers flattened into a table: how far the run got, what is waiting for a person, and whether it has
+// stalled. A handover that carries tasks.csv and audit.ndjson but not this leaves the receiver rebuilding "where the structured path stood"
+// from screenshots.
+func TestPlaybookRunsCSVKeepsTheThreeQuestions(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	s := mustTenantServer(t)
+
+	run := playbook.Run{Name: "csv-run", Steps: []playbook.Step{
+		{ID: "recon", Status: playbook.StatusSucceeded},
+		{ID: "exploit", Needs: []string{"recon"}},
+		{ID: "exfil", Needs: []string{"exploit"}, Approval: true, Status: playbook.StatusBlocked},
+	}}
+	if err := run.Normalise(); err != nil {
+		t.Fatalf("normalise: %v", err)
+	}
+	if _, err := s.savePlaybookRun(playbookTenantContext(1), run, "op"); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/playbooks/runs?format=csv", nil)
+	c.Set("user", "op")
+	c.Set("user_role", db.RoleAdmin)
+	c.Set("user_id", uint(1))
+	c.Set(middleware.TenantIDContextKey, uint(1))
+	s.handleListPlaybookRuns(c)
+	if w.Code != http.StatusOK {
+		t.Fatalf("csv = %d (%s)", w.Code, w.Body.String())
+	}
+	if contentType := w.Header().Get("Content-Type"); !strings.HasPrefix(contentType, "text/csv") {
+		t.Fatalf("Content-Type = %q", contentType)
+	}
+
+	rows, err := csv.NewReader(strings.NewReader(w.Body.String())).ReadAll()
+	if err != nil {
+		t.Fatalf("csv: %v", err)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("rows = %d, want a header and the one run", len(rows))
+	}
+	header := strings.Join(rows[0], ",")
+	for _, column := range []string{"Run ID", "Blocked steps", "Next step", "Stalled"} {
+		if !strings.Contains(header, column) {
+			t.Fatalf("header %q is missing %q", header, column)
+		}
+	}
+	// The three answers, in the one row: 1/3 settled, exfil blocked on a person, exploit ready next, not stalled.
+	row := rows[1]
+	if row[3] != "op" {
+		t.Fatalf("created by = %q", row[3])
+	}
+	if row[5] != "1" || row[6] != "3" {
+		t.Fatalf("progress = %s/%s, want 1/3", row[5], row[6])
+	}
+	if row[7] != "exfil" {
+		t.Fatalf("blocked steps = %q, want exfil", row[7])
+	}
+	if row[8] != "exploit" {
+		t.Fatalf("next step = %q, want exploit", row[8])
+	}
+	if row[10] != "false" {
+		t.Fatalf("stalled = %q, want false", row[10])
 	}
 }
