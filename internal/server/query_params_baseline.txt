@@ -1,6 +1,5 @@
 # Query parameters read by a handler but documented in no operation.
 # SHRINK-ONLY: document a parameter, delete its line. Never add a line to make a build pass.
-after
 before
 browser
 campaign_id
@@ -27,8 +26,6 @@ quality
 range
 read
 reason
-session
-session_id
 severity
 task_ids
 technique

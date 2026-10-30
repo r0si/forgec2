@@ -22,8 +22,18 @@ func TestQueryParametersAreDocumented(t *testing.T) {
 		t.Fatalf("the API document is missing: %v", err)
 	}
 	documented := map[string]bool{}
-	for _, match := range regexp.MustCompile(`- name: ([a-zA-Z0-9_]+)`).FindAllStringSubmatch(string(spec), -1) {
-		documented[match[1]] = true
+	// Two spellings, and the second one matters: this document writes most parameters inline as `- {name: format, ...}`, and
+	// matching only the block form made the guard report a documented parameter as missing - a false positive that would have
+	// pushed real documentation into the baseline.
+	paramPatterns := []*regexp.Regexp{
+		regexp.MustCompile(`- name: ([a-zA-Z0-9_]+)`),
+		regexp.MustCompile(`- \{name: ([a-zA-Z0-9_]+)`),
+		regexp.MustCompile(`- \{name: "([a-zA-Z0-9_]+)"`),
+	}
+	for _, pattern := range paramPatterns {
+		for _, match := range pattern.FindAllStringSubmatch(string(spec), -1) {
+			documented[match[1]] = true
+		}
 	}
 	if len(documented) < 40 {
 		t.Fatalf("only %d documented parameters found; this guard is not reading the spec", len(documented))

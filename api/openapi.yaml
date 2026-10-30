@@ -13883,6 +13883,53 @@ paths:
                             sample: {type: string}
         '400':
           description: Invalid since or group_by
+  /api/stats/builds/failures:
+    get:
+      tags: [Stats]
+      summary: Why builds failed, grouped by cause
+      description: >-
+        A build log row already carries its failure text, so this report **classifies the history** with the same helper that produces
+        `error_hint` for a single build - the property that matters, since "six failed with toolchain_missing" (an environment problem)
+        and "six with compile_error" (a code problem) send an operator to different places, and a report that disagreed with the single-build
+        view would be worse than none. Groups are ordered by frequency, each carrying the advice sentence, the platforms it happened on and
+        one bounded example. `summary` states the leading cause so the caller does not have to derive it.
+      operationId: buildFailureStats
+      security: [{SessionCookie: []}]
+      parameters:
+        - name: since
+          in: query
+          description: Window, as a duration (`24h`) or a bare number of hours (`12`). Default 24h, capped at 720h.
+          schema: {type: string, default: 24h}
+      responses:
+        '200':
+          description: Failure causes in the window
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: {type: boolean}
+                  data:
+                    type: object
+                    properties:
+                      since: {type: string, format: date-time}
+                      window_hours: {type: integer}
+                      total_failed: {type: integer}
+                      summary: {type: string}
+                      note: {type: string}
+                      causes:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            code: {type: string, description: Same closed set as error_hint}
+                            advice: {type: string}
+                            count: {type: integer}
+                            platforms:
+                              type: array
+                              items: {type: string}
+                            example: {type: string, description: One bounded failure text}
+        '400': {description: since is not a duration or an hour count}
   /api/stats/tasks/duration:
     get:
       tags: [Statistics]

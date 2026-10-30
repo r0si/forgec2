@@ -17,6 +17,8 @@ func (s *Server) registerGenerateRoutes(auth *gin.RouterGroup) {
 		genRead.GET("/generate/builds/:id", s.handleBuildStatus)
 		genRead.GET("/generate/builds/:id/download", s.handleBuildDownload)
 		genRead.GET("/api/builds/effectiveness", s.handleBuildEffectiveness)
+		// Why builds failed, grouped by cause: an environment problem and a code problem send an operator to different places.
+		genRead.GET("/api/stats/builds/failures", s.handleBuildFailureStats)
 		// What the SERVER needs in order to build, checked as the server's own user: these environment failures otherwise surface only
 		// as a failed compile.
 		genRead.GET("/api/generate/toolchain", s.handleBuildToolchain)

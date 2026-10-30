@@ -11364,6 +11364,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/stats/builds/failures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Why builds failed, grouped by cause
+         * @description A build log row already carries its failure text, so this report **classifies the history** with the same helper that produces `error_hint` for a single build - the property that matters, since "six failed with toolchain_missing" (an environment problem) and "six with compile_error" (a code problem) send an operator to different places, and a report that disagreed with the single-build view would be worse than none. Groups are ordered by frequency, each carrying the advice sentence, the platforms it happened on and one bounded example. `summary` states the leading cause so the caller does not have to derive it.
+         */
+        get: operations["buildFailureStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/stats/tasks/duration": {
         parameters: {
             query?: never;
@@ -28784,6 +28804,55 @@ export interface operations {
                 };
             };
             /** @description Invalid since or group_by */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    buildFailureStats: {
+        parameters: {
+            query?: {
+                /** @description Window, as a duration (`24h`) or a bare number of hours (`12`). Default 24h, capped at 720h. */
+                since?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Failure causes in the window */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        data?: {
+                            /** Format: date-time */
+                            since?: string;
+                            window_hours?: number;
+                            total_failed?: number;
+                            summary?: string;
+                            note?: string;
+                            causes?: {
+                                /** @description Same closed set as error_hint */
+                                code?: string;
+                                advice?: string;
+                                count?: number;
+                                platforms?: string[];
+                                /** @description One bounded failure text */
+                                example?: string;
+                            }[];
+                        };
+                    };
+                };
+            };
+            /** @description since is not a duration or an hour count */
             400: {
                 headers: {
                     [name: string]: unknown;
