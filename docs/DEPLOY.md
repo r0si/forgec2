@@ -264,6 +264,7 @@ them are about things that keep working while being useless, which is why they a
 | `audit_chain` | the chain does not verify in the ready window | treat as an incident: `docs/AUDIT_EXPORT.md` explains what it can and cannot prove |
 | `task_queue` | a beacon holds a pending task older than **its own sleep interval plus two minutes** | the beacon is not polling, not slow: `GET /api/stats/tasks/queue` names the host and the age |
 | `build_toolchain` | the server process cannot build a payload (`go` missing from its PATH, or an unwritable `GOCACHE`) | `GET /api/generate/toolchain` names the missing piece; a shell where `go` works proves nothing about the service account |
+| `build_history` | the last 24 h of builds **all failed** (at least three of them) | `GET /api/stats/builds/failures` names the cause; one failed build is a typo, a run of them is a broken toolchain |
 
 Both delivery checks use "never delivered", not "anything failed": one failure after a hundred successes is a blip, and a
 probe that warns on blips gets muted. Neither makes the server **unready** - the process is fine, the notification path is

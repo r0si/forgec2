@@ -37,20 +37,25 @@ import (
 // HTTP glue in server_http.go.
 
 type Server struct {
-	cfg            *config.Config
-	configMu       sync.RWMutex
-	db             *gorm.DB
-	router         *gin.Engine
-	wsClients      map[*websocket.Conn]*wsClientConn
-	wsMutex        sync.RWMutex
-	wsUpgrader     websocket.Upgrader
-	rateLimiter    *middleware.RateLimiter
-	apiRateLimiter *middleware.APIRateLimiter
-	loginLockout   *loginLockoutTracker
-	socksEngine    *socksRelayEngine
-	cookieProxy    *cookieProxyEngine
-	tunEngine      *tunEngine
-	startTime      time.Time
+	cfg       *config.Config
+	configMu  sync.RWMutex
+	db        *gorm.DB
+	router    *gin.Engine
+	wsClients map[*websocket.Conn]*wsClientConn
+	wsMutex   sync.RWMutex
+	// The build-health snapshot belongs to THIS server: it describes this database's build history. A package-level cache let one
+	// test's failed builds decide another test's readiness answer, which is how a global cache turns into a flaky suite.
+	buildHealthMu     sync.Mutex
+	buildHealthCached buildHealthSnapshot
+	buildHealthAt     time.Time
+	wsUpgrader        websocket.Upgrader
+	rateLimiter       *middleware.RateLimiter
+	apiRateLimiter    *middleware.APIRateLimiter
+	loginLockout      *loginLockoutTracker
+	socksEngine       *socksRelayEngine
+	cookieProxy       *cookieProxyEngine
+	tunEngine         *tunEngine
+	startTime         time.Time
 
 	dnsListener *DNSBeaconListener
 	// dnsListenerMu guards the dnsListener pointer: the status poll, the

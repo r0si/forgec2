@@ -139,6 +139,17 @@ func (s *Server) handleReadyCheck(c *gin.Context) {
 		// A deployment that cannot build a payload is broken in a way nobody notices until they need one. The probe is the thing
 		// running when nobody is watching, so it reports the toolchain state from its short-lived cache rather than by shelling out on
 		// every poll.
+		// Whether builds have been WORKING, not just whether they could: a deployment where every build fails is broken in a way nobody
+		// notices until they need a payload. The snapshot warns only when the evidence is unambiguous (three or more builds, none of them
+		// successful), so a single typo does not turn /ready yellow.
+		if health := s.buildHealth(); health.Scanned {
+			checks["build_history"] = health.Text
+			if health.Warn {
+				warnings = append(warnings,
+					"payload builds are failing consistently; GET /api/stats/builds/failures names the cause")
+			}
+		}
+
 		// Informational, never a warning - the same reasoning as bundle_signing. A probe whose answer depends on the process
 		// environment (PATH, GOCACHE) would fire on a transient state and get muted, and the endpoint that owns the detail
 		// (/api/generate/toolchain) says exactly what is missing and how to fix it.
