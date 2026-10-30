@@ -154,11 +154,11 @@ export default function GeneratePayloadWorkspace() {
       case "dll":
         return <BinaryPanel variant="dll" form={g.forms.dll} setForm={makeDispatch("dll")} busy={g.states.dll.busy} result={g.states.dll.result} signature={g.states.dll.signature} hint={g.states.dll.hint} onGenerate={g.handlerMap.dll} canGenerate={canGenerate} agentModules={g.agentModules} />;
       case "ps1":
-        return <PS1Panel form={g.forms.ps1} setForm={makeDispatch("ps1")} busy={g.states.ps1.busy} result={g.states.ps1.result} code={g.extras.ps1?.code} originalLen={g.extras.ps1?.original_length} obfuscatedLen={g.extras.ps1?.obfuscated_len} onGenerate={g.handlerMap.ps1} canGenerate={canGenerate} />;
+        return <PS1Panel form={g.forms.ps1} setForm={makeDispatch("ps1")} busy={g.states.ps1.busy} result={g.states.ps1.result} code={g.extras.ps1?.code} originalLen={g.extras.ps1?.original_length} obfuscatedLen={g.extras.ps1?.obfuscated_len} hint={g.states.ps1.hint} onGenerate={g.handlerMap.ps1} canGenerate={canGenerate} />;
       case "linux":
-        return <UnixPanel variant="linux" form={g.forms.linux} setForm={makeDispatch("linux")} busy={g.states.linux.busy} result={g.states.linux.result} onGenerate={g.handlerMap.linux} canGenerate={canGenerate} agentModules={g.agentModules} />;
+        return <UnixPanel variant="linux" form={g.forms.linux} setForm={makeDispatch("linux")} busy={g.states.linux.busy} result={g.states.linux.result} hint={g.states.linux.hint} onGenerate={g.handlerMap.linux} canGenerate={canGenerate} agentModules={g.agentModules} />;
       case "macos":
-        return <UnixPanel variant="macos" form={g.forms.macos} setForm={makeDispatch("macos")} busy={g.states.macos.busy} result={g.states.macos.result} onGenerate={g.handlerMap.macos} canGenerate={canGenerate} agentModules={g.agentModules} />;
+        return <UnixPanel variant="macos" form={g.forms.macos} setForm={makeDispatch("macos")} busy={g.states.macos.busy} result={g.states.macos.result} hint={g.states.macos.hint} onGenerate={g.handlerMap.macos} canGenerate={canGenerate} agentModules={g.agentModules} />;
       case "oneliner":
         return (
           <Suspense fallback={null}>
@@ -307,8 +307,8 @@ export default function GeneratePayloadWorkspace() {
                     desc={t("generate.artifact_kit_desc")}
                   />
                   <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                    <StagerPanel variant="windows" form={g.forms.stager} setForm={makeDispatch("stager")} busy={g.states.stager.busy} result={g.states.stager.result} onGenerate={g.handlerMap.stager} canGenerate={canGenerate} />
-                    <StagerPanel variant="linux" form={g.forms.stager_linux} setForm={makeDispatch("stager_linux")} busy={g.states.stager_linux.busy} result={g.states.stager_linux.result} onGenerate={g.handlerMap.stager_linux} canGenerate={canGenerate} />
+                    <StagerPanel variant="windows" form={g.forms.stager} setForm={makeDispatch("stager")} busy={g.states.stager.busy} result={g.states.stager.result} hint={g.states.stager.hint} onGenerate={g.handlerMap.stager} canGenerate={canGenerate} />
+                    <StagerPanel variant="linux" form={g.forms.stager_linux} setForm={makeDispatch("stager_linux")} busy={g.states.stager_linux.busy} result={g.states.stager_linux.result} hint={g.states.stager_linux.hint} onGenerate={g.handlerMap.stager_linux} canGenerate={canGenerate} />
                   </div>
                 </div>
                 <div>
@@ -319,8 +319,8 @@ export default function GeneratePayloadWorkspace() {
                     desc={t("generate.shellcode_donut_desc")}
                   />
                   <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                    <ShellcodePanel form={g.forms.shellcode} setForm={makeDispatch("shellcode")} busy={g.states.shellcode.busy} result={g.states.shellcode.result} onGenerate={g.handlerMap.shellcode} canGenerate={canGenerate} />
-                    <DonutPanel form={g.forms.donut} setForm={makeDispatch("donut")} busy={g.states.donut.busy} result={g.states.donut.result} onGenerate={g.handlerMap.donut} fileRef={g.donutFileRef} canGenerate={canGenerate} />
+                    <ShellcodePanel form={g.forms.shellcode} setForm={makeDispatch("shellcode")} busy={g.states.shellcode.busy} result={g.states.shellcode.result} hint={g.states.shellcode.hint} onGenerate={g.handlerMap.shellcode} canGenerate={canGenerate} />
+                    <DonutPanel form={g.forms.donut} setForm={makeDispatch("donut")} busy={g.states.donut.busy} result={g.states.donut.result} hint={g.states.donut.hint} onGenerate={g.handlerMap.donut} fileRef={g.donutFileRef} canGenerate={canGenerate} />
                   </div>
                 </div>
                 <Suspense fallback={null}><DeliveryPanel /></Suspense>
