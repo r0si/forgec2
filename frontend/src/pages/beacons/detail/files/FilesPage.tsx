@@ -161,12 +161,14 @@ export default function FilesPage() {
   };
 
   return (
-    <PageContainer className="h-full gap-(--page-gap) px-(--page-pad-x) py-(--page-pad-y)">
+    <PageContainer variant="workspace" className="h-full">
       {osError && (
-        <DataError
-          message={osError}
-          onRetry={() => { window.location.reload(); }}
-        />
+        <div className="px-(--page-pad-x) py-(--page-pad-y)">
+          <DataError
+            message={osError}
+            onRetry={() => { window.location.reload(); }}
+          />
+        </div>
       )}
       {!osError && (
       <>
@@ -181,6 +183,7 @@ export default function FilesPage() {
         onRefresh={() => void loadDirectory(currentPath, { refresh: true })}
       />
 
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-(--page-pad-x) py-(--page-pad-y) scrollbar-thin">
       <p className="text-xs text-muted-foreground">{t("agents.files_channel_hint")}</p>
 
       <FilesPathBar
@@ -359,6 +362,8 @@ export default function FilesPage() {
           )}
         </>
       )}
+
+      </div>
 
       <FilesDialogs
         t={t}

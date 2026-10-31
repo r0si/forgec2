@@ -17,34 +17,34 @@ export default function RemoteDesktopPage() {
   const rdp = useRemoteDesktop(id);
 
   return (
-    <PageContainer className="h-full gap-(--page-gap) px-(--page-pad-x) py-(--page-pad-y)">
-      <Banner tone="warning" icon={<TriangleAlert className="size-4" />} className="items-start">
-        <div className="font-semibold">{t("agents.rdp_experimental_title")}</div>
-        <div className="text-xs text-muted-foreground">{t("agents.rdp_experimental_desc")}</div>
-      </Banner>
-      <div className="flex min-h-0 flex-1 flex-col">
-        <RdpToolbar
-          t={t}
-          agentId={id}
-          nativeWidth={rdp.liveActive ? rdp.liveWidth : rdp.nativeWidth}
-          nativeHeight={rdp.liveActive ? rdp.liveHeight : rdp.nativeHeight}
-          resolutions={rdp.RESOLUTIONS}
-          resolution={rdp.resolution}
-          setResolution={rdp.setResolution}
-          mode={rdp.mode}
-          setMode={rdp.setMode}
-          livePresets={rdp.livePresets}
-          livePreset={rdp.livePreset}
-          setLivePreset={rdp.setLivePreset}
-          active={rdp.sessionActive}
-          isFullscreen={rdp.isFullscreen}
-          onToggleFullscreen={() => void rdp.toggleFullscreen()}
-          versionBlocked={rdp.versionBlocked}
-          onStart={rdp.handleStart}
-          onStop={rdp.handleStop}
-        />
+    <PageContainer variant="workspace" className="h-full">
+      <RdpToolbar
+        t={t}
+        agentId={id}
+        nativeWidth={rdp.liveActive ? rdp.liveWidth : rdp.nativeWidth}
+        nativeHeight={rdp.liveActive ? rdp.liveHeight : rdp.nativeHeight}
+        resolutions={rdp.RESOLUTIONS}
+        resolution={rdp.resolution}
+        setResolution={rdp.setResolution}
+        mode={rdp.mode}
+        setMode={rdp.setMode}
+        livePresets={rdp.livePresets}
+        livePreset={rdp.livePreset}
+        setLivePreset={rdp.setLivePreset}
+        active={rdp.sessionActive}
+        isFullscreen={rdp.isFullscreen}
+        onToggleFullscreen={() => void rdp.toggleFullscreen()}
+        versionBlocked={rdp.versionBlocked}
+        onStart={rdp.handleStart}
+        onStop={rdp.handleStop}
+      />
 
-        <div className="flex-1 min-h-0 flex flex-col">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 px-(--page-pad-x) py-(--page-pad-y)">
+        <Banner tone="warning" icon={<TriangleAlert className="size-4" />} className="items-start">
+          <div className="font-semibold">{t("agents.rdp_experimental_title")}</div>
+          <div className="text-xs text-muted-foreground">{t("agents.rdp_experimental_desc")}</div>
+        </Banner>
+        <div className="flex min-h-0 flex-1 flex-col">
           <RdpStage
             t={t}
             status={rdp.status}

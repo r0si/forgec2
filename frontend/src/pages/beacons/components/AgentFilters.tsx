@@ -9,6 +9,7 @@ import { useI18n } from "@/lib/i18n";
 import type { Tag } from "./types";
 import { Apple, Columns, Monitor, Terminal, Wifi } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import type { ReactNode } from "react";
 
 interface AgentFiltersProps {
   searchInput: string; setSearchInput: (v: string) => void;
@@ -20,6 +21,8 @@ interface AgentFiltersProps {
   visibleCols: Record<string, boolean>; setVisibleCols: (v: Record<string, boolean> | ((prev: Record<string, boolean>) => Record<string, boolean>)) => void;
   onlineCount: number;
   windowsCount: number; linuxCount: number; darwinCount: number;
+  /** Saved-view picker; rendered in the same row as the filters. */
+  savedView?: ReactNode;
 }
 
 export function AgentFilters({
@@ -32,6 +35,7 @@ export function AgentFilters({
   visibleCols, setVisibleCols,
   onlineCount,
   windowsCount, linuxCount, darwinCount,
+  savedView,
 }: AgentFiltersProps) {
   const { t } = useI18n();
   return (
@@ -111,6 +115,9 @@ export function AgentFilters({
               })}
             </DropdownMenuContent>
           </DropdownMenu>
+          {savedView && (
+            <div className="col-span-2 flex items-center sm:col-span-1">{savedView}</div>
+          )}
           <div className="hidden sm:flex items-center gap-1.5 ml-auto text-xs-sm">
             {onlineCount > 0 && <Badge variant="secondary" className="gap-1 text-success-ink"><Wifi className="size-4" />{onlineCount}</Badge>}
             {windowsCount > 0 && <Badge variant="secondary" className="gap-1"><Monitor className="size-4" />{windowsCount}</Badge>}

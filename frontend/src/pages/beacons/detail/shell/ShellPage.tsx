@@ -21,6 +21,8 @@ import { useWS } from "@/lib/wsContext";
 import { agentDetailHref } from "../components/agent-detail-utils";
 import type { AgentStatus } from "@/types/agent";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import { PageContainer } from "@/components/ui/page-container";
+import { WorkspaceToolbar } from "@/components/ui/workspace-toolbar";
 
 const ShellTerminal = lazy(() => import("@/components/ShellTerminal")); // xterm is heavy; spinner fallback at usage below
 
@@ -229,48 +231,49 @@ export default function AgentShellPage() {
   const activeOffline = Boolean(activeMetaResolved?.status && activeMetaResolved.status !== "online");
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-(--shell-terminal-bg) text-slate-100">
-      <h1 className="sr-only">{t("shell.title")}</h1>
-      <header className="flex h-12 shrink-0 items-center gap-2 border-b border-white/10 px-3 sm:px-4">
-        <Button
-          variant="ghost"
-          size="sm"
-          render={<Link to={agentDetailHref(activeAgentId || routeAgentId)} />}
-          className="gap-1.5 px-2 text-slate-200 hover:bg-white/10 hover:text-white"
-        >
-          <ArrowLeft className="size-4" />
-          <span className="hidden sm:inline">{t("shell.back_to_session")}</span>
-        </Button>
-        <ChevronRight className="hidden size-3.5 text-slate-600 sm:block" />
-        {activeMetaResolved?.status ? <StatusBadge status={activeMetaResolved.status} pulse={activeMetaResolved.status === "online"} /> : null}
-        <div className="min-w-0 leading-tight">
-          <div className="truncate text-sm font-semibold tracking-tight">{title}</div>
-          <div className="truncate font-mono text-micro-sm text-slate-400">
-            {[activeMetaResolved?.ip, activeMetaResolved?.osType].filter(Boolean).join(" · ")}
-          </div>
-        </div>
-        <Select value={activeAgentId} onValueChange={(v) => { if (v) openAgentTab(v); }}>
-          <SelectTrigger
-            ref={selectTriggerRef}
-            className="ml-auto h-8 w-[min(18rem,40vw)] border-white/10 bg-white/5 text-xs text-slate-200"
-            aria-label={t("shell.switch_session")}
-          >
-            <SelectValue placeholder={t("agents.shell_select_agent")} />
-          </SelectTrigger>
-          <SelectContent>
-            {agents.map((a) => (
-              <SelectItem key={a.id} value={a.id}>
-                {agentIdentityTitle(a.hostname, a.username, a.id)}
-                {a.ip ? ` @ ${a.ip}` : ""} — {t(`agents.${a.status}_label`)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </header>
-
+    <PageContainer variant="workspace" className="h-full bg-(--shell-terminal-bg) text-slate-100">
+      <WorkspaceToolbar
+        tone="terminal"
+        leading={
+          <>
+            <Button
+              variant="ghost"
+              size="sm"
+              render={<Link to={agentDetailHref(activeAgentId || routeAgentId)} />}
+              className="gap-1.5 px-2 text-slate-200 hover:bg-white/10 hover:text-white"
+            >
+              <ArrowLeft className="size-4" />
+              <span className="hidden sm:inline">{t("shell.back_to_session")}</span>
+            </Button>
+            <ChevronRight className="hidden size-3.5 text-slate-600 sm:block" />
+          </>
+        }
+        title={title}
+        meta={[activeMetaResolved?.ip, activeMetaResolved?.osType].filter(Boolean).join(" · ") || undefined}
+        badges={activeMetaResolved?.status ? <StatusBadge status={activeMetaResolved.status} pulse={activeMetaResolved.status === "online"} /> : null}
+        actions={
+          <Select value={activeAgentId} onValueChange={(v) => { if (v) openAgentTab(v); }}>
+            <SelectTrigger
+              ref={selectTriggerRef}
+              className="h-8 w-[min(18rem,40vw)] border-white/10 bg-white/5 text-xs text-slate-200"
+              aria-label={t("shell.switch_session")}
+            >
+              <SelectValue placeholder={t("agents.shell_select_agent")} />
+            </SelectTrigger>
+            <SelectContent>
+              {agents.map((a) => (
+                <SelectItem key={a.id} value={a.id}>
+                  {agentIdentityTitle(a.hostname, a.username, a.id)}
+                  {a.ip ? ` @ ${a.ip}` : ""} — {t(`agents.${a.status}_label`)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        }
+      >
       {tabs.length > 0 && (
         <div
-          className="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-white/10 bg-black/20 px-2 py-1"
+          className="flex items-center gap-1 overflow-x-auto bg-black/20 px-2 py-1"
           role="tablist"
           aria-label={t("shell.tabs_label")}
         >
@@ -329,6 +332,7 @@ export default function AgentShellPage() {
           </Button>
         </div>
       )}
+      </WorkspaceToolbar>
 
       {activeOffline && activeMetaResolved && (
         <div className="flex shrink-0 items-start gap-3 border-b border-amber-400/20 bg-amber-500/15 px-4 py-2.5 text-amber-50" role="status">
@@ -380,6 +384,6 @@ export default function AgentShellPage() {
           </div>
         )}
       </div>
-    </div>
+    </PageContainer>
   );
 }

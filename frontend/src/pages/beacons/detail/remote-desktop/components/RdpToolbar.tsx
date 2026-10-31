@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { WorkspaceToolbar } from "@/components/ui/workspace-toolbar";
 import { Compass, Expand, Maximize2, Play, Square, Users } from "lucide-react";
 import { isExperimentalDesktop } from "../../components/session-quality";
 import type { ResolutionOption } from "./useRemoteDesktop";
@@ -38,102 +39,101 @@ export default memo(function RdpToolbar({
   active, isFullscreen, onToggleFullscreen, versionBlocked, onStart, onStop,
 }: RdpToolbarProps) {
   return (
-    <div className="flex items-center justify-between mb-3 gap-3 flex-wrap shrink-0">
-      <div className="flex items-center gap-3">
-        <h1 className="text-lg font-bold text-foreground flex items-center gap-2">
-          <Users className="size-4" />
-          {t("agents.rdp_title")}
+    <WorkspaceToolbar
+      title={t("agents.rdp_title")}
+      icon={Users}
+      badges={
+        <>
           {isExperimentalDesktop("remote-desktop") ? (
             <span className="text-micro font-normal text-warning-ink">{t("generate.quality_experimental")}</span>
           ) : null}
-        </h1>
-        <Badge variant="secondary" className="text-xs text-muted-foreground font-mono bg-muted/50 px-2 py-0.5 rounded-lg">
-          {agentId}
-        </Badge>
-        {nativeWidth > 0 && nativeHeight > 0 && (
-          <Badge variant="secondary" className="text-xs bg-muted/50 text-muted-foreground px-2.5 py-1 rounded-lg flex items-center gap-1">
-            <Maximize2 className="size-4" />
-            {nativeWidth} x {nativeHeight}
+          <Badge variant="secondary" className="text-xs text-muted-foreground font-mono">
+            {agentId}
           </Badge>
-        )}
-      </div>
-      <div className="flex items-center gap-2 flex-wrap">
-        <Select
-          value={mode}
-          onValueChange={(v) => { if (v === "snapshot" || v === "live") setMode(v); }}
-          disabled={active}
-        >
-          <SelectTrigger className="w-[150px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="snapshot">{t("agents.rdp_mode_snapshot")}</SelectItem>
-            <SelectItem value="live">{t("agents.rdp_mode_live")}</SelectItem>
-          </SelectContent>
-        </Select>
-        {mode === "snapshot" ? (
-          <Select value={resolution} onValueChange={(v) => { if (v !== null) setResolution(v); }} disabled={active}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {resolutions.map((r) => (
-                <SelectItem key={r.value} value={r.value}>
-                  {r.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        ) : (
+          {nativeWidth > 0 && nativeHeight > 0 && (
+            <Badge variant="secondary" className="text-xs bg-muted/50 text-muted-foreground flex items-center gap-1">
+              <Maximize2 className="size-3.5" />
+              {nativeWidth} x {nativeHeight}
+            </Badge>
+          )}
+        </>
+      }
+      actions={
+        <>
           <Select
-            value={livePreset}
-            onValueChange={(v) => {
-              if (v === "720p" || v === "1080p") setLivePreset(v);
-            }}
+            value={mode}
+            onValueChange={(v) => { if (v === "snapshot" || v === "live") setMode(v); }}
             disabled={active}
           >
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-[150px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {livePresets.map((preset) => (
-                <SelectItem key={preset.value} value={preset.value}>
-                  {preset.label}
-                </SelectItem>
-              ))}
+              <SelectItem value="snapshot">{t("agents.rdp_mode_snapshot")}</SelectItem>
+              <SelectItem value="live">{t("agents.rdp_mode_live")}</SelectItem>
             </SelectContent>
           </Select>
-        )}
-        <Tooltip>
-          <TooltipTrigger render={<Button
-              variant="outline"
-              size="icon-lg"
-              onClick={onToggleFullscreen}
-              aria-label={isFullscreen ? t("agents.rdp_exit_fullscreen") : t("agents.rdp_enter_fullscreen")}
-            />}>
-            {isFullscreen ? <Compass className="size-4" /> : <Expand className="size-4" />}
-          </TooltipTrigger>
-          <TooltipContent>{isFullscreen ? t("agents.rdp_exit_fullscreen") : t("agents.rdp_fullscreen")}</TooltipContent>
-        </Tooltip>
-        {!active ? (
-          <Button
-            onClick={onStart}
-            disabled={versionBlocked}
-            title={versionBlocked ? t("agents.version_unknown_dest") : undefined}
-          >
-            <Play className="size-4" />
-            {t("agents.rdp_start")}
-          </Button>
-        ) : (
-          <Button
-            variant="destructive"
-            onClick={onStop}
-          >
-            <Square className="size-4" />
-            {t("agents.rdp_stop")}
-          </Button>
-        )}
-      </div>
-    </div>
+          {mode === "snapshot" ? (
+            <Select value={resolution} onValueChange={(v) => { if (v !== null) setResolution(v); }} disabled={active}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {resolutions.map((r) => (
+                  <SelectItem key={r.value} value={r.value}>
+                    {r.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Select
+              value={livePreset}
+              onValueChange={(v) => {
+                if (v === "720p" || v === "1080p") setLivePreset(v);
+              }}
+              disabled={active}
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {livePresets.map((preset) => (
+                  <SelectItem key={preset.value} value={preset.value}>
+                    {preset.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <Tooltip>
+            <TooltipTrigger render={<Button
+                variant="outline"
+                size="icon-lg"
+                onClick={onToggleFullscreen}
+                aria-label={isFullscreen ? t("agents.rdp_exit_fullscreen") : t("agents.rdp_enter_fullscreen")}
+              />}>
+              {isFullscreen ? <Compass className="size-4" /> : <Expand className="size-4" />}
+            </TooltipTrigger>
+            <TooltipContent>{isFullscreen ? t("agents.rdp_exit_fullscreen") : t("agents.rdp_fullscreen")}</TooltipContent>
+          </Tooltip>
+          {!active ? (
+            <Button
+              onClick={onStart}
+              disabled={versionBlocked}
+              title={versionBlocked ? t("agents.version_unknown_dest") : undefined}
+            >
+              <Play className="size-4" />
+              {t("agents.rdp_start")}
+            </Button>
+          ) : (
+            <Button variant="destructive" onClick={onStop}>
+              <Square className="size-4" />
+              {t("agents.rdp_stop")}
+            </Button>
+          )}
+        </>
+      }
+    />
   );
 });

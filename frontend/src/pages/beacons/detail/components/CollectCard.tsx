@@ -1,6 +1,5 @@
 import { memo, type ReactNode } from "react";
-import { Card } from "@/components/ui/card";
-import { CardHeader } from "@/components/ui/card-header";
+import { SectionCard } from "@/components/ui/section-card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { CopyButton } from "@/components/ui/copy-button";
 import type { Hue } from "@/lib/ui/statusStyles";
@@ -54,8 +53,7 @@ export default memo(function CollectCard({
   resultMaxHeight = "max-h-72",
 }: CollectCardProps) {
   return (
-    <Card className="mb-(--page-gap) gap-0 overflow-hidden py-0">
-      <CardHeader icon={icon} tone={tone} title={title} action={headerRight} />
+    <SectionCard title={title} icon={icon} tone={tone} action={headerRight} className="mb-(--page-gap)">
       <div className="space-y-3 p-3">
         {children}
         {resultOverride ?? (result === null ? (
@@ -75,6 +73,6 @@ export default memo(function CollectCard({
         ))}
         {footer}
       </div>
-    </Card>
+    </SectionCard>
   );
 });

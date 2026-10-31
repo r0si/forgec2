@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Layout gate (U9.7): the layout contract in docs/frontend-style-conventions.md
-// is only worth writing down if it is enforced. These rules catch the four
+// Layout gate (U9.7/U9.5): the layout contract in docs/frontend-style-conventions.md
+// is only worth writing down if it is enforced. These rules catch the
 // ways the contract was broken in the first place - each one reachable with
 // a single class name.
 //
@@ -11,6 +11,21 @@ import { join, relative } from "node:path";
 
 const ROOT = join(process.cwd(), "src");
 const listOnly = process.argv.includes("--list");
+
+/** Agent workspaces share one chrome contract: workspace container + toolbar. */
+const WORKSPACE_PAGES = new Map([
+  ["pages/beacons/detail/files/FilesPage.tsx", "<FilesToolbar"],
+  ["pages/beacons/detail/shell/ShellPage.tsx", "<WorkspaceToolbar"],
+  ["pages/beacons/detail/screen/ScreenPage.tsx", "<ScreenToolbar"],
+  ["pages/beacons/detail/remote-desktop/RemoteDesktopPage.tsx", "<RdpToolbar"],
+]);
+
+/** The page-specific toolbar wrappers must delegate to the shared primitive. */
+const WORKSPACE_TOOLBARS = new Set([
+  "pages/beacons/detail/files/components/FilesToolbar.tsx",
+  "pages/beacons/detail/screen/components/ScreenToolbar.tsx",
+  "pages/beacons/detail/remote-desktop/components/RdpToolbar.tsx",
+]);
 
 /** @type {{file: string, line: number, rule: string, text: string, fix: string}[]} */
 const findings = [];
@@ -37,6 +52,7 @@ function report(file, line, rule, text, fix) {
 function check(file) {
   const src = readFileSync(file, "utf8");
   const lines = src.split("\n");
+  const rel = relative(ROOT, file).replace(/\\/g, "/");
   lines.forEach((line, i) => {
     // Rule 1: a dialog's width belongs to its `size` prop. Only the
     // element's own tag is inspected - a width class on a child of the
@@ -68,7 +84,35 @@ function check(file) {
     }
   });
 
-  // Rule 4: the label's typography belongs to the Label primitive. The tag can
+  // Rule 5: the four agent workspaces use the shared container + toolbar.
+  // Padding belongs to the content region so the toolbar can stay edge-to-edge.
+  if (WORKSPACE_PAGES.has(rel)) {
+    if (!src.includes('variant="workspace"')) {
+      report(file, 1, "workspace.variant", rel, 'workspace pages must render <PageContainer variant="workspace">');
+    }
+    const toolbarTag = WORKSPACE_PAGES.get(rel);
+    if (!src.includes(toolbarTag)) {
+      report(file, 1, "workspace.toolbar", rel, `workspace pages must render ${toolbarTag} instead of a hand-rolled header`);
+    }
+    const pc = src.match(/<PageContainer[\s\S]*?>/);
+    if (pc && /(?:px-\(--page-pad-x\)|py-\(--page-pad-y\))/.test(pc[0])) {
+      const line = src.slice(0, pc.index).split("\n").length;
+      report(file, line, "workspace.padding", "PageContainer padding", "move --page-pad-* to the scrolling content region; the toolbar owns the band");
+    }
+  }
+
+  if (WORKSPACE_TOOLBARS.has(rel) && !src.includes("<WorkspaceToolbar")) {
+    report(file, 1, "workspace.toolbar_primitive", rel, "workspace toolbars must render <WorkspaceToolbar> instead of a hand-rolled header");
+  }
+
+  // Rule 6: detail sections use the SectionCard/CollectCard shell. A direct
+  // Card + CardHeader import is the exact drift this rule exists to stop.
+  if (rel.startsWith("pages/beacons/detail/") && src.includes('"@/components/ui/card-header"')) {
+    const line = src.slice(0, src.indexOf('"@/components/ui/card-header"')).split("\n").length;
+    report(file, line, "detail.card_header", "CardHeader", "use <SectionCard> (or <CollectCard> for collect sections) instead of a hand-rolled Card + CardHeader");
+  }
+
+  // Rule 7: the label's typography belongs to the Label primitive. The tag can
   // span lines, so this pass reads the whole file.
   const labelRe = /<Label(\s[^>]*?)className="([^"]*)"/g;
   let m;
@@ -84,7 +128,7 @@ function check(file) {
 walk(ROOT);
 
 if (findings.length === 0) {
-  console.log("[layout] layout contract OK - dialogs declare a size, cards use --card-spacing, page rhythm uses the token.");
+  console.log("[layout] layout contract OK - dialogs declare a size, cards use --card-spacing, workspaces share one toolbar, page rhythm uses the token.");
   process.exit(0);
 }
 

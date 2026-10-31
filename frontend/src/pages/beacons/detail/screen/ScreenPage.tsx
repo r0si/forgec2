@@ -23,8 +23,8 @@ export default function ScreenPage() {
   const monitor = useScreenMonitor(id, { interval, quality, autoRefresh, t });
 
   return (
-    <PageContainer variant="workspace" className="h-full px-(--page-pad-x) py-(--page-pad-y)">
-      <div className="flex h-full min-h-0 flex-col">
+    <PageContainer variant="workspace" className="h-full">
+      <div className="flex min-h-0 flex-1 flex-col">
         <ScreenToolbar
           t={t}
           agentId={id}
@@ -39,7 +39,7 @@ export default function ScreenPage() {
           onDownload={() => monitor.downloadScreenshot()}
         />
 
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_19rem]">
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-y-auto px-(--page-pad-x) py-(--page-pad-y) scrollbar-thin lg:grid-cols-[minmax(0,1fr)_19rem] lg:overflow-hidden">
           <ScreenViewer
             t={t}
             screenshot={monitor.screenshot}
@@ -56,7 +56,7 @@ export default function ScreenPage() {
             onActivatePreview={monitor.activatePreview}
           />
 
-          <div className="content-auto flex min-h-0 flex-col gap-3 overscroll-contain overflow-y-auto scrollbar-thin">
+          <div className="flex min-h-0 flex-col gap-3 lg:content-auto lg:overscroll-contain lg:overflow-y-auto lg:scrollbar-thin">
             <ScreenControls
               t={t}
               monitoring={monitor.monitoring}
