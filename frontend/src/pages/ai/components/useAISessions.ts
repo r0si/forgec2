@@ -127,7 +127,12 @@ export function useAISessions(
     setSessionsLoading(true);
     try {
       const data = await api.get(paths.ai.sessions);
-      const list = Array.isArray(data) ? data : ((data as { data?: AISession[] })?.data ?? []);
+      // api.get already unwraps the outer {"success":true,"data":...};
+      // the list lives under data.sessions (the previous data.data shape
+      // was a second envelope, which read as undefined).
+      const list = Array.isArray(data)
+        ? data
+        : ((data as { sessions?: AISession[] })?.sessions ?? []);
       setSessions(list as AISession[]);
       setSessionsError(null);
     } catch (e) {
@@ -162,7 +167,10 @@ export function useAISessions(
     try {
       const data = await api.get(paths.ai.sessionMessages(id));
       if (seq !== selectSeqRef.current) return false;
-      const list = Array.isArray(data) ? data : ((data as { data?: unknown[] })?.data ?? []);
+      // The list lives under data.messages inside the single envelope.
+      const list = Array.isArray(data)
+        ? data
+        : ((data as { messages?: unknown[] })?.messages ?? []);
 	  const mapped = restoreSessionMessages(list as { id?: number; role: string; content: string; tool_name?: string; created_at?: string }[]);
       const recent = mapped.length > HISTORY_MESSAGE_CAP ? mapped.slice(-HISTORY_MESSAGE_CAP) : mapped;
       setMessagesBoth(capRestoredHistory(recent));

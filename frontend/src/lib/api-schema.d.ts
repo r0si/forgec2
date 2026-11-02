@@ -12395,11 +12395,21 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Session extended (Set-Cookie rotated) */
-            204: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data: {
+                            /**
+                             * Format: int64
+                             * @description New session expiry as ms epoch
+                             */
+                            session_exp?: number;
+                        };
+                    };
+                };
             };
             401: components["responses"]["Unauthorized"];
         };
@@ -25198,19 +25208,16 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["SuccessResponse"] & {
                         data: {
-                            success: boolean;
-                            data: {
-                                id: number;
-                                username: string;
-                                /** @description Built-in (admin|user) or custom role name */
-                                role: string;
-                                permissions: string[];
-                                /**
-                                 * Format: int64
-                                 * @description Session expiry as ms epoch, when known
-                                 */
-                                session_exp?: number;
-                            };
+                            id: number;
+                            username: string;
+                            /** @description Built-in (admin|user) or custom role name */
+                            role: string;
+                            permissions: string[];
+                            /**
+                             * Format: int64
+                             * @description Session expiry as ms epoch, when known
+                             */
+                            session_exp?: number;
                         };
                     };
                 };

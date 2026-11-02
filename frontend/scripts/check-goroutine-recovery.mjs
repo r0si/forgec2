@@ -17,30 +17,40 @@ const serverDir = join(root, "internal", "server");
 
 // Existing sites, frozen at the state the gate was added. Each is reviewed when touched; the list must
 // only ever shrink.
+//
+// A site is keyed by file + enclosing function + its zero-based occurrence in that function, NOT by line
+// number. Line numbers move whenever an unrelated comment or handler above shifts, and every one of those
+// moves reads as "3 new unguarded goroutines" — a false alarm that trains people to bypass the gate.
 const LEGACY = new Set([
   // select()s on dst.done, so a racing unsubscribe drops instead of panicking on a closed channel.
-  "handlers_ai_runs.go:154",
-  "handlers_ai_runs.go:477",
-  "handlers_ai_runs.go:601",
-  "handlers_ai_runs.go:811",
-  "handlers_auth.go:212",
-  "handlers_auth.go:270",
-  "handlers_cookie_proxy.go:120",
-  "handlers_cookie_proxy.go:262",
-  "handlers_domain_front_stager.go:85",
-  "handlers_lportfwd.go:130",
-  "handlers_socks_relay.go:951",
-  "handlers_websocket.go:753",
-  "handlers_websocket.go:789",
+  "handlers_ai_runs.go|publish|0",
+  "handlers_ai_runs.go|startAIBackgroundRun|0",
+  "handlers_ai_runs.go|executeAIBackgroundRun|0",
+  "handlers_ai_runs.go|initializeAIRuns|0",
+  "handlers_cookie_proxy.go|start|0",
+  "handlers_cookie_proxy.go|handleConnect|0",
+  "handlers_domain_front_stager.go|frontRefresh|0",
+  "handlers_lportfwd.go|lportfwdConnect|0",
+  "handlers_socks_relay.go|startUDPAssociate|0",
+  "handlers_websocket.go|handleOperatorWS|0",
+  "handlers_websocket.go|handleOperatorWS|1",
 ]);
 
 const START = /^\s*go func\s*\(/;
+const FUNC = /^func\s+(?:\([^)]*\)\s+)?(\w+)/;
 
 const problems = [];
 for (const entry of readdirSync(serverDir)) {
   if (!entry.startsWith("handlers_") || !entry.endsWith(".go") || entry.endsWith("_test.go")) continue;
   const lines = readFileSync(join(serverDir, entry), "utf8").split("\n");
+  let fn = "(none)";
+  const seen = new Map();
   for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(FUNC);
+    if (m) {
+      fn = m[1];
+      if (!seen.has(fn)) seen.set(fn, 0);
+    }
     if (!START.test(lines[i])) continue;
     let depth = 0;
     const body = [];
@@ -52,10 +62,19 @@ for (const entry of readdirSync(serverDir)) {
       }
       if (depth === 0 && j > i) break;
     }
-    if (/recover\(\)/.test(body.join("\n"))) continue;
-    const id = `${entry}:${i + 1}`;
+    if (/recover\(\)/.test(body.join("\n"))) {
+      // Still consumes the ordinal: occurrence numbering follows document
+      // order, so a guarded goroutine added above an unguarded one cannot
+      // hand that one its frozen slot.
+      const used = seen.get(fn) ?? 0;
+      seen.set(fn, used + 1);
+      continue;
+    }
+    const occurrence = seen.get(fn) ?? 0;
+    seen.set(fn, occurrence + 1);
+    const id = `${entry}|${fn}|${occurrence}`;
     if (LEGACY.has(id)) continue;
-    problems.push(`${id}: ${lines[i].trim().slice(0, 90)}`);
+    problems.push(`${id} (line ${i + 1}): ${lines[i].trim().slice(0, 90)}`);
   }
 }
 

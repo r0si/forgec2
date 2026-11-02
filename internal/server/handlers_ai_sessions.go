@@ -89,7 +89,11 @@ func (s *Server) handleAISessionsList(c *gin.Context) {
 		nextCursor = strconv.FormatUint(uint64(sessions[limit-1].ID), 10)
 		sessions = sessions[:limit]
 	}
-	respond(c, gin.H{"data": sessions, "next_cursor": nextCursor})
+	// respond() already emits {"success":true,"data":...}; the keyset cursor
+	// and the list live INSIDE that payload. Naming the field `sessions`
+	// instead of `data` removes the nested second envelope, where clients
+	// reading data.data saw a list one level deeper than the contract.
+	respond(c, gin.H{"sessions": sessions, "next_cursor": nextCursor})
 }
 
 // handleAISessionsCreate creates a new AI chat session.
@@ -178,7 +182,7 @@ func (s *Server) handleAISessionsGet(c *gin.Context) {
 	for left, right := 0, len(messages)-1; left < right; left, right = left+1, right-1 {
 		messages[left], messages[right] = messages[right], messages[left]
 	}
-	respond(c, gin.H{"data": messages, "next_cursor": nextCursor})
+	respond(c, gin.H{"messages": messages, "next_cursor": nextCursor})
 }
 
 // handleAISessionsMessages creates a new message in an AI chat session.

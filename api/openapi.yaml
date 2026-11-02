@@ -168,8 +168,23 @@ paths:
       security:
         - SessionCookie: []
       responses:
-        '204':
+        '200':
           description: Session extended (Set-Cookie rotated)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          session_exp:
+                            type: integer
+                            format: int64
+                            description: New session expiry as ms epoch
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -11436,30 +11451,24 @@ paths:
                     properties:
                       data:
                         type: object
-                        required: [success, data]
+                        required: [id, username, role, permissions]
                         properties:
-                          success:
-                            type: boolean
-                          data:
-                            type: object
-                            required: [id, username, role, permissions]
-                            properties:
-                              id:
-                                type: integer
-                              username:
-                                type: string
-                              role:
-                                type: string
-                                description: Built-in (admin|user) or custom role name
-                              permissions:
-                                type: array
-                                items:
-                                  type: string
-                                  description: Effective permissions for the role (admin = full set)
-                              session_exp:
-                                type: integer
-                                format: int64
-                                description: Session expiry as ms epoch, when known
+                          id:
+                            type: integer
+                          username:
+                            type: string
+                          role:
+                            type: string
+                            description: Built-in (admin|user) or custom role name
+                          permissions:
+                            type: array
+                            items:
+                              type: string
+                              description: Effective permissions for the role (admin = full set)
+                          session_exp:
+                            type: integer
+                            format: int64
+                            description: Session expiry as ms epoch, when known
   /api/docs:
     get:
       tags: [Settings]

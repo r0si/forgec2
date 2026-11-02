@@ -340,10 +340,10 @@ func (s *Server) handleGetCurrentUser(c *gin.Context) {
 			data["session_exp"] = t.UnixMilli()
 		}
 	}
-	respond(c, gin.H{
-
-		"data": data,
-	})
+	// `respond` already wraps the payload in {"success":true,"data":...}.
+	// Passing gin.H{"data": data} here emitted a second envelope, so clients
+	// reading data.permissions saw a nested object instead of the list.
+	respond(c, data)
 }
 
 // permissionsForRole resolves the effective permission set for a user role.
@@ -454,8 +454,9 @@ func (s *Server) handleExtendSession(c *gin.Context) {
 	slog.Info("Session extended", "username", user.Username, "ip", c.ClientIP(), "max_age", maxAge)
 
 	exp := now.Add(time.Duration(maxAge) * time.Second).UnixMilli()
-	respond(c, gin.H{
-
-		"data": gin.H{"session_exp": exp},
-	})
+	// respond() wraps exactly once. Passing gin.H{"data": ...} here produced
+	// {"success":true,"data":{"data":{...}}}, so the client-side session
+	// timeout warning read data.session_exp as undefined and never scheduled
+	// the warning.
+	respond(c, gin.H{"session_exp": exp})
 }

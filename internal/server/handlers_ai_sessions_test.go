@@ -73,14 +73,14 @@ func TestAISessionGetReturnsNewestMessagesInChronologicalOrder(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 	var response struct {
-		Data []db.AIChatMessage `json:"data"`
+		Messages []db.AIChatMessage `json:"messages"`
 	}
 	unmarshalData(t, w.Body.Bytes(), &response)
-	if len(response.Data) != aiSessionMessageLimit {
-		t.Fatalf("expected %d recent messages, got %d", aiSessionMessageLimit, len(response.Data))
+	if len(response.Messages) != aiSessionMessageLimit {
+		t.Fatalf("expected %d recent messages, got %d", aiSessionMessageLimit, len(response.Messages))
 	}
-	if response.Data[0].Content != "message-006" || response.Data[len(response.Data)-1].Content != "message-205" {
-		t.Fatalf("unexpected restored range: first=%q last=%q", response.Data[0].Content, response.Data[len(response.Data)-1].Content)
+	if response.Messages[0].Content != "message-006" || response.Messages[len(response.Messages)-1].Content != "message-205" {
+		t.Fatalf("unexpected restored range: first=%q last=%q", response.Messages[0].Content, response.Messages[len(response.Messages)-1].Content)
 	}
 }
 

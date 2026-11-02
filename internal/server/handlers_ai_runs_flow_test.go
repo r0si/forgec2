@@ -231,11 +231,24 @@ func TestHandleAIRunsCreateValidation(t *testing.T) {
 		t.Fatalf("stored run = %+v", stored)
 	}
 
-	// Replaying the key returns the same run instead of creating a second one.
+	// Replaying the key returns the same run instead of creating a second
+	// one. The replay answers 200 (the create answers 202) with the run as
+	// the single-envelope data, exactly like the create path: clients read
+	// run.id the same way on both branches.
 	c, w = aiRunsCtx(body)
 	s.handleAIRunsCreate(c)
-	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"reused":true`) {
+	if w.Code != http.StatusOK {
 		t.Fatalf("idempotent replay = %d %s", w.Code, w.Body.String())
+	}
+	var replayed struct {
+		Success bool         `json:"success"`
+		Data    db.AIChatRun `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &replayed); err != nil {
+		t.Fatalf("decode replay: %v (%s)", err, w.Body.String())
+	}
+	if !replayed.Success || replayed.Data.ID != created.Data.ID {
+		t.Fatalf("idempotent replay returned a different run: %+v (want %s)", replayed.Data, created.Data.ID)
 	}
 	var runs int64
 	s.db.Model(&db.AIChatRun{}).Where("idempotency_key = ?", "run-1").Count(&runs)

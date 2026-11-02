@@ -86,16 +86,17 @@ func (s *Server) handleGetAgentScreenshot(c *gin.Context) {
 	}
 	width, height := pngDimensions(data)
 
+	// The live-monitor branch above answers with a flat image/width/height
+	// object. respond() wraps exactly once, so this branch must use the same
+	// shape; the previous gin.H{"data": ...} produced a second envelope and
+	// the dock's screenshot card showed "no screenshot" for a file that exists.
 	respond(c, gin.H{
-
-		"data": gin.H{
-			"image":       "data:image/png;base64," + base64.StdEncoding.EncodeToString(data),
-			"width":       width,
-			"height":      height,
-			"window_name": "Desktop",
-			"capture_id":  newest.Name(),
-			"captured_at": newestTime.UTC().Format(time.RFC3339Nano),
-		},
+		"image":       "data:image/png;base64," + base64.StdEncoding.EncodeToString(data),
+		"width":       width,
+		"height":      height,
+		"window_name": "Desktop",
+		"capture_id":  newest.Name(),
+		"captured_at": newestTime.UTC().Format(time.RFC3339Nano),
 	})
 }
 

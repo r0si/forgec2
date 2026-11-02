@@ -132,23 +132,20 @@ func TestHandleGetCurrentUser_Active(t *testing.T) {
 		t.Fatalf("expected 200, got %d; body=%s", w.Code, w.Body.String())
 	}
 	var resp struct {
-		Success bool `json:"success"`
-		Data    struct {
-			ID         uint   `json:"id"`
-			Username   string `json:"username"`
-			Role       string `json:"role"`
-			SessionExp int64  `json:"session_exp"`
-		} `json:"data"`
+		ID         uint   `json:"id"`
+		Username   string `json:"username"`
+		Role       string `json:"role"`
+		SessionExp int64  `json:"session_exp"`
 	}
 	unmarshalData(t, w.Body.Bytes(), &resp)
-	if resp.Data.ID != user.ID {
-		t.Errorf("expected id=%d, got %d", user.ID, resp.Data.ID)
+	if resp.ID != user.ID {
+		t.Errorf("expected id=%d, got %d", user.ID, resp.ID)
 	}
-	if resp.Data.Username != "current-user" {
-		t.Errorf("expected username=current-user, got %s", resp.Data.Username)
+	if resp.Username != "current-user" {
+		t.Errorf("expected username=current-user, got %s", resp.Username)
 	}
-	if resp.Data.SessionExp != 0 {
-		t.Errorf("expected session_exp to be absent (0) when not set in context, got %d", resp.Data.SessionExp)
+	if resp.SessionExp != 0 {
+		t.Errorf("expected session_exp to be absent (0) when not set in context, got %d", resp.SessionExp)
 	}
 }
 
@@ -179,18 +176,15 @@ func TestHandleGetCurrentUser_ReturnsSessionExp(t *testing.T) {
 		t.Fatalf("expected 200, got %d; body=%s", w.Code, w.Body.String())
 	}
 	var resp struct {
-		Success bool `json:"success"`
-		Data    struct {
-			SessionExp int64 `json:"session_exp"`
-		} `json:"data"`
+		SessionExp int64 `json:"session_exp"`
 	}
 	unmarshalData(t, w.Body.Bytes(), &resp)
-	if resp.Data.SessionExp == 0 {
-		t.Fatalf("expected session_exp to be present, got %d", resp.Data.SessionExp)
+	if resp.SessionExp == 0 {
+		t.Fatalf("expected session_exp to be present, got %d", resp.SessionExp)
 	}
 	wantMs := exp.UnixMilli()
-	if resp.Data.SessionExp != wantMs {
-		t.Errorf("expected session_exp=%d, got %d", wantMs, resp.Data.SessionExp)
+	if resp.SessionExp != wantMs {
+		t.Errorf("expected session_exp=%d, got %d", wantMs, resp.SessionExp)
 	}
 }
 
@@ -225,25 +219,22 @@ func TestHandleGetCurrentUser_ReturnsPermissions(t *testing.T) {
 				t.Fatalf("expected 200, got %d; body=%s", w.Code, w.Body.String())
 			}
 			var resp struct {
-				Success bool `json:"success"`
-				Data    struct {
-					Permissions []string `json:"permissions"`
-				} `json:"data"`
+				Permissions []string `json:"permissions"`
 			}
 			unmarshalData(t, w.Body.Bytes(), &resp)
-			if len(resp.Data.Permissions) == 0 {
+			if len(resp.Permissions) == 0 {
 				t.Fatal("expected a non-empty permissions list")
 			}
 			for _, want := range tc.want {
 				found := false
-				for _, got := range resp.Data.Permissions {
+				for _, got := range resp.Permissions {
 					if got == want {
 						found = true
 						break
 					}
 				}
 				if !found {
-					t.Errorf("missing permission %q in %v", want, resp.Data.Permissions)
+					t.Errorf("missing permission %q in %v", want, resp.Permissions)
 				}
 			}
 		})
@@ -280,23 +271,20 @@ func TestHandleGetCurrentUser_CustomRolePermissions(t *testing.T) {
 		t.Fatalf("expected 200, got %d; body=%s", w.Code, w.Body.String())
 	}
 	var resp struct {
-		Success bool `json:"success"`
-		Data    struct {
-			Role        string   `json:"role"`
-			Permissions []string `json:"permissions"`
-		} `json:"data"`
+		Role        string   `json:"role"`
+		Permissions []string `json:"permissions"`
 	}
 	unmarshalData(t, w.Body.Bytes(), &resp)
-	if resp.Data.Role != "blue-team" {
-		t.Errorf("expected role=blue-team, got %s", resp.Data.Role)
+	if resp.Role != "blue-team" {
+		t.Errorf("expected role=blue-team, got %s", resp.Role)
 	}
 	want := []string{"agents.read", "audit.read"}
-	if len(resp.Data.Permissions) != len(want) {
-		t.Fatalf("expected permissions %v, got %v", want, resp.Data.Permissions)
+	if len(resp.Permissions) != len(want) {
+		t.Fatalf("expected permissions %v, got %v", want, resp.Permissions)
 	}
 	for i := range want {
-		if resp.Data.Permissions[i] != want[i] {
-			t.Errorf("expected permissions %v, got %v", want, resp.Data.Permissions)
+		if resp.Permissions[i] != want[i] {
+			t.Errorf("expected permissions %v, got %v", want, resp.Permissions)
 			break
 		}
 	}
@@ -323,14 +311,12 @@ func TestHandleGetCurrentUser_UnknownRoleNoPermissions(t *testing.T) {
 		t.Fatalf("expected 200, got %d; body=%s", w.Code, w.Body.String())
 	}
 	var resp struct {
-		Success bool `json:"success"`
-		Data    struct {
-			Permissions []string `json:"permissions"`
-		} `json:"data"`
+		Role        string   `json:"role"`
+		Permissions []string `json:"permissions"`
 	}
 	unmarshalData(t, w.Body.Bytes(), &resp)
-	if len(resp.Data.Permissions) != 0 {
-		t.Errorf("expected no permissions for unknown role, got %v", resp.Data.Permissions)
+	if len(resp.Permissions) != 0 {
+		t.Errorf("expected no permissions for unknown role, got %v", resp.Permissions)
 	}
 }
 
@@ -600,13 +586,10 @@ func TestHandleExtendSession_RotatesTokenAndCookie(t *testing.T) {
 
 	// Response exposes the new session_exp.
 	var resp struct {
-		Success bool `json:"success"`
-		Data    struct {
-			SessionExp int64 `json:"session_exp"`
-		} `json:"data"`
+		SessionExp int64 `json:"session_exp"`
 	}
 	unmarshalData(t, w.Body.Bytes(), &resp)
-	if resp.Data.SessionExp == 0 {
+	if resp.SessionExp == 0 {
 		t.Fatalf("expected session_exp, got %+v", resp)
 	}
 
@@ -697,5 +680,50 @@ func TestHandleExtendSession_Unauthenticated(t *testing.T) {
 		if ck.Name == "forgec2_session" {
 			t.Fatalf("must not set a session cookie for unauthenticated extend")
 		}
+	}
+}
+
+// TestHandleGetCurrentUser_SingleEnvelope pins the /api/me payload shape.
+//
+// respond() wraps exactly once, so the handler must pass the user object
+// itself. An earlier regression passed gin.H{"data": data}, producing
+// {"success":true,"data":{"data":{...}}}; the frontend then read
+// data.permissions as undefined, treated the permission set as "not loaded"
+// and showed every navigation entry to read-only operators.
+func TestHandleGetCurrentUser_SingleEnvelope(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	database := newContractDB(t)
+	s := &Server{db: database}
+
+	user := db.User{Username: "envelope-user", Role: db.RoleUser, IsActive: true}
+	if err := database.Create(&user).Error; err != nil {
+		t.Fatalf("create user: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request, _ = http.NewRequest(http.MethodGet, "/api/me", nil)
+	c.Set("user_id", user.ID)
+
+	s.handleGetCurrentUser(c)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d; body=%s", w.Code, w.Body.String())
+	}
+	var envelope struct {
+		Success bool                   `json:"success"`
+		Data    map[string]interface{} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &envelope); err != nil {
+		t.Fatalf("decode body: %v (%s)", err, w.Body.String())
+	}
+	if !envelope.Success {
+		t.Fatalf("expected success=true; body=%s", w.Body.String())
+	}
+	if _, nested := envelope.Data["data"]; nested {
+		t.Fatalf("/api/me double-wraps its payload: %s", w.Body.String())
+	}
+	if _, ok := envelope.Data["permissions"]; !ok {
+		t.Fatalf("/api/me payload has no top-level permissions: %s", w.Body.String())
 	}
 }

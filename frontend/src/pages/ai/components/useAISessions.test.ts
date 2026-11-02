@@ -77,6 +77,37 @@ describe("useAISessions failure surfaces", () => {
     vi.mocked(toast.error).mockClear();
   });
 
+  it("reads the sessions list from the single-envelope sessions field", async () => {
+    // api.get unwraps {"success":true,"data":...}; the payload is
+    // {sessions, next_cursor}. The old double envelope put the list at
+    // data.data, which read back as undefined and emptied the sidebar.
+    getMock
+      .mockResolvedValueOnce({
+        sessions: [{ id: 7, title: "gamma", updated_at: "2026-11-01T10:00:00.000Z" }],
+        next_cursor: "",
+      })
+      .mockResolvedValueOnce({
+        messages: [{ role: "user", content: "hello" }],
+        next_cursor: "",
+      });
+
+    const pushed: { role: string; content: string }[][] = [];
+    const { result } = renderHook(() => useAISessions((updater) => {
+      const next = typeof updater === "function" ? updater([]) : updater;
+      pushed.push(next as { role: string; content: string }[]);
+    }));
+    await waitFor(() => expect(result.current.sessionsLoading).toBe(false));
+    expect(result.current.sessions.map((session) => session.id)).toEqual([7]);
+
+    let selected: boolean | undefined;
+    await act(async () => {
+      selected = await result.current.selectSession(7);
+    });
+    expect(selected).toBe(true);
+    const last = pushed[pushed.length - 1];
+    expect(last.map((message) => message.content)).toEqual(["hello"]);
+  });
+
   it("maps a failed session list read onto the shared copy on both surfaces", async () => {
     getMock.mockRejectedValueOnce(Object.assign(new Error("boom"), { status: 500 }));
 

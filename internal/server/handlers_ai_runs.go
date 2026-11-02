@@ -341,7 +341,12 @@ func (s *Server) handleAIRunsCreate(c *gin.Context) {
 	defer s.aiRunCreateMu.Unlock()
 	var existing db.AIChatRun
 	if err := s.db.Where("tenant_id = ? AND owner_id = ? AND idempotency_key = ?", principal.TenantID, principal.UserID, req.IdempotencyKey).First(&existing).Error; err == nil {
-		respond(c, gin.H{"data": existing, "reused": true})
+		// An idempotent replay answers 200 with the run itself as `data`,
+		// exactly like the 202 create path, so clients read run.id the same
+		// way on both. The status code is the "reused" signal; an earlier
+		// shape here wrapped the run in a second data envelope, which made
+		// the console stream events for run id `undefined`.
+		respond(c, existing)
 		return
 	}
 	userLimit, tenantLimit := aiRunUserLimitDefault, aiRunTenantLimitDefault
@@ -405,7 +410,7 @@ func (s *Server) handleAIRunsCreate(c *gin.Context) {
 		}
 		if errors.Is(txErr, gorm.ErrDuplicatedKey) {
 			if s.db.Where("tenant_id = ? AND owner_id = ? AND idempotency_key = ?", principal.TenantID, principal.UserID, req.IdempotencyKey).First(&existing).Error == nil {
-				respond(c, gin.H{"data": existing, "reused": true})
+				respond(c, existing)
 				return
 			}
 		}
@@ -417,7 +422,7 @@ func (s *Server) handleAIRunsCreate(c *gin.Context) {
 			// otherwise a lost race silently duplicates runs or exceeds caps.
 			var dup db.AIChatRun
 			if err := s.db.Where("tenant_id = ? AND owner_id = ? AND idempotency_key = ?", principal.TenantID, principal.UserID, req.IdempotencyKey).First(&dup).Error; err == nil {
-				respond(c, gin.H{"data": dup, "reused": true})
+				respond(c, dup)
 				return
 			}
 			var userActive, tenantActive int64
@@ -442,7 +447,7 @@ func (s *Server) handleAIRunsCreate(c *gin.Context) {
 			} else if errors.Is(err, gorm.ErrDuplicatedKey) {
 				// Lost the race after all: return the winner instead of 500.
 				if s.db.Where("tenant_id = ? AND owner_id = ? AND idempotency_key = ?", principal.TenantID, principal.UserID, req.IdempotencyKey).First(&dup).Error == nil {
-					respond(c, gin.H{"data": dup, "reused": true})
+					respond(c, dup)
 					return
 				}
 				respondError(c, http.StatusInternalServerError, "failed to create AI run")
