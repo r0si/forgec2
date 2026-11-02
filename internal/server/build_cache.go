@@ -122,6 +122,7 @@ func GenerateCacheKey(cfg *payload.ImplantConfig, platform, format, goVersion, g
 	
 	// Include relevant config fields that affect the build output
 	if cfg != nil {
+		fmt.Fprintf(h, "arch=%s\n", cfg.Architecture)
 		fmt.Fprintf(h, "c2_url=%s\n", cfg.C2URL)
 		fmt.Fprintf(h, "protocol=%s\n", cfg.Protocol)
 		fmt.Fprintf(h, "interval=%d\n", cfg.Interval)
