@@ -347,7 +347,7 @@ func (s *Server) runBuildAndUpdateJob(job *BuildJob, buildFn func() (string, err
 				"format":     format,
 				"cache_hit":  true,
 			})
-			s.emitBuildOutcomeEvent(job, nil, platform, format, filename)
+			s.emitBuildOutcomeEvent(job, nil, platform, format, filename, true)
 			return
 		}
 	}
@@ -422,31 +422,35 @@ func (s *Server) runBuildAndUpdateJob(job *BuildJob, buildFn func() (string, err
 	}
 	s.broadcastOperatorEvent(event)
 
-	s.emitBuildOutcomeEvent(job, err, platform, format, filename)
+	s.emitBuildOutcomeEvent(job, err, platform, format, filename, false)
 }
 
 // emitBuildOutcomeEvent publishes the build outcome on the automation bus.
+// cacheHit is true when the artifact was served from the build cache.
 //
 // Kept separate from the websocket broadcast so a test can drive it with a job and an error without a live build: the event is the part
 // a rule depends on, and it should be verifiable without a toolchain.
-func (s *Server) emitBuildOutcomeEvent(job *BuildJob, err error, platform, format, filename string) {
+func (s *Server) emitBuildOutcomeEvent(job *BuildJob, err error, platform, format, filename string, cacheHit bool) {
 	if s.eventManager == nil {
 		return
 	}
-	s.eventManager.Emit(buildOutcomeEvent(job, err, platform, format, filename))
+	s.eventManager.Emit(buildOutcomeEvent(job, err, platform, format, filename, cacheHit))
 }
 
 // buildOutcomeEvent builds the event a rule receives.
 //
 // Pure, and separate from the emit, because this payload is the contract a rule writes conditions against: a test can pin the type, the
 // hint code and the fields a condition may reference without a running event bus. Delivery stays one call.
-func buildOutcomeEvent(job *BuildJob, err error, platform, format, filename string) Event {
+func buildOutcomeEvent(job *BuildJob, err error, platform, format, filename string, cacheHit bool) Event {
 	buildType := EventBuildSucceeded
 	buildData := map[string]interface{}{
 		"build_id": job.ID,
 		"platform": platform,
 		"format":   format,
 		"filename": filename,
+	}
+	if cacheHit {
+		buildData["cache_hit"] = true
 	}
 	if err != nil {
 		buildType = EventBuildFailed

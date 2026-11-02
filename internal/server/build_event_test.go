@@ -26,7 +26,7 @@ func TestBuildOutcomeEvent(t *testing.T) {
 	}
 	s.completeBuildJob(job, "", errTestCompileFailure{})
 
-	failed := buildOutcomeEvent(job, errTestCompileFailure{}, "windows", "exe", "agent.exe")
+	failed := buildOutcomeEvent(job, errTestCompileFailure{}, "windows", "exe", "agent.exe", false)
 	if failed.Type != EventBuildFailed {
 		t.Fatalf("type = %q, want %q", failed.Type, EventBuildFailed)
 	}
@@ -48,7 +48,7 @@ func TestBuildOutcomeEvent(t *testing.T) {
 	// A successful build is a different type and carries no error field, so a rule can watch for recovery.
 	okJob := s.startBuildJob("linux", "elf", "https://c2.example", 0, "agent.elf")
 	s.completeBuildJob(okJob, "/tmp/agent.elf", nil)
-	succeeded := buildOutcomeEvent(okJob, nil, "linux", "elf", "agent.elf")
+	succeeded := buildOutcomeEvent(okJob, nil, "linux", "elf", "agent.elf", false)
 	if succeeded.Type != EventBuildSucceeded {
 		t.Fatalf("type = %q, want %q", succeeded.Type, EventBuildSucceeded)
 	}
@@ -57,6 +57,16 @@ func TestBuildOutcomeEvent(t *testing.T) {
 	}
 	if _, hasHint := succeeded.Data["hint_code"]; hasHint {
 		t.Fatalf("a successful build carried a hint: %v", succeeded.Data)
+	}
+
+	// A cache hit is reported in the event so automation rules can distinguish
+	// a served artifact from a fresh build.
+	cached := buildOutcomeEvent(okJob, nil, "linux", "elf", "agent.elf", true)
+	if cached.Data["cache_hit"] != true {
+		t.Fatalf("a cache hit was not reported in the event: %v", cached.Data)
+	}
+	if _, hasCacheHit := succeeded.Data["cache_hit"]; hasCacheHit {
+		t.Fatalf("a non-cached build reported cache_hit: %v", succeeded.Data)
 	}
 
 	// And the operator-facing status agrees with the event about the code, so the two views cannot drift.
