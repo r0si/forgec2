@@ -17,6 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatTime } from "@/lib/utils";
 import { Pencil, Plus, Tag, Trash2, X } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { usePermissions } from "@/lib/hooks/usePermissions";
 
 interface Tag {
   id: string;
@@ -39,6 +40,10 @@ const TAG_COLORS = [
 
 export default function TagsPage() {
   const { t } = useI18n();
+  const { can } = usePermissions();
+  // Reads live under agents.read; the mutations below still need
+  // agents.write, so read-only roles see the inventory without dead buttons.
+  const canWrite = can("agents.write");
   const { data, loading, error, refresh: loadTags } = useApiResource<Tag[]>({
     fetcher: async () => {
       const data = await fetchTags();
@@ -114,13 +119,15 @@ export default function TagsPage() {
       title={t("tags.title")}
       subtitle={`${tags.length} ${t("tags.total")}`}
       actions={
-        <Button
-          onClick={openCreate}
-          className="inline-flex items-center justify-center gap-x-2 px-4 sm:px-5 text-sm font-medium text-primary-foreground min-w-[2.75rem] min-h-[2.75rem]"
-        >
-          <Plus className="size-4" />
-          <span>{t("tags.create")}</span>
-        </Button>
+        canWrite ? (
+          <Button
+            onClick={openCreate}
+            className="inline-flex items-center justify-center gap-x-2 px-4 sm:px-5 text-sm font-medium text-primary-foreground min-w-[2.75rem] min-h-[2.75rem]"
+          >
+            <Plus className="size-4" />
+            <span>{t("tags.create")}</span>
+          </Button>
+        ) : undefined
       }
     >
       {actionMsg && (
@@ -132,7 +139,7 @@ export default function TagsPage() {
 
       
 
-      <DataState loading={loading} error={error} onRetry={loadTags} empty={!loading && !error && tags.length === 0} emptyIcon={Tag} emptyTitle={t("tags.empty")} emptyMessage={t("tags.empty_desc")} emptyAction={<Button onClick={openCreate} className="inline-flex items-center gap-2 px-4 py-2.5 min-w-[2.75rem] min-h-[2.75rem]"><Plus className="size-4" /><span>{t("tags.create")}</span></Button>} loadingSkeleton={
+      <DataState loading={loading} error={error} onRetry={loadTags} empty={!loading && !error && tags.length === 0} emptyIcon={Tag} emptyTitle={t("tags.empty")} emptyMessage={t("tags.empty_desc")} emptyAction={canWrite ? <Button onClick={openCreate} className="inline-flex items-center gap-2 px-4 py-2.5 min-w-[2.75rem] min-h-[2.75rem]"><Plus className="size-4" /><span>{t("tags.create")}</span></Button> : undefined} loadingSkeleton={
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
             <Card key={"skel-" + i} className="p-(--card-spacing)">
@@ -162,30 +169,34 @@ export default function TagsPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Tooltip>
-                    <TooltipTrigger render={<Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => openEdit(tag)}
-                        className="size-8 text-muted-foreground hover:text-primary min-w-[2.75rem] min-h-[2.75rem]"
-                        aria-label={t("tags.a11y_edit")}
-                      />}>
-                      <Pencil className="size-4" />
-                    </TooltipTrigger>
-                    <TooltipContent>{t("common.edit")}</TooltipContent>
-                  </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger render={<Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setDeleteConfirm(tag)}
-                        className="size-8 text-muted-foreground hover:text-destructive-ink min-w-[2.75rem] min-h-[2.75rem]"
-                        aria-label={t("tags.a11y_delete")}
-                      />}>
-                      <Trash2 className="size-4" />
-                    </TooltipTrigger>
-                    <TooltipContent>{t("common.delete")}</TooltipContent>
-                  </Tooltip>
+                  {canWrite && (
+                    <>
+                      <Tooltip>
+                        <TooltipTrigger render={<Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openEdit(tag)}
+                            className="size-8 text-muted-foreground hover:text-primary min-w-[2.75rem] min-h-[2.75rem]"
+                            aria-label={t("tags.a11y_edit")}
+                          />}>
+                          <Pencil className="size-4" />
+                        </TooltipTrigger>
+                        <TooltipContent>{t("common.edit")}</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger render={<Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setDeleteConfirm(tag)}
+                            className="size-8 text-muted-foreground hover:text-destructive-ink min-w-[2.75rem] min-h-[2.75rem]"
+                            aria-label={t("tags.a11y_delete")}
+                          />}>
+                          <Trash2 className="size-4" />
+                        </TooltipTrigger>
+                        <TooltipContent>{t("common.delete")}</TooltipContent>
+                      </Tooltip>
+                    </>
+                  )}
                 </div>
               </div>
               <div className="text-xs text-muted-foreground">

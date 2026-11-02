@@ -68,10 +68,14 @@ func (s *Server) registerExtendedRoutes(auth *gin.RouterGroup) {
 		siemWrite.POST("/siem/rules/:id/toggle", s.handleToggleSIEMRule)
 	}
 
-	groupsWrite := auth.Group("/")
-	groupsWrite.Use(middleware.RequirePermission(db.PermGroupsWrite))
+	// The group list is a read: it only SELECTs groups and counts. Requiring
+	// groups.write here made the page 403 for every read-only role (the demo
+	// observer holds groups.read), and the nav-perms gate could not see it
+	// because the path is bare /groups, not /api/groups.
+	groupsRead := auth.Group("/")
+	groupsRead.Use(middleware.RequirePermission(db.PermGroupsRead))
 	{
-		groupsWrite.GET("/groups", s.handleAPIGroups)
+		groupsRead.GET("/groups", s.handleAPIGroups)
 	}
 
 	workflowsRead := auth.Group("/")
@@ -131,14 +135,23 @@ func (s *Server) registerExtendedRoutes(auth *gin.RouterGroup) {
 		cbWrite.POST("/circuit-breaker/toggle/:id", s.handleAPICircuitBreakerToggle)
 	}
 
+	// Tag reads live under agents.read: the tag inventory names nothing
+	// sensitive and the nav entry for /tags already promises read-only roles
+	// can browse it. Keeping the GETs in the write group 403s a read-only
+	// role that reaches the page by URL while its sidebar shows the link.
+	tagsRead := auth.Group("/")
+	tagsRead.Use(middleware.RequirePermission(db.PermAgentsRead))
+	{
+		tagsRead.GET("/api/tags", s.handleAPITagList)
+		tagsRead.GET("/api/agents/:id/tags", s.handleAgentTags)
+	}
+
 	tagsWrite := auth.Group("/")
 	tagsWrite.Use(middleware.RequirePermission(db.PermAgentsWrite))
 	{
-		tagsWrite.GET("/api/tags", s.handleAPITagList)
 		tagsWrite.POST("/api/tags", s.handleAPITagCreate)
 		tagsWrite.PUT("/api/tags/:id", s.handleAPITagUpdate)
 		tagsWrite.DELETE("/api/tags/:id", s.handleAPITagDelete)
-		tagsWrite.GET("/api/agents/:id/tags", s.handleAgentTags)
 		tagsWrite.POST("/agents/batch/tags", s.handleBatchAgentTags)
 	}
 }

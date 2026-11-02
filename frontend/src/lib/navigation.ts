@@ -106,7 +106,7 @@ export const NAV_SECTIONS: NavSectionDef[] = [
       { href: "/settings", labelKey: "nav.settings", icon: Settings, perms: ["settings.read"] },
       { href: "/users", labelKey: "nav.users", icon: Users, perms: ["users.read"] },
       { href: "/roles", labelKey: "nav.roles", icon: Shield, perms: ["roles.read"] },
-      { href: "/tags", labelKey: "nav.tags", icon: Tags, perms: ["agents.write"] },
+      { href: "/tags", labelKey: "nav.tags", icon: Tags, perms: ["agents.read"] },
       { href: "/groups", labelKey: "nav.groups", icon: Layers, perms: ["groups.read"] },
       { href: "/autotag", labelKey: "nav.autotag", icon: Wand2, perms: ["settings.read"] },
       { href: "/audit", labelKey: "nav.audit", icon: Shield, perms: ["audit.read"] },
