@@ -42,6 +42,11 @@ func TestAgentTimelineCSVExport(t *testing.T) {
 			t.Fatalf("seed task: %v", err)
 		}
 	}
+	if err := s.db.Create(&db.AgentStatusEvent{
+		AgentID: "a-1", Status: "online", Timestamp: now.Add(-30 * time.Minute),
+	}).Error; err != nil {
+		t.Fatalf("seed status event: %v", err)
+	}
 
 	call := func(query string) *httptest.ResponseRecorder {
 		w := httptest.NewRecorder()
@@ -72,8 +77,8 @@ func TestAgentTimelineCSVExport(t *testing.T) {
 	if err != nil {
 		t.Fatalf("csv: %v", err)
 	}
-	if len(records) < 3 {
-		t.Fatalf("rows = %d, want a header and both tasks", len(records))
+	if len(records) < 4 {
+		t.Fatalf("rows = %d, want a header, both tasks, and the status event", len(records))
 	}
 	if got := strings.Join(records[0], ","); got != "Time,Kind,Type,Title,Detail,Status,Ref ID" {
 		t.Fatalf("header = %q", got)
@@ -92,6 +97,15 @@ func TestAgentTimelineCSVExport(t *testing.T) {
 	if !foundFailed {
 		t.Fatalf("no row reports the failed status: %v", records)
 	}
+	foundStatus := false
+	for _, row := range records[1:] {
+		if row[1] == "status" && row[3] == "online" {
+			foundStatus = true
+		}
+	}
+	if !foundStatus {
+		t.Fatalf("agent status history is missing from the export: %v", records)
+	}
 
 	// 2. The default is still JSON, with the same events.
 	jsonResponse := call("")
@@ -100,5 +114,8 @@ func TestAgentTimelineCSVExport(t *testing.T) {
 	}
 	if !strings.Contains(jsonResponse.Body.String(), `"events"`) {
 		t.Fatalf("the default shape changed: %s", jsonResponse.Body.String())
+	}
+	if !strings.Contains(jsonResponse.Body.String(), `"kind":"status"`) {
+		t.Fatalf("agent status history is missing from JSON: %s", jsonResponse.Body.String())
 	}
 }

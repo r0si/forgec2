@@ -139,7 +139,9 @@ func (s *Server) handleAgentTimeline(c *gin.Context) {
 		statusQuery := s.db.Table("agent_status_events").
 			Select("id, status, timestamp").
 			Where("agent_id = ?", id)
-		statusQuery = s.tenantScope(statusQuery, c)
+		// AgentStatusEvent deliberately has no tenant_id column. The agent was
+		// already resolved through getAgentOrFail above, so its stable ID is the
+		// owning relationship and the correct tenant boundary for this table.
 		if err := statusQuery.
 			Order("timestamp desc").Limit(limit).Scan(&statuses).Error; err != nil {
 			statuses = nil

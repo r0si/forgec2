@@ -341,6 +341,7 @@ func currentUserID(c *gin.Context) (uint, bool) {
 // operators (tenant 0) keep global visibility, mirroring list behavior.
 // Use this for every entity carrying TenantID instead of findOrFail.
 func (s *Server) findTenantOrFail(c *gin.Context, dest interface{}, id, entityName string) bool {
+	// check:tenant-scope-ok dest is a caller-supplied tenant-owned model; every call site is owner-gated.
 	if err := s.tenantScope(s.db, c).First(dest, "id = ?", id).Error; err != nil {
 		respondError(c, http.StatusNotFound, entityName+" not found")
 		return false

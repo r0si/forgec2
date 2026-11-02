@@ -8,13 +8,14 @@
 //
 // Resolution order for a scope call, within its enclosing function:
 //   1. a model literal on the scope line itself;
-//   2. a model literal in the same statement (the chain may wrap onto later lines);
-//   3. the query's destination variable, typed by its "var x []db.Model" / "x := db.Model{}"
+//   2. the most recent assignment of the query variable passed to the scope helper;
+//   3. a model literal in the same statement (the chain may wrap onto later lines);
+//   4. the query's destination variable, typed by its "var x []db.Model" / "x := db.Model{}"
 //      declaration, matched through First/Find/Delete(&x);
-//   4. exactly one model referenced in the function at all.
+//   5. exactly one model referenced in the function at all.
 // A call that cannot be resolved is COUNTED and reported, never guessed: guessing is how the
 // original bug read as fine. A deliberate exception carries
-// "// check:tenant-scope-ok <reason>" on the line.
+// "// check:tenant-scope-ok <reason>" on the call or immediately preceding line.
 import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -41,15 +42,24 @@ if (models.size === 0) {
   fail(`parsed zero model structs under ${DB_DIR}; the pattern no longer matches the code`);
 }
 
-// A struct with a TableName method is a real table; a bare DTO (db.TaskStats) is only a scan
-// destination and must never be read as the model being scoped.
+// A struct with a TableName method or an AutoMigrate registration is a real table; a bare DTO
+// (db.TaskStats) is only a scan destination and must never be read as the model being scoped.
 const tables = new Set();
+const tableNameModels = new Map(); // SQL table name -> model name
 for (const file of readdirSync(DB_DIR).filter((f) => f.endsWith(".go") && !f.endsWith("_test.go"))) {
   const src = readFileSync(join(DB_DIR, file), "utf8");
-  for (const m of src.matchAll(/func \((\w+)\) TableName\(\) string/g)) tables.add(m[1]);
+  for (const m of src.matchAll(/func \((\w+)\) TableName\(\) string\s*\{\s*return\s+"([^"]+)"\s*\}/g)) {
+    tables.add(m[1]);
+    tableNameModels.set(m[2], m[1]);
+  }
+  for (const line of src.split("\n").filter((candidate) => candidate.includes("AutoMigrate("))) {
+    for (const m of line.matchAll(/&?(\w+)\{\}/g)) {
+      if (models.has(m[1])) tables.add(m[1]);
+    }
+  }
 }
 if (tables.size === 0) {
-  fail(`parsed zero TableName methods under ${DB_DIR}; the pattern no longer matches the code`);
+  fail(`parsed zero persisted models under ${DB_DIR}; the patterns no longer match the code`);
 }
 const isTable = (name) => tables.has(name);
 
@@ -59,6 +69,9 @@ const SCOPE_CALL = /\b(tenantScope|auditTenantScope)\s*\(/;
 // literal form left half the call sites unresolvable.
 const refsIn = (line) =>
   [...line.matchAll(/\bdb\.(\w+)\b/g)].map((m) => m[1]).filter((name) => models.has(name));
+const literalTableNamesIn = (line) =>
+  [...line.matchAll(/\.Table\(\s*"([^"]+)"\s*\)/g)].map((m) => m[1]);
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const violations = [];
 const unresolved = [];
@@ -98,11 +111,18 @@ for (const file of readdirSync(SERVER_DIR).filter((f) => f.endsWith(".go") && !f
 
   lines.forEach((line, i) => {
     if (!SCOPE_CALL.test(line) || line.trimStart().startsWith("//")) return;
-    if (line.includes("check:tenant-scope-ok")) return;
+    if (/^func .*\b(?:tenantScope|auditTenantScope)\s*\(/.test(line)) return;
+    if (line.includes("check:tenant-scope-ok") || lines[i - 1]?.includes("check:tenant-scope-ok")) return;
     const fStart = functionStart(i);
     const fEnd = functionEnd(i);
 
     // 1. The scope line itself.
+    const onLineLiteralTables = literalTableNamesIn(line);
+    if (onLineLiteralTables.length > 0) {
+      checked++;
+      recordTableName(onLineLiteralTables[onLineLiteralTables.length - 1], i, path);
+      return;
+    }
     const onLineTables = refsIn(line).filter(isTable);
     if (onLineTables.length > 0) {
       checked++;
@@ -110,7 +130,32 @@ for (const file of readdirSync(SERVER_DIR).filter((f) => f.endsWith(".go") && !f
       return;
     }
 
-    // 2. The statement the call belongs to: walk back to a blank line or a line ending in
+    // 2. Resolve the query variable from its most recent assignment. This is more precise
+    //    than treating the surrounding block as one statement: a scope line is often
+    //    followed immediately by a second query against a different table.
+    const scopeArg = line.match(/\b(?:tenantScope|auditTenantScope)\s*\(\s*(\w+)/)?.[1];
+    if (scopeArg) {
+      const assignment = new RegExp(`^\\s*${escapeRegExp(scopeArg)}\\s*:?=`);
+      for (let j = i - 1; j >= fStart; j--) {
+        if (!assignment.test(lines[j])) continue;
+        const originLines = lines.slice(j, i);
+        const originTableNames = originLines.flatMap(literalTableNamesIn);
+        if (originTableNames.length > 0) {
+          checked++;
+          recordTableName(originTableNames[originTableNames.length - 1], i, path);
+          return;
+        }
+        const originTables = originLines.flatMap(refsIn).filter(isTable);
+        if (originTables.length > 0) {
+          checked++;
+          record(originTables[originTables.length - 1], i, path);
+          return;
+        }
+        break;
+      }
+    }
+
+    // 3. The statement the call belongs to: walk back to a blank line or a line ending in
     //    an explicit terminator, and forward to the end of the chain.
     let s = i;
     while (s > fStart && !/^\s*$/.test(lines[s - 1]) && !/;\s*$/.test(lines[s - 1])) s--;
@@ -118,6 +163,13 @@ for (const file of readdirSync(SERVER_DIR).filter((f) => f.endsWith(".go") && !f
     while (e < fEnd && !/^\s*$/.test(lines[e + 1]) && !/;\s*$/.test(lines[e])) e++;
     let inStatement = [];
     for (let j = s; j <= e; j++) inStatement.push(...refsIn(lines[j]));
+    const statementTableNames = [];
+    for (let j = s; j <= e; j++) statementTableNames.push(...literalTableNamesIn(lines[j]));
+    if (statementTableNames.length > 0) {
+      checked++;
+      recordTableName(statementTableNames[statementTableNames.length - 1], i, path);
+      return;
+    }
     const stmtTables = inStatement.filter(isTable);
     if (stmtTables.length > 0) {
       checked++;
@@ -125,7 +177,7 @@ for (const file of readdirSync(SERVER_DIR).filter((f) => f.endsWith(".go") && !f
       return;
     }
 
-    // 3. The destination variable of First/Find/Delete in this statement.
+    // 4. The destination variable of First/Find/Delete in this statement.
     const vars = varModels(fStart, fEnd);
     for (let j = s; j <= e; j++) {
       for (const m of lines[j].matchAll(/\b(?:First|Find|Delete|Count|Scan|Take|Last)\(&?(\w+)/g)) {
@@ -137,7 +189,7 @@ for (const file of readdirSync(SERVER_DIR).filter((f) => f.endsWith(".go") && !f
       }
     }
 
-    // 4. Exactly one model in the whole function.
+    // 5. Exactly one model in the whole function.
     const all = [];
     for (let j = fStart; j <= fEnd; j++) all.push(...refsIn(lines[j]));
     const unique = [...new Set(all)].filter(isTable);
@@ -168,6 +220,17 @@ for (const file of readdirSync(SERVER_DIR).filter((f) => f.endsWith(".go") && !f
       );
     }
   }
+
+  function recordTableName(tableName, i, filePath) {
+    const model = tableNameModels.get(tableName);
+    if (!model) {
+      violations.push(
+        `${relative(root, filePath)}:${i + 1}: Table(${JSON.stringify(tableName)}) has no matching TableName model`,
+      );
+      return;
+    }
+    record(model, i, filePath);
+  }
 }
 
 if (checked === 0) {
@@ -177,11 +240,11 @@ if (violations.length > 0) {
   fail(`${violations.length} scope call(s) target a model without a tenant column`, violations);
 }
 if (unresolved.length > 0) {
-  console.log(
-    `check-tenant-scope: ${unresolved.length} call site(s) could not be resolved and were skipped ` +
-      `(add "// check:tenant-scope-ok" where the model cannot be inferred):`,
+  fail(
+    `${unresolved.length} scope call site(s) could not be resolved; add a model or a reasoned ` +
+      `"// check:tenant-scope-ok" exception`,
+    unresolved,
   );
-  for (const line of unresolved.slice(0, 10)) console.log(`  ${line}`);
 }
 console.log(
   `check-tenant-scope: OK (${checked} resolved scope calls, ${models.size} models; every scoped model carries TenantID)`,
