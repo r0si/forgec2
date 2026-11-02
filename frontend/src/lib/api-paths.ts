@@ -211,6 +211,8 @@ export const paths = {
     list: (query = "") => (query ? `/builds?${query}` : "/builds"),
     download: (id: string) => `/builds/${id}/download`,
     effectiveness: (days = 30) => `/api/builds/effectiveness?days=${days}`,
+    cacheStats: () => "/api/builds/cache/stats",
+    cacheClear: () => "/api/builds/cache/clear",
   },
   /**
    * Settings page dual-use at /settings.

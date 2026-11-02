@@ -27,6 +27,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Activity, AlertCircle, AlertTriangle, Apple, Calendar, CheckCircle, Clock, Cpu, Download, File, Filter, Hammer, Monitor, Plus, RefreshCw, Terminal, Timer, User, X, XCircle } from "lucide-react";
 import EffectivenessCard from "./components/EffectivenessCard";
+import BuildCacheCard from "./components/BuildCacheCard";
 
 interface BuildLog {
   id?: string;
@@ -272,6 +273,8 @@ export default function BuildsPage({ embedded = false }: { embedded?: boolean })
       </div>
 
       <EffectivenessCard />
+
+      <BuildCacheCard />
 
       {versionDist.length > 0 && (
         <Card className="p-(--card-spacing) mb-4">

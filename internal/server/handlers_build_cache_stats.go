@@ -1,6 +1,7 @@
 package server
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -41,7 +42,8 @@ func (s *Server) handleBuildCacheClear(c *gin.Context) {
 		return
 	}
 	if err := s.buildCache.Clear(); err != nil {
-		respondError(c, http.StatusInternalServerError, "failed to clear cache: " + err.Error())
+		slog.Error("Failed to clear build cache", "error", err)
+		respondError(c, http.StatusInternalServerError, sanitizeError(err, "Clear cache"))
 		return
 	}
 	respond(c, gin.H{"message": "cache cleared"})
