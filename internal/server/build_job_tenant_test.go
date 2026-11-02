@@ -33,7 +33,7 @@ func TestBuildJobVisibilityIsTenantScoped(t *testing.T) {
 	// The caller needs a user row for currentTenantID to resolve to 1.
 	seedAIUser(t, s, "admin1", 1)
 
-	job := s.startBuildJobWithProfile("windows", "exe", "https://c2.example", 7, "agent.exe", "prof", "hash", 2)
+	job := s.startBuildJobWithProfile("windows", "exe", "https://c2.example", 7, "agent.exe", "prof", "hash", "", 2)
 	s.completeBuildJob(job, filepath.Join(t.TempDir(), "agent.exe"), nil)
 
 	// A tenant-1 operator must not see (or download) a tenant-2 build.
@@ -86,7 +86,7 @@ func TestBuildDownloadRefusesQueuedJob(t *testing.T) {
 	s := mustTenantServer(t)
 	seedAIUser(t, s, "admin1", 1)
 
-	job := s.startBuildJobWithProfile("windows", "exe", "https://c2.example", 1, "a.exe", "", "", 1)
+	job := s.startBuildJobWithProfile("windows", "exe", "https://c2.example", 1, "a.exe", "", "", "", 1)
 	if err := os.WriteFile(filepath.Join(t.TempDir(), "unused"), nil, 0o600); err != nil {
 		t.Fatal(err)
 	}

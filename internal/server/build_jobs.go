@@ -2,6 +2,8 @@ package server
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -30,8 +32,12 @@ type BuildJob struct {
 	Filename    string
 	ProfileName string
 	ProfileHash string
-	CreatedAt   time.Time
-	StartedAt   time.Time
+	// ConfigHash is the SHA-256 of every field that affects the compiled binary
+	// (generated via GenerateCacheKey). Two builds with the same hash can share
+	// a cached artifact; different hashes MUST not.
+	ConfigHash string
+	CreatedAt  time.Time
+	StartedAt  time.Time
 	CompletedAt time.Time
 
 	// Authenticode classification for a direct Windows EXE/DLL output. Empty
@@ -50,11 +56,14 @@ type BuildJob struct {
 
 // startBuildJob creates a build job, stores it, and returns its ID.
 func (s *Server) startBuildJob(platform, format, c2URL string, listenerID uint, filename string) *BuildJob {
-	return s.startBuildJobWithProfile(platform, format, c2URL, listenerID, filename, "", "", 0)
+	return s.startBuildJobWithProfile(platform, format, c2URL, listenerID, filename, "", "", "", 0)
 }
 
 // startBuildJobWithProfile additionally records the malleable profile for audit.
-func (s *Server) startBuildJobWithProfile(platform, format, c2URL string, listenerID uint, filename, profileName, profileHash string, tenantID uint) *BuildJob {
+// configHash is the SHA-256 of every field that affects the compiled binary
+// (computed via GenerateCacheKey); two builds with the same hash can share a
+// cached artifact, different hashes MUST not.
+func (s *Server) startBuildJobWithProfile(platform, format, c2URL string, listenerID uint, filename, profileName, profileHash, configHash string, tenantID uint) *BuildJob {
 	job := &BuildJob{
 		ID:          protocol.UUIDv7(),
 		TenantID:    tenantID,
@@ -67,6 +76,7 @@ func (s *Server) startBuildJobWithProfile(platform, format, c2URL string, listen
 		Filename:    filename,
 		ProfileName: profileName,
 		ProfileHash: profileHash,
+		ConfigHash:  configHash,
 		CreatedAt:   time.Now(),
 	}
 	s.buildJobsMu.Lock()
@@ -317,6 +327,30 @@ func (s *Server) buildJobSnapshots() []gin.H {
 
 // runBuildAndUpdateJob is a helper to run a build function and update the job.
 func (s *Server) runBuildAndUpdateJob(job *BuildJob, buildFn func() (string, error), platform, format, c2URL string, listenerID uint, filename string) {
+	// Check build cache before running the build
+	cacheKey := job.ConfigHash
+	if cacheKey == "" {
+		// Fallback: compute from the job's stored fields (for backward compat
+		// with jobs created before ConfigHash was tracked).
+		cacheKey = generateCacheKeyFromFields(job.Platform, job.Format, job.C2URL, job.ProfileName, job.Filename)
+	}
+	if s.buildCache != nil {
+		if cachedPath, ok := s.buildCache.Get(cacheKey); ok {
+			slog.Info("Build cache hit", "build_id", job.ID, "cache_key", cacheKey)
+			s.completeBuildJob(job, cachedPath, nil)
+			s.broadcastOperatorEvent(map[string]interface{}{
+				"type":       "build_update",
+				"build_id":   job.ID,
+				"status":     "completed",
+				"platform":   platform,
+				"format":     format,
+				"cache_hit":  true,
+			})
+			s.emitBuildOutcomeEvent(job, nil, platform, format, filename)
+			return
+		}
+	}
+
 	// A panic in the toolchain must never kill the worker goroutine (that
 	// would silently stop the whole queue). Recover, mark the job failed,
 	// and let the worker continue with the next queued build.
@@ -352,14 +386,18 @@ func (s *Server) runBuildAndUpdateJob(job *BuildJob, buildFn func() (string, err
 		"format":   format,
 	})
 	outPath, err := buildFn()
-	s.completeBuildJob(job, outPath, err)
-	if err != nil {
-		s.logBuildWithProfile(platform, format, c2URL, listenerID, filename, "failed", err.Error(), "", job.ProfileName, job.ProfileHash)
-		slog.Error("Async build failed", "build_id", job.ID, "platform", platform, "format", format, "error", err)
-	} else {
-		s.logBuildWithProfile(platform, format, c2URL, listenerID, filename, "success", "", outPath, job.ProfileName, job.ProfileHash)
-		slog.Info("Async build completed", "build_id", job.ID, "platform", platform, "format", format, "output", outPath)
+	if err == nil {
+		// Store successful build in cache
+		if cacheKey == "" {
+			cacheKey = generateCacheKeyFromFields(job.Platform, job.Format, job.C2URL, job.ProfileName, job.Filename)
+		}
+		if s.buildCache != nil {
+			if err := s.buildCache.Put(cacheKey, outPath); err != nil {
+				slog.Warn("Failed to store build in cache", "build_id", job.ID, "error", err)
+			}
+		}
 	}
+	s.completeBuildJob(job, outPath, err)
 	event := map[string]interface{}{
 		"type":     "build_update",
 		"build_id": job.ID,
@@ -572,4 +610,15 @@ func parseArchitecture(arch string) string {
 		return "386"
 	}
 	return arch
+}
+
+// generateCacheKeyFromFields is a simplified fallback cache key for jobs that
+// were created before ConfigHash was tracked. It hashes only the fields that
+// were available at job creation.
+func generateCacheKeyFromFields(platform, format, c2URL, profileName, filename string) string {
+	cacheKey := fmt.Sprintf("%s:%s:%s:%s:%s", platform, format, c2URL, profileName, filename)
+	h := sha256.New()
+	fmt.Fprintf(h, "%s", cacheKey)
+	sum := h.Sum(nil)
+	return hex.EncodeToString(sum)[:32]
 }

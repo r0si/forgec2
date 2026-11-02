@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"log/slog"
@@ -43,6 +43,8 @@ type BuildCache struct {
 	maxEntries  int    // maximum number of entries
 	currentSize int64  // current total size in bytes
 	ttl         time.Duration // time-to-live for cache entries
+	hitCount    atomic.Int64
+	missCount   atomic.Int64
 }
 
 // BuildCacheConfig holds configuration for the build cache.
@@ -107,11 +109,14 @@ func NewBuildCache(config BuildCacheConfig) (*BuildCache, error) {
 // the build output.
 func GenerateCacheKey(cfg *payload.ImplantConfig, platform, format, goVersion, garbleVersion string) string {
 	h := sha256.New()
-	// Include all relevant configuration fields that affect the build output
+	// Include all relevant configuration fields that affect the build output.
+	// NOTE: runtime.GOOS/GOARCH are deliberately excluded — they are the SERVER's
+	// OS/arch, not the target's. The target platform comes from `platform` and the
+	// target arch from cfg.Architecture. Including server-specific fields would make
+	// a Windows server and a Linux server produce different cache keys for the same
+	// target build, defeating cross-platform cache sharing.
 	fmt.Fprintf(h, "platform=%s\n", platform)
 	fmt.Fprintf(h, "format=%s\n", format)
-	fmt.Fprintf(h, "goos=%s\n", runtime.GOOS)
-	fmt.Fprintf(h, "goarch=%s\n", runtime.GOARCH)
 	fmt.Fprintf(h, "go_version=%s\n", goVersion)
 	fmt.Fprintf(h, "garble_version=%s\n", garbleVersion)
 	
@@ -167,6 +172,7 @@ func (c *BuildCache) Get(key string) (string, bool) {
 	c.mu.RUnlock()
 
 	if !ok {
+		c.missCount.Add(1)
 		return "", false
 	}
 
@@ -177,6 +183,7 @@ func (c *BuildCache) Get(key string) (string, bool) {
 		c.mu.Unlock()
 		// Clean up file
 		os.Remove(entry.OutputPath)
+		c.missCount.Add(1)
 		return "", false
 	}
 
@@ -186,6 +193,7 @@ func (c *BuildCache) Get(key string) (string, bool) {
 		delete(c.entries, key)
 		c.currentSize -= entry.Size
 		c.mu.Unlock()
+		c.missCount.Add(1)
 		return "", false
 	}
 
@@ -195,6 +203,7 @@ func (c *BuildCache) Get(key string) (string, bool) {
 	entry.AccessCount++
 	c.mu.Unlock()
 
+	c.hitCount.Add(1)
 	return entry.OutputPath, true
 }
 
@@ -357,19 +366,27 @@ type BuildCacheStats struct {
 
 func (c *BuildCache) Stats() BuildCacheStats {
 	c.mu.RLock()
-	defer c.mu.RUnlock()
+	entries := len(c.entries)
+	totalSize := c.currentSize
+	maxSize := c.maxSize
+	maxEntries := c.maxEntries
+	c.mu.RUnlock()
 
-	var totalHits, totalMisses int64
-	// Note: We don't track hits/misses in this simple implementation
-	// In a production system, you'd want to add atomic counters for hits/misses
+	hits := c.hitCount.Load()
+	misses := c.missCount.Load()
+	total := hits + misses
+	hitRate := 0.0
+	if total > 0 {
+		hitRate = float64(hits) / float64(total)
+	}
 
 	return BuildCacheStats{
-		Entries:    len(c.entries),
-		TotalSize:  c.currentSize,
-		MaxSize:    c.maxSize,
-		MaxEntries: c.maxEntries,
-		HitCount:   totalHits,
-		MissCount:  totalMisses,
-		HitRate:    0,
+		Entries:    entries,
+		TotalSize:  totalSize,
+		MaxSize:    maxSize,
+		MaxEntries: maxEntries,
+		HitCount:   hits,
+		MissCount:  misses,
+		HitRate:    hitRate,
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"runtime"
 	"strings"
 	"time"
 
@@ -604,7 +605,8 @@ func (s *Server) handleGenerateEXE(c *gin.Context) {
 		return
 	}
 	agentsDir := s.extractAgentsDir()
-	job := s.startBuildJobWithProfile("windows", "exe", form.C2URL, form.ListenerID, form.Filename, form.Profile, profileAuditHash(cfg), s.currentTenantID(c))
+	configHash := GenerateCacheKey(&cfg, "windows", "exe", runtime.Version(), "")
+	job := s.startBuildJobWithProfile("windows", "exe", form.C2URL, form.ListenerID, form.Filename, form.Profile, profileAuditHash(cfg), configHash, s.currentTenantID(c))
 
 	if !s.submitBuild(job, func() (string, error) {
 		return payload.GenerateWindowsEXE(cfg, agentsDir)
@@ -646,7 +648,7 @@ func (s *Server) handleGenerateDLL(c *gin.Context) {
 		respondError(c, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
-	job := s.startBuildJobWithProfile("windows", "dll", form.C2URL, form.ListenerID, form.Filename, form.Profile, profileAuditHash(cfg), s.currentTenantID(c))
+	job := s.startBuildJobWithProfile("windows", "dll", form.C2URL, form.ListenerID, form.Filename, form.Profile, profileAuditHash(cfg), GenerateCacheKey(&cfg, "windows", "dll", runtime.Version(), ""), s.currentTenantID(c))
 
 	if !s.submitBuild(job, func() (string, error) {
 		return payload.GenerateWindowsDLL(cfg, agentsDir)
@@ -680,7 +682,7 @@ func (s *Server) handleGenerateLinux(c *gin.Context) {
 		return
 	}
 	agentsDir := s.extractAgentsDir()
-	job := s.startBuildJobWithProfile("linux", "elf", form.C2URL, form.ListenerID, form.Filename, form.Profile, profileAuditHash(cfg), s.currentTenantID(c))
+	job := s.startBuildJobWithProfile("linux", "elf", form.C2URL, form.ListenerID, form.Filename, form.Profile, profileAuditHash(cfg), GenerateCacheKey(&cfg, "linux", "elf", runtime.Version(), ""), s.currentTenantID(c))
 
 	if !s.submitBuild(job, func() (string, error) {
 		return payload.GenerateLinuxELF(cfg, agentsDir)
@@ -714,7 +716,7 @@ func (s *Server) handleGenerateMacOS(c *gin.Context) {
 		return
 	}
 	agentsDir := s.extractAgentsDir()
-	job := s.startBuildJobWithProfile("macos", "binary", form.C2URL, form.ListenerID, form.Filename, form.Profile, profileAuditHash(cfg), s.currentTenantID(c))
+	job := s.startBuildJobWithProfile("macos", "binary", form.C2URL, form.ListenerID, form.Filename, form.Profile, profileAuditHash(cfg), GenerateCacheKey(&cfg, "macos", "binary", runtime.Version(), ""), s.currentTenantID(c))
 
 	if !s.submitBuild(job, func() (string, error) {
 		return payload.GenerateMacOS(cfg, agentsDir)

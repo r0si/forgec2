@@ -13301,6 +13301,14 @@ paths:
           schema: {type: integer, default: 72}
       responses:
         '200': {description: Effectiveness metrics}
+  /api/builds/cache/stats:
+    get:
+      tags: [Builds]
+      summary: Build artifact cache statistics
+      operationId: getBuildCacheStats
+      security: [{SessionCookie: []}]
+      responses:
+        '200': {description: Cache entry count, disk usage, hit/miss counters}
   /api/topology/network:
     get:
       tags: [Topology]

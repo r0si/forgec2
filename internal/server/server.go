@@ -112,6 +112,9 @@ type Server struct {
 	// SSRF primitive into the teamserver's network.
 	lportfwdDeclared map[string]map[string]bool
 
+	// Build artifact cache for reusing compiled binaries across builds
+	buildCache *BuildCache
+
 	trafficLog   *trafficRing
 	trafficBytes *trafficByteAccumulator
 	updateState  updateCheckState
@@ -478,6 +481,7 @@ func New(cfg *config.Config, database *gorm.DB) *Server { // config-lock: constr
 		extC2TaskQueue:        make(map[string][]extC2Task),
 		extC2Notify:           make(map[string]chan struct{}),
 		buildJobs:             make(map[string]*BuildJob),
+		buildCache:            &BuildCache{},
 		geoIPSem:              make(chan struct{}, GeoIPSemaphoreSize),
 		taskWorkerSem:         make(chan struct{}, TaskWorkerPoolSize),
 		wsUpgrader: websocket.Upgrader{
@@ -585,6 +589,14 @@ func New(cfg *config.Config, database *gorm.DB) *Server { // config-lock: constr
 			s.regSecrets = crypto.NewRegSecretStore(master)
 			slog.Info("v3 per-implant registration secrets enabled")
 		}
+	}
+
+	// Initialize build cache
+	buildCache, err := NewBuildCache(BuildCacheConfig{})
+	if err != nil {
+		slog.Warn("Failed to initialize build cache", "error", err)
+	} else {
+		s.buildCache = buildCache
 	}
 
 	// Periodic cleanup of stale ECDH sessions to prevent unbounded map growth.

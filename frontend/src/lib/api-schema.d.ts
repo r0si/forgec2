@@ -11062,6 +11062,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/builds/cache/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Build artifact cache statistics */
+        get: operations["getBuildCacheStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/topology/network": {
         parameters: {
             query?: never;
@@ -28165,6 +28182,24 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Effectiveness metrics */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getBuildCacheStats: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cache entry count */
             200: {
                 headers: {
                     [name: string]: unknown;
