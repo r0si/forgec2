@@ -1,0 +1,16 @@
+[Unit]
+Description=ForgeC2 read-only HTTP demo gateway
+After=network.target forgec2-demo.service
+Wants=forgec2-demo.service
+
+[Service]
+Type=simple
+ExecStartPre=/bin/nginx -t -c /opt/forgec2-demo/nginx.conf
+ExecStart=/bin/nginx -c /opt/forgec2-demo/nginx.conf -g "daemon off;"
+ExecReload=/bin/nginx -c /opt/forgec2-demo/nginx.conf -s reload
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

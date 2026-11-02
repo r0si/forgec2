@@ -1,0 +1,33 @@
+# Copy outside the repository to /opt/forgec2-demo/config.yaml.
+# First boot generates unique secrets. The random admin password is deliberately
+# not logged; set it with cmd/reset-password before operator provisioning.
+# Never reuse production data, keys, credentials, or listener configuration.
+server:
+  host: 127.0.0.1
+  port: 18000
+  # Public HTTP is only acceptable for this isolated, disposable observer demo.
+  # Never use these values with real operators, Agents, credentials, or data.
+  tls_enabled: false
+  require_tls_for_auth: false
+  data_dir: /opt/forgec2-demo/data
+  cert_file: /opt/forgec2-demo/data/server.crt
+  key_file: /opt/forgec2-demo/data/server.key
+  allowed_origins:
+    - http://43.143.162.139:8000
+  trusted_proxies:
+    - 127.0.0.1
+  tcp_enabled: false
+  dns_enabled: false
+  grpc_enabled: false
+  icmp_enabled: false
+  udp_enabled: false
+  quic_enabled: false
+  ssh_enabled: false
+  lportfwd_enabled: false
+  auto_recon: []
+database:
+  path: /opt/forgec2-demo/data/db/forgec2.db
+  driver: sqlite
+auth:
+  default_password: ""
+  log_generated_password: false

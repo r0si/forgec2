@@ -211,6 +211,11 @@ func (s *Server) handleLogin(c *gin.Context) {
 		s.wg.Add(1)
 		go func() {
 			defer s.wg.Done()
+			defer func() {
+				if recovered := recover(); recovered != nil {
+					slog.Error("Recovered panic in login plugin hook", "panic", recovered)
+				}
+			}()
 			if err := s.pluginManager.ExecuteHook(s.ctx, plugin.Event{
 				Type:      plugin.EventUserLogin,
 				Timestamp: time.Now(),
@@ -226,6 +231,14 @@ func (s *Server) handleLogin(c *gin.Context) {
 		}()
 	}
 
+	// The login route runs before AuthRequired, so stamp the authenticated
+	// principal explicitly before writing success records. Without this the
+	// audit row carried the correct IP but attributed every login to "system"
+	// and left tenant_id at zero, making public-demo login review ambiguous.
+	c.Set("user_id", user.ID)
+	c.Set("user", user.Username)
+	c.Set("user_role", user.Role)
+	c.Set(middleware.TenantIDContextKey, user.TenantID)
 	s.LogAuditRecord(c, "login", "auth", username, "Login successful", true, nil)
 	// First login ever from this address is worth an audit row even when
 	// everything else checks out (session-theft / credential-sharing signal).
@@ -269,6 +282,11 @@ func (s *Server) handleLogout(c *gin.Context) {
 		s.wg.Add(1)
 		go func() {
 			defer s.wg.Done()
+			defer func() {
+				if recovered := recover(); recovered != nil {
+					slog.Error("Recovered panic in logout plugin hook", "panic", recovered)
+				}
+			}()
 			if err := s.pluginManager.ExecuteHook(s.ctx, plugin.Event{
 				Type:      plugin.EventUserLogout,
 				Timestamp: time.Now(),

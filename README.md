@@ -17,6 +17,12 @@
 
 ![ForgeC2 operations dashboard](docs/assets/screens/dashboard.png)
 
+## Live demo
+
+[Open the read-only ForgeC2 demo](http://43.143.162.139:8000/) using username `demo` and password `ForgeC2Demo2026!`.
+
+The public account has an isolated observer role with read-only Agent, listener, and task access. The gateway rejects business-data writes, Beacon endpoints, and WebSocket upgrades. The instance contains no production data. Because this temporary demo uses plain HTTP, do not enter any other credentials or sensitive information.
+
 ---
 
 ## Quick start

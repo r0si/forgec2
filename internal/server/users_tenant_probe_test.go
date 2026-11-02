@@ -69,6 +69,47 @@ func TestAddUserStampsCallerTenant(t *testing.T) {
 	}
 }
 
+func TestAddUserAcceptsExistingObserverRoleOnly(t *testing.T) {
+	s := mustTenantServer(t)
+	if err := s.db.Create(&db.User{Username: "demo-admin", Role: db.RoleAdmin, TenantID: 1, IsActive: true}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := s.db.Create(&db.CustomRole{Name: "demo-observer", Permissions: `["agents.read","tasks.read"]`}).Error; err != nil {
+		t.Fatal(err)
+	}
+	add := func(username, role string) int {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest(http.MethodPost, "/users", strings.NewReader(
+			"username="+username+"&password=Str0ng!Passw0rd&role="+role))
+		c.Request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		c.Set("user", "demo-admin")
+		c.Set("user_role", db.RoleAdmin)
+		s.handleAddUser(c)
+		return w.Code
+	}
+	if got := add("viewer1", "demo-observer"); got != http.StatusOK {
+		t.Fatalf("observer user creation status=%d", got)
+	}
+	var created db.User
+	if err := s.db.Where("username = ?", "viewer1").First(&created).Error; err != nil {
+		t.Fatal(err)
+	}
+	if created.Role != "demo-observer" {
+		t.Fatalf("created role=%q", created.Role)
+	}
+	if got := add("viewer2", "unknown-role"); got != http.StatusBadRequest {
+		t.Fatalf("unknown role status=%d, want 400", got)
+	}
+	var count int64
+	if err := s.db.Model(&db.User{}).Where("username = ?", "viewer2").Count(&count).Error; err != nil {
+		t.Fatal(err)
+	}
+	if count != 0 {
+		t.Fatal("unknown role silently created a user")
+	}
+}
+
 // TestSetUserPasswordTenantIsolation pins the cross-tenant takeover fix: a
 // tenant admin must not be able to reset another tenant's password by id.
 func TestSetUserPasswordTenantIsolation(t *testing.T) {
@@ -155,7 +196,6 @@ func TestAddUserValidation(t *testing.T) {
 	if code := post("username=admin&password=Str0ng!Passw0rd"); code != http.StatusConflict {
 		t.Fatalf("duplicate = %d", code)
 	}
-	// viewer is not in the admin/user allowlist, so it is coerced to user.
 	if code := post("username=coerced&password=Str0ng!Passw0rd&role=admin"); code != http.StatusOK {
 		t.Fatalf("create admin-capable user = %d", code)
 	}
@@ -166,15 +206,17 @@ func TestAddUserValidation(t *testing.T) {
 	if coerced.Role != db.RoleAdmin {
 		t.Fatalf("explicit admin role = %q, want admin", coerced.Role)
 	}
-	if code := post("username=plainrole&password=Str0ng!Passw0rd&role=viewer"); code != http.StatusOK {
-		t.Fatalf("create with non-allowlisted role = %d", code)
+	// Unknown roles must fail closed instead of silently creating a more
+	// privileged built-in user. Existing custom roles are covered separately.
+	if code := post("username=plainrole&password=Str0ng!Passw0rd&role=viewer"); code != http.StatusBadRequest {
+		t.Fatalf("create with unknown role = %d, want 400", code)
 	}
-	var plain db.User
-	if err := s.db.Where("username = ?", "plainrole").First(&plain).Error; err != nil {
+	var plainCount int64
+	if err := s.db.Model(&db.User{}).Where("username = ?", "plainrole").Count(&plainCount).Error; err != nil {
 		t.Fatal(err)
 	}
-	if plain.Role != db.RoleUser {
-		t.Fatalf("non-allowlisted role = %q, want the user fallback", plain.Role)
+	if plainCount != 0 {
+		t.Fatal("unknown role silently created a user")
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net"
@@ -437,6 +438,7 @@ func AuthRequired(database *gorm.DB) gin.HandlerFunc {
 						c.Set("user_id", user.ID)
 						c.Set("user", user.Username)
 						c.Set("user_role", user.Role)
+						setCustomRolePermissions(c, database, user.Role)
 						// The tenant travels with the authenticated row so the server does
 						// not have to re-SELECT users on every scoped request. The handler
 						// side falls back to a lookup when this is absent.
@@ -552,6 +554,7 @@ func AuthRequired(database *gorm.DB) gin.HandlerFunc {
 		c.Set("user_id", user.ID)
 		c.Set("user", user.Username)
 		c.Set("user_role", user.Role)
+		setCustomRolePermissions(c, database, user.Role)
 		if claims.ExpiresAt != nil {
 			c.Set("session_exp", claims.ExpiresAt.Time)
 		}
@@ -626,6 +629,38 @@ func apiKeyScopes(c *gin.Context) (map[string]bool, bool) {
 	return nil, true
 }
 
+// Custom roles are resolved on every authenticated request so permission edits
+// take effect immediately. A missing role, DB error, or malformed permission
+// list grants nothing; built-in roles continue to use the static permission map.
+func setCustomRolePermissions(c *gin.Context, database *gorm.DB, role string) {
+	if _, builtin := db.RolePermissionsMap[role]; builtin {
+		return
+	}
+	permissions := map[string]bool{}
+	var custom db.CustomRole
+	if err := database.Where("name = ?", role).First(&custom).Error; err == nil {
+		var names []string
+		if json.Unmarshal([]byte(custom.Permissions), &names) == nil {
+			for _, name := range names {
+				permissions[name] = true
+			}
+		}
+	}
+	c.Set("role_permissions", permissions)
+}
+
+func hasRolePermission(c *gin.Context, role, permission string) bool {
+	if db.RoleHasPermission(role, permission) {
+		return true
+	}
+	grants, ok := c.Get("role_permissions")
+	if !ok {
+		return false
+	}
+	set, ok := grants.(map[string]bool)
+	return ok && set[permission]
+}
+
 func RequireRole(allowedRoles ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Capability keys never satisfy identity-role gates, even when the
@@ -679,7 +714,7 @@ func RequirePermission(permissions ...string) gin.HandlerFunc {
 				if !set[perm] {
 					continue
 				}
-				if db.RoleHasPermission(ownerRole, perm) {
+				if hasRolePermission(c, ownerRole, perm) {
 					c.Next()
 					return
 				}
@@ -708,7 +743,7 @@ func RequirePermission(permissions ...string) gin.HandlerFunc {
 			return
 		}
 		for _, perm := range permissions {
-			if db.RoleHasPermission(roleStr, perm) {
+			if hasRolePermission(c, roleStr, perm) {
 				c.Next()
 				return
 			}
@@ -737,7 +772,7 @@ func RequireAllPermissions(permissions ...string) gin.HandlerFunc {
 			return
 		}
 		for _, perm := range permissions {
-			if !db.RoleHasPermission(roleStr, perm) {
+			if !hasRolePermission(c, roleStr, perm) {
 				respondError(c, http.StatusForbidden, "insufficient permissions")
 				c.Abort()
 				return

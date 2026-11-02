@@ -55,12 +55,11 @@ func (s *Server) handleAddUser(c *gin.Context) {
 		respondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	validRoles := map[string]bool{
-		db.RoleAdmin: true,
-		db.RoleUser:  true,
-	}
-	if !validRoles[role] {
+	if role == "" {
 		role = db.RoleUser
+	} else if !s.roleGrantsOperator(role) {
+		respondError(c, http.StatusBadRequest, "Invalid role")
+		return
 	}
 
 	hash, err := middleware.HashPassword(password)
@@ -189,11 +188,7 @@ func (s *Server) handleEditUser(c *gin.Context) {
 		updates["username"] = username
 	}
 	if role != "" && role != user.Role {
-		validRoles := map[string]bool{
-			db.RoleAdmin: true,
-			db.RoleUser:  true,
-		}
-		if !validRoles[role] {
+		if !s.roleGrantsOperator(role) {
 			respondError(c, http.StatusBadRequest, "Invalid role")
 			return
 		}

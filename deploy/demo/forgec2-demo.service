@@ -1,0 +1,20 @@
+[Unit]
+Description=ForgeC2 isolated read-only demo backend
+After=network.target
+
+[Service]
+Type=simple
+User=forgec2demo
+Group=forgec2demo
+WorkingDirectory=/opt/forgec2-demo
+ExecStart=/opt/forgec2-demo/forgec2-server -config /opt/forgec2-demo/config.yaml -log-format json -log-file /opt/forgec2-demo/logs/forgec2.log
+Restart=on-failure
+RestartSec=5s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/forgec2-demo/data /opt/forgec2-demo/logs /opt/forgec2-demo/config.yaml
+
+[Install]
+WantedBy=multi-user.target

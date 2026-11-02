@@ -17,6 +17,12 @@
 
 ![ForgeC2 作战仪表盘](docs/assets/screens/dashboard.png)
 
+## 在线演示
+
+[打开 ForgeC2 只读演示](http://43.143.162.139:8000/)，用户名为 `demo`，密码为 `ForgeC2Demo2026!`。
+
+公开账号使用隔离的观察者角色，仅有 Agent、监听器和任务的只读权限。网关会拒绝业务数据写入、Beacon 端点和 WebSocket 升级，实例不包含任何生产数据。该临时演示使用明文 HTTP，请勿输入其他凭据或敏感信息。
+
 ---
 
 ## 快速开始

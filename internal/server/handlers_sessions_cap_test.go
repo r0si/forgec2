@@ -135,4 +135,34 @@ func TestLoginSessionCapAndNewIP(t *testing.T) {
 	if newIP == 0 {
 		t.Fatalf("no login_new_ip audit row")
 	}
+	var login db.AuditLog
+	if err := s.db.Where("action = ? AND resource = ?", "login", "auth").Order("id desc").First(&login).Error; err != nil {
+		t.Fatalf("no successful login audit row: %v", err)
+	}
+	if login.IP != "3.3.3.3" {
+		t.Fatalf("login audit IP=%q, want 3.3.3.3", login.IP)
+	}
+	if login.User != "cap-login" {
+		t.Fatalf("login audit user=%q, want cap-login", login.User)
+	}
+	if login.TenantID != 1 {
+		t.Fatalf("login audit tenant=%d, want 1", login.TenantID)
+	}
+
+	badForm := url.Values{}
+	badForm.Set("username", "cap-login")
+	badForm.Set("password", "wrong-password")
+	failed := httptest.NewRecorder()
+	failedCtx, _ := gin.CreateTestContext(failed)
+	failedCtx.Request, _ = http.NewRequest(http.MethodPost, "/login", strings.NewReader(badForm.Encode()))
+	failedCtx.Request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	failedCtx.Request.RemoteAddr = "4.4.4.4:4321"
+	s.handleLogin(failedCtx)
+	var failure db.AuditLog
+	if err := s.db.Where("action = ? AND resource = ?", "login_failed", "auth").Order("id desc").First(&failure).Error; err != nil {
+		t.Fatalf("no failed login audit row: %v", err)
+	}
+	if failure.IP != "4.4.4.4" {
+		t.Fatalf("failed login audit IP=%q, want 4.4.4.4", failure.IP)
+	}
 }

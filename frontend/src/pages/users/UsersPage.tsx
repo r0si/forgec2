@@ -57,8 +57,10 @@ interface UserSession {
 
 function getRoleBadge(role: string) {
   if (role === "admin")
-    return { icon: <Crown className="size-2.5" />, key: "users.role_admin", cls: "bg-primary/10 text-primary dark:bg-primary/25 dark:text-primary" };
-  return { icon: <UserIcon className="size-2.5" />, key: "users.role_user", cls: "bg-info/10 text-info-ink" };
+    return { icon: <Crown className="size-2.5" />, label: "users.role_admin", custom: false, cls: "bg-primary/10 text-primary dark:bg-primary/25 dark:text-primary" };
+  if (role === "user")
+    return { icon: <UserIcon className="size-2.5" />, label: "users.role_user", custom: false, cls: "bg-info/10 text-info-ink" };
+  return { icon: <UserIcon className="size-2.5" />, label: role, custom: true, cls: "bg-secondary text-secondary-foreground" };
 }
 
 export default function UsersPage() {
@@ -127,7 +129,7 @@ export default function UsersPage() {
         const badge = getRoleBadge(u.role || "user");
         return (
           <Badge variant="outline" className={badge.cls}>
-            {badge.icon} {t(badge.key)}
+            {badge.icon} {badge.custom ? badge.label : t(badge.label)}
           </Badge>
         );
       },
