@@ -28,6 +28,8 @@ func (s *Server) registerGenerateRoutes(auth *gin.RouterGroup) {
 	genWrite := auth.Group("/")
 	genWrite.Use(middleware.RequirePermission(db.PermAgentsWrite))
 	{
+		// Operators can clear the cache when disk is tight or after a toolchain upgrade.
+		genWrite.POST("/api/builds/cache/clear", s.handleBuildCacheClear)
 		genWrite.POST("/api/generate/profile", s.handleSaveProfile)
 		genWrite.POST("/api/generate/profile/import", s.handleImportProfile)
 		genWrite.POST("/api/generate/profile/import-text", s.handleImportProfileText)

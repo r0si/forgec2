@@ -391,3 +391,31 @@ func (c *BuildCache) Stats() BuildCacheStats {
 		HitRate:    hitRate,
 	}
 }
+
+// Clear removes all cache entries and their files from disk.
+func (c *BuildCache) Clear() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	for _, entry := range c.entries {
+		os.Remove(entry.OutputPath)
+	}
+	c.entries = make(map[string]*BuildCacheEntry)
+	c.currentSize = 0
+	return nil
+}
+
+// ClearEntry removes a single cache entry by key.
+func (c *BuildCache) ClearEntry(key string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	entry, ok := c.entries[key]
+	if !ok {
+		return fmt.Errorf("cache entry not found: %s", key)
+	}
+	os.Remove(entry.OutputPath)
+	c.currentSize -= entry.Size
+	delete(c.entries, key)
+	return nil
+}

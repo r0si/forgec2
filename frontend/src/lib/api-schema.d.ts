@@ -11079,6 +11079,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/builds/cache/clear": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Clear all build cache entries */
+        post: operations["clearBuildCache"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/topology/network": {
         parameters: {
             query?: never;
@@ -28200,6 +28217,24 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Cache entry count */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    clearBuildCache: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cache cleared */
             200: {
                 headers: {
                     [name: string]: unknown;

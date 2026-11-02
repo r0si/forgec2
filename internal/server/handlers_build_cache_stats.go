@@ -1,6 +1,8 @@
 package server
 
 import (
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -29,4 +31,18 @@ func (s *Server) handleBuildCacheStats(c *gin.Context) {
 		"miss_count":  stats.MissCount,
 		"hit_rate":    stats.HitRate,
 	})
+}
+
+// handleBuildCacheClear clears all entries from the build cache.
+// POST /api/builds/cache/clear
+func (s *Server) handleBuildCacheClear(c *gin.Context) {
+	if s.buildCache == nil {
+		respondError(c, http.StatusOK, "build cache is not initialized")
+		return
+	}
+	if err := s.buildCache.Clear(); err != nil {
+		respondError(c, http.StatusInternalServerError, "failed to clear cache: " + err.Error())
+		return
+	}
+	respond(c, gin.H{"message": "cache cleared"})
 }
