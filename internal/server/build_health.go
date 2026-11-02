@@ -30,6 +30,12 @@ type buildHealthSnapshot struct {
 	Text    string
 	Warn    bool
 	Scanned bool
+	// Cache info is included so /ready can show whether the build cache is
+	// helping (hit rate) or just consuming disk.
+	CacheEntries int
+	CacheHits    int64
+	CacheMisses  int64
+	CacheHitRate float64
 }
 
 // buildHealth returns the cached snapshot, refreshing it when stale.
@@ -75,6 +81,15 @@ func (s *Server) buildHealth() buildHealthSnapshot {
 		default:
 			snapshot.Text = itoaInt(failed) + " of " + itoaInt(len(rows)) + " build(s) failed in 24h"
 		}
+	}
+
+	// Include cache info if available.
+	if s.buildCache != nil {
+		stats := s.buildCache.Stats()
+		snapshot.CacheEntries = stats.Entries
+		snapshot.CacheHits = stats.HitCount
+		snapshot.CacheMisses = stats.MissCount
+		snapshot.CacheHitRate = stats.HitRate
 	}
 
 	s.buildHealthMu.Lock()
