@@ -301,6 +301,7 @@ func (s *Server) buildJobSnapshots() []gin.H {
 			"listener_id":  j.ListenerID,
 			"profile_name": j.ProfileName,
 			"profile_hash": j.ProfileHash,
+			"config_hash":  j.ConfigHash,
 			"created_at":   j.CreatedAt,
 		}
 		if j.Error != "" {
