@@ -1,4 +1,14 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+
+function readStoredValue<T>(key: string, initial: T): T {
+  if (typeof window === "undefined") return initial;
+  try {
+    const raw = window.localStorage.getItem(key);
+    return raw === null ? initial : (JSON.parse(raw) as T);
+  } catch {
+    return initial;
+  }
+}
 
 /**
  * useState persisted to localStorage. Reads once on mount (client-side),
@@ -6,36 +16,28 @@ import { useEffect, useState } from "react";
  * restored the value as invalid JSON — falls back to `initial`.
  */
 export function usePersistedState<T>(key: string, initial: T) {
-  const [value, setValue] = useState<T>(() => {
-    if (typeof window === "undefined") return initial;
-    try {
-      const raw = window.localStorage.getItem(key);
-      return raw === null ? initial : (JSON.parse(raw) as T);
-    } catch {
-      return initial;
-    }
-  });
+  const [snapshot, setSnapshot] = useState(() => ({ key, value: readStoredValue(key, initial) }));
 
-  // Resync when key changes (SPA navigation A→B reuses hook instance;
-  // without this, B would keep A's value and then clobber B's storage).
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const raw = window.localStorage.getItem(key);
-      setValue(raw === null ? initial : (JSON.parse(raw) as T));
-    } catch {
-      setValue(initial);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- initial is the one-shot fallback for a missing key; a changing initial must not clobber the stored value.
-  }, [key]);
+  // Reset before committing a render for a different key. Separate read/write
+  // effects briefly wrote A's value to B before the read effect's update landed.
+  if (snapshot.key !== key) {
+    setSnapshot({ key, value: readStoredValue(key, initial) });
+  }
+
+  const setValue = useCallback((next: T | ((previous: T) => T)) => {
+    setSnapshot(previous => {
+      const value = typeof next === "function" ? (next as (value: T) => T)(previous.value) : next;
+      return Object.is(previous.value, value) ? previous : { key: previous.key, value };
+    });
+  }, []);
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(key, JSON.stringify(value));
+      if (snapshot.key === key) window.localStorage.setItem(key, JSON.stringify(snapshot.value));
     } catch {
       // Storage full / disabled — state still works in-memory.
     }
-  }, [key, value]);
+  }, [key, snapshot]);
 
-  return [value, setValue] as const;
+  return [snapshot.value, setValue] as const;
 }
