@@ -24,6 +24,14 @@ RUN go mod download
 COPY --from=frontend-builder /build/frontend/out /build/internal/webdist/dist
 # Copy source code (local webdist/dist not needed in build context)
 COPY cmd/ ./cmd/
+# api/ is not optional: internal/server/handlers_api_docs.go imports the api package,
+# which //go:embed's openapi.yaml so the docs endpoint serves the copy baked into the
+# binary (the archives ship no api/ directory, which is why it is embedded at all).
+# Omitting it here breaks the IMAGE build only — `go build ./...` passes on any real
+# checkout, where api/ exists — so this line is guarded by
+# scripts/check-docker-context.mjs, which fails when a top-level package the module
+# imports is missing from the COPY list.
+COPY api/ ./api/
 COPY internal/ ./internal/
 COPY pkg/ ./pkg/
 RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o forgec2-server ./cmd/server

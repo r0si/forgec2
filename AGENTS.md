@@ -122,6 +122,16 @@ by hand at least once; do not weaken one to make a change pass — fix the chang
   no `api/` directory), and plugin **quarantine** moved deleted sources into `<cwd>/data`. The
   implant is exempt: absolute host paths (`/etc/hosts`, `/proc/<pid>`) are the point. A
   deliberate relative path carries a reason in the script's ALLOWLIST.
+- `check:docker-context` (`scripts/check-docker-context.mjs`) — the image must build from
+  exactly the files the Dockerfile copies. Stage 2 COPYs `cmd/ internal/ pkg/` and (now)
+  `api/`, but `internal/server/handlers_api_docs.go` imports `github.com/forgec2/forgec2/api`
+  (which `//go:embed`s openapi.yaml — the same embed that fixed the runtime-paths 500
+  above). The image was missing `api/` and `docker build` failed with "no required module
+  provides package …/api", while `go build ./...` stayed green on every checkout because
+  there `api/` EXISTS — only the image context lacked it. The gate reads the Dockerfile's
+  COPY set, follows in-module imports transitively from the production Go files (test files
+  and `//go:build ignore` helpers excluded), and fails if the closure needs a top-level
+  directory the Dockerfile never copies or `.dockerignore` excludes wholesale.
 - `check:owner-scope` (`scripts/check-owner-scope.mjs`) — a request handler that touches a
   table **without a tenant column** by id must scope through the owning relationship. Fourteen
   rounds of this audit found the same shape by hand (scripts, BOF blobs, phishing templates and
