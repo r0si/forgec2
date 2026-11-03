@@ -50,8 +50,10 @@ func (s *Server) handleTopologyPage(c *gin.Context) {
 // handleTopologyData returns JSON nodes and edges for the topology graph
 func (s *Server) handleTopologyData(c *gin.Context) {
 	var listeners []db.Listener
-	if err := s.db.Where("enabled = ?", true).Limit(500).Find(&listeners).Error; err != nil {
-		slog.Error("Failed to query listeners for topology", "err", err)
+	listenerQ := s.tenantScope(s.db.Where("enabled = ?", true), c)
+	if err := listenerQ.Limit(500).Find(&listeners).Error; err != nil {
+		handleQueryError(c, err, "Failed to query the topology")
+		return
 	}
 
 	var agents []db.Implant

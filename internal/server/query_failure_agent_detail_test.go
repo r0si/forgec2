@@ -1,8 +1,12 @@
 package server
 
 import (
+	"bytes"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
+	"github.com/forgec2/forgec2/internal/db"
 	"github.com/gin-gonic/gin"
 )
 
@@ -141,6 +145,55 @@ func TestChatAndMeshReads_QueryFailureIsNotAnEmptyList(t *testing.T) {
 func TestTimeline_QueryFailureIsNotAnEmptyList(t *testing.T) {
 	assertQueryFailureIs500(t, "timeline", "/api/timeline", func(s *Server, c *gin.Context) {
 		s.handleAPITimelineData(c)
+	})
+}
+
+// TestTagReads_QueryFailureIsNotAnEmptyList covers the inventory, per-agent,
+// and batch tag reads. Tags drive fleet classification and filters, so a
+// database failure must not look like an untagged fleet.
+func TestTagReads_QueryFailureIsNotAnEmptyList(t *testing.T) {
+	assertQueryFailureIs500(t, "tag list", "/api/tags", func(s *Server, c *gin.Context) {
+		s.handleAPITagList(c)
+	})
+
+	t.Run("agent tags", func(t *testing.T) {
+		s := mustTenantServer(t)
+		if err := s.db.Create(&db.Implant{ID: "a1", TenantID: 1, Hostname: "host-1"}).Error; err != nil {
+			t.Fatalf("seed agent: %v", err)
+		}
+		if err := s.db.Migrator().DropTable("agent_tags"); err != nil {
+			t.Fatalf("drop tags: %v", err)
+		}
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest(http.MethodGet, "/api/agents/a1/tags", nil)
+		c.Params = gin.Params{{Key: "id", Value: "a1"}}
+		c.Set(tenantIDContextKey, tenantResolution{tid: 1, ok: true})
+		s.handleAgentTags(c)
+		if w.Code != http.StatusInternalServerError {
+			t.Fatalf("agent tags: expected 500, got %d; body=%s", w.Code, w.Body.String())
+		}
+	})
+
+	t.Run("batch tags", func(t *testing.T) {
+		s := closedDBServer(t)
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest(http.MethodPost, "/api/agents/tags/batch", bytes.NewBufferString(`{"agent_ids":["a1"]}`))
+		c.Request.Header.Set("Content-Type", "application/json")
+		c.Set(tenantIDContextKey, tenantResolution{tid: 1, ok: true})
+		s.handleBatchAgentTags(c)
+		if w.Code != http.StatusInternalServerError {
+			t.Fatalf("batch tags: expected 500, got %d; body=%s", w.Code, w.Body.String())
+		}
+	})
+}
+
+// TestTopologyData_QueryFailureIsNotPartial proves a failed listener query
+// cannot be rendered as a valid graph with the listener layer missing.
+func TestTopologyData_QueryFailureIsNotPartial(t *testing.T) {
+	assertQueryFailureIs500(t, "topology data", "/topology/data", func(s *Server, c *gin.Context) {
+		s.handleTopologyData(c)
 	})
 }
 

@@ -1,7 +1,6 @@
 package server
 
 import (
-	"log/slog"
 	"net/http"
 	"regexp"
 	"strings"
@@ -41,7 +40,8 @@ func validTagColor(color string) bool {
 func (s *Server) handleAPITagList(c *gin.Context) {
 	var tags []db.AgentTag
 	if err := s.tenantScope(s.db.Model(&db.AgentTag{}), c).Order("name asc").Find(&tags).Error; err != nil {
-		slog.Error("Failed to list tags", "err", err)
+		handleQueryError(c, err, "Failed to list tags")
+		return
 	}
 	respond(c, tags)
 }
@@ -162,7 +162,8 @@ func (s *Server) handleAgentTags(c *gin.Context) {
 		Where("agent_tag_assignments.implant_id = ?", id).
 		Order("agent_tags.name asc").
 		Find(&tags).Error; err != nil {
-		slog.Error("Failed to load agent tags", "agent_id", id, "err", err)
+		handleQueryError(c, err, "Failed to load agent tags")
+		return
 	}
 	respond(c, gin.H{"tags": tags})
 }
@@ -195,7 +196,8 @@ func (s *Server) handleBatchAgentTags(c *gin.Context) {
 		Where("agent_tag_assignments.implant_id IN ?", req.AgentIDs).
 		Where("agent_tag_assignments.implant_id IN (?)", visible).
 		Find(&rows).Error; err != nil {
-		slog.Error("Failed to batch-load agent tags", "agent_ids", req.AgentIDs, "err", err)
+		handleQueryError(c, err, "Failed to load agent tags")
+		return
 	}
 
 	tagsByAgent := make(map[string][]gin.H)

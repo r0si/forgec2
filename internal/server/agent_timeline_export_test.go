@@ -118,4 +118,62 @@ func TestAgentTimelineCSVExport(t *testing.T) {
 	if !strings.Contains(jsonResponse.Body.String(), `"kind":"status"`) {
 		t.Fatalf("agent status history is missing from JSON: %s", jsonResponse.Body.String())
 	}
+
+	// A kind filter is also a query-planning contract: excluded sources must
+	// not be queried or leak into the response.
+	statusOnly := call("?kinds=status")
+	if statusOnly.Code != http.StatusOK {
+		t.Fatalf("status-only response = %d (%s)", statusOnly.Code, statusOnly.Body.String())
+	}
+	if strings.Contains(statusOnly.Body.String(), `"kind":"task"`) {
+		t.Fatalf("status-only response leaked tasks: %s", statusOnly.Body.String())
+	}
+	if !strings.Contains(statusOnly.Body.String(), `"kind":"status"`) {
+		t.Fatalf("status-only response lost status history: %s", statusOnly.Body.String())
+	}
+}
+
+// TestAgentTimelineQueryFailureIsNotPartial proves that each database-backed
+// source fails closed. Returning 200 after dropping one source makes an
+// incomplete activity history indistinguishable from a complete one.
+func TestAgentTimelineQueryFailureIsNotPartial(t *testing.T) {
+	tests := []struct {
+		name  string
+		table string
+		query string
+	}{
+		{name: "tasks", table: "tasks", query: "?kinds=task"},
+		{name: "credentials", table: "credential_entries", query: "?kinds=credential"},
+		{name: "status", table: "agent_status_events", query: "?kinds=status"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			s := mustTenantServer(t)
+			if err := s.db.Create(&db.Implant{ID: "a-1", TenantID: 1, Hostname: "web-01"}).Error; err != nil {
+				t.Fatalf("seed agent: %v", err)
+			}
+			if err := s.db.Migrator().DropTable(tc.table); err != nil {
+				t.Fatalf("drop %s: %v", tc.table, err)
+			}
+
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+			c.Request = httptest.NewRequest(http.MethodGet, "/api/agents/a-1/timeline"+tc.query, nil)
+			c.Params = gin.Params{{Key: "id", Value: "a-1"}}
+			c.Set("user", "op")
+			c.Set("user_role", db.RoleAdmin)
+			c.Set("user_id", uint(1))
+			c.Set(middleware.TenantIDContextKey, uint(1))
+
+			s.handleAgentTimeline(c)
+
+			if w.Code != http.StatusInternalServerError {
+				t.Fatalf("status = %d, want 500; body=%s", w.Code, w.Body.String())
+			}
+			if strings.Contains(w.Body.String(), `"events"`) {
+				t.Fatalf("failed source returned a partial timeline: %s", w.Body.String())
+			}
+		})
+	}
 }

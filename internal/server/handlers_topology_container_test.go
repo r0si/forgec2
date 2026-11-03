@@ -3,6 +3,7 @@ package server
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/forgec2/forgec2/internal/config"
@@ -51,6 +52,45 @@ func TestHandleTopologyData_IncludesAgents(t *testing.T) {
 	}
 	if agentNodes != 2 {
 		t.Fatalf("expected 2 agent nodes, got %d (nodes=%d); body=%s", agentNodes, len(resp.Nodes), w.Body.String())
+	}
+}
+
+func TestHandleTopologyData_TenantIsolation(t *testing.T) {
+	s := newTopologyTestServer(t)
+	listeners := []db.Listener{
+		{Name: "own-listener", TenantID: 1, Scheme: "http", Host: "10.0.0.1", Port: 8080, Enabled: true},
+		{Name: "foreign-listener", TenantID: 2, Scheme: "https", Host: "10.9.9.9", Port: 8443, Enabled: true},
+	}
+	if err := s.db.Create(&listeners).Error; err != nil {
+		t.Fatalf("seed listeners: %v", err)
+	}
+	agents := []db.Implant{
+		{ID: "own-agent", TenantID: 1, Hostname: "own-host", ListenerID: listeners[0].ID},
+		{ID: "foreign-agent", TenantID: 2, Hostname: "foreign-host", ListenerID: listeners[1].ID},
+	}
+	if err := s.db.Create(&agents).Error; err != nil {
+		t.Fatalf("seed agents: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/topology/data", nil)
+	c.Set(tenantIDContextKey, tenantResolution{tid: 1, ok: true})
+	s.handleTopologyData(c)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d; body=%s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	for _, want := range []string{"own-listener", "own-host"} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("topology lost %q: %s", want, body)
+		}
+	}
+	for _, leak := range []string{"foreign-listener", "10.9.9.9", "foreign-host", "foreign-agent"} {
+		if strings.Contains(body, leak) {
+			t.Fatalf("topology leaked %q: %s", leak, body)
+		}
 	}
 }
 

@@ -132,7 +132,7 @@ func (s *Server) fireWebhook(wh db.WebhookConfig, evt Event) error {
 		resp, err := ssrfSafeClient(s.httpClient).Do(req)
 		if err != nil {
 			if attempt < webhookMaxRetries {
-				slog.Warn("Webhook delivery failed, retrying", "name", wh.Name, "attempt", attempt+1, "error", redactURLFromMessage(err.Error(), wh.URL))
+				slog.Warn("Webhook delivery failed, retrying", "name", wh.Name, "url", redactURLForLog(wh.URL), "attempt", attempt+1, "error", redactURLFromMessage(err.Error(), wh.URL))
 				select {
 				case <-s.ctx.Done():
 					return fmt.Errorf("webhook delivery aborted: server shutting down")
@@ -140,7 +140,7 @@ func (s *Server) fireWebhook(wh db.WebhookConfig, evt Event) error {
 				}
 				continue
 			}
-			slog.Error("Webhook delivery failed, exhausted retries", "name", wh.Name, "error", redactURLFromMessage(err.Error(), wh.URL))
+			slog.Error("Webhook delivery failed, exhausted retries", "name", wh.Name, "url", redactURLForLog(wh.URL), "error", redactURLFromMessage(err.Error(), wh.URL))
 			return err
 		}
 		resp.Body.Close()
@@ -166,7 +166,7 @@ func (s *Server) fireWebhook(wh db.WebhookConfig, evt Event) error {
 			return nil
 		}
 		if attempt < webhookMaxRetries && resp.StatusCode >= 500 {
-			slog.Warn("Webhook delivery got server error, retrying", "name", wh.Name, "status", resp.StatusCode, "attempt", attempt+1)
+			slog.Warn("Webhook delivery got server error, retrying", "name", wh.Name, "url", redactURLForLog(wh.URL), "status", resp.StatusCode, "attempt", attempt+1)
 			select {
 			case <-s.ctx.Done():
 				return fmt.Errorf("webhook delivery aborted: server shutting down")
@@ -175,7 +175,7 @@ func (s *Server) fireWebhook(wh db.WebhookConfig, evt Event) error {
 			continue
 		}
 
-		slog.Error("Webhook delivery failed with non-retryable status", "name", wh.Name, "status", resp.StatusCode)
+		slog.Error("Webhook delivery failed with non-retryable status", "name", wh.Name, "url", redactURLForLog(wh.URL), "status", resp.StatusCode)
 		s.flushAuditEntries([]db.AuditLog{{
 			User:    "system",
 			Action:  "webhook",

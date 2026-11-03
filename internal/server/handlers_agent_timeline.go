@@ -55,36 +55,38 @@ func (s *Server) handleAgentTimeline(c *gin.Context) {
 	events := make([]timelineEvent, 0, limit)
 
 	// ── Tasks (skip noisy/no-op types to keep the feed readable) ──
-	skipTypes := map[string]bool{
-		"beacon_now": true, "set_sleep": true,
-	}
-	// Dest is db.Task so Task.AfterFind decrypts Command for the
-	// SensitiveTaskTypes (mimikatz, cred_check, token_make, …). Scanning into a
-	// bare struct put an "FC2ENC:..." blob in the feed as the event title.
-	var tasks []db.Task
-	q := s.db.Table("tasks").
-		Select("id, agent_id, type, command, status, created_at").
-		Where("agent_id = ?", id)
-	q = s.tenantScope(q, c)
-	if err := q.Order("created_at desc").Limit(limit).Find(&tasks).Error; err != nil {
-		// Non-fatal: still render other sources.
-		tasks = nil
-	}
-	for _, t := range tasks {
-		if skipTypes[t.Type] {
-			continue
+	if want("task") {
+		skipTypes := map[string]bool{
+			"beacon_now": true, "set_sleep": true,
 		}
-		title := t.Command
-		if title == "" {
-			title = t.Type
+		// Dest is db.Task so Task.AfterFind decrypts Command for the
+		// SensitiveTaskTypes (mimikatz, cred_check, token_make, …). Scanning into a
+		// bare struct put an "FC2ENC:..." blob in the feed as the event title.
+		var tasks []db.Task
+		q := s.db.Table("tasks").
+			Select("id, agent_id, type, command, status, created_at").
+			Where("agent_id = ?", id)
+		q = s.tenantScope(q, c)
+		if err := q.Order("created_at desc").Limit(limit).Find(&tasks).Error; err != nil {
+			handleQueryError(c, err, "Failed to load the agent timeline")
+			return
 		}
-		if len(title) > 120 {
-			title = title[:120] + "…"
+		for _, t := range tasks {
+			if skipTypes[t.Type] {
+				continue
+			}
+			title := t.Command
+			if title == "" {
+				title = t.Type
+			}
+			if len(title) > 120 {
+				title = title[:120] + "…"
+			}
+			events = append(events, timelineEvent{
+				Time: t.CreatedAt, Kind: "task", Type: t.Type,
+				Title: title, Status: t.Status, RefID: t.ID,
+			})
 		}
-		events = append(events, timelineEvent{
-			Time: t.CreatedAt, Kind: "task", Type: t.Type,
-			Title: title, Status: t.Status, RefID: t.ID,
-		})
 	}
 
 	// ── Screenshots (files on disk; ModTime is the capture time) ──
@@ -114,7 +116,8 @@ func (s *Server) handleAgentTimeline(c *gin.Context) {
 		credQuery = s.tenantScope(credQuery, c)
 		if err := credQuery.
 			Order("created_at desc").Limit(limit).Scan(&creds).Error; err != nil {
-			creds = nil
+			handleQueryError(c, err, "Failed to load the agent timeline")
+			return
 		}
 		for _, cr := range creds {
 			detail := cr.Type
@@ -144,7 +147,8 @@ func (s *Server) handleAgentTimeline(c *gin.Context) {
 		// owning relationship and the correct tenant boundary for this table.
 		if err := statusQuery.
 			Order("timestamp desc").Limit(limit).Scan(&statuses).Error; err != nil {
-			statuses = nil
+			handleQueryError(c, err, "Failed to load the agent timeline")
+			return
 		}
 		for _, st := range statuses {
 			events = append(events, timelineEvent{
