@@ -1,9 +1,11 @@
 package server
 
 import (
+	"net/http"
 	"sync"
 	"time"
 
+	"github.com/forgec2/forgec2/internal/db"
 	"github.com/gin-gonic/gin"
 )
 
@@ -208,5 +210,56 @@ func (s *Server) handleTrafficPage(c *gin.Context) {
 
 func (s *Server) handleTrafficData(c *gin.Context) {
 	logs := s.trafficLog.recent(200)
-	respond(c, logs)
+	tenantID, resolved := s.resolveTenant(c)
+	if !resolved {
+		respondError(c, http.StatusInternalServerError, "tenant lookup failed")
+		return
+	}
+	// Legacy tenant 0 operators retain the global view. Scoped operators may
+	// only see records attributed to an agent they currently own; unattributed
+	// traffic (failed authentication, probes) stays in the global view because
+	// it has no safe tenant relationship to scope through.
+	if tenantID == 0 {
+		respond(c, logs)
+		return
+	}
+
+	agentIDs := uniqueTrafficAgentIDs(logs)
+	visible := make(map[string]bool, len(agentIDs))
+	if len(agentIDs) > 0 {
+		var found []string
+		if err := s.db.Model(&db.Implant{}).
+			Where("tenant_id = ? AND id IN ?", tenantID, agentIDs).
+			Pluck("id", &found).Error; err != nil {
+			handleQueryError(c, err, "Failed to load traffic data")
+			return
+		}
+		for _, id := range found {
+			visible[id] = true
+		}
+	}
+
+	filtered := make([]TrafficEntry, 0, len(logs))
+	for _, entry := range logs {
+		if entry.AgentID != "" && visible[entry.AgentID] {
+			filtered = append(filtered, entry)
+		}
+	}
+	respond(c, filtered)
+}
+
+func uniqueTrafficAgentIDs(logs []TrafficEntry) []string {
+	seen := make(map[string]struct{}, len(logs))
+	ids := make([]string, 0, len(logs))
+	for _, entry := range logs {
+		if entry.AgentID == "" {
+			continue
+		}
+		if _, ok := seen[entry.AgentID]; ok {
+			continue
+		}
+		seen[entry.AgentID] = struct{}{}
+		ids = append(ids, entry.AgentID)
+	}
+	return ids
 }
