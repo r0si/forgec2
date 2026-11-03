@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log/slog"
-	"net"
 	"net/http"
 	"net/netip"
 	"net/url"
@@ -331,27 +330,33 @@ func RequestBodyLimit(maxBytes int64) gin.HandlerFunc {
 	}
 }
 
-// CORS returns a middleware that sets CORS headers based on the provided allowed origins.
-// When allowedOrigins is empty, only localhost origins are permitted (safe default).
+// CORS returns a middleware that sets CORS headers based on the canonical
+// OriginAllowed policy shared with WebSocket upgrades.
 func CORS(allowedOrigins []string) gin.HandlerFunc {
+	snapshot := append([]string(nil), allowedOrigins...)
+	return CORSWithOrigins(func() []string { return snapshot })
+}
+
+// CORSWithOrigins reads the current allowlist for every request. The server
+// uses this variant because server.allowed_origins is hot-reloadable; capturing
+// the startup slice made WebSockets update immediately while fetch requests
+// kept the old policy until restart.
+func CORSWithOrigins(current func() []string) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Even a request without Origin needs this cache key: otherwise its
+		// response may be reused for a later cross-origin browser request.
+		c.Writer.Header().Add("Vary", "Origin")
 		origin := c.Request.Header.Get("Origin")
 		if origin == "" {
 			c.Next()
 			return
 		}
 
-		allowed := false
-		if len(allowedOrigins) == 0 {
-			allowed = isAllowedLocalhostOrigin(origin)
-		} else {
-			for _, o := range allowedOrigins {
-				if o == origin {
-					allowed = true
-					break
-				}
-			}
+		var allowedOrigins []string
+		if current != nil {
+			allowedOrigins = current()
 		}
+		allowed := OriginAllowed(origin, c.Request.Host, allowedOrigins)
 		if allowed {
 			c.Header("Access-Control-Allow-Origin", origin)
 			c.Header("Access-Control-Allow-Credentials", "true")
@@ -374,34 +379,85 @@ func CORS(allowedOrigins []string) gin.HandlerFunc {
 	}
 }
 
-// isAllowedLocalhostOrigin reports whether an Origin header refers to a real
-// loopback origin. The host must be exactly localhost/127.0.0.1 (optionally
-// ::1) and any port must be numeric — a string prefix like
-// "http://localhost:evil.example.com" is rejected.
-func isAllowedLocalhostOrigin(origin string) bool {
-	u, err := url.Parse(origin)
-	if err != nil {
+// OriginAllowed is the single browser-origin policy for CORS and WebSockets.
+// A console served by this process is always allowed to call back to the same
+// authority, including a public IP or hostname. With no explicit allowlist,
+// loopback-to-loopback requests may also cross ports for local Vite development;
+// a localhost page is not allowed to reach a public Host. Configured entries are
+// hostnames (a full http(s) origin is accepted for backward compatibility).
+func OriginAllowed(origin, requestHost string, allowedOrigins []string) bool {
+	if origin == "" {
+		return true
+	}
+	u, ok := parseBrowserOrigin(origin)
+	if !ok {
 		return false
 	}
-	if u.Scheme != "http" && u.Scheme != "https" {
-		return false
+	if strings.EqualFold(strings.TrimSpace(u.Host), strings.TrimSpace(requestHost)) {
+		return true
 	}
-	if u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" || u.Host == "" {
-		return false
+
+	requestHostname := authorityHostname(requestHost)
+	if len(allowedOrigins) == 0 {
+		return hostIsLoopback(u.Hostname()) && hostIsLoopback(requestHostname)
 	}
-	host, port, err := net.SplitHostPort(u.Host)
-	if err != nil {
-		// No port is allowed for loopback hosts.
-		return hostIsLoopback(u.Host)
-	}
-	if port != "" {
-		if p, perr := strconv.Atoi(port); perr != nil || p < 1 || p > 65535 {
-			return false
+	for _, configured := range allowedOrigins {
+		configured = strings.TrimSpace(configured)
+		if strings.Contains(configured, "://") {
+			if allowed, ok := parseBrowserOrigin(configured); ok &&
+				strings.EqualFold(u.Scheme, allowed.Scheme) && strings.EqualFold(u.Host, allowed.Host) {
+				return true
+			}
+			continue
+		}
+		if hostname, ok := configuredOriginHostname(configured); ok && strings.EqualFold(u.Hostname(), hostname) {
+			return true
 		}
 	}
-	return hostIsLoopback(host)
+	return false
 }
 
+func parseBrowserOrigin(origin string) (*url.URL, bool) {
+	u, err := url.Parse(origin)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.User != nil || u.Hostname() == "" ||
+		u.Path != "" || u.RawQuery != "" || u.Fragment != "" {
+		return nil, false
+	}
+	if strings.HasSuffix(u.Host, ":") {
+		return nil, false
+	}
+	if port := u.Port(); port != "" {
+		value, err := strconv.Atoi(port)
+		if err != nil || value < 1 || value > 65535 {
+			return nil, false
+		}
+	}
+	return u, true
+}
+
+func authorityHostname(authority string) string {
+	u, err := url.Parse("//" + strings.TrimSpace(authority))
+	if err != nil || u.User != nil || u.Path != "" {
+		return ""
+	}
+	return u.Hostname()
+}
+
+func configuredOriginHostname(value string) (string, bool) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", false
+	}
+	u, err := url.Parse("//" + value)
+	if err != nil || u.User != nil || u.Hostname() == "" || u.Port() != "" || strings.HasSuffix(u.Host, ":") ||
+		u.Path != "" || u.RawQuery != "" || u.Fragment != "" {
+		return "", false
+	}
+	return u.Hostname(), true
+}
+
+// hostIsLoopback reports whether a hostname is a loopback address: the three
+// spellings plus any address in 127/8 or ::1.
 func hostIsLoopback(host string) bool {
 	switch strings.ToLower(host) {
 	case "localhost", "127.0.0.1", "::1":

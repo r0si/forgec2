@@ -23,6 +23,7 @@ import (
 	"github.com/forgec2/forgec2/internal/config"
 	"github.com/forgec2/forgec2/internal/crypto"
 	"github.com/forgec2/forgec2/internal/db"
+	"github.com/forgec2/forgec2/internal/server/middleware"
 	"github.com/gin-gonic/gin"
 )
 
@@ -449,30 +450,11 @@ func serveFileSafe(c *gin.Context, absPath, baseDir, downloadName string) {
 	}
 }
 
-// allowedOrigin checks whether an HTTP request's Origin is permitted based on
-// the server's AllowedOrigins config. When empty, only localhost origins pass.
+// allowedOrigin shares the exact browser-origin policy used by CORS. Keeping
+// WebSocket upgrades and fetch requests on one implementation prevents a
+// public console from loading successfully while its live channel is refused.
 func allowedOrigin(cfg *config.Config, r *http.Request) bool {
-	origin := r.Header.Get("Origin")
-	if origin == "" {
-		return true
-	}
-	u, err := url.Parse(origin)
-	if err != nil {
-		return false
-	}
-	originHost := strings.ToLower(u.Hostname())
-	if len(cfg.Server.AllowedOrigins) == 0 {
-		return originHost == "localhost" || originHost == "127.0.0.1" || originHost == "::1"
-	}
-	// Hostnames are case-insensitive (RFC 4343). A config entry typed with
-	// capitals used to never match the browser's lowercase Origin, so an
-	// operator who had just added their host was still refused.
-	for _, allowed := range cfg.Server.AllowedOrigins {
-		if originHost == strings.ToLower(strings.TrimSpace(allowed)) {
-			return true
-		}
-	}
-	return false
+	return middleware.OriginAllowed(r.Header.Get("Origin"), r.Host, cfg.Server.AllowedOrigins)
 }
 
 // sanitizeFilename strips characters that could enable Content-Disposition header injection

@@ -490,9 +490,11 @@ Manual equivalent when a step has to be isolated:
    caller's console handles and a script that started it blocks until the server exits.
    `Start-Process -WindowStyle Hidden -FilePath ".\forgec2-server.exe" -ArgumentList "-config config.yaml" -PassThru -RedirectStandardOutput logs\stdout.log -RedirectStandardError logs\stderr.log`
 6. Logs go to `logs/forgec2.log`. Verify with `GET /health` (expects `ok`).
-7. The server binds `0.0.0.0` by default (reachable from other hosts). A browser on another host also
-   needs its hostname in `server.allowed_origins`, otherwise the API refuses it as cross-origin — the
-   server logs a startup warning for a wildcard bind with an empty list.
+7. The server binds `0.0.0.0` by default (reachable from other hosts). A browser opening this server's
+   own address works without configuration — the origin policy allows strict same-origin requests (CORS
+   and the WebSocket share `middleware.OriginAllowed`). `server.allowed_origins` is only for a console
+   hosted on a DIFFERENT origin; with an empty list, loopback↔loopback cross-port passes for Vite dev,
+   and a loopback page may never reach a public Host.
 
 ## Releasing
 Push a `v*` tag. `.github/workflows/release.yml` cross-compiles linux/windows × amd64/arm64, then

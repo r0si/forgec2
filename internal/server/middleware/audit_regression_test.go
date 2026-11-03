@@ -11,7 +11,16 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func TestIsAllowedLocalhostOrigin(t *testing.T) {
+func TestOriginAllowedLoopbackAndMalformed(t *testing.T) {
+	// The loopback parser lives behind OriginAllowed now: the CORS middleware
+	// and the WebSocket upgrade share one policy, so these regressions run
+	// through that entry point. A loopback page may reach a loopback server
+	// across ports; anything malformed or non-loopback must not.
+	//
+	// The request host is deliberately a DIFFERENT loopback authority, so the
+	// strict same-origin branch cannot short-circuit and the loopback rule is
+	// what actually decides each case.
+	const loopbackHost = "127.0.0.1:9999"
 	valid := []string{
 		"http://localhost",
 		"http://localhost:3000",
@@ -22,8 +31,8 @@ func TestIsAllowedLocalhostOrigin(t *testing.T) {
 		"https://[::1]",
 	}
 	for _, origin := range valid {
-		if !isAllowedLocalhostOrigin(origin) {
-			t.Errorf("isAllowedLocalhostOrigin(%q) = false, want true", origin)
+		if !OriginAllowed(origin, loopbackHost, nil) {
+			t.Errorf("OriginAllowed(%q, %q, nil) = false, want true", origin, loopbackHost)
 		}
 	}
 
@@ -42,9 +51,18 @@ func TestIsAllowedLocalhostOrigin(t *testing.T) {
 		"http://user@localhost", // userinfo not allowed
 	}
 	for _, origin := range invalid {
-		if isAllowedLocalhostOrigin(origin) {
-			t.Errorf("isAllowedLocalhostOrigin(%q) = true, want false", origin)
+		if OriginAllowed(origin, "127.0.0.1:8000", nil) {
+			t.Errorf("OriginAllowed(%q, loopback host, nil) = true, want false", origin)
 		}
+	}
+
+	// A loopback page must never reach a public host, and a public page never
+	// reaches a loopback server: neither is a local development pairing.
+	if OriginAllowed("http://localhost:5173", "203.0.113.10:8000", nil) {
+		t.Error("a loopback origin was allowed against a public host")
+	}
+	if OriginAllowed("http://203.0.113.10:8000", "127.0.0.1:8000", nil) {
+		t.Error("a public origin was allowed against a loopback host")
 	}
 }
 

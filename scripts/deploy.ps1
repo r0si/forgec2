@@ -120,18 +120,16 @@ try {
     Ok "probe port $Port"
 
     # The bind address decides whether the console is reachable from another
-    # host. A wildcard bind without allowed_origins means every API call from
-    # a remote browser is refused as cross-origin.
+    # host. Same-origin access needs no allowlist, so a wildcard bind means
+    # any host that can route here can reach the login page - the exposure is
+    # worth calling out even though authentication still gates everything.
     $hostLine = Select-String -Path $Config -Pattern '^\s*host:\s*"?([0-9a-fA-F.:\[\]]+)"?' -ErrorAction SilentlyContinue | Select-Object -First 1
     $bindHost = "0.0.0.0"
     if ($hostLine -and $hostLine.Matches.Count -gt 0) {
         $bindHost = $hostLine.Matches[0].Groups[1].Value
     }
     if ($bindHost -eq "0.0.0.0" -or $bindHost -eq "::" -or $bindHost -eq "") {
-        $origins = Select-String -Path $Config -Pattern 'allowed_origins' -ErrorAction SilentlyContinue | Select-Object -First 1
-        if (-not $origins) {
-            Warn "the console binds $bindHost but server.allowed_origins is unset - remote browsers will be refused as cross-origin"
-        }
+        Warn "the console binds $bindHost - any host that can route to this machine can reach the login page; set server.host: 127.0.0.1 to keep it local"
     }
 
     # ------------------------------------------------------------------ 1. build

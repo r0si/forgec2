@@ -21,8 +21,10 @@ powershell -File scripts/deploy.ps1    # Windows
 What it adds over "build and restart by hand":
 
 - **Preflight** — the toolchain and the config must exist; the probe port is
-  read from `server.port`; a wildcard bind without `server.allowed_origins`
-  is called out (remote browsers would be refused as cross-origin).
+  read from `server.port`; a wildcard bind is called out so the operator
+  knows the console is reachable from other hosts (same-origin access needs
+  no configuration; `server.allowed_origins` is only for separately hosted
+  consoles).
 - **One build path** — `scripts/build-embedded.ps1` owns the
   frontend → `internal/webdist/dist` sync (staged copy, LF-normalized, so the
   committed bundle stays byte-identical on every platform). The deploy script
@@ -158,9 +160,11 @@ Data (SQLite + uploads) lives under `data/` (or the `forgec2_data` volume).
 The console binds **every interface** by default (`server.host: 0.0.0.0`), so
 it can be operated from another host or container network. Two consequences:
 
-- A browser on another host is refused as cross-origin unless its hostname is
-  listed under `server.allowed_origins` in `config.yaml`. The server logs a
-  warning at startup when the bind is a wildcard and the list is empty.
+- Opening this server's own address from any browser works immediately: a
+  same-origin request needs no `server.allowed_origins` entry. List a hostname
+  under `server.allowed_origins` only when a console hosted on a **different**
+  origin must call this API. A loopback page (Vite dev server) may reach a
+  loopback server across ports; a loopback page cannot reach a public host.
 - Set `server.host: 127.0.0.1` to keep the console local. The SOCKS relay
   stays local either way (`server.socks_listen_host`).
 

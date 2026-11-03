@@ -1199,23 +1199,3 @@ func (c *Config) LoadFromData(data []byte) error {
 	defer c.mu.Unlock()
 	return yaml.Unmarshal(data, c)
 }
-
-// AllowedOrigin checks if the given origin hostname is in the configured allow list.
-// Returns false (deny) when no origins are configured.
-func (c *Config) AllowedOrigin(hostname string) bool {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	if len(c.Server.AllowedOrigins) == 0 {
-		return false
-	}
-	// Case-insensitive for the same reason as the server-side check: RFC 4343
-	// hostnames are not case-sensitive, and a config entry typed with capitals
-	// must not silently never match.
-	want := strings.ToLower(strings.TrimSpace(hostname))
-	for _, allowed := range c.Server.AllowedOrigins {
-		if want == strings.ToLower(strings.TrimSpace(allowed)) {
-			return true
-		}
-	}
-	return false
-}

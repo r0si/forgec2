@@ -69,8 +69,9 @@ bash scripts/deploy.sh --no-start
 `forgec2-server`。去掉 `-NoStart` / `--no-start` 就会顺带重启实例，并做
 `/health` 探测与失败回滚。
 
-> **要从别的机器访问？** 控制台默认监听 `0.0.0.0`。把那台机器的主机名加进
-> `server.allowed_origins`，否则所有 API 调用都会被当作跨域拒绝。详见
+> **要从别的机器访问？** 控制台默认监听 `0.0.0.0`。浏览器直接访问本服务器
+> 自己的地址即可使用，同源请求无需任何配置。只有当控制台部署在**别处**、
+> 需要调用本 API 时，才把对应主机名加进 `server.allowed_origins`。详见
 > [docs/DEPLOY.md](docs/DEPLOY.md)。
 
 ---

@@ -916,7 +916,11 @@ func (s *Server) SetupRoutes() { // config-lock: boot, before the listener serve
 	s.router.Use(middleware.RequestLogger())
 
 	// CORS middleware — applies to all routes
-	s.router.Use(middleware.CORS(s.cfg.Server.AllowedOrigins))
+	s.router.Use(middleware.CORSWithOrigins(func() []string {
+		s.configMu.RLock()
+		defer s.configMu.RUnlock()
+		return append([]string(nil), s.cfg.Server.AllowedOrigins...)
+	}))
 
 	// Unauthenticated routes
 	s.registerPublicRoutes()

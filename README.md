@@ -70,9 +70,11 @@ bash scripts/deploy.sh --no-start
 frontend gates and produces `forgec2-server`. Drop `-NoStart` / `--no-start` to
 also restart a running instance with `/health` probing and rollback.
 
-> **Exposed to another host?** The console binds `0.0.0.0` by default. Add that
-> hostname to `server.allowed_origins`, or every API call is refused as
-> cross-origin. See [docs/DEPLOY.md](docs/DEPLOY.md).
+> **Exposed to another host?** The console binds `0.0.0.0` by default, and a
+> browser opening this server's own address works out of the box: same-origin
+> requests need no configuration. List hostnames under
+> `server.allowed_origins` only when a console hosted *elsewhere* must call
+> this API. See [docs/DEPLOY.md](docs/DEPLOY.md).
 
 ---
 

@@ -18,8 +18,11 @@ func TestAllowedOrigin(t *testing.T) {
 		cfg.Server.AllowedOrigins = origins
 		return cfg
 	}
-	req := func(origin string) *http.Request {
+	req := func(origin string, host ...string) *http.Request {
 		r := httptest.NewRequest(http.MethodGet, "/ws", nil)
+		if len(host) > 0 {
+			r.Host = host[0]
+		}
 		if origin != "" {
 			r.Header.Set("Origin", origin)
 		}
@@ -66,33 +69,19 @@ func TestAllowedOrigin(t *testing.T) {
 		t.Fatal("a malformed Origin was allowed")
 	}
 
-	// With no allowlist, only loopback passes.
+	// With no allowlist, strict same-origin public access and local development
+	// across loopback ports pass; unrelated public origins do not.
 	empty := withOrigins()
-	for _, origin := range []string{"http://localhost", "http://127.0.0.1"} {
-		if !allowedOrigin(empty, req(origin)) {
-			t.Fatalf("loopback origin %q was refused with an empty allowlist", origin)
-		}
+	if !allowedOrigin(empty, req("http://203.0.113.10:8000", "203.0.113.10:8000")) {
+		t.Fatal("a same-origin public console was refused with an empty allowlist")
 	}
-	if allowedOrigin(empty, req("https://example.com")) {
+	if !allowedOrigin(empty, req("http://localhost:5173", "127.0.0.1:8000")) {
+		t.Fatal("loopback Vite origin was refused with an empty allowlist")
+	}
+	if allowedOrigin(empty, req("http://localhost:5173", "203.0.113.10:8000")) {
+		t.Fatal("a localhost origin was allowed to reach a public host")
+	}
+	if allowedOrigin(empty, req("https://example.com", "203.0.113.10:8000")) {
 		t.Fatal("a public origin was allowed with an empty allowlist")
-	}
-}
-
-// TestConfigAllowedOriginMethod covers the config-level helper, which must agree
-// with the server-side gate and stay deny-by-default.
-func TestConfigAllowedOriginMethod(t *testing.T) {
-	cfg := &config.Config{}
-	if cfg.AllowedOrigin("example.com") {
-		t.Fatal("an empty allowlist allowed a host")
-	}
-	cfg.Server.AllowedOrigins = []string{"Example.COM"}
-	if !cfg.AllowedOrigin("example.com") {
-		t.Fatal("a capitalised entry did not match")
-	}
-	if !cfg.AllowedOrigin("EXAMPLE.com") {
-		t.Fatal("a capitalised query did not match")
-	}
-	if cfg.AllowedOrigin("evil.test") {
-		t.Fatal("an unlisted host was allowed")
 	}
 }

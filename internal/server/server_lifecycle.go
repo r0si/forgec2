@@ -572,12 +572,13 @@ func (s *Server) Run() error {
 
 	slog.Info("Starting ForgeC2 server", "addr", addr, "tls", s.cfg.Server.TLSEnabled)
 
-	// The console listens on every interface by default. A browser on another
-	// host then has to be allowed explicitly (server.allowed_origins), or the
-	// API calls are refused as a cross-origin request - a confusing first
-	// symptom for an operator who just changed the bind address.
+	// A same-authority browser needs no allowlist entry, so with a wildcard
+	// bind anything that can route to this port can load the login page and
+	// attempt to authenticate — CSRF and the browser-origin gate stop a
+	// *foreign* page, not a visitor who arrives here directly. The bind
+	// itself is the exposure, so it stays a warning.
 	if isWildcardHost(s.cfg.Server.Host) && len(s.cfg.Server.AllowedOrigins) == 0 {
-		slog.Warn("The console listens on all interfaces and server.allowed_origins is empty: only browsers on localhost can use the API. Add the hostnames you operate from to server.allowed_origins.",
+		slog.Warn("The console listens on all interfaces: any host that can reach this port can attempt to log in. Set server.host: 127.0.0.1 to keep it local, or restrict network access to the port. server.allowed_origins is only needed for a console hosted on a DIFFERENT origin.",
 			"addr", addr)
 	}
 

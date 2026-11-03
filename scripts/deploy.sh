@@ -63,10 +63,10 @@ ok "probe port $PORT"
 
 BIND_HOST=$(awk '/^[[:space:]]*host:[[:space:]]*/ { gsub(/["'\'' ]/, "", $2); print $2; exit }' "$CONFIG" 2>/dev/null || true)
 BIND_HOST="${BIND_HOST:-0.0.0.0}"
+# Same-origin access needs no allowlist, so a wildcard bind means any host
+# that can route here can reach the login page.
 if [ "$BIND_HOST" = "0.0.0.0" ] || [ "$BIND_HOST" = "::" ] || [ -z "$BIND_HOST" ]; then
-  if ! grep -q 'allowed_origins' "$CONFIG"; then
-    warn "the console binds $BIND_HOST but server.allowed_origins is unset - remote browsers will be refused as cross-origin"
-  fi
+  warn "the console binds $BIND_HOST - any host that can route to this machine can reach the login page; set server.host: 127.0.0.1 to keep it local"
 fi
 
 # -------------------------------------------------------------------- 1. build
