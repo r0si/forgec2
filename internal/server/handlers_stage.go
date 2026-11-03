@@ -58,27 +58,17 @@ func (s *Server) handleServeStage(c *gin.Context) {
 		dataDir = "data"
 	}
 
-	blob, err := payload.LoadStage2Blob(dataDir, token)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			c.String(http.StatusInternalServerError, "stage not available")
-			return
-		}
-		// Lazy build: stage-2 payloads are generated on first fetch so the
-		// (fast) register API does not block on the toolchain.
-		if buildErr := s.buildStage2Blob(&tok); buildErr != nil {
-			c.String(http.StatusNotFound, "stage not ready")
-			return
-		}
-		blob, err = payload.LoadStage2Blob(dataDir, token)
-		if err != nil {
-			c.String(http.StatusInternalServerError, "stage not available")
-			return
-		}
-	}
-
-	// Atomically claim the token so concurrent fetches cannot double-serve.
-	// Only one request wins the row update; the loser is treated as consumed.
+	// Atomically claim the token BEFORE the blob is touched. Only one request
+	// can win the row update, and the loser stops here.
+	//
+	// Ordering matters: when the claim came after the read, a second request
+	// that had already passed the Used check (its row read was stale) fell
+	// through to the lazy rebuild as soon as the winner deleted the blob. It
+	// then minted a second registration secret and wrote a second encrypted
+	// stage-2 for a token that was already consumed — the exact reuse this
+	// gate exists to prevent — and where the build could not run (no listener,
+	// no toolchain) it answered 404 instead of 410. Claiming first means a
+	// loser never builds, never writes, and always sees 410.
 	claim := s.db.Model(&db.StagerToken{}).
 		Where("id = ? AND used = ?", tok.ID, false).
 		Update("used", true)
@@ -92,11 +82,46 @@ func (s *Server) handleServeStage(c *gin.Context) {
 		return
 	}
 
+	blob, err := payload.LoadStage2Blob(dataDir, token)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			s.releaseStageClaim(tok.ID)
+			c.String(http.StatusInternalServerError, "stage not available")
+			return
+		}
+		// Lazy build: stage-2 payloads are generated on first fetch so the
+		// (fast) register API does not block on the toolchain.
+		if buildErr := s.buildStage2Blob(&tok); buildErr != nil {
+			s.releaseStageClaim(tok.ID)
+			c.String(http.StatusNotFound, "stage not ready")
+			return
+		}
+		blob, err = payload.LoadStage2Blob(dataDir, token)
+		if err != nil {
+			s.releaseStageClaim(tok.ID)
+			c.String(http.StatusInternalServerError, "stage not available")
+			return
+		}
+	}
+
 	// The encrypted blob is no longer needed once the token is consumed.
 	_ = os.Remove(payload.Stage2BlobPath(dataDir, token))
 
 	c.Header("Cache-Control", "no-store")
 	c.Data(http.StatusOK, "application/octet-stream", blob)
+}
+
+// releaseStageClaim un-consumes a token whose request failed before any
+// payload byte reached the client, so a missing toolchain or a disk error does
+// not burn the single-use URL the stager is holding. It runs only on paths
+// that served nothing, so a token stays single-use for every request that
+// actually received stage-2.
+func (s *Server) releaseStageClaim(id uint) {
+	if err := s.db.Model(&db.StagerToken{}).
+		Where("id = ? AND used = ?", id, true).
+		Update("used", false).Error; err != nil {
+		slog.Error("failed to release stage token claim", "token_id", id, "err", err)
+	}
 }
 
 func isHexToken(s string) bool {

@@ -157,7 +157,8 @@ func TestStageServeConsumesToken(t *testing.T) {
 }
 
 func TestStageServeConcurrentConsumesOnce(t *testing.T) {
-	s, token, sig, _, _ := stageFixture(t, t.TempDir(), time.Now().Add(time.Hour))
+	dataDir := t.TempDir()
+	s, token, sig, _, _ := stageFixture(t, dataDir, time.Now().Add(time.Hour))
 
 	results := make(chan int, 2)
 	done := make(chan struct{})
@@ -184,5 +185,49 @@ func TestStageServeConcurrentConsumesOnce(t *testing.T) {
 	}
 	if ok != 1 || gone != 1 {
 		t.Fatalf("expected exactly one 200 + one 410, got ok=%d gone=%d", ok, gone)
+	}
+
+	// The loser must leave nothing behind. The claim now precedes every disk
+	// access, so a request that served no bytes cannot observe the winner's
+	// deleted blob and fall through to the lazy rebuild — which in production
+	// (a listener exists, so the build succeeds) minted a second registration
+	// secret and wrote a second encrypted stage-2 that nothing ever removed.
+	if _, err := os.Stat(payload.Stage2BlobPath(dataDir, token)); !os.IsNotExist(err) {
+		t.Fatalf("orphaned stage-2 blob left by a request that served nothing (err=%v)", err)
+	}
+}
+
+// TestStageServeFailedBuildKeepsTokenUsable pins the other half of claiming
+// early: the stage-2 build runs BEFORE anything is served, so a transient
+// failure must release the claim instead of burning the single-use URL. The
+// stager holds exactly one URL; consuming it on a request that returned no
+// payload strands the implant permanently.
+func TestStageServeFailedBuildKeepsTokenUsable(t *testing.T) {
+	dataDir := t.TempDir()
+	s, token, sig, _, _ := stageFixture(t, dataDir, time.Now().Add(time.Hour))
+
+	// No listener row: the lazy build cannot resolve a C2URL and fails.
+	if err := s.db.Where("1 = 1").Delete(&db.Listener{}).Error; err != nil {
+		t.Fatalf("clear listeners: %v", err)
+	}
+	// Force the rebuild path by removing the pre-written blob, as a cold first
+	// fetch would hit.
+	if err := os.Remove(payload.Stage2BlobPath(dataDir, token)); err != nil {
+		t.Fatalf("remove blob: %v", err)
+	}
+
+	w := stageGet(t, s, "/stage/"+token+"?s="+sig)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("failed-build status = %d, want 404; body=%q", w.Code, w.Body.String())
+	}
+
+	// The token must still be unused, so the stager's retry can still succeed
+	// once the listener is restored.
+	var tok db.StagerToken
+	if err := s.db.First(&tok, "token = ?", token).Error; err != nil {
+		t.Fatalf("reload token: %v", err)
+	}
+	if tok.Used {
+		t.Fatal("a request that served no payload consumed the single-use token")
 	}
 }
