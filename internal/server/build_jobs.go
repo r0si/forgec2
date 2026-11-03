@@ -35,9 +35,9 @@ type BuildJob struct {
 	// ConfigHash is the SHA-256 of every field that affects the compiled binary
 	// (generated via GenerateCacheKey). Two builds with the same hash can share
 	// a cached artifact; different hashes MUST not.
-	ConfigHash string
-	CreatedAt  time.Time
-	StartedAt  time.Time
+	ConfigHash  string
+	CreatedAt   time.Time
+	StartedAt   time.Time
 	CompletedAt time.Time
 
 	// Authenticode classification for a direct Windows EXE/DLL output. Empty
@@ -340,12 +340,12 @@ func (s *Server) runBuildAndUpdateJob(job *BuildJob, buildFn func() (string, err
 			slog.Info("Build cache hit", "build_id", job.ID, "cache_key", cacheKey)
 			s.completeBuildJob(job, cachedPath, nil)
 			s.broadcastOperatorEvent(map[string]interface{}{
-				"type":       "build_update",
-				"build_id":   job.ID,
-				"status":     "completed",
-				"platform":   platform,
-				"format":     format,
-				"cache_hit":  true,
+				"type":      "build_update",
+				"build_id":  job.ID,
+				"status":    "completed",
+				"platform":  platform,
+				"format":    format,
+				"cache_hit": true,
 			})
 			s.emitBuildOutcomeEvent(job, nil, platform, format, filename, true)
 			return

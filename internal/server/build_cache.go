@@ -39,9 +39,9 @@ type BuildCache struct {
 	mu          sync.RWMutex
 	entries     map[string]*BuildCacheEntry
 	cacheDir    string
-	maxSize     int64  // maximum total cache size in bytes
-	maxEntries  int    // maximum number of entries
-	currentSize int64  // current total size in bytes
+	maxSize     int64         // maximum total cache size in bytes
+	maxEntries  int           // maximum number of entries
+	currentSize int64         // current total size in bytes
 	ttl         time.Duration // time-to-live for cache entries
 	hitCount    atomic.Int64
 	missCount   atomic.Int64
@@ -49,10 +49,10 @@ type BuildCache struct {
 
 // BuildCacheConfig holds configuration for the build cache.
 type BuildCacheConfig struct {
-	CacheDir    string
-	MaxSize     int64  // maximum total cache size in bytes (default: 10GB)
-	MaxEntries  int    // maximum number of entries (default: 1000)
-	TTL         time.Duration // time-to-live for cache entries (default: 7 days)
+	CacheDir   string
+	MaxSize    int64         // maximum total cache size in bytes (default: 10GB)
+	MaxEntries int           // maximum number of entries (default: 1000)
+	TTL        time.Duration // time-to-live for cache entries (default: 7 days)
 }
 
 // DefaultBuildCacheConfig returns the default build cache configuration.
@@ -85,11 +85,11 @@ func NewBuildCache(config BuildCacheConfig) (*BuildCache, error) {
 	}
 
 	cache := &BuildCache{
-		entries:  make(map[string]*BuildCacheEntry),
-		cacheDir: config.CacheDir,
-		maxSize:  config.MaxSize,
+		entries:    make(map[string]*BuildCacheEntry),
+		cacheDir:   config.CacheDir,
+		maxSize:    config.MaxSize,
 		maxEntries: config.MaxEntries,
-		ttl:      config.TTL,
+		ttl:        config.TTL,
 	}
 
 	// Load existing cache entries from disk
@@ -119,7 +119,7 @@ func GenerateCacheKey(cfg *payload.ImplantConfig, platform, format, goVersion, g
 	fmt.Fprintf(h, "format=%s\n", format)
 	fmt.Fprintf(h, "go_version=%s\n", goVersion)
 	fmt.Fprintf(h, "garble_version=%s\n", garbleVersion)
-	
+
 	// Include relevant config fields that affect the build output
 	if cfg != nil {
 		fmt.Fprintf(h, "arch=%s\n", cfg.Architecture)
@@ -161,7 +161,7 @@ func GenerateCacheKey(cfg *payload.ImplantConfig, platform, format, goVersion, g
 		fmt.Fprintf(h, "sign_key_pem=%v\n", len(cfg.SignKeyPEM) > 0)
 		fmt.Fprintf(h, "modules=%v\n", cfg.Modules)
 	}
-	
+
 	sum := h.Sum(nil)
 	return hex.EncodeToString(sum)[:32] // Use first 32 chars of hash
 }
@@ -356,13 +356,13 @@ func (c *BuildCache) cleanupExpired() {
 
 // Stats returns cache statistics.
 type BuildCacheStats struct {
-	Entries      int
-	TotalSize    int64
-	MaxSize      int64
-	MaxEntries   int
-	HitCount     int64
-	MissCount    int64
-	HitRate      float64
+	Entries    int
+	TotalSize  int64
+	MaxSize    int64
+	MaxEntries int
+	HitCount   int64
+	MissCount  int64
+	HitRate    float64
 }
 
 func (c *BuildCache) Stats() BuildCacheStats {
