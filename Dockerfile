@@ -34,7 +34,9 @@ COPY cmd/ ./cmd/
 COPY api/ ./api/
 COPY internal/ ./internal/
 COPY pkg/ ./pkg/
-RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o forgec2-server ./cmd/server
+ARG VERSION=dev
+ARG SOURCE_REPO=r0si/forgec2
+RUN CGO_ENABLED=0 go build -ldflags="-s -w -X github.com/forgec2/forgec2/internal/server.ServerVersion=${VERSION} -X github.com/forgec2/forgec2/internal/buildinfo.Repo=${SOURCE_REPO}" -o forgec2-server ./cmd/server
 RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o healthcheck ./cmd/healthcheck
 # Seed /data with nonroot ownership in the builder (which has a shell).
 # NOTE: no RUN in the distroless stage — it has no shell and the build fails.

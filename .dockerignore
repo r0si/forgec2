@@ -27,4 +27,14 @@ config.yaml
 config.yaml.bak
 .env
 .env.*
+# Local configuration and key material may live below the repository root.
+# Exclude them from the context sent to a remote builder, not only the image.
+**/.env
+**/.env.*
+**/*.key
+**/*.pem
+**/*.p12
+**/*.pfx
+**/.ssh
+**/.aws
 backups/

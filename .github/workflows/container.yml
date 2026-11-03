@@ -1,0 +1,76 @@
+name: Publish container
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Container tag (use edge for development builds)'
+        required: true
+        default: edge
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: container-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE_TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Validate tag and prepare image name
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$IMAGE_TAG" =~ ^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,127}$ ]]; then
+            echo 'Invalid container tag' >&2
+            exit 1
+          fi
+          echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+      - name: Check build context safety
+        run: |
+          node --test scripts/docker-secret-exclusions.test.mjs
+          node scripts/check-docker-context.mjs
+      - name: Build Linux amd64 image
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --pull \
+            --build-arg VERSION="$IMAGE_TAG" \
+            --build-arg SOURCE_REPO="$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --label "org.opencontainers.image.version=$IMAGE_TAG" \
+            --tag "$IMAGE:$IMAGE_TAG" \
+            --tag "$IMAGE:sha-$GITHUB_SHA" .
+      - name: Verify image before publishing
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(docker run --rm --network none "$IMAGE:$IMAGE_TAG" -version)" = "$IMAGE_TAG"
+          test "$(docker inspect --format '{{.Config.User}}' "$IMAGE:$IMAGE_TAG")" = 'nonroot:nonroot'
+      - name: Publish to GitHub Container Registry
+        shell: bash
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker push "$IMAGE:sha-$GITHUB_SHA"
+          docker push "$IMAGE:$IMAGE_TAG"
+          {
+            echo '### Published container'
+            echo "- Image: \`$IMAGE:$IMAGE_TAG\`"
+            echo "- Commit: \`$IMAGE:sha-$GITHUB_SHA\`"
+            echo '- Platform: linux/amd64'
+          } >> "$GITHUB_STEP_SUMMARY"

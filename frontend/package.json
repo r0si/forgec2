@@ -41,7 +41,7 @@
     "check:mitre-coverage": "node ../scripts/check-mitre-coverage.mjs",
     "check:runtime-paths": "node ../scripts/check-runtime-paths.mjs",
     "check:owner-scope": "node ../scripts/check-owner-scope.mjs",
-    "check:docker-context": "node ../scripts/check-docker-context.mjs",
+    "check:docker-context": "node --test ../scripts/docker-secret-exclusions.test.mjs && node ../scripts/check-docker-context.mjs",
     "check:nav-perms": "node scripts/check-nav-perms.mjs",
     "check:discarded-results": "node scripts/check-discarded-results.mjs",
     "check:http-status": "node scripts/check-http-status.mjs",

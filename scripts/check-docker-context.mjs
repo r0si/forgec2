@@ -21,6 +21,7 @@
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { unsafeSecretExclusions } from "./docker-secret-exclusions.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -56,6 +57,13 @@ if (copied.size === 0) {
 // 3. .dockerignore patterns that would exclude a directory wholesale (exact or dir/ lines;
 // globs beyond that are out of scope and reported only for the wholesale case).
 const dockerignoreExists = existsSync(join(root, ".dockerignore"));
+// Root-only .env patterns do not protect frontend/.env.local when stage 1
+// copies frontend/. Keep local credentials out of remote build contexts.
+const missingSecretExclusions = unsafeSecretExclusions(dockerignoreExists ? read(".dockerignore") : "");
+if (missingSecretExclusions.length) {
+  console.error(`check-docker-context: recursive secret exclusions must exist after all ! includes: ${missingSecretExclusions.join(", ")}`);
+  process.exit(1);
+}
 const ignoredDirs = new Set();
 if (dockerignoreExists) {
   for (const line of read(".dockerignore").split(/\r?\n/)) {
