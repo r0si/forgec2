@@ -137,15 +137,17 @@ func init() {
 	// Direct/indirect syscall policy: independent of the sleep-mask opt-in.
 	// When enabled, resolve SSNs once from ntdll on disk at startup; if the
 	// table is incomplete, refuse to use indirect syscalls (no silent fallback
-	// to a wrong syscall number on the target).
+	// to a wrong syscall number on the target). Clearing the flag is the
+	// platform file's job — useIndirectSyscall is declared in a
+	// windows-tagged file, and agent_main.go compiles for every GOOS, so
+	// naming it here broke the linux/arm64 agent build outright.
 	syscallPolicyEnabled = strings.ToLower(SyscallPolicyStr) == "true" || SyscallPolicyStr == "1"
 	if v := os.Getenv("FORGEC2_SYSCALL_POLICY"); v == "1" || strings.ToLower(v) == "true" {
 		syscallPolicyEnabled = true
 	}
-	if syscallPolicyEnabled && runtime.GOOS == "windows" {
+	if syscallPolicyEnabled {
 		if err := initSyscallPolicy(); err != nil {
 			logDebugf("[syscall] policy resolution failed: %v", err)
-			useIndirectSyscall = false
 		}
 	}
 

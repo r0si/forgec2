@@ -24,9 +24,18 @@ import (
 // falling back to a silent wrong syscall number on the target. The resolved
 // table is registered with the syscall manager so stubs use the parsed numbers
 // instead of re-scanning the mapped image.
-func initSyscallPolicy() error {
+//
+// Any failure clears useIndirectSyscall here rather than at the call site:
+// the flag is declared in a windows-tagged file, and the policy entry point
+// is reached from agent_main.go, which compiles for every GOOS.
+func initSyscallPolicy() (err error) {
+	defer func() {
+		if err != nil {
+			useIndirectSyscall = false
+		}
+	}()
 	ntdllPath := filepath.Join(os.Getenv("WINDIR"), "System32", "ntdll.dll")
-	if _, err := os.Stat(ntdllPath); err != nil {
+	if _, err = os.Stat(ntdllPath); err != nil {
 		return fmt.Errorf("ntdll not found at %s: %w", ntdllPath, err)
 	}
 
@@ -50,7 +59,6 @@ func initSyscallPolicy() error {
 		}
 		syscallPolicyFailed = failed
 		// Refuse to run indirect syscalls when the table is incomplete.
-		useIndirectSyscall = false
 		return fmt.Errorf("syscall table incomplete: %d of %d required syscalls unresolved: %v",
 			len(table.Numbers), len(RequiredSyscalls), strings.Join(failed, ", "))
 	}
