@@ -93,6 +93,11 @@ type relayedTask struct {
 type beaconResponse struct {
 	Tasks           []task `json:"tasks"`
 	ProtocolVersion uint   `json:"pv,omitempty"`
+	// Tenant attribution is server-internal telemetry metadata. It lets the
+	// HTTP traffic accumulator remain tenant-aware without another DB lookup
+	// on every successful beacon.
+	TenantID       uint `json:"-"`
+	TenantResolved bool `json:"-"`
 	// ProtocolDeprecated tells an agent that the server is serving it on a
 	// version that is on its way out: it still works, but the agent has to
 	// be rebuilt before the compatibility window closes. Set only when the

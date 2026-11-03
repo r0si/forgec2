@@ -406,6 +406,9 @@ func (s *Server) handleBeacon(c *gin.Context) {
 			return
 		}
 		c.Set(trafficAgentIDContextKey, req.UUID)
+		if resp.TenantResolved {
+			c.Set(trafficTenantIDContextKey, resp.TenantID)
+		}
 	} else {
 		var ok bool
 		respBytes, ok = s.processAuthFrame(env, kind)
@@ -414,6 +417,9 @@ func (s *Server) handleBeacon(c *gin.Context) {
 			return
 		}
 		c.Set(trafficAgentIDContextKey, env.UUID)
+		if tenantID, ok := s.agentTenantOf(env.UUID); ok {
+			c.Set(trafficTenantIDContextKey, tenantID)
+		}
 	}
 
 	// Async GeoIP lookup (don't block beacon response) — only when enabled in config.

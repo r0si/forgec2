@@ -18,10 +18,12 @@ type TrafficEntry struct {
 	Status   int       `json:"status"`
 	Size     int       `json:"size"`
 	Latency  string    `json:"latency"`
+	TenantID uint      `json:"-"`
 }
 
 const maxTrafficLogs = 500
 const trafficAgentIDContextKey = "traffic_agent_id"
+const trafficTenantIDContextKey = "traffic_tenant_id"
 
 type trafficRing struct {
 	mu    sync.RWMutex
@@ -38,54 +40,67 @@ type trafficByteBucket struct {
 	out int64
 }
 
-// trafficByteAccumulator keeps hourly in/out byte counters for the last 7
-// days in memory (slimmed from 31d per user confirmation). It is updated
-// from the traffic middleware where the real request Content-Length and
-// response body size are known.
+// trafficByteAccumulator keeps five-minute in/out byte counters for the last
+// 7 days in memory (slimmed from 31d per user confirmation). Five-minute
+// buckets preserve the dashboard's 1h view without storing individual
+// requests. It is updated from the traffic middleware where the real request
+// Content-Length and response body size are known.
 type trafficByteAccumulator struct {
-	mu     sync.RWMutex
-	hourly map[int64]*trafficByteBucket // key = hour-truncated unix time
+	mu      sync.RWMutex
+	buckets map[trafficByteBucketKey]*trafficByteBucket
+}
+
+type trafficByteBucketKey struct {
+	start    int64
+	tenantID uint
 }
 
 const trafficAccumulatorWindowHours = 7 * 24
+const trafficAccumulatorBucketSize = 5 * time.Minute
 
 func newTrafficByteAccumulator() *trafficByteAccumulator {
 	return &trafficByteAccumulator{
-		hourly: make(map[int64]*trafficByteBucket),
+		buckets: make(map[trafficByteBucketKey]*trafficByteBucket),
 	}
 }
 
-func (a *trafficByteAccumulator) add(t time.Time, in, out int64) {
-	key := t.Truncate(time.Hour).Unix()
+func (a *trafficByteAccumulator) add(t time.Time, tenantID uint, in, out int64) {
+	key := trafficByteBucketKey{start: t.Truncate(trafficAccumulatorBucketSize).Unix(), tenantID: tenantID}
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	b, ok := a.hourly[key]
+	b, ok := a.buckets[key]
 	if !ok {
 		b = &trafficByteBucket{}
-		a.hourly[key] = b
+		a.buckets[key] = b
 	}
 	b.in += in
 	b.out += out
 
 	// Prune stale buckets (only when the map grows past the window) so a
 	// long-running server does not accumulate unbounded memory.
-	if prune := time.Now().Add(-trafficAccumulatorWindowHours * time.Hour).Unix(); len(a.hourly) > trafficAccumulatorWindowHours {
-		for k := range a.hourly {
-			if k < prune {
-				delete(a.hourly, k)
+	windowBuckets := trafficAccumulatorWindowHours * int(time.Hour/trafficAccumulatorBucketSize)
+	if prune := time.Now().Add(-trafficAccumulatorWindowHours * time.Hour).Unix(); len(a.buckets) > windowBuckets {
+		for k := range a.buckets {
+			if k.start < prune {
+				delete(a.buckets, k)
 			}
 		}
 	}
 }
 
-// sumRange returns total in/out bytes for hourly buckets in [start, end).
-func (a *trafficByteAccumulator) sumRange(start, end time.Time) (in, out int64) {
-	startKey := start.Truncate(time.Hour).Unix()
-	endKey := end.Truncate(time.Hour).Unix()
+// sumRange returns one tenant's total in/out bytes for five-minute buckets in
+// [start, end). Tenant 0 is the legacy/global view and intentionally
+// aggregates every tenant bucket.
+func (a *trafficByteAccumulator) sumRange(start, end time.Time, tenantID uint) (in, out int64) {
+	startKey := start.Truncate(trafficAccumulatorBucketSize).Unix()
+	endKey := end.Truncate(trafficAccumulatorBucketSize).Unix()
+	if end.After(end.Truncate(trafficAccumulatorBucketSize)) {
+		endKey = end.Truncate(trafficAccumulatorBucketSize).Add(trafficAccumulatorBucketSize).Unix()
+	}
 	a.mu.RLock()
 	defer a.mu.RUnlock()
-	for k, b := range a.hourly {
-		if k >= startKey && k < endKey {
+	for k, b := range a.buckets {
+		if k.start >= startKey && k.start < endKey && (tenantID == 0 || k.tenantID == tenantID) {
 			in += b.in
 			out += b.out
 		}
@@ -185,6 +200,9 @@ func (s *Server) recordTrafficRequest(c *gin.Context, start time.Time) {
 		Size:     c.Writer.Size(),
 		Latency:  time.Since(start).Round(time.Millisecond).String(),
 	}
+	if tenantID, ok := c.Get(trafficTenantIDContextKey); ok {
+		entry.TenantID, _ = tenantID.(uint)
+	}
 	s.trafficLog.add(entry)
 	// Feed the listener-traffic chart with real wire sizes: the request
 	// Content-Length (as received) and the actual response body written.
@@ -192,7 +210,7 @@ func (s *Server) recordTrafficRequest(c *gin.Context, start time.Time) {
 	if reqBytes < 0 {
 		reqBytes = 0
 	}
-	s.trafficBytes.add(start, reqBytes, int64(entry.Size))
+	s.trafficBytes.add(start, entry.TenantID, reqBytes, int64(entry.Size))
 }
 
 func (s *Server) handleTrafficPage(c *gin.Context) {

@@ -361,6 +361,8 @@ func (s *Server) processBeaconWithBudget(req beaconRequest, publicIP string, fra
 	}
 	resp := beaconResponse{
 		Tasks:              s.fetchPendingTasks(req.UUID, taskLimit),
+		TenantID:           agent.TenantID,
+		TenantResolved:     true,
 		Relayed:            s.fetchRelayedChildTasks(req.UUID),
 		RelayedReplies:     relayedReplies,
 		ProtocolVersion:    protocol.CurrentProtocolVersion,

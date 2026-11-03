@@ -1,6 +1,7 @@
 package server
 
 import (
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -189,6 +190,11 @@ func (s *Server) handleDashboardTaskStatus(c *gin.Context) {
 }
 
 func (s *Server) handleDashboardListenerTraffic(c *gin.Context) {
+	tenantID, resolved := s.resolveTenant(c)
+	if !resolved {
+		respondError(c, http.StatusInternalServerError, "tenant lookup failed")
+		return
+	}
 	rangeParam := c.DefaultQuery("range", "24h")
 
 	var points int
@@ -248,7 +254,7 @@ func (s *Server) handleDashboardListenerTraffic(c *gin.Context) {
 			if i+1 < points {
 				end = bucketStarts[i+1]
 			}
-			in, out := s.trafficBytes.sumRange(bucketStarts[i], end)
+			in, out := s.trafficBytes.sumRange(bucketStarts[i], end, tenantID)
 			bytesIn[i] = in
 			bytesOut[i] = out
 		}
