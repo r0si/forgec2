@@ -40,6 +40,21 @@ type exportCapabilities struct {
 	Notes []string `json:"notes,omitempty"`
 }
 
+// dualUseAcceptNote is stated once and reused, because three of the advertised paths are
+// also console page routes and the constraint is identical for all of them.
+//
+// The embedded-frontend middleware runs BEFORE routing (SetStaticFS is called before
+// SetupRoutes in cmd/server/main.go), so a GET on /tasks/export, /audit/export or
+// /tasks/:taskId/output without `Accept: application/json` is answered with the console's
+// index.html and status 200 — measured against the running deployment: 200 text/html, 2364
+// bytes. That is worse than an error: a script believes it downloaded an export and then
+// cannot parse it. Verified as a fact, not inferred from the code path.
+//
+// It lives in Notes rather than Headers on purpose: `Headers` documents RESPONSE headers
+// (ETag, Content-Disposition), and putting a REQUEST header there would teach a client to
+// read ETag off its own outgoing call.
+const dualUseAcceptNote = "send Accept: application/json — this path is also a console route, and without the header the embedded frontend answers index.html with 200, so a script that omits it saves a web page and cannot parse it"
+
 // handleExportCapabilities answers what the download endpoints accept.
 func (s *Server) handleExportCapabilities(c *gin.Context) {
 	taskFields := make([]string, 0, len(exportFields))
@@ -49,7 +64,7 @@ func (s *Server) handleExportCapabilities(c *gin.Context) {
 
 	respond(c, gin.H{
 		"task_export": exportCapabilities{
-			Path:       "/api/tasks/export",
+			Path:       "/tasks/export",
 			Formats:    []string{"csv", "json"},
 			Parameters: []string{"limit", "since", "until", "engagement", "format", "fields"},
 			MaxRows:    ExportTaskLimit,
@@ -63,6 +78,7 @@ func (s *Server) handleExportCapabilities(c *gin.Context) {
 			Notes: []string{
 				"the default column set is format-aware: the CSV keeps its nine historical columns, JSON adds agent_id",
 				"a preset must be the whole fields value; mixing one with column names is a 400",
+				dualUseAcceptNote,
 			},
 		},
 		// The CSV reports, listed because a client that can discover the download endpoints but not the reports will re-implement the
@@ -77,10 +93,10 @@ func (s *Server) handleExportCapabilities(c *gin.Context) {
 			},
 			Reports: []reportCapability{
 				{Path: "/api/agents", Answers: "the fleet, one row per beacon"},
-				{Path: "/api/agents/:agentId/timeline", Answers: "one beacon's activity, one row per entry"},
+				{Path: "/api/agents/:id/timeline", Answers: "one beacon's activity, one row per entry"},
 				{Path: "/api/automation/rules", Answers: "the automation rules and what each last did"},
 				{Path: "/api/notification-routes", Answers: "where alerts go, and whether each route was tested"},
-				{Path: "/api/stats/failures", Answers: "failed tasks with their error text"},
+				{Path: "/api/stats/tasks/failures", Answers: "failed tasks with their error text"},
 				{Path: "/api/stats/failures/signatures", Answers: "failures grouped by what they look like"},
 				{Path: "/api/stats/tasks/duration", Answers: "how long tasks take, by type"},
 				{Path: "/api/stats/tasks/queue", Answers: "which beacon is not draining its queue, with its oldest pending age"},
@@ -88,7 +104,7 @@ func (s *Server) handleExportCapabilities(c *gin.Context) {
 				{Path: "/api/playbooks/runs", Answers: "where each structured checklist stood: progress, what waits for a person, and what stalled"},
 			},
 		}, "audit_export": exportCapabilities{
-			Path:       "/api/audit/export",
+			Path:       "/audit/export",
 			Formats:    []string{"ndjson", "json"},
 			Parameters: []string{"limit", "since_id", "since", "until", "user", "action", "agent_id", "format"},
 			MaxRows:    200000,
@@ -100,10 +116,11 @@ func (s *Server) handleExportCapabilities(c *gin.Context) {
 			Notes: []string{
 				"no column projection: offline verification needs every field the entry hash covers, so a projected export would look verifiable while being unverifiable",
 				"any time, user, action or agent filter makes the rows a selection rather than a contiguous chain; the response says so in X-Audit-Export-Filtered and a Warning header",
+				dualUseAcceptNote,
 			},
 		},
 		"task_output_download": exportCapabilities{
-			Path:           "/api/tasks/:taskId/output",
+			Path:           "/tasks/:taskId/output",
 			Formats:        []string{"text/plain"},
 			Parameters:     []string{"taskId"},
 			Headers:        []string{"X-Task-Status", "X-Task-Final", "Accept-Ranges", "Content-Range"},
@@ -111,6 +128,7 @@ func (s *Server) handleExportCapabilities(c *gin.Context) {
 			Notes: []string{
 				"a failed task still downloads, with the error appended to the output",
 				"nothing to download is a 404 rather than a zero-byte file",
+				dualUseAcceptNote,
 			},
 		},
 		"plugins_index": exportCapabilities{
@@ -307,7 +325,7 @@ func (s *Server) handleExportCapabilities(c *gin.Context) {
 			{
 				// Not a counter reset, but the same thing from a client's point of view: it changes what the reports will say
 				// next. Listed here rather than under diagnostics because it dispatches work.
-				"path":    "/api/tasks/rerun-by-signature",
+				"path":    "/tasks/rerun-by-signature",
 				"method":  "POST",
 				"clears":  "re-dispatches the failed tasks that share one failure shape (bounded to 100)",
 				"audited": "tasks_rerun_by_signature",

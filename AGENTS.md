@@ -272,7 +272,7 @@ Three things are easy to get wrong here:
   discontinuity only at the window start when the id sequence has a gap - a
   legitimate purge must not make /ready cry tampering, and an interior deletion
   must still fail.
-- **Keep an out-of-band copy.** GET /api/audit/export streams NDJSON with every
+- **Keep an out-of-band copy.** GET /audit/export streams NDJSON with every
   hashed field plus both hashes, so a third party can verify offline; a later
   rewrite of the whole table cannot match their copy.
 

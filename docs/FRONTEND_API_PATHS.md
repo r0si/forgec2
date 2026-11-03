@@ -22,7 +22,7 @@ Source of truth: `frontend/src/lib/api-paths.ts`.
 | Agent one | `paths.agents.one(id)` |
 | Agent tasks | `paths.agents.tasks(id)` |
 | Listeners | `paths.listeners.list` |
-| Credentials list | `paths.credentials.list()` → `/api/credentials` |
+| Credentials list | `paths.credentials.list()` → `/credentials` (dual-use, JSON via `Accept`) |
 | Credentials by agent | `paths.credentials.byAgent(id)` |
 | Credentials mutations | `paths.credentials.add` / `one` / `confirm` / `batchTags` → `/credentials/*` |
 | Listeners CRUD | `paths.listeners.list` / `one` / `enable` / `disable` |

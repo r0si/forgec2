@@ -106,6 +106,21 @@ func TestDiagnosticsDocPathsExist(t *testing.T) {
 // panicked on its first run rather than reporting a missing path.
 func testingServerRoutes(t *testing.T) []string {
 	t.Helper()
+	routes := testingServerMethodRoutes(t)
+	paths := make([]string, 0, len(routes))
+	for _, entry := range routes {
+		_, path, _ := strings.Cut(entry, " ")
+		paths = append(paths, path)
+	}
+	return paths
+}
+
+// testingServerMethodRoutes is the same registry keyed "METHOD /path", for guards that must
+// check a verb as well as a path. A path that exists only for another method is not an
+// endpoint a client can use, which is how a capabilities document once advertised a GET on a
+// route registered as POST.
+func testingServerMethodRoutes(t *testing.T) []string {
+	t.Helper()
 	database := testutil.SetupTestDB(t)
 	cfg := config.DefaultConfig()
 	cfg.Server.JWTSecret = "test-secret-for-diagnostics-doc-guard!"
@@ -117,7 +132,7 @@ func testingServerRoutes(t *testing.T) []string {
 
 	routes := make([]string, 0, 512)
 	for _, route := range s.router.Routes() {
-		routes = append(routes, route.Path)
+		routes = append(routes, route.Method+" "+route.Path)
 	}
 	return routes
 }

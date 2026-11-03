@@ -22,10 +22,18 @@ func TestAuditExportDocMatchesTheImplementation(t *testing.T) {
 	if _, err := os.Stat("../../cmd/verify-audit/main.go"); err != nil {
 		t.Fatalf("the document names cmd/verify-audit but it is missing: %v", err)
 	}
-	for _, needle := range []string{"cmd/verify-audit", "/api/audit/export"} {
+	for _, needle := range []string{"cmd/verify-audit", "/audit/export"} {
 		if !strings.Contains(doc, needle) {
 			t.Fatalf("the document does not mention %q", needle)
 		}
+	}
+	// And the fictional spelling must be gone, not just absent from one line. This page is
+	// the third party's instructions: a reader who types /api/audit/export reaches the beacon
+	// NoRoute handler and gets 400 "invalid beacon payload". The previous version of this
+	// check pinned that wrong path as the EXPECTED text, which is how the document stayed
+	// broken while its own guard passed.
+	if strings.Contains(doc, "/api/audit/export") {
+		t.Fatal("the document still names /api/audit/export, which is not a registered route")
 	}
 
 	// 2. Every query parameter the handler honours is documented, so a reader can build the request they need.

@@ -258,7 +258,7 @@ func (s *Server) handleFailureSignatures(c *gin.Context) {
 		// text is itself the request body, which is the whole point of passing shapes rather than id lists.
 		"rerun": gin.H{
 			"method": "POST",
-			"path":   "/api/tasks/rerun-by-signature",
+			"path":   "/tasks/rerun-by-signature",
 			"body":   gin.H{"signature": "<the row signature>", "since": since},
 			"note":   "re-dispatches the failed tasks that share this shape; bounded to 100 per call",
 		},

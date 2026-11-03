@@ -152,8 +152,10 @@ func TestFailureSignatures(t *testing.T) {
 	}
 
 	// 2b. The answer says what to DO with a row: the signature text is the request body, so a client can wire the button
-	// from the response without knowing the second endpoint exists.
-	if resp.Data.Rerun.Method != "POST" || resp.Data.Rerun.Path != "/api/tasks/rerun-by-signature" {
+	// from the response without knowing the second endpoint exists. The path must be the one the ROUTER registers —
+	// this hint used to advertise /api/tasks/rerun-by-signature, which no route serves, and a client that followed it
+	// landed on the beacon NoRoute handler and got 400 "invalid beacon payload".
+	if resp.Data.Rerun.Method != "POST" || resp.Data.Rerun.Path != "/tasks/rerun-by-signature" {
 		t.Fatalf("rerun hint = %+v", resp.Data.Rerun)
 	}
 	if resp.Data.Rerun.Body["since"] != "7d" {

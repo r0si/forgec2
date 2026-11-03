@@ -18,7 +18,7 @@ session.post("http://localhost:8000/login", data={
 
 ### Agents
 - `GET /api/agents` — List all agents (paginated)
-- `GET /api/agents/:id` — Get agent details
+- `GET /agents/:id` — Get agent details (dual-use: send `Accept: application/json`)
 - `POST /agents/:id/command` — Execute shell command on agent
 - `POST /agents/:id/kill` — Kill agent
 - `DELETE /agents/:id` — Delete agent

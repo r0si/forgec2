@@ -122,7 +122,7 @@ never a filter that quietly selects everything.
 |---|---|
 | `POST /api/automation/rules/{id}/test` | **Runs the rule's actions** against a synthetic event (`confirm: true` required, 10 s cooldown) |
 | `POST /api/notification-routes/{id}/test` | **Delivers a real message** to the configured target (disabled route: 409, 10 s cooldown) |
-| `POST /api/tasks/rerun-by-signature` | **Re-dispatches** the failed tasks that share one shape (bounded to 100) |
+| `POST /tasks/rerun-by-signature` | **Re-dispatches** the failed tasks that share one shape (bounded to 100) |
 
 `/api/exports/capabilities` marks the first two with `side_effects: true`, so a client offering "run all diagnostics" can exclude
 them without guessing — and the test that enforces that requires **exactly** that set.

@@ -338,12 +338,18 @@ func TestCapabilitiesListEveryCSVReport(t *testing.T) {
 	// The endpoints that implement a CSV branch, mapped to the path the router exposes. Hand-written because the alternative is parsing
 	// the handlers; the test's job is to fail when one of these gains a sibling and nobody lists it, so the list is checked in BOTH
 	// directions against the catalogue.
+	//
+	// These strings must match the ROUTER, not a plausible spelling: two entries here used to
+	// name /api/agents/:agentId/timeline and /api/stats/failures, neither of which is
+	// registered, and because this list and the catalogue are compared to EACH OTHER the pair
+	// agreed on the fiction and stayed green. TestAdvertisedEndpointPathsExist is the guard
+	// that compares them to the router instead.
 	expected := []string{
 		"/api/agents",
-		"/api/agents/:agentId/timeline",
+		"/api/agents/:id/timeline",
 		"/api/automation/rules",
 		"/api/notification-routes",
-		"/api/stats/failures",
+		"/api/stats/tasks/failures",
 		"/api/stats/failures/signatures",
 		"/api/stats/tasks/duration",
 		"/api/stats/tasks/queue",

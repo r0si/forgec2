@@ -1,7 +1,7 @@
 # Verifying an audit export
 
 The audit log is a hash chain: every row carries `entry_hash`, the digest of its own fields, and `prev_hash`, the digest
-of the row before it. `GET /api/audit/export` writes those rows so that **a third party can verify the copy they hold
+of the row before it. `GET /audit/export` writes those rows so that **a third party can verify the copy they hold
 without trusting — or even contacting — the server that produced it**.
 
 This page is that third party's instructions.
@@ -9,10 +9,10 @@ This page is that third party's instructions.
 ## Getting the file
 
 ```
-GET /api/audit/export                       # newline-delimited JSON, the default
-GET /api/audit/export?format=json           # one document with count/truncated/filtered/rows
-GET /api/audit/export?since=7d              # a window, same spellings as the task export
-GET /api/audit/export?since_id=<id>         # only rows newer than a copy you already verified
+GET /audit/export                       # newline-delimited JSON, the default
+GET /audit/export?format=json           # one document with count/truncated/filtered/rows
+GET /audit/export?since=7d              # a window, same spellings as the task export
+GET /audit/export?since_id=<id>         # only rows newer than a copy you already verified
 ```
 
 Every row carries **both hashes** and every field the digest covers. That is deliberate: there is **no column

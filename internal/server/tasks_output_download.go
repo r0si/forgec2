@@ -17,7 +17,12 @@ import (
 // operator actually wants. The response carries the status and whether the stored result was truncated,
 // so a reader can tell "empty because it failed" from "empty because nothing came back".
 //
-// GET /api/tasks/:taskId/output  (also /agents/:id/tasks/:taskId/output)
+// GET /tasks/:taskId/output  (also /agents/:id/tasks/:taskId/output)
+//
+// Not /api/tasks/...: the route is registered on the auth group, which carries no prefix.
+// Both spellings are dual-use paths, so a client must send Accept: application/json — the
+// embedded-frontend middleware runs before routing and answers a bare GET with the console
+// index.html and status 200.
 func (s *Server) handleDownloadTaskOutput(c *gin.Context) {
 	taskID, err := strconv.ParseUint(c.Param("taskId"), 10, 64)
 	if err != nil {

@@ -34,7 +34,7 @@ the worst of them: it names **four** different objects in this system.
 
 | Term | Where it appears | What it actually is |
 |---|---|---|
-| **signature** (audit) | `audit.ndjson`, `/api/audit/verify` | an **unkeyed hash chain** entry — detects partial edits, not a rewrite |
+| **signature** (audit) | `audit.ndjson`, `/audit/verify` | an **unkeyed hash chain** entry — detects partial edits, not a rewrite |
 | **signature** (bundle) | `MANIFEST.json`, `X-Bundle-Signed`, `verify-bundle` | an **Ed25519 signature** over the canonical payload |
 | **signature** (plugin) | `manifest.yaml` `signature:`, `cmd/sign-plugin` | an **Ed25519 signature** over the package digest |
 | **signature** (failure) | `/api/stats/failures/signatures` | a **normalised error shape** — no cryptography at all |

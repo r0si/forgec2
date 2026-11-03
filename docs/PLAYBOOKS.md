@@ -83,4 +83,4 @@ exists precisely because the machine is not trusted to decide alone.
 - `GET /api/playbooks/runs?attention=1` — what needs a person right now.
 - `GET /api/playbooks/runs/{id}` — what may run next, and why not.
 - `GET /api/playbooks/runs/{id}/history` — who advanced it, and when. The rows are the audit log's, and each carries `entry_hash` so it can
-  be matched against `/api/audit/export`; this is a convenience view, not a second record.
+  be matched against `/audit/export`; this is a convenience view, not a second record.

@@ -71,7 +71,7 @@ ForgeC2 includes the following built-in security measures:
 
 - Use a reverse proxy (Nginx/Caddy) to terminate TLS in production
 - Set `allowed_origins` to restrict WebSocket/CORS access
-- Rotate JWT secret via `/api/settings/jwt/regenerate`
+- Rotate JWT secret via `POST /settings/jwt/regenerate`
 - Review audit logs regularly (`AuditLog` table)
 - Use `VACUUM` and DB backups via Settings UI
 - Set `require_tls_for_auth: true` in production

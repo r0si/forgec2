@@ -54,7 +54,7 @@ one it means, and this table is the map (`docs/TERMINOLOGY.md` defines the vocab
 
 | Sense | Reported by | Keyed? | What it proves |
 |---|---|---|---|
-| audit hash chain entry | `verify-audit -json`, `POST /api/audit/verify` | **no** | rows were not partially edited; a full rewrite is invisible |
+| audit hash chain entry | `verify-audit -json`, `GET /audit/verify` | **no** | rows were not partially edited; a full rewrite is invisible |
 | bundle manifest signature | `verify-bundle -json`, `POST /api/engagements/{id}/bundle/verify` | **yes** (ed25519) | the signer held the private key — `trusted` only when you supply the key you already trust |
 | plugin package signature | `verify-plugin -json`, `cmd/plugin-check -json` | **yes** (ed25519) | the package was stamped by a key, checked against `plugins.trusted_keys` |
 | failure shape | `GET /api/stats/failures/signatures`, `failures.json` | **no** | nothing cryptographic: a normalised error string with paths, ids and digits collapsed |
