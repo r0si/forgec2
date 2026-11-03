@@ -27,54 +27,25 @@ The public account has an isolated observer role with read-only Agent, listener,
 
 ## Quick start
 
-### Option A — one-click archive (no toolchain)
+### Pull the container image
 
-| Platform | Steps |
-|---|---|
-| **Windows** | Unzip `forgec2-v2.7.1-windows-amd64.zip`, then run `start.cmd` from inside the folder |
-| **Linux** | `tar xzf forgec2-v2.7.1-linux-amd64.tar.gz && cd forgec2-v2.7.1-linux-amd64 && ./start.sh` |
-
-Both archives do the same thing on first start:
-
-1. create `config.yaml` from `config.example.yaml`,
-2. print the generated `admin` password to the console,
-3. serve the console at **<https://127.0.0.1:8000/>** with a self-signed certificate.
-
-Accept the browser warning once, sign in as `admin`, and change the password immediately.
-
-### Option B — Docker
+Use the published GHCR image; no local Go/Node toolchain or source build is required.
+The current image targets **Linux amd64** (use Linux containers on Docker Desktop).
 
 ```bash
-cp config.example.yaml config.yaml     # required: compose bind-mounts this exact file
-docker compose up -d --build
+docker pull ghcr.io/r0si/forgec2:edge
 ```
 
-The same `https://127.0.0.1:8000/` console comes up with data persisted in the
-`forgec2_data` volume.
+`edge` is a rolling development tag, not a stable release. For reproducible deployments,
+pin the image digest or a published `sha-<commit>` tag. There is currently no `latest` tag.
+If the package is private, authenticate with `docker login ghcr.io` using an account
+with package access; never put a token directly in a command or configuration file.
 
-### Option C — build from source
-
-Go <!--fact:go-->1.26<!--/fact-->+ and Node.js >= <!--fact:node-->24.15.0<!--/fact-->:
-
-```bash
-git clone https://github.com/r0si/forgec2.git && cd forgec2
-
-# Windows
-powershell -File scripts/deploy.ps1 -NoStart
-
-# Linux / macOS (falls back to npm + go build when pwsh is unavailable)
-bash scripts/deploy.sh --no-start
-```
-
-`deploy.*` builds the frontend, syncs it into `internal/webdist/dist`, runs the
-frontend gates and produces `forgec2-server`. Drop `-NoStart` / `--no-start` to
-also restart a running instance with `/health` probing and rollback.
-
-> **Exposed to another host?** The console binds `0.0.0.0` by default, and a
-> browser opening this server's own address works out of the box: same-origin
-> requests need no configuration. List hostnames under
-> `server.allowed_origins` only when a console hosted *elsewhere* must call
-> this API. See [docs/DEPLOY.md](docs/DEPLOY.md).
+Before starting the image, prepare a writable `/data/config.yaml` based on
+[config.example.yaml](config.example.yaml), persist `/data` for the database and keys,
+and set `FORGEC2_DATA_DIR=/data`. Keep TLS enabled and restrict the console to localhost
+or a trusted management network. Pulling the image alone does not start the service.
+See [docs/DEPLOY.md](docs/DEPLOY.md) for configuration and TLS details.
 
 ---
 

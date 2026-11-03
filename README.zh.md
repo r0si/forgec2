@@ -27,52 +27,24 @@
 
 ## 快速开始
 
-### 方式 A —— 一键归档（无需工具链）
+### 拉取容器镜像
 
-| 平台 | 步骤 |
-|---|---|
-| **Windows** | 解压 `forgec2-v2.7.1-windows-amd64.zip`，进入目录运行 `start.cmd` |
-| **Linux** | `tar xzf forgec2-v2.7.1-linux-amd64.tar.gz && cd forgec2-v2.7.1-linux-amd64 && ./start.sh` |
-
-首次启动会：
-
-1. 用 `config.example.yaml` 生成 `config.yaml`；
-2. 在控制台打印随机生成的 `admin` 密码；
-3. 在 **<https://127.0.0.1:8000/>** 提供控制台（自签名证书）。
-
-浏览器点一次“继续访问”，用 `admin` 登录后立即修改密码。
-
-### 方式 B —— Docker
+使用已发布的 GHCR 镜像，无需本地 Go/Node 工具链或源码构建。
+当前镜像支持 **Linux amd64**（Docker Desktop 请使用 Linux 容器模式）。
 
 ```bash
-cp config.example.yaml config.yaml     # 必需：compose 直接挂载这个文件
-docker compose up -d --build
+docker pull ghcr.io/r0si/forgec2:edge
 ```
 
-同样在 `https://127.0.0.1:8000/` 打开，数据落在 `forgec2_data` 卷里。
+`edge` 是滚动开发标签，并非稳定发行版。需要可复现部署时，请固定镜像摘要或
+已发布的 `sha-<commit>` 标签，目前没有 `latest` 标签。
+如果包为私有，请使用有包访问权限的账号执行 `docker login ghcr.io`；
+不要将 Token 直接写在命令或配置文件中。
 
-### 方式 C —— 源码构建
-
-需要 Go <!--fact:go-->1.26<!--/fact-->+ 与 Node.js >= <!--fact:node-->24.15.0<!--/fact-->：
-
-```bash
-git clone https://github.com/r0si/forgec2.git && cd forgec2
-
-# Windows
-powershell -File scripts/deploy.ps1 -NoStart
-
-# Linux / macOS（没有 pwsh 时自动回退到 npm + go build）
-bash scripts/deploy.sh --no-start
-```
-
-`deploy.*` 会构建前端、同步进 `internal/webdist/dist`、跑前端门禁并产出
-`forgec2-server`。去掉 `-NoStart` / `--no-start` 就会顺带重启实例，并做
-`/health` 探测与失败回滚。
-
-> **要从别的机器访问？** 控制台默认监听 `0.0.0.0`。浏览器直接访问本服务器
-> 自己的地址即可使用，同源请求无需任何配置。只有当控制台部署在**别处**、
-> 需要调用本 API 时，才把对应主机名加进 `server.allowed_origins`。详见
-> [docs/DEPLOY.md](docs/DEPLOY.md)。
+启动镜像前，请参考 [config.example.yaml](config.example.yaml) 准备可写的
+`/data/config.yaml`，持久化 `/data` 以保存数据库和密钥，并设置
+`FORGEC2_DATA_DIR=/data`。保持 TLS 启用，控制台仅向本机或可信管理网络开放。
+仅拉取镜像不会启动服务，配置与 TLS 说明见 [docs/DEPLOY.md](docs/DEPLOY.md)。
 
 ---
 
