@@ -41,7 +41,7 @@ interface NavSectionDef {
   items: NavItemDef[];
 }
 
-/** Ink-wash console navigation: seven operator workstreams, every route discoverable. */
+/** Ink-wash console navigation: operator workstreams with every route discoverable. */
 export const NAV_SECTIONS: NavSectionDef[] = [
   {
     titleKey: "operations",
@@ -50,7 +50,14 @@ export const NAV_SECTIONS: NavSectionDef[] = [
       { href: "/dashboard", labelKey: "nav.dashboard", icon: Activity, perms: ["agents.read"] },
       { href: "/beacons", labelKey: "nav.beacons", icon: Bug, badge: "agents", perms: ["agents.read"] },
       { href: "/listeners", labelKey: "nav.listeners", icon: Radio, badge: "listeners", perms: ["listeners.read"] },
+    ],
+  },
+  {
+    titleKey: "logs",
+    items: [
       { href: "/events", labelKey: "nav.events", icon: Clock, badge: "notifications", perms: ["agents.read"] },
+      { href: "/traffic", labelKey: "nav.traffic", icon: Network, perms: ["agents.read"] },
+      { href: "/audit", labelKey: "nav.audit", icon: Shield, perms: ["audit.read"] },
     ],
   },
   {
@@ -84,7 +91,6 @@ export const NAV_SECTIONS: NavSectionDef[] = [
     items: [
       { href: "/loot", labelKey: "nav.loot", icon: Archive, perms: ["agents.read"] },
       { href: "/credentials", labelKey: "nav.credentials", icon: Key, perms: ["credentials.read"] },
-      { href: "/traffic", labelKey: "nav.traffic", icon: Network, perms: ["agents.read"] },
       { href: "/bloodhound", labelKey: "nav.bloodhound", icon: Network, perms: ["intel.read"] },
       { href: "/attack", labelKey: "nav.attack", icon: Shield, perms: ["campaigns.read"] },
       { href: "/campaign", labelKey: "nav.campaign", icon: Crosshair, perms: ["campaigns.read"] },
@@ -109,7 +115,6 @@ export const NAV_SECTIONS: NavSectionDef[] = [
       { href: "/tags", labelKey: "nav.tags", icon: Tags, perms: ["agents.read"] },
       { href: "/groups", labelKey: "nav.groups", icon: Layers, perms: ["groups.read"] },
       { href: "/autotag", labelKey: "nav.autotag", icon: Wand2, perms: ["settings.read"] },
-      { href: "/audit", labelKey: "nav.audit", icon: Shield, perms: ["audit.read"] },
     ],
   },
   {

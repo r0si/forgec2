@@ -3908,6 +3908,7 @@ export const zh: Record<string, string> = {
     "section.intelligence": "情报与分析",
     "section.lab": "高级战术",
     "section.lab_badge": "高级",
+    "section.logs": "系统日志",
     "section.operations": "作战台",
     "section.reporting": "报告与归档",
     "section.toolbox": "工具箱",

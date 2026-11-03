@@ -3860,6 +3860,7 @@ export const en: Record<string, string> = {
     "section.intelligence": "Intelligence",
     "section.lab": "Advanced Tactics",
     "section.lab_badge": "adv",
+    "section.logs": "System Logs",
     "section.operations": "Console",
     "section.reporting": "Reporting",
     "section.toolbox": "Toolbox",

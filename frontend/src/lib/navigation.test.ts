@@ -32,6 +32,7 @@ describe("navigation single source", () => {
   it("sections are non-empty and follow the operator workstream order", () => {
     expect(NAV_SECTIONS.map((s) => s.titleKey)).toEqual([
       "operations",
+      "logs",
       "build-deploy",
       "toolbox",
       "intelligence",
@@ -87,19 +88,20 @@ describe("navigation single source", () => {
         "/dashboard",
         "/beacons",
         "/listeners",
-        "/events",
       ]);
-      // The notification count must still surface somewhere in the sidebar,
-      // now carried by the events entry.
-      expect(primary.items.some((i) => i.badge === "notifications")).toBe(true);
+      const logs = NAV_SECTIONS.find((s) => s.titleKey === "logs");
+      expect(logs?.items.map((i) => i.href)).toEqual(["/events", "/traffic", "/audit"]);
+      // The notification count remains visible on the unified log entry.
+      expect(logs?.items.some((i) => i.badge === "notifications")).toBe(true);
     });
 
   it("keeps administration destinations grouped instead of palette-only", () => {
     const admin = NAV_SECTIONS.find((s) => s.titleKey === "administration");
     const hrefs = (admin?.items ?? []).map((i) => i.href);
     expect(hrefs).toEqual(
-      expect.arrayContaining(["/settings", "/users", "/roles", "/tags", "/groups", "/autotag", "/audit"]),
+      expect.arrayContaining(["/settings", "/users", "/roles", "/tags", "/groups", "/autotag"]),
     );
+    expect(hrefs).not.toContain("/audit");
     expect(NAV_BY_HREF["/settings"]).toBe("nav.settings");
   });
 });
