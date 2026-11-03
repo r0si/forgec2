@@ -901,7 +901,7 @@ func (s *Server) auditAIToolCall(reqCtx *aiReqCtx, name, argsJSON string) {
 		}
 		target = reqCtx.RunID
 		if reqCtx.SessionID != 0 {
-			target = "session:" + strconv.FormatUint(uint64(reqCtx.SessionID), 10)
+			target = "session_id:" + strconv.FormatUint(uint64(reqCtx.SessionID), 10)
 		}
 	}
 	details := name

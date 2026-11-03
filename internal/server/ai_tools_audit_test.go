@@ -31,7 +31,7 @@ func TestAuditAIToolCall(t *testing.T) {
 	if e.User != "alice" {
 		t.Fatalf("audit user = %q, want alice", e.User)
 	}
-	if !strings.Contains(e.Details, "token_make") || !strings.Contains(e.Details, "session:7") {
+	if !strings.Contains(e.Details, "token_make") || !strings.Contains(e.Details, "session_id:7") {
 		t.Fatalf("audit details missing tool/session: %q", e.Details)
 	}
 	if strings.Contains(e.Details, "s3cret") {
