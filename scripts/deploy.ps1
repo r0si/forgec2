@@ -145,16 +145,21 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "build failed (see the output above)" }
     Ok "build finished"
 
+    $binary = Join-Path $root "forgec2-server.exe"
+    $candidate = Join-Path $root "forgec2-server.new.exe"
+    $previous = Join-Path $root "forgec2-server.exe.prev"
+    if (-not (Test-Path -LiteralPath $candidate)) {
+        throw "build reported success but candidate '$candidate' is missing"
+    }
+
     if ($NoStart) {
-        Write-Host "`nBuild only (-NoStart): the running instance was not touched." -ForegroundColor DarkGray
+        Write-Host "`nBuild only (-NoStart): candidate ready at $candidate; the running instance was not touched." -ForegroundColor DarkGray
         return
     }
 
     # ------------------------------------------------- 2. keep the last good build
-    $binary = Join-Path $root "forgec2-server.exe"
-    $previous = Join-Path $root "forgec2-server.exe.prev"
-    if (Test-Path $binary) {
-        Copy-Item -Force $binary $previous
+    if (Test-Path -LiteralPath $binary) {
+        Copy-Item -LiteralPath $binary -Destination $previous -Force
         Ok "previous binary kept as forgec2-server.exe.prev"
     }
 
@@ -181,6 +186,15 @@ try {
     } else {
         Ok "no running instance found"
     }
+
+    # The candidate was completed before the old process stopped. Replace the
+    # locked executable only now, while the previous binary is available for
+    # rollback.
+    if (Test-Path -LiteralPath $binary) {
+        Remove-Item -LiteralPath $binary -Force
+    }
+    Move-Item -LiteralPath $candidate -Destination $binary
+    Ok "candidate promoted to forgec2-server.exe"
 
     # --------------------------------------------------------------- 4. start it up
     Step "Start the new instance"

@@ -7,8 +7,8 @@
 # Parameters:
 #   -SkipChecks   skip the frontend gates (npm run check)
 #   -SkipFrontend skip the frontend build and the webdist sync (backend only)
-#   -NoRestart    build only; do not touch the running instance
-#                 (scripts/deploy.ps1 owns the stop/start/health/rollback)
+#   -NoRestart    build forgec2-server.new.exe only; do not touch the running
+#                 instance (scripts/deploy.ps1 owns stop/start/rollback)
 param(
     [switch]$SkipChecks,
     [switch]$SkipFrontend,
@@ -132,13 +132,21 @@ try {
     }
     }
 
-    # 3. Build backend
+    # 3. Build backend. On Windows an executing .exe is locked, so the old
+    # build-then-stop order could never update a running server. Build a
+    # sibling candidate first; only a successful build is allowed to replace
+    # the live executable after it has stopped.
     Write-Host "==> Building Go backend..." -ForegroundColor Cyan
-    go build -o forgec2-server.exe ./cmd/server 2>&1 | ForEach-Object { Write-Host $_ }
+    $serverBinary = "forgec2-server.exe"
+    $candidateBinary = "forgec2-server.new.exe"
+    if (Test-Path -LiteralPath $candidateBinary) {
+        Remove-Item -LiteralPath $candidateBinary -Force
+    }
+    go build -o $candidateBinary ./cmd/server 2>&1 | ForEach-Object { Write-Host $_ }
     if ($LASTEXITCODE -ne 0) { throw "Backend build failed" }
 
     if ($NoRestart) {
-        Write-Host "`nBuild only (-NoRestart): the running instance was not touched." -ForegroundColor DarkGray
+        Write-Host "`nBuild only (-NoRestart): candidate ready at $candidateBinary; the running instance was not touched." -ForegroundColor DarkGray
         return
     }
 
@@ -146,6 +154,10 @@ try {
     Write-Host "==> Restarting server..." -ForegroundColor Cyan
     cmd /c "taskkill /f /im forgec2-server.exe >nul 2>&1"
     Start-Sleep -Seconds 1
+    if (Test-Path -LiteralPath $serverBinary) {
+        Remove-Item -LiteralPath $serverBinary -Force
+    }
+    Move-Item -LiteralPath $candidateBinary -Destination $serverBinary
     # Redirect the child's stdout/stderr to files: with the default
     # inheritance the server keeps the parent's console handles open, and the
     # caller (CI job, or an agent shell) blocks until the process exits.
