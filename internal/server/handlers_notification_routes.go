@@ -197,7 +197,7 @@ func (s *Server) handleListNotificationRoutes(c *gin.Context) {
 			if err := writer.Write([]string{
 				strconv.FormatUint(uint64(route.ID), 10),
 				route.Name,
-				string(route.Channel),
+				route.Channel,
 				strconv.FormatBool(route.Enabled),
 				strconv.Itoa(delivered),
 				strconv.Itoa(failed),

@@ -37,9 +37,9 @@ func TestAutomationHealth(t *testing.T) {
 		t.Fatalf("seed macro: %v", err)
 	}
 
-	seed := func(id, name string, slighty string, conds []RuleCondition, acts []RuleAction, tenant uint) {
+	seed := func(id, name string, eventType string, conds []RuleCondition, acts []RuleAction, tenant uint) {
 		rule := db.AutomationRule{
-			ID: id, Name: name, Enabled: true, EventType: slighty,
+			ID: id, Name: name, Enabled: true, EventType: eventType,
 			Conditions: conditions(conds), Actions: actions(acts), TenantID: tenant,
 		}
 		if err := s.db.Create(&rule).Error; err != nil {

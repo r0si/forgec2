@@ -107,7 +107,7 @@ func markValue(t *testing.T, v reflect.Value, depth int) {
 		return
 	}
 	switch v.Kind() {
-	case reflect.Ptr:
+	case reflect.Pointer:
 		if v.IsNil() {
 			return
 		}
@@ -127,7 +127,7 @@ func markValue(t *testing.T, v reflect.Value, depth int) {
 				f.SetBool(!f.Bool())
 			case reflect.Int, reflect.Int64:
 				f.SetInt(f.Int() + 1)
-			case reflect.Struct, reflect.Ptr:
+			case reflect.Struct, reflect.Pointer:
 				markValue(t, f, depth+1)
 			}
 		}

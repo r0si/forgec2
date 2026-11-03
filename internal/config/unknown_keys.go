@@ -37,7 +37,7 @@ func collectUnknownKeys(t reflect.Type, node map[string]interface{}, prefix stri
 	if depth > 8 || t == nil {
 		return
 	}
-	for t.Kind() == reflect.Ptr || t.Kind() == reflect.Slice || t.Kind() == reflect.Array {
+	for t.Kind() == reflect.Pointer || t.Kind() == reflect.Slice || t.Kind() == reflect.Array {
 		t = t.Elem()
 	}
 	if t.Kind() != reflect.Struct {
