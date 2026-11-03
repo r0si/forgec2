@@ -249,6 +249,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/agents/{id}/tasks/{taskId}/output": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One task's result as a plain text file (agent-scoped)
+         * @description Identical bytes to `GET /tasks/{taskId}/output`, addressed through the beacon that ran it. The agent id is a filter, not decoration: the lookup adds `agent_id = ?`, so a task that belongs to a different beacon is a 404 even when its task id is known, and the legacy-tenant fallback re-gates on agent visibility. **Send `Accept: application/json`:** this path is also a console route, and without the header the embedded-frontend middleware answers the index.html with 200.
+         */
+        get: operations["downloadAgentTaskOutput"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/agents/{id}/task/{taskId}/rerun": {
         parameters: {
             query?: never;
@@ -11241,7 +11261,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List playbook runs
+         * @description Read-only view of structured playbook runs. The transitions live in `internal/playbook` and are exhaustive there; this endpoint persists what that package produced and renders it. `settled`/`total` come from the stored steps, so a list can show progress without a reader opening each run. `?state=` filters on the value the machine computed at save time.
+         */
+        get: operations["listPlaybookRuns"];
         put?: never;
         /**
          * Create a playbook run
@@ -11281,11 +11305,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * List playbook runs
-         * @description Read-only view of structured playbook runs. The transitions live in `internal/playbook` and are exhaustive there; this endpoint persists what that package produced and renders it. `settled`/`total` come from the stored steps, so a list can show progress without a reader opening each run. `?state=` filters on the value the machine computed at save time.
-         */
-        get: operations["listPlaybookRuns"];
+        get?: never;
         put?: never;
         /**
          * Record a transition on a playbook run
@@ -11358,7 +11378,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/tasks/rerun-by-signature": {
+    "/tasks/rerun-by-signature": {
         parameters: {
             query?: never;
             header?: never;
@@ -11438,7 +11458,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/tasks/{taskId}/output": {
+    "/tasks/{taskId}/output": {
         parameters: {
             query?: never;
             header?: never;
@@ -11447,7 +11467,7 @@ export interface paths {
         };
         /**
          * One task's result as a plain text file
-         * @description A file is what an operator wants for a large result. A failed task still downloads, and the file ends with the error rather than silently omitting why it failed; nothing to download is a 404 with a reason instead of a zero-byte file.
+         * @description A file is what an operator wants for a large result. A failed task still downloads, and the file ends with the error rather than silently omitting why it failed; nothing to download is a 404 with a reason instead of a zero-byte file. **Send `Accept: application/json`.** This path sits under the console's own route tree, and the embedded-frontend middleware runs before routing: a GET with no JSON Accept header is answered with the console's index.html and status 200, so a script that omits the header saves a web page and thinks it downloaded a result.
          */
         get: operations["downloadTaskOutput"];
         put?: never;
@@ -12693,6 +12713,56 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["SuccessResponse"];
                 };
+            };
+        };
+    };
+    downloadAgentTaskOutput: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                taskId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The result (and the error, when the task failed) as text/plain; byte ranges are honoured exactly as on the task-scoped route. */
+            200: {
+                headers: {
+                    /** @description Always "bytes" */
+                    "Accept-Ranges"?: string;
+                    /** @description Stored task status */
+                    "X-Task-Status"?: string;
+                    /** @description "true" when the stored result is final (status completed) */
+                    "X-Task-Final"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description A partial response for a Range request */
+            206: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The task id is not numeric */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No such task, no output yet, or the agent is not visible to the caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -28452,6 +28522,56 @@ export interface operations {
             };
         };
     };
+    listPlaybookRuns: {
+        parameters: {
+            query?: {
+                /** @description draft|blocked|running|failed|complete */
+                state?: string;
+                /** @description csv returns the checklist as a file with one row per run: progress, what waits for a person, and what stalled. A handover that carries tasks.csv and audit.ndjson but not this leaves the receiver rebuilding "where the structured path stood" from screenshots. */
+                format?: "json" | "csv";
+                /** @description `1` keeps only the runs that are waiting for a HUMAN - an approval step that has not been approved - because "blocked" alone makes the reader open each run to learn whether the blocker is a person or a dependency. Filtering happens after the steps are decoded, since blocked is a property of a step rather than of the row. */
+                attention?: "1";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Runs, most recently updated first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        data?: {
+                            count?: number;
+                            runs?: {
+                                id?: number;
+                                name?: string;
+                                state?: string;
+                                created_by?: string;
+                                updated_at?: string;
+                                settled?: number;
+                                total?: number;
+                                /** @description Steps waiting for a HUMAN (an approval step that has not been approved). On the list on purpose: a run that only says "blocked" makes the reader open each one to learn whether the blocker is a person or a dependency, and those need different people. */
+                                blocked_steps?: string[];
+                                /** @description The first step that may run now, empty when nothing can */
+                                next_step?: string;
+                                /** @description Steps currently in progress */
+                                running_steps?: string[];
+                                /** @description A running step untouched for more than 12 hours. The state machine is right to call the run "running", so nothing is wrong and nothing draws attention - which is why the flag exists. attention=1 keeps these runs too. */
+                                stalled?: boolean;
+                            }[];
+                            stall_grace_seconds?: number;
+                        };
+                    };
+                };
+            };
+        };
+    };
     createPlaybookRun: {
         parameters: {
             query?: never;
@@ -28532,56 +28652,6 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
-            };
-        };
-    };
-    listPlaybookRuns: {
-        parameters: {
-            query?: {
-                /** @description draft|blocked|running|failed|complete */
-                state?: string;
-                /** @description csv returns the checklist as a file with one row per run: progress, what waits for a person, and what stalled. A handover that carries tasks.csv and audit.ndjson but not this leaves the receiver rebuilding "where the structured path stood" from screenshots. */
-                format?: "json" | "csv";
-                /** @description `1` keeps only the runs that are waiting for a HUMAN - an approval step that has not been approved - because "blocked" alone makes the reader open each run to learn whether the blocker is a person or a dependency. Filtering happens after the steps are decoded, since blocked is a property of a step rather than of the row. */
-                attention?: "1";
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Runs, most recently updated first */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        success?: boolean;
-                        data?: {
-                            count?: number;
-                            runs?: {
-                                id?: number;
-                                name?: string;
-                                state?: string;
-                                created_by?: string;
-                                updated_at?: string;
-                                settled?: number;
-                                total?: number;
-                                /** @description Steps waiting for a HUMAN (an approval step that has not been approved). On the list on purpose: a run that only says "blocked" makes the reader open each one to learn whether the blocker is a person or a dependency, and those need different people. */
-                                blocked_steps?: string[];
-                                /** @description The first step that may run now, empty when nothing can */
-                                next_step?: string;
-                                /** @description Steps currently in progress */
-                                running_steps?: string[];
-                                /** @description A running step untouched for more than 12 hours. The state machine is right to call the run "running", so nothing is wrong and nothing draws attention - which is why the flag exists. attention=1 keeps these runs too. */
-                                stalled?: boolean;
-                            }[];
-                            stall_grace_seconds?: number;
-                        };
-                    };
-                };
             };
         };
     };
