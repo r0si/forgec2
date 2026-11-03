@@ -19,6 +19,7 @@ import (
 	"github.com/forgec2/forgec2/internal/db"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // Async audit pipeline tuning: request goroutines never touch the DB.
@@ -674,8 +675,11 @@ func auditEntryHash(e *db.AuditLog) string {
 	return auditchain.Hash(e.User, e.Action, e.Resource, e.AgentID, e.IP, e.Success, e.Error, e.Details)
 }
 
-// persistAuditBatch chains entries onto prevHash ("": read from DB) and
-// inserts them in a single bounded transaction.
+// persistAuditBatch chains entries onto the current database head and inserts
+// them in a single bounded transaction. prevHash is the caller's expected head;
+// it is only a fast drift signal, never trusted as the source of truth. A second
+// server process can otherwise append while this process is alive and leave the
+// worker's in-memory head stale, creating a valid-looking fork in the chain.
 func (s *Server) persistAuditBatch(entries []db.AuditLog, prevHash string) error {
 	// The single choke point before the DB, so the sanitizer runs here as well as
 	// in buildAuditEntries: callers that construct db.AuditLog rows directly (the
@@ -687,13 +691,18 @@ func (s *Server) persistAuditBatch(entries []db.AuditLog, prevHash string) error
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), auditWriteTimeout)
 	defer cancel()
+	headDrifted := false
+	var databaseHeadID uint
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		lastHash := prevHash
-		if lastHash == "" {
-			var lastEntry db.AuditLog
-			if err := tx.Order("id DESC").First(&lastEntry).Error; err == nil {
-				lastHash = lastEntry.EntryHash
-			}
+		var lastEntry db.AuditLog
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			Order("id DESC").Limit(1).Find(&lastEntry).Error; err != nil {
+			return err
+		}
+		lastHash := lastEntry.EntryHash
+		databaseHeadID = lastEntry.ID
+		if prevHash != "" && prevHash != lastHash {
+			headDrifted = true
 		}
 		for i := range entries {
 			entries[i].PrevHash = lastHash
@@ -710,6 +719,10 @@ func (s *Server) persistAuditBatch(entries []db.AuditLog, prevHash string) error
 	if err == nil && len(entries) > 0 {
 		last := entries[len(entries)-1]
 		s.appendAuditAnchor(last.EntryHash, last.ID)
+		if headDrifted {
+			slog.Warn("Audit chain head advanced outside this writer; rebased batch onto database head",
+				"database_head_id", databaseHeadID, "new_head_id", last.ID)
+		}
 	}
 	return err
 }

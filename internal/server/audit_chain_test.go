@@ -180,6 +180,47 @@ func TestAuditWorker_PersistsAndDrains(t *testing.T) {
 	}
 }
 
+// Regression: another server process can append to the same SQLite database
+// after this worker cached its head. The worker must rebase onto the database
+// head inside the write transaction instead of creating a fork from its stale
+// in-memory hash.
+func TestAuditWorker_RebasesAfterExternalWriterAdvancesHead(t *testing.T) {
+	s := newAuditTestServer(t)
+	s.LogAuditRecord(nil, "before_worker", "test", "", "seed", true, nil)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s.ctx = ctx
+	s.startAuditWorker()
+
+	external := &Server{db: s.db}
+	externalBatch := []db.AuditLog{{
+		User: "external", Action: "external_append", Resource: "test", Success: true,
+	}}
+	if err := external.persistAuditBatch(externalBatch, ""); err != nil {
+		t.Fatalf("external append: %v", err)
+	}
+
+	s.LogAuditRecord(nil, "after_external", "test", "", "local", true, nil)
+	cancel()
+	s.wg.Wait()
+
+	var rows []db.AuditLog
+	if err := s.db.Order("id ASC").Find(&rows).Error; err != nil {
+		t.Fatalf("load audit rows: %v", err)
+	}
+	if len(rows) != 3 {
+		t.Fatalf("rows = %d, want 3", len(rows))
+	}
+	for i := 1; i < len(rows); i++ {
+		if rows[i].PrevHash != rows[i-1].EntryHash {
+			t.Fatalf("row %d prev_hash = %q, want database predecessor %q", rows[i].ID, rows[i].PrevHash, rows[i-1].EntryHash)
+		}
+	}
+	if verdict := s.verifyAuditChain(100); !verdict.OK {
+		t.Fatalf("rebased chain failed verification: %+v", verdict)
+	}
+}
+
 // Regression: lateral-movement credentials in audit details must be masked
 // (pass/ticket/bare key), while ordinary text passes through.
 func TestSanitizeDetailsMasksCreds(t *testing.T) {
