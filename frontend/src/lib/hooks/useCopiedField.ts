@@ -11,12 +11,16 @@ export function useCopiedField(revertMs = 1500): {
 } {
   const [copiedField, setCopiedField] = useState("");
   const timerRef = useRef<number | null>(null);
+  const lifecycleRef = useRef(0);
 
   const copy = useCallback(
     (text: string, key: string) => {
-      navigator.clipboard
-        .writeText(text)
+      const lifecycle = lifecycleRef.current;
+      if (!navigator.clipboard?.writeText) return;
+      try {
+        navigator.clipboard.writeText(text)
         .then(() => {
+          if (lifecycleRef.current !== lifecycle) return;
           if (timerRef.current !== null) window.clearTimeout(timerRef.current);
           setCopiedField(key);
           timerRef.current = window.setTimeout(() => {
@@ -25,12 +29,17 @@ export function useCopiedField(revertMs = 1500): {
           }, revertMs);
         })
         .catch(() => {});
+      } catch {
+        // Some clipboard implementations throw before returning a Promise.
+        // Do not mark the field copied when the browser refused the write.
+      }
     },
     [revertMs]
   );
 
   useEffect(
     () => () => {
+      lifecycleRef.current++;
       if (timerRef.current !== null) window.clearTimeout(timerRef.current);
     },
     []

@@ -1814,6 +1814,7 @@ export const en: Record<string, string> = {
     "common.command": "Command",
     "common.confirm": "Confirm",
     "common.copy": "Copy",
+    "common.copied": "Copied",
     "common.copy_value": "Copy {value}",
     "common.copy_failed": "Copy failed",
     "common.create": "Create",

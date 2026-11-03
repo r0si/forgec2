@@ -1814,6 +1814,7 @@ export const zh: Record<string, string> = {
     "common.command": "命令",
     "common.confirm": "确认",
     "common.copy": "复制",
+    "common.copied": "已复制",
     "common.copy_value": "复制 {value}",
     "common.copy_failed": "复制失败",
     "common.create": "创建",

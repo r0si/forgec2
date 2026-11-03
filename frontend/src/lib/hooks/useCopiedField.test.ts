@@ -46,4 +46,28 @@ describe("useCopiedField", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(0); });
     expect(result.current.copiedField).toBe("");
   });
+
+  it("does not throw when the browser has no clipboard API", () => {
+    vi.stubGlobal("navigator", { clipboard: undefined });
+    const { result } = renderHook(() => useCopiedField());
+    expect(() => result.current.copy("a", "k1")).not.toThrow();
+    expect(result.current.copiedField).toBe("");
+  });
+
+  it("does not throw or mark success on a synchronous clipboard rejection", () => {
+    vi.mocked(navigator.clipboard.writeText).mockImplementation(() => { throw new Error("denied"); });
+    const { result } = renderHook(() => useCopiedField());
+    expect(() => result.current.copy("a", "k1")).not.toThrow();
+    expect(result.current.copiedField).toBe("");
+  });
+
+  it("does not schedule a feedback timer after unmount", async () => {
+    let finish!: () => void;
+    vi.mocked(navigator.clipboard.writeText).mockReturnValue(new Promise<void>(resolve => { finish = resolve; }));
+    const { result, unmount } = renderHook(() => useCopiedField());
+    act(() => result.current.copy("a", "k1"));
+    unmount();
+    await act(async () => { finish(); await Promise.resolve(); });
+    expect(vi.getTimerCount()).toBe(0);
+  });
 });
