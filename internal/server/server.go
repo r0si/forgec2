@@ -1007,6 +1007,8 @@ func (s *Server) SetupRoutes() { // config-lock: boot, before the listener serve
 	// before the decrypt hot path in all cases.
 	s.router.NoRoute(func(c *gin.Context) {
 		if c.GetHeader("Accept") != "application/json" {
+			trafficStart := time.Now()
+			defer s.recordTrafficRequest(c, trafficStart)
 			middleware.RequestBodyLimit(BeaconMaxBodySize)(c)
 			if c.IsAborted() {
 				return

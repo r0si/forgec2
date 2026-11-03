@@ -19,6 +19,7 @@ type TrafficEntry struct {
 }
 
 const maxTrafficLogs = 500
+const trafficAgentIDContextKey = "traffic_agent_id"
 
 type trafficRing struct {
 	mu    sync.RWMutex
@@ -158,30 +159,38 @@ func (s *Server) trafficMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		c.Next()
-		path := c.Request.URL.Path
-		// Only capture API paths
-		if len(path) < 8 || path[:7] != "/api/v1" {
-			return
-		}
-		entry := TrafficEntry{
-			Time:     start,
-			Method:   c.Request.Method,
-			Path:     path,
-			RemoteIP: c.ClientIP(),
-			AgentID:  c.GetHeader("X-Agent-ID"),
-			Status:   c.Writer.Status(),
-			Size:     c.Writer.Size(),
-			Latency:  time.Since(start).Round(time.Millisecond).String(),
-		}
-		s.trafficLog.add(entry)
-		// Feed the listener-traffic chart with real wire sizes: the request
-		// Content-Length (as received) and the actual response body written.
-		reqBytes := c.Request.ContentLength
-		if reqBytes < 0 {
-			reqBytes = 0
-		}
-		s.trafficBytes.add(start, reqBytes, int64(entry.Size))
+		s.recordTrafficRequest(c, start)
 	}
+}
+
+// recordTrafficRequest is shared with the custom-profile NoRoute path, which
+// cannot call a normal c.Next-based middleware after route resolution.
+func (s *Server) recordTrafficRequest(c *gin.Context, start time.Time) {
+	path := c.Request.URL.Path
+	agentID := c.GetString(trafficAgentIDContextKey)
+	if agentID == "" {
+		// Older agents may still send the optional header. Authenticated
+		// handlers set the context value, which cannot be forged by a client.
+		agentID = c.GetHeader("X-Agent-ID")
+	}
+	entry := TrafficEntry{
+		Time:     start,
+		Method:   c.Request.Method,
+		Path:     path,
+		RemoteIP: c.ClientIP(),
+		AgentID:  agentID,
+		Status:   c.Writer.Status(),
+		Size:     c.Writer.Size(),
+		Latency:  time.Since(start).Round(time.Millisecond).String(),
+	}
+	s.trafficLog.add(entry)
+	// Feed the listener-traffic chart with real wire sizes: the request
+	// Content-Length (as received) and the actual response body written.
+	reqBytes := c.Request.ContentLength
+	if reqBytes < 0 {
+		reqBytes = 0
+	}
+	s.trafficBytes.add(start, reqBytes, int64(entry.Size))
 }
 
 func (s *Server) handleTrafficPage(c *gin.Context) {

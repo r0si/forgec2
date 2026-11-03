@@ -405,6 +405,7 @@ func (s *Server) handleBeacon(c *gin.Context) {
 			respondError(c, http.StatusInternalServerError, "response build failed")
 			return
 		}
+		c.Set(trafficAgentIDContextKey, req.UUID)
 	} else {
 		var ok bool
 		respBytes, ok = s.processAuthFrame(env, kind)
@@ -412,6 +413,7 @@ func (s *Server) handleBeacon(c *gin.Context) {
 			respondError(c, http.StatusBadRequest, "authentication failed")
 			return
 		}
+		c.Set(trafficAgentIDContextKey, env.UUID)
 	}
 
 	// Async GeoIP lookup (don't block beacon response) — only when enabled in config.

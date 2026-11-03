@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { filterUnified, mergeEvents } from "./merge-events";
+import { countEventSources, filterUnified, mergeEvents } from "./merge-events";
 
 describe("mergeEvents", () => {
   it("sorts mixed sources newest first", () => {
@@ -32,5 +32,17 @@ describe("filterUnified", () => {
     expect(filterUnified(events, "all", "", "aaa")).toHaveLength(1);
     expect(filterUnified(events, "all", "", "bbb")[0].source).toBe("task");
     expect(filterUnified(events, "all", "")).toHaveLength(2);
+  });
+});
+
+describe("countEventSources", () => {
+  it("counts the merged stream, including live rows", () => {
+    const polled = mergeEvents(
+      [{ id: "1", timestamp: "2026-01-01T10:00:00Z", type: "agent_online", title: "up" }],
+      [],
+      [],
+    );
+    const live = { ...polled[0], id: "task-live", source: "task" as const };
+    expect(countEventSources([...polled, live])).toEqual({ timeline: 1, task: 1, alert: 0 });
   });
 });

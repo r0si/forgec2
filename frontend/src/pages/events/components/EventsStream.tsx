@@ -20,7 +20,7 @@ import { StatusBadge } from "@/components/ui/status-indicator";
 import { RefreshCw, Activity, AlertTriangle, ListTodo, Zap, Radio } from "lucide-react";
 import type { Task } from "@/types/task";
 import type { TimelineEvent, UnifiedEvent } from "./types";
-import { filterUnified, mergeEvents, type AlertLike } from "./merge-events";
+import { countEventSources, filterUnified, mergeEvents, type AlertLike } from "./merge-events";
 import { mergePolledWithLive, unifiedFromWS, upsertLiveEvent } from "./ws-to-event";
 import { useInteractStore } from "@/lib/interact-store";
 
@@ -107,14 +107,19 @@ export default function EventsStream() {
     [data],
   );
 
+  const mergedRows = useMemo(
+    () => mergePolledWithLive(allRows, live),
+    [allRows, live],
+  );
+
   const rows = useMemo(
     () => filterUnified(
-      mergePolledWithLive(allRows, live),
+      mergedRows,
       "all",
       query,
       followSession ? dockAgentId : null,
     ),
-    [allRows, live, query, followSession, dockAgentId],
+    [mergedRows, query, followSession, dockAgentId],
   );
 
   // The feed is unbounded (three merged sources plus the live socket), so only
@@ -126,11 +131,7 @@ export default function EventsStream() {
   const visible = useMemo(() => rows.slice(0, visibleCount), [rows, visibleCount]);
   const hidden = rows.length - visible.length;
 
-  const counts = useMemo(() => {
-    const c = { timeline: 0, task: 0, alert: 0 };
-    for (const r of allRows) { if (r.source in c) c[r.source as keyof typeof c]++; }
-    return c;
-  }, [allRows]);
+  const counts = useMemo(() => countEventSources(mergedRows), [mergedRows]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -191,7 +192,7 @@ export default function EventsStream() {
         })}
         <div className="ml-auto text-xs text-muted-foreground font-mono">
           {visible.length === rows.length
-            ? `${rows.length} ${rows.length === 1 ? "event" : "events"}`
+            ? t("events.total_count", { count: rows.length })
             : t("events.shown_of_total", { shown: visible.length, total: rows.length })}
         </div>
       </div>

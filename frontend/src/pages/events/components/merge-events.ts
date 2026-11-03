@@ -11,6 +11,18 @@ export interface AlertLike {
   created_at: string;
 }
 
+export interface EventSourceCounts {
+  timeline: number;
+  task: number;
+  alert: number;
+}
+
+export function countEventSources(events: UnifiedEvent[]): EventSourceCounts {
+  const counts: EventSourceCounts = { timeline: 0, task: 0, alert: 0 };
+  for (const event of events) counts[event.source]++;
+  return counts;
+}
+
 export function mergeEvents(
   timeline: TimelineEvent[],
   tasks: Task[],

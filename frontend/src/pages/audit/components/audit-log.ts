@@ -52,3 +52,29 @@ export function normalizeAuditLogs(raw: unknown): AuditLog[] {
   const list = Array.isArray(raw) ? raw : [];
   return list.map(normalizeAuditLog).filter((row): row is AuditLog => row != null);
 }
+
+const CSV_HEADERS = ["Timestamp", "User", "IP", "Action", "Resource", "Target", "Status", "Severity", "Details"];
+
+function csvCell(value: unknown): string {
+  let text = String(value ?? "");
+  // CSV files are routinely opened in spreadsheet software. Prefix values
+  // that would otherwise be interpreted as formulas while preserving the
+  // original text for an operator reading the cell.
+  if (/^[=+\-@\t\r]/.test(text.trimStart())) text = `'${text}`;
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+export function auditLogsToCSV(logs: AuditLog[]): string {
+  const rows = logs.map((log) => [
+    log.timestamp,
+    log.username,
+    log.ip,
+    log.action,
+    log.resource,
+    log.target,
+    log.status,
+    log.severity,
+    log.details,
+  ].map(csvCell).join(","));
+  return [CSV_HEADERS.map(csvCell).join(","), ...rows].join("\r\n") + "\r\n";
+}

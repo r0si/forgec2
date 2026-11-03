@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { auditSessionId, looksLikeAgentId, normalizeAuditLog, normalizeAuditLogs } from "./audit-log";
+import { auditLogsToCSV, auditSessionId, looksLikeAgentId, normalizeAuditLog, normalizeAuditLogs } from "./audit-log";
 
 describe("normalizeAuditLog", () => {
   it("maps teamserver fields onto the operator row", () => {
@@ -43,5 +43,29 @@ describe("auditSessionId", () => {
 describe("normalizeAuditLogs", () => {
   it("drops junk rows", () => {
     expect(normalizeAuditLogs([null, { id: 1, user: "a" }])).toHaveLength(1);
+  });
+});
+
+describe("auditLogsToCSV", () => {
+  it("quotes commas, quotes and newlines without changing the record shape", () => {
+    const csv = auditLogsToCSV([{
+      id: "1",
+      timestamp: "2026-11-03T00:00:00Z",
+      username: "alice",
+      action: "update",
+      details: "changed, \"two\" fields\nnext line",
+    }]);
+    expect(csv).toContain('"changed, ""two"" fields\nnext line"');
+    expect(csv.split("\r\n")).toHaveLength(3);
+  });
+
+  it("neutralizes spreadsheet formulas in exported cells", () => {
+    const csv = auditLogsToCSV([{
+      id: "1",
+      username: "=HYPERLINK(\"https://example.test\")",
+      details: "+cmd|' /C calc'!A0",
+    }]);
+    expect(csv).toContain('"\'=HYPERLINK(""https://example.test"")"');
+    expect(csv).toContain('"\'+cmd|\' /C calc\'!A0"');
   });
 });

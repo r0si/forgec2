@@ -19,7 +19,7 @@ import { StatTile } from "@/components/ui/stat-tile";
 import { IconBadge } from "@/components/ui/icon-badge";
 import type { AuditLog } from "@/types/audit";
 import { useInteractStore } from "@/lib/interact-store";
-import { auditSessionId, normalizeAuditLogs } from "./components/audit-log";
+import { auditLogsToCSV, auditSessionId, normalizeAuditLogs } from "./components/audit-log";
 
 const ACTION_BADGES: Record<string, string> = {
   login: "success",
@@ -48,6 +48,7 @@ export default function AuditPage() {
   const [perPage] = useState(50);
   const [userFilter, setUserFilter] = useState("");
   const [actionFilter, setActionFilter] = useState("");
+  const [appliedFilters, setAppliedFilters] = useState({ user: "", action: "" });
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
   const [users, setUsers] = useState<{ username: string }[]>([]);
   const { t } = useI18n();
@@ -73,8 +74,8 @@ export default function AuditPage() {
         page: String(page),
         pageSize: String(perPage),
       });
-      if (userFilter) params.set("user", userFilter);
-      if (actionFilter) params.set("action", actionFilter);
+      if (appliedFilters.user) params.set("user", appliedFilters.user);
+      if (appliedFilters.action) params.set("action", appliedFilters.action);
       const data = await api.get(paths.audit.logs(params.toString()), { signal });
       const payload = (data && typeof data === "object") ? data as Record<string, unknown> : {};
       setLogs(normalizeAuditLogs(payload.logs));
@@ -89,7 +90,7 @@ export default function AuditPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, perPage, userFilter, actionFilter, t]);
+  }, [page, perPage, appliedFilters, t]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -97,28 +98,23 @@ export default function AuditPage() {
     return () => controller.abort();
   }, [loadLogs]);
 
-  const applyFilters = () => { setPage(1); };
+  const applyFilters = () => {
+    setPage(1);
+    setAppliedFilters({ user: userFilter, action: actionFilter });
+  };
   const resetFilters = () => {
     setUserFilter("");
     setActionFilter("");
     setPage(1);
+    setAppliedFilters({ user: "", action: "" });
   };
 
   const handleExport = () => {
-    const csv = logs.filter(Boolean).map((l) => {
-      const time = l.timestamp || "";
-      const user = l.username || "";
-      const ip = l.ip || "";
-      const action = l.action || "";
-      const resource = l.resource || "";
-      const target = l.target || "";
-      const status = l.status || "";
-      const severity = l.severity || "";
-      const details = (l.details || "").replace(/,/g, ";");
-      return `${time},${user},${ip},${action},${resource},${target},${status},${severity},${details}`;
-    }).join("\n");
-    const header = "Timestamp,User,IP,Action,Resource,Target,Status,Severity,Details\n";
-    downloadText(header + csv, "audit-logs.csv", "text/csv");
+    downloadText(
+      auditLogsToCSV(logs.filter(Boolean)),
+      `audit-logs-page-${page}.csv`,
+      "text/csv;charset=utf-8",
+    );
   };
 
   const getActionBadge = (action: string) => {
@@ -158,9 +154,9 @@ export default function AuditPage() {
 
   return (
     <PageContainer title={t("audit.title")} subtitle={t("audit.subtitle")} actions={<>
-        <Button onClick={handleExport}>
+        <Button onClick={handleExport} disabled={loading || logs.length === 0}>
           <Download className="size-4" />
-          <span>{t("audit.export")} CSV</span>
+          <span>{t("audit.export_page_csv")}</span>
         </Button>
       </>}>
 
@@ -203,7 +199,7 @@ export default function AuditPage() {
               ))}
             </SelectContent>
           </Select>
-          <Button onClick={applyFilters}>
+          <Button onClick={applyFilters} disabled={loading}>
             <Filter className="size-4" />
             <span>{t("audit.apply")}</span>
           </Button>

@@ -17,52 +17,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Network, RefreshCw, Trash2 } from "lucide-react";
-
-interface TrafficEntry {
-  id?: string;
-  ID?: string;
-  timestamp?: string;
-  Timestamp?: string;
-  time?: string;
-  method?: string;
-  Method?: string;
-  path?: string;
-  Path?: string;
-  source_ip?: string;
-  SourceIP?: string;
-  remote_ip?: string;
-  agent_id?: string;
-  AgentID?: string;
-  status_code?: number;
-  StatusCode?: number;
-  status?: number;
-  size?: number;
-  Size?: number;
-  latency?: number | string;
-  Latency?: number | string;
-  protocol?: string;
-  Protocol?: string;
-}
+import { ListX, Network, RefreshCw } from "lucide-react";
+import { normalizeTrafficEntry, summarizeTraffic, type TrafficEntry } from "./traffic-data";
 
 const EMPTY_TRAFFIC: TrafficEntry[] = [];
-
-function normalizeTrafficEntry(raw: TrafficEntry): TrafficEntry {
-  // Backend: {time, remote_ip, status, latency:"12ms", size}  Front expects {timestamp, source_ip, status_code, latency:number}
-  const e = raw as Record<string, unknown>;
-  return {
-    id: String(e.id || e.ID || e.time || e.timestamp || ""),
-    timestamp: String(e.timestamp || e.Timestamp || e.time || ""),
-    method: String(e.method || e.Method || ""),
-    path: String(e.path || e.Path || ""),
-    source_ip: String(e.source_ip || e.SourceIP || e.remote_ip || ""),
-    agent_id: String(e.agent_id || e.AgentID || ""),
-    status_code: Number(e.status_code ?? e.StatusCode ?? e.status ?? 0),
-    size: Number(e.size ?? e.Size ?? 0),
-    latency: typeof e.latency === "string" ? parseInt(String(e.latency), 10) || 0 : Number(e.latency ?? e.Latency ?? 0),
-    protocol: String(e.protocol || e.Protocol || ""),
-  };
-}
 
 export default function TrafficPage({ embedded = false }: { embedded?: boolean } = {}) {
   const [autoRefresh, setAutoRefresh] = useState(true);
@@ -84,15 +42,10 @@ export default function TrafficPage({ embedded = false }: { embedded?: boolean }
   });
   const entries = data ?? EMPTY_TRAFFIC;
 
-  const { filteredEntries, sourceIps, totalRequests, beacons, errors, dataTransferred } = useMemo(() => {
-    const filtered = sourceIpFilter ? entries.filter((e) => (e.source_ip || "").includes(sourceIpFilter)) : entries;
-    const ips = [...new Set(entries.map((e) => e.source_ip || "").filter(Boolean))];
-    const total = entries.length;
-    const b = entries.filter((e) => (e.protocol || "").toLowerCase().includes("beacon")).length;
-    const err = entries.filter((e) => (e.status_code ?? 0) >= 400).length;
-    const bytes = entries.reduce((acc, e) => acc + (e.size ?? 0), 0);
-    return { filteredEntries: filtered, sourceIps: ips, totalRequests: total, beacons: b, errors: err, dataTransferred: bytes };
-  }, [entries, sourceIpFilter]);
+  const { filteredEntries, sourceIps, totalRequests, beacons, errors, dataTransferred } = useMemo(
+    () => summarizeTraffic(entries, sourceIpFilter),
+    [entries, sourceIpFilter],
+  );
 
   const isUserScrolledRef = useRef(false);
   useEffect(() => {
@@ -136,7 +89,7 @@ export default function TrafficPage({ embedded = false }: { embedded?: boolean }
             {t("traffic.auto_scroll")}
           </Label>
           <Select value={sourceIpFilter || "__all"} onValueChange={v => setSourceIpFilter(v === "__all" ? "" : v ?? "")}>
-            <SelectTrigger className="w-full">
+            <SelectTrigger className="w-44 max-w-full">
               <SelectValue>
                 {(value) => (value === "__all" ? t("traffic.all_ip") : String(value ?? ""))}
               </SelectValue>
@@ -148,13 +101,13 @@ export default function TrafficPage({ embedded = false }: { embedded?: boolean }
               ))}
             </SelectContent>
           </Select>
-          <Button onClick={loadTraffic} size="lg">
+          <Button onClick={loadTraffic} size="sm">
             <RefreshCw className="size-4" />
             <span>{t("traffic.refresh")}</span>
           </Button>
-          <Button onClick={clearLog} size="lg" className="bg-destructive-solid hover:bg-destructive-solid/90 text-destructive-foreground">
-            <Trash2 className="size-4" />
-            <span>{t("traffic.clear")}</span>
+          <Button onClick={clearLog} size="sm" variant="outline" disabled={entries.length === 0}>
+            <ListX className="size-4" />
+            <span>{t("traffic.clear_view")}</span>
           </Button>
         </div>
       </>}>
@@ -179,7 +132,7 @@ export default function TrafficPage({ embedded = false }: { embedded?: boolean }
           emptyIcon={Network}
           emptyTitle={t("traffic.empty")}
           loadingSkeleton={
-            <Table>
+            <Table label={t("traffic.beacon_comm")}>
               <TableHeader>
                 <TableRow className="bg-muted border-b border-border sticky top-0">
                   <TableHead className="text-xs font-medium min-w-[80px]">{t("traffic.time")}</TableHead>
@@ -205,7 +158,7 @@ export default function TrafficPage({ embedded = false }: { embedded?: boolean }
           }
         >
           <div ref={containerRef} className="max-h-[500px] overflow-y-auto">
-            <Table>
+            <Table label={t("traffic.beacon_comm")}>
               <TableHeader>
                 <TableRow className="bg-muted border-b border-border sticky top-0">
                   <TableHead className="text-xs font-medium min-w-[80px]">{t("traffic.time")}</TableHead>
@@ -234,13 +187,13 @@ export default function TrafficPage({ embedded = false }: { embedded?: boolean }
                     <TableRow key={id}>
                       <TableCell className="text-xs text-muted-foreground">{formatTime(ts)}</TableCell>
                       <TableCell>
-                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${getMethodStyle(method)}`}>{method}</span>
+                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${getMethodStyle(method)}`}>{method || "—"}</span>
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground max-w-[250px] truncate">{path}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">{ip}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">{agent ? agent.substring(0, 8) : "-"}</TableCell>
                       <TableCell className="text-center">
-                        <span className={`text-xs font-medium ${status >= 400 ? "text-destructive-ink" : status >= 300 ? "text-warning-ink" : "text-success-ink"}`}>{status}</span>
+                        <span className={`text-xs font-medium ${status === 0 ? "text-muted-foreground" : status >= 400 ? "text-destructive-ink" : status >= 300 ? "text-warning-ink" : "text-success-ink"}`}>{status || "—"}</span>
                       </TableCell>
                       <TableCell className="text-right text-xs text-muted-foreground">{formatBytes(size)}</TableCell>
                       <TableCell className="text-right text-xs text-muted-foreground">{latency}ms</TableCell>
