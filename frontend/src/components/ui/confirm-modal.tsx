@@ -1,8 +1,8 @@
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useI18n } from "@/lib/i18n";
 
 export function ConfirmModal({ open, title, message, confirmText, cancelText, danger, requireText, onConfirm, onCancel }: {
@@ -17,48 +17,57 @@ export function ConfirmModal({ open, title, message, confirmText, cancelText, da
   onCancel: () => void;
 }) {
   const { t } = useI18n();
+  const typedId = useId();
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
+  const generationRef = useRef(0);
   const resolvedConfirm = confirmText || t("common.confirm");
   const resolvedCancel = cancelText || t("common.cancel");
   const matched = !requireText || typed.trim() === requireText;
 
   useEffect(() => {
+    generationRef.current += 1;
+    busyRef.current = false;
     if (open) {
       setTyped("");
       setBusy(false);
     }
+    return () => { generationRef.current += 1; };
   }, [open]);
 
   const handleConfirm = () => {
-    if (busy) return;
+    if (!open || !matched || busyRef.current) return;
+    const generation = generationRef.current;
+    busyRef.current = true;
     setBusy(true);
-    try {
-      const result = onConfirm();
-      if (result instanceof Promise) {
-        result.catch(() => {}).finally(() => setBusy(false));
-      } else {
-        setBusy(false);
-      }
-    } catch {
+    const finish = () => {
+      // Closing/reopening or unmounting invalidates the previous operation.
+      if (generation !== generationRef.current) return;
+      busyRef.current = false;
       setBusy(false);
+    };
+    try {
+      void Promise.resolve(onConfirm()).then(finish, finish);
+    } catch {
+      finish();
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onCancel()}>
-      <DialogContent size="md">
+      <DialogContent size="md" aria-busy={busy}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
-        <p className="text-sm text-muted-foreground">{message}</p>
+        <DialogDescription>{message}</DialogDescription>
         {requireText && (
           <div>
-            <label htmlFor="confirm-modal-typed" className="block text-xs text-muted-foreground mb-1.5">
+            <label htmlFor={typedId} className="block text-xs text-muted-foreground mb-1.5">
               {t("common.type_to_confirm").replace("{text}", requireText)}
             </label>
             <Input
-              id="confirm-modal-typed"
+              id={typedId}
               value={typed}
               onChange={(e) => setTyped(e.target.value)}
               placeholder={requireText}
