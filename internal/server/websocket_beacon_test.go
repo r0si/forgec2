@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -21,11 +22,28 @@ func wsTestServer(t *testing.T) (*Server, *httptest.Server) {
 	if s.ctx == nil {
 		s.ctx = context.Background()
 	}
+	ctx, cancel := context.WithCancel(s.ctx)
+	s.ctx = ctx
+	// Initialize before serving: sleeping after Dial does not synchronize a
+	// test's direct hub reads with the handler's lazy initialization.
+	s.wsHubOnce.Do(func() { s.wsHub = NewWebSocketHub() })
 	gin.SetMode(gin.TestMode)
 	engine := gin.New()
 	engine.GET("/ws/beacon", s.handleWebSocketBeacon)
-	srv := httptest.NewServer(engine)
-	t.Cleanup(srv.Close)
+	var requests sync.WaitGroup
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		defer requests.Done()
+		engine.ServeHTTP(w, r)
+	}))
+	t.Cleanup(func() {
+		srv.Close()
+		// Close does not wait for hijacked handlers. They must finish adding
+		// pumps before waiting for those pumps, and before DB fixture cleanup.
+		requests.Wait()
+		cancel()
+		s.wg.Wait()
+	})
 	return s, srv
 }
 
