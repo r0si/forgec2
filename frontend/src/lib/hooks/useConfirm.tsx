@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { useI18n } from "@/lib/i18n";
 
@@ -12,6 +12,7 @@ interface ConfirmOptions {
 }
 
 interface ConfirmState {
+  id: number;
   opts: ConfirmOptions;
   resolve: (value: boolean) => void;
 }
@@ -30,25 +31,40 @@ export function useConfirm() {
   const { t } = useI18n();
   const [state, setState] = useState<ConfirmState | null>(null);
   const stateRef = useRef<ConfirmState | null>(null);
+  const sequenceRef = useRef(0);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      stateRef.current?.resolve(false);
+      stateRef.current = null;
+    };
+  }, []);
 
   // G3 fix: when a second confirm() is called while one is already open,
   // resolve the pending promise as false before overwriting, preventing hangs.
   const confirm = useCallback((opts: ConfirmOptions) => {
+    if (!mountedRef.current) return Promise.resolve(false);
     return new Promise<boolean>((resolve) => {
       if (stateRef.current) stateRef.current.resolve(false);
-      stateRef.current = { opts, resolve };
+      stateRef.current = { id: ++sequenceRef.current, opts: { ...opts }, resolve };
       setState(stateRef.current);
     });
   }, []);
 
-  const close = useCallback((value: boolean) => {
-    stateRef.current?.resolve(value);
+  const close = useCallback((request: ConfirmState, value: boolean) => {
+    // Events from a replaced prompt must never settle the current request.
+    if (stateRef.current !== request) return;
+    request.resolve(value);
     stateRef.current = null;
     setState(null);
   }, []);
 
   const modal = state ? (
     <ConfirmModal
+      key={state.id}
       open
       title={state.opts.title || t("common.confirm")}
       message={state.opts.message}
@@ -56,8 +72,8 @@ export function useConfirm() {
       cancelText={state.opts.cancelText}
       danger={state.opts.danger}
       requireText={state.opts.requireText}
-      onConfirm={() => close(true)}
-      onCancel={() => close(false)}
+      onConfirm={() => close(state, true)}
+      onCancel={() => close(state, false)}
     />
   ) : null;
 

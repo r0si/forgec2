@@ -1,5 +1,6 @@
 ﻿import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { render, renderHook, screen, fireEvent, act } from "@testing-library/react";
+import type { ReactElement } from "react";
 import { useConfirm } from "./useConfirm";
 
 vi.mock("@/lib/i18n", () => ({
@@ -83,5 +84,56 @@ describe("useConfirm", () => {
       fireEvent.click(confirmBtn);
     });
     expect(onResult).toHaveBeenCalledWith(true);
+  });
+
+  it("cancels an outstanding request when its owner unmounts", async () => {
+    const settled = vi.fn();
+    const { result, unmount } = renderHook(() => useConfirm());
+    act(() => { void result.current.confirm({ message: "Pending" }).then(settled); });
+    unmount();
+    await act(async () => {});
+    expect(settled).toHaveBeenCalledExactlyOnceWith(false);
+  });
+
+  it("does not create a pending request through a retained callback after unmount", async () => {
+    const settled = vi.fn();
+    const { result, unmount } = renderHook(() => useConfirm());
+    const confirm = result.current.confirm;
+    unmount();
+    void confirm({ message: "Too late" }).then(settled);
+    await act(async () => {});
+    expect(settled).toHaveBeenCalledExactlyOnceWith(false);
+  });
+
+  it("does not let a stale prompt approve its replacement", async () => {
+    const first = vi.fn();
+    const second = vi.fn();
+    const { result } = renderHook(() => useConfirm());
+    act(() => { void result.current.confirm({ message: "First" }).then(first); });
+    const oldModal = result.current.modal as ReactElement<{ onConfirm: () => void }>;
+    act(() => { void result.current.confirm({ message: "Second" }).then(second); });
+    await act(async () => { oldModal.props.onConfirm(); });
+    expect(first).toHaveBeenCalledExactlyOnceWith(false);
+    expect(second).not.toHaveBeenCalled();
+    expect(result.current.modal).not.toBeNull();
+  });
+
+  it("requires fresh typed confirmation when a pending prompt is replaced", async () => {
+    function ReplacementHarness() {
+      const { confirm, modal } = useConfirm();
+      return <>
+        <button onClick={() => { void confirm({ message: "First", requireText: "delete" }); }}>first</button>
+        <button onClick={() => { void confirm({ message: "Second", requireText: "delete" }); }}>second</button>
+        {modal}
+      </>;
+    }
+    render(<ReplacementHarness />);
+    fireEvent.click(screen.getByText("first"));
+    fireEvent.change(screen.getByLabelText(/to confirm/i), { target: { value: "delete" } });
+    expect(screen.getByRole("button", { name: "Confirm" }).hasAttribute("disabled")).toBe(false);
+    fireEvent.click(screen.getByText("second"));
+    await screen.findByText("Second");
+    expect((screen.getByRole("textbox") as HTMLInputElement).value).toBe("");
+    expect(screen.getByRole("button", { name: "Confirm" }).hasAttribute("disabled")).toBe(true);
   });
 });
