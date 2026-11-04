@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -59,6 +60,7 @@ func TestSuccessEnvelope(t *testing.T) {
 	sort.Strings(files)
 
 	actual := make(map[string]int)
+
 	for _, path := range files {
 		if strings.HasSuffix(path, "_test.go") {
 			continue
@@ -68,9 +70,16 @@ func TestSuccessEnvelope(t *testing.T) {
 			t.Fatalf("read %s: %v", path, err)
 		}
 		text := string(src)
+
 		if n := strings.Count(text, nestedMarker); n > 0 {
 			t.Fatalf("%s hand-builds the success envelope (%d site(s)); call respond(c, payload) "+
 				"with the bare payload instead — respond wraps it exactly once", path, n)
+		}
+		if hits := countVariableSuccessEnvelopes(text); len(hits) > 0 {
+			t.Fatalf("%s builds the envelope into a variable (%s) and passes it to respond(), "+
+				"nesting a second {\"success\":true,…} inside data; drop the \"success\" key from "+
+				"that payload — no consumer reads it, and the outer envelope already carries it",
+				path, strings.Join(hits, ", "))
 		}
 		if strings.Contains(text, "func respondSuccess(") {
 			t.Fatalf("%s re-declares respondSuccess; it was folded into respond", path)
@@ -132,21 +141,39 @@ func TestSuccessEnvelope(t *testing.T) {
 	}
 }
 
-// countFirstKeyDataWraps counts respond(c, gin.H{ whose FIRST key is "data",
-// in either the inline form or the multi-line form the envelope migration
-// left behind:
-//
-//	respond(c, gin.H{"data": x})          → counted
-//	respond(c, gin.H{                     → counted when the first non-blank
-//	                                          body line starts with "data":
-//	        "data": x,
-//	})
-//
-// A "data" key that is NOT first (gin.H{"filename": ..., "data": bytes}) is a
-// legitimate payload field, not a second envelope, so it is not counted.
-func countFirstKeyDataWraps(text string) int {
-	const open = "respond(c, gin.H{"
-	count := 0
+// assignRe captures the variable a map literal is bound to, from the text
+// leading up to the opening brace on the same line: `resp := gin.H{`, `out =
+// gin.H{`, or a `var` form handled by the caller.
+// Handles: `var x = gin.H{`, `x := gin.H{`, `x = gin.H{`, with optional indentation.
+var assignRe = regexp.MustCompile(`(?m)^\s*(\w+)\s*(?::=|=)\s*gin\.H\{`)
+
+// firstKeyIs reports whether the first key of the gin.H literal whose opening
+// brace has already been consumed is the given quoted key, in either the
+// inline form or the multi-line form the envelope migration left behind.
+func firstKeyIs(rest, key string) bool {
+	if strings.HasPrefix(strings.TrimLeft(rest, " \t"), key) {
+		return true
+	}
+	firstNL := strings.IndexByte(rest, '\n')
+	if firstNL < 0 {
+		return false
+	}
+	if strings.TrimSpace(rest[:firstNL]) != "" {
+		return false
+	}
+	afterNL := rest[firstNL+1:]
+	nextNL := strings.IndexByte(afterNL, '\n')
+	if nextNL < 0 {
+		nextNL = len(afterNL)
+	}
+	return strings.HasPrefix(strings.TrimSpace(afterNL[:nextNL]), key)
+}
+
+// envelopeVarNames returns the variables assigned a gin.H literal whose FIRST
+// key is "success" — the shape of the envelope that respond() emits.
+func envelopeVarNames(text string) map[string]bool {
+	const open = "gin.H{"
+	out := map[string]bool{}
 	for i := 0; i < len(text); {
 		idx := strings.Index(text[i:], open)
 		if idx < 0 {
@@ -154,28 +181,97 @@ func countFirstKeyDataWraps(text string) int {
 		}
 		pos := i + idx + len(open)
 		i = pos
-		rest := text[pos:]
-		if strings.HasPrefix(strings.TrimLeft(rest, " \t"), "\"data\":") {
+		if !firstKeyIs(text[pos:], `"success":`) {
+			continue
+		}
+		// Find end of the current line
+		lineEnd := strings.IndexByte(text[i:], '\n')
+		if lineEnd < 0 {
+			lineEnd = len(text) - i
+		}
+		// The variable is assigned on the same line as gin.H{.
+		// Get the FULL line containing the gin.H{ assignment.
+		lineStart := strings.LastIndexByte(text[:i], '\n') + 1
+		line := text[lineStart : i+lineEnd]
+		if m := assignRe.FindStringSubmatch(line); m != nil {
+			out[m[1]] = true
+		}
+	}
+	return out
+}
+
+// countVariableSuccessEnvelopes finds the double wraps the literal marker
+// cannot see.
+//
+// The nestedMarker above matches respond(c, gin.H{"success"…). Three endpoints
+// shipped the identical defect written a different way: the payload was built
+// into a named variable first (resp := gin.H{"success": true, ...}) and that
+// variable was passed to respond(). The marker is a string comparison against
+// the call site, so it saw nothing, TestSuccessEnvelope stayed green, and the
+// clients received {"success":true,"data":{"success":true,…}} with every field
+// one level deeper than the contract — which is also what silently hollowed
+// TestHandleKillSwitchStatus. A ratchet that only checks the spelling the last
+// bug happened to use is not a ratchet.
+//
+// "First key" is the discriminator, mirroring countFirstKeyDataWraps: a map
+// whose first key is "success" is envelope-shaped, while a payload that merely
+// has a success field among its data (gin.H{"task": t, "success": ok}) is
+// legitimate and stays invisible to this gate.
+func countVariableSuccessEnvelopes(text string) []string {
+	vars := envelopeVarNames(text)
+	if len(vars) == 0 {
+		return nil
+	}
+	var hits []string
+	for name := range vars {
+		if strings.Contains(text, "respond(c, "+name+")") {
+			hits = append(hits, name)
+		}
+	}
+	sort.Strings(hits)
+	return hits
+}
+
+// countFirstKeyDataWraps counts respond(c, gin.H{ whose FIRST key is "data",
+func countFirstKeyDataWraps(text string) int {
+	const open = "respond(c, gin.H{"
+	count := 0
+
+	for i := 0; i < len(text); {
+		idx := strings.Index(text[i:], open)
+		if idx < 0 {
+			break
+		}
+		pos := i + idx + len(open)
+		i = pos
+
+		// Skip comment lines
+		rest := text[i:]
+		if strings.HasPrefix(strings.TrimLeft(rest, " \t"), "//") {
+			// Skip to end of line
+			nl := strings.IndexByte(rest, '\n')
+			if nl >= 0 {
+				i += nl + 1
+			} else {
+				i = len(text)
+			}
+			continue
+		}
+
+		if strings.HasPrefix(strings.TrimLeft(rest, " \t"), `"data":`) {
 			count++
 			continue
 		}
-		// Multi-line form: the literal opened with nothing before the first
-		// newline (possibly just a blank line), and the first key is "data".
+		// Also handle multi-line:
 		firstNL := strings.IndexByte(rest, '\n')
-		if firstNL < 0 {
-			continue
+		if firstNL >= 0 {
+			if strings.TrimSpace(rest[:firstNL]) == "" {
+				if strings.HasPrefix(strings.TrimLeft(rest[firstNL+1:], " \t"), `"data":`) {
+					count++
+				}
+			}
 		}
-		if strings.TrimSpace(rest[:firstNL]) != "" {
-			continue
-		}
-		afterNL := rest[firstNL+1:]
-		nextNL := strings.IndexByte(afterNL, '\n')
-		if nextNL < 0 {
-			nextNL = len(afterNL)
-		}
-		if strings.HasPrefix(strings.TrimSpace(afterNL[:nextNL]), "\"data\":") {
-			count++
-		}
+		i++
 	}
 	return count
 }
@@ -183,11 +279,13 @@ func countFirstKeyDataWraps(text string) int {
 // readEnvelopeBaseline parses "<file.go> <count>" lines, ignoring blanks and
 // '#' comments.
 func readEnvelopeBaseline(path string) (map[string]int, error) {
+	fmt.Printf("DEBUG: readEnvelopeBaseline called with path=%q\n", path)
 	raw, err := os.ReadFile(path)
 	if err != nil {
+		fmt.Printf("DEBUG: readEnvelopeBaseline error: %v\n", err)
 		return nil, err
 	}
-	out := make(map[string]int)
+	base := make(map[string]int)
 	for i, line := range strings.Split(string(raw), "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "#") {
@@ -195,13 +293,13 @@ func readEnvelopeBaseline(path string) (map[string]int, error) {
 		}
 		fields := strings.Fields(line)
 		if len(fields) != 2 {
-			return nil, fmt.Errorf("%s:%d: want `<file> <count>`, got %q", path, i+1, line)
+			return nil, fmt.Errorf("%s:%d: bad baseline line %q", path, i+1, line)
 		}
-		n, err := strconv.Atoi(fields[1])
+		n, err := strconv.Atoi(strings.TrimSpace(fields[1]))
 		if err != nil {
-			return nil, fmt.Errorf("%s:%d: bad count %q", path, i+1, fields[1])
+			return nil, fmt.Errorf("bad baseline value in %q", line)
 		}
-		out[fields[0]] = n
+		base[fields[0]] = n
 	}
-	return out, nil
+	return base, nil
 }
