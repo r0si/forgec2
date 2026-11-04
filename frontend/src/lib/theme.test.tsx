@@ -1,6 +1,7 @@
 import { act, fireEvent, render, renderHook, screen } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ThemeProvider, useTheme } from "./theme";
+import { StrictMode, useEffect } from "react";
 
 interface MediaMock {
   matches: boolean;
@@ -48,6 +49,12 @@ function Probe() {
       </button>
     </div>
   );
+}
+
+function InitialChoice() {
+  const { setTheme } = useTheme();
+  useEffect(() => { setTheme("dark"); }, [setTheme]);
+  return <Probe />;
 }
 
 async function mount(expectedAfterBoot: string) {
@@ -139,5 +146,85 @@ describe("ThemeProvider", () => {
 
     unmount();
     expect(media.removeEventListener).toHaveBeenCalled();
+  });
+
+  it("still boots when browser storage is blocked", async () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new DOMException("Blocked", "SecurityError");
+    });
+    await mount("light|light");
+  });
+
+  it("keeps system mode working in memory when preference writes fail", async () => {
+    await mount("light|light");
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("Full", "QuotaExceededError");
+    });
+    fireEvent.click(screen.getByTestId("to-system"));
+    expect(screen.getByTestId("probe").textContent).toBe("system|light");
+    media.matches = true;
+    act(() => fireMediaChange());
+    expect(screen.getByTestId("probe").textContent).toBe("system|dark");
+  });
+
+  it("does not overwrite a user choice with the queued boot preference", async () => {
+    render(<ThemeProvider><Probe /></ThemeProvider>);
+    fireEvent.click(screen.getByTestId("to-dark"));
+    await act(async () => {});
+    expect(screen.getByTestId("probe").textContent).toBe("dark|dark");
+  });
+
+  it("does not apply a queued boot theme after unmount", async () => {
+    localStorage.setItem("forgec2_theme", "dark");
+    const view = render(<ThemeProvider><Probe /></ThemeProvider>);
+    view.unmount();
+    await act(async () => {});
+    expect(document.documentElement.classList.contains("dark")).toBe(false);
+  });
+
+  it("falls back safely when matchMedia is unavailable", async () => {
+    vi.stubGlobal("matchMedia", undefined);
+    localStorage.setItem("forgec2_theme", "system");
+    await mount("system|light");
+    fireEvent.click(screen.getByTestId("to-dark"));
+    expect(screen.getByTestId("probe").textContent).toBe("dark|dark");
+  });
+
+  it("does not restore stale system mode after a failed fixed-theme save", async () => {
+    localStorage.setItem("forgec2_theme", "system");
+    await mount("system|light");
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("Full", "QuotaExceededError");
+    });
+    fireEvent.click(screen.getByTestId("to-dark"));
+    act(() => fireMediaChange());
+    expect(screen.getByTestId("probe").textContent).toBe("dark|dark");
+    expect(document.documentElement.classList.contains("dark")).toBe(true);
+  });
+
+  it("supports legacy media listeners and releases the exact callback", async () => {
+    const addListener = vi.fn<(callback: () => void) => void>();
+    const removeListener = vi.fn();
+    const legacy = { matches: false, addListener, removeListener };
+    vi.stubGlobal("matchMedia", () => legacy);
+    const view = render(<ThemeProvider><Probe /></ThemeProvider>);
+    await act(async () => {});
+    fireEvent.click(screen.getByTestId("to-system"));
+    const callback = addListener.mock.calls[0][0];
+    legacy.matches = true;
+    act(() => callback());
+    expect(screen.getByTestId("probe").textContent).toBe("system|dark");
+    view.unmount();
+    expect(removeListener).toHaveBeenCalledWith(callback);
+  });
+
+  it("preserves a child's mount-time choice when storage cannot persist it", async () => {
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("Blocked", "SecurityError");
+    });
+    render(<StrictMode><ThemeProvider><InitialChoice /></ThemeProvider></StrictMode>);
+    await act(async () => {});
+    expect(screen.getByTestId("probe").textContent).toBe("dark|dark");
+    expect(document.documentElement.classList.contains("dark")).toBe(true);
   });
 });
