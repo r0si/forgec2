@@ -1,4 +1,5 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
+import type { FormEvent } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { z } from "zod";
 
@@ -170,5 +171,49 @@ describe("useForm", () => {
 
     fireEvent.click(screen.getByTestId("reset"));
     expect(values()).toEqual(initial);
+  });
+
+  it("does not show a stale failure after the form owner unmounts", async () => {
+    let reject!: (error: Error) => void;
+    const pending = new Promise<void>((_resolve, fail) => { reject = fail; });
+    const view = render(<Harness onSubmit={() => pending} />);
+    fillValid();
+    fireEvent.click(screen.getByTestId("submit"));
+    view.unmount();
+    await act(async () => {
+      reject(new Error("late failure"));
+      await pending.catch(() => {});
+    });
+    expect(mocks.toastError).not.toHaveBeenCalled();
+  });
+
+  it("does not submit through a retained handler after unmount", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    const { result, unmount } = renderHook(() => useForm({
+      initialValues: { name: "valid", admin: false, port: "8000" }, schema, onSubmit,
+    }));
+    const submit = result.current.handleSubmit;
+    unmount();
+    await submit({ preventDefault: vi.fn() } as unknown as FormEvent);
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("does not lose validation errors for prototype-named fields", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() => useForm({
+      initialValues: { constructor: "", toString: "" },
+      schema: z.object({
+        constructor: z.string().min(1, "constructor is required"),
+        toString: z.string().min(1, "toString is required"),
+      }),
+      onSubmit,
+    }));
+    expect(result.current.isValid).toBe(false);
+    await act(async () => {
+      await result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as FormEvent);
+    });
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(result.current.errors.constructor).toBe("constructor is required");
+    expect(result.current.errors.toString).toBe("toString is required");
   });
 });

@@ -1,5 +1,5 @@
 
-import { useState, useCallback, useMemo, useRef } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import type { ZodSchema, ZodError } from "zod";
 import { useErrorToast } from "@/lib/hooks/useErrorToast";
 
@@ -32,13 +32,21 @@ export function useForm<T extends Record<string, unknown>>({
   const [touched, setTouched] = useState<Partial<Record<keyof T, boolean>>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const submittingRef = useRef(false);
+  const mountedRef = useRef(true);
   const { toastError } = useErrorToast();
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   const validate = useCallback(
     (vals: T): Partial<Record<keyof T, string>> => {
       const result = schema.safeParse(vals);
       if (result.success) return {};
-      const fieldErrors: Partial<Record<keyof T, string>> = {};
+      // Field names must not collide with inherited properties such as
+      // constructor/toString or trigger the legacy __proto__ setter.
+      const fieldErrors: Partial<Record<keyof T, string>> = Object.create(null);
       for (const issue of (result as { error: ZodError }).error.issues) {
         const path = issue.path[0] as keyof T;
         if (!fieldErrors[path]) fieldErrors[path] = issue.message;
@@ -88,7 +96,7 @@ export function useForm<T extends Record<string, unknown>>({
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
-      if (submittingRef.current) return;
+      if (!mountedRef.current || submittingRef.current) return;
       submittingRef.current = true;
       const allErrors = validate(values);
       setErrors(allErrors);
@@ -106,9 +114,9 @@ export function useForm<T extends Record<string, unknown>>({
       try {
         await onSubmit(values);
       } catch (err) {
-        toastError(err, "common.submit_failed");
+        if (mountedRef.current) toastError(err, "common.submit_failed");
       } finally {
-        setIsSubmitting(false);
+        if (mountedRef.current) setIsSubmitting(false);
         submittingRef.current = false;
       }
     },
