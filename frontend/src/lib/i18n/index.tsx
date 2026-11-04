@@ -13,13 +13,14 @@ interface I18nContextType {
   ready: boolean;
 }
 
-const I18nContext = createContext<I18nContextType>({
+const defaultI18n: I18nContextType = {
   locale: "en",
   setLocale: () => {},
   t: (key: string) => key,
   dir: "ltr",
   ready: true,
-});
+};
+const I18nContext = createContext<I18nContextType>(defaultI18n);
 
 type Dict = Record<string, string>;
 
@@ -190,4 +191,11 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 
 export function useI18n() {
   return useContext(I18nContext);
+}
+
+/** Root error views need a provider, but nested boundaries must preserve the
+ * application's live locale rather than shadowing it with independent state. */
+export function I18nFallbackProvider({ children }: { children: ReactNode }) {
+  const inherited = useContext(I18nContext);
+  return inherited === defaultI18n ? <I18nProvider>{children}</I18nProvider> : children;
 }

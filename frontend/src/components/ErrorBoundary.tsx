@@ -2,7 +2,7 @@
 import { Component, ErrorInfo, ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Bug } from "lucide-react";
-import { I18nProvider, useI18n } from "@/lib/i18n";
+import { I18nFallbackProvider, useI18n } from "@/lib/i18n";
 import { logger } from "@/lib/logger";
 
 interface Props {
@@ -42,8 +42,10 @@ class ErrorBoundaryInner extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
-      if (this.props.fallback !== undefined) return this.props.fallback;
-      return <ErrorFallbackUI onReset={() => this.setState({ hasError: false, error: null })} />;
+      return <I18nFallbackProvider>
+        {this.props.fallback !== undefined ? this.props.fallback :
+          <ErrorFallbackUI onReset={() => this.setState({ hasError: false, error: null })} />}
+      </I18nFallbackProvider>;
     }
     return this.props.children;
   }
@@ -73,10 +75,6 @@ function ErrorFallbackUI({ onReset }: { onReset: () => void }) {
 }
 
 export default function ErrorBoundary(props: Props) {
-  return (
-    <I18nProvider>
-      <ErrorBoundaryInner {...props} />
-    </I18nProvider>
-  );
+  return <ErrorBoundaryInner {...props} />;
 }
 

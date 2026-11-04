@@ -5,7 +5,7 @@ import ErrorBoundary from "./ErrorBoundary";
 import { logger } from "@/lib/logger";
 
 vi.mock("@/lib/i18n", () => ({
-  I18nProvider: ({ children }: { children: ReactNode }) => children,
+  I18nFallbackProvider: ({ children }: { children: ReactNode }) => children,
   useI18n: () => ({ t: (key: string) => key }),
 }));
 vi.mock("@/lib/logger", () => ({ logger: { error: vi.fn() } }));
