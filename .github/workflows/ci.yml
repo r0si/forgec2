@@ -138,11 +138,20 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # The server alone takes 11–14 minutes under -race locally; keeping
-          # it in its own leg gives each half the full timeout instead of
-          # sharing one 20-minute budget, and reports which half regressed.
-          - suite: server
+          # The complete server race suite exceeded 20m. Partition the actual
+          # discovered test inventory, not a manually maintained subset.
+          - suite: server-1
             packages: ./internal/server/...
+            shard: 0
+          - suite: server-2
+            packages: ./internal/server/...
+            shard: 1
+          - suite: server-3
+            packages: ./internal/server/...
+            shard: 2
+          - suite: server-4
+            packages: ./internal/server/...
+            shard: 3
           - suite: core
             packages: ./internal/db/... ./internal/plugin/... ./internal/scripting/... ./internal/payload/agent/...
     steps:
@@ -153,11 +162,21 @@ jobs:
           cache: true
           cache-dependency-path: go.sum
       - run: go mod download
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: matrix.suite != 'core'
+        with:
+          node-version: '24'
       # The server runs beacon handlers, plugin workers, audit/SIEM queues and
       # WebSocket fan-out concurrently; -race is the only gate that catches a
       # shared-state regression there.
       - name: go test -race
+        if: matrix.suite == 'core'
         run: go test -race ${{ matrix.packages }} -count=1 -timeout 20m
+      - name: Check race shard coverage and run shard
+        if: matrix.suite != 'core'
+        run: |
+          node --test scripts/go-test-shards.test.mjs
+          node scripts/go-test-shards.mjs ${{ matrix.shard }} 4 ${{ matrix.packages }}
 
   # The C implant ships as source and is assembled on operator machines, so no
   # other job would notice a syntax error, a fresh compiler warning, a task type
