@@ -40,15 +40,23 @@ export function selectionPattern(names) {
   return escaped.length ? `^(${escaped.join("|")})$` : "^$";
 }
 
-function main() {
-  const [rawIndex, rawCount, ...args] = process.argv.slice(2);
+export function parseShardArgs(argv) {
+  const [rawIndex, rawCount, ...args] = argv;
   const index = Number(rawIndex);
   const count = Number(rawCount);
   const listOnly = args[0] === "--list-only";
   const packages = listOnly ? args.slice(1) : args;
-  if (!Number.isInteger(index) || index < 0 || index >= count || !packages.length || packages.some(p => p.startsWith("-"))) {
+  if (!/^\d+$/.test(rawIndex ?? "") || !/^\d+$/.test(rawCount ?? "") ||
+      !Number.isInteger(count) || count < 1 || count > 64 ||
+      !Number.isInteger(index) || index < 0 || index >= count ||
+      !packages.length || packages.some(p => !p.trim() || p.startsWith("-"))) {
     throw new Error("Usage: node scripts/go-test-shards.mjs INDEX COUNT [--list-only] PACKAGE...");
   }
+  return { index, count, listOnly, packages };
+}
+
+function main() {
+  const { index, count, listOnly, packages } = parseShardArgs(process.argv.slice(2));
   // Match the build configuration of execution, including race-only files.
   const listed = spawnSync("go", ["test", "-race", "-list", ".", "-json", ...packages], {
     encoding: "utf8", maxBuffer: 32 * 1024 * 1024,

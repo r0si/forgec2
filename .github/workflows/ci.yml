@@ -171,12 +171,25 @@ jobs:
       # shared-state regression there.
       - name: go test -race
         if: matrix.suite == 'core'
-        run: go test -race ${{ matrix.packages }} -count=1 -timeout 20m
+        shell: bash
+        run: |
+          set -o pipefail
+          go test -race ${{ matrix.packages }} -count=1 -timeout 20m 2>&1 | tee race.log
       - name: Check race shard coverage and run shard
         if: matrix.suite != 'core'
+        shell: bash
         run: |
+          set -o pipefail
           node --test scripts/go-test-shards.test.mjs
-          node scripts/go-test-shards.mjs ${{ matrix.shard }} 4 ${{ matrix.packages }}
+          node scripts/go-test-shards.mjs ${{ matrix.shard }} 4 ${{ matrix.packages }} 2>&1 | tee race.log
+      - name: Preserve race failure diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: race-failure-${{ matrix.suite }}
+          path: race.log
+          retention-days: 7
+          if-no-files-found: ignore
 
   # The C implant ships as source and is assembled on operator machines, so no
   # other job would notice a syntax error, a fresh compiler warning, a task type
