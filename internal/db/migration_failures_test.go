@@ -2,7 +2,6 @@ package db
 
 import (
 	"log/slog"
-	"path/filepath"
 	"testing"
 )
 
@@ -53,7 +52,12 @@ func TestMigrationFailuresFailTheRun(t *testing.T) {
 // exposed: a schema migration that ALTERs a table this installation does not have yet must
 // not fail the run, because AutoMigrate creates it (columns included) immediately after.
 func TestMigrationSkipsTablesAutoMigrateCreates(t *testing.T) {
-	database, err := InitDB(filepath.Join(t.TempDir(), "legacy.db"), slog.LevelError)
+	// Skip if PostgreSQL is unavailable
+	if !postgresAvailable(t) {
+		t.Skip("PostgreSQL unavailable")
+	}
+
+	database, err := InitDBWithDriver("postgres", testPostgresDSN, "", slog.LevelError, 1, 1, 0)
 	if err != nil {
 		t.Fatalf("fresh InitDB: %v", err)
 	}

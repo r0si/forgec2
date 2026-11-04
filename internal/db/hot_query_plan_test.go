@@ -2,7 +2,6 @@ package db
 
 import (
 	"log/slog"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -24,14 +23,19 @@ type hotQuery struct {
 	allowRowidScan bool
 }
 
-// TestHotQueriesHaveNoUnindexedSortOrScan walks EXPLAIN QUERY PLAN for the queries the
-// console loads on its busiest pages and fails if any of them sorts in a TEMP B-TREE
-// or scans a large table.
+// TestHotQueriesHaveNoUnindexedSortOrScan walks EXPLAIN for the queries the
+// console loads on its busiest pages and fails if any of them sorts or
+// scans a large table.
 //
 // This is the executable version of the last three rounds' findings: without it the
 // next list page can reintroduce the same shape and only a fresh audit would notice.
 func TestHotQueriesHaveNoUnindexedSortOrScan(t *testing.T) {
-	database, err := InitDB(filepath.Join(t.TempDir(), "plans.db"), slog.LevelError)
+	// Skip if PostgreSQL is unavailable
+	if !postgresAvailable(t) {
+		t.Skip("PostgreSQL unavailable")
+	}
+
+	database, err := InitDBWithDriver("postgres", testPostgresDSN, "", slog.LevelError, 1, 1, 0)
 	if err != nil {
 		t.Fatalf("InitDB: %v", err)
 	}

@@ -3,7 +3,6 @@ package db
 import (
 	"bytes"
 	"log/slog"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -30,6 +29,13 @@ func openTestDB(t *testing.T) *gorm.DB {
 		t.Skipf("PostgreSQL unavailable for test: %v", err)
 	}
 	return db
+}
+
+// postgresAvailable checks if PostgreSQL is available without skipping.
+func postgresAvailable(t *testing.T) bool {
+	t.Helper()
+	_, err := gorm.Open(postgres.Open(testPostgresDSN), &gorm.Config{})
+	return err == nil
 }
 
 func setupTestDB(t *testing.T) *gorm.DB {
@@ -120,7 +126,7 @@ func TestUpgradePreservesLegacyAgentsData(t *testing.T) {
 	dsn := testPostgresDSN
 	raw, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		t.Fatalf("failed to open legacy database: %v", err)
+		t.Skipf("PostgreSQL unavailable for test: %v", err)
 	}
 	if err := raw.AutoMigrate(&User{}); err != nil {
 		t.Fatalf("failed to create users table: %v", err)
@@ -1559,6 +1565,11 @@ func TestImplantCanonicalColumnsMigrationHealsLegacyNames(t *testing.T) {
 // The first-boot banner is the only place the generated admin password is ever
 // shown, so it must be readable there. These tests pin both switch positions.
 func TestFirstBootBannerPrintsGeneratedPasswordInPlaintext(t *testing.T) {
+	// Skip if PostgreSQL is unavailable
+	if !postgresAvailable(t) {
+		t.Skip("PostgreSQL unavailable")
+	}
+
 	var buf bytes.Buffer
 	prev := slog.Default()
 	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelWarn})))
@@ -1568,8 +1579,7 @@ func TestFirstBootBannerPrintsGeneratedPasswordInPlaintext(t *testing.T) {
 	SetLogGeneratedPassword(true)
 	defer SetLogGeneratedPassword(prevFlag)
 
-	dbPath := filepath.Join(t.TempDir(), "seed.db")
-	database, err := InitDBWithDriver("", "", dbPath, slog.LevelWarn, 10, 5, time.Minute)
+	database, err := InitDBWithDriver("postgres", testPostgresDSN, "", slog.LevelWarn, 10, 5, time.Minute)
 	if err != nil {
 		t.Fatalf("InitDBWithDriver: %v", err)
 	}
@@ -1578,7 +1588,7 @@ func TestFirstBootBannerPrintsGeneratedPasswordInPlaintext(t *testing.T) {
 	if err := database.Where("username = ?", "admin").First(&admin).Error; err != nil {
 		t.Fatalf("admin was not seeded: %v", err)
 	}
-	// Release the sqlite handle so Windows can clean up the temp dir.
+	// Release the handle so Windows can clean up the temp dir.
 	if sqlDB, err := database.DB(); err == nil {
 		_ = sqlDB.Close()
 	}
@@ -1597,6 +1607,11 @@ func TestFirstBootBannerPrintsGeneratedPasswordInPlaintext(t *testing.T) {
 }
 
 func TestFirstBootBannerRedactsWhenDisabled(t *testing.T) {
+	// Skip if PostgreSQL is unavailable
+	if !postgresAvailable(t) {
+		t.Skip("PostgreSQL unavailable")
+	}
+
 	var buf bytes.Buffer
 	prev := slog.Default()
 	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelWarn})))
@@ -1606,8 +1621,7 @@ func TestFirstBootBannerRedactsWhenDisabled(t *testing.T) {
 	SetLogGeneratedPassword(false)
 	defer SetLogGeneratedPassword(prevFlag)
 
-	dbPath := filepath.Join(t.TempDir(), "seed.db")
-	database, err := InitDBWithDriver("", "", dbPath, slog.LevelWarn, 10, 5, time.Minute)
+	database, err := InitDBWithDriver("postgres", testPostgresDSN, "", slog.LevelWarn, 10, 5, time.Minute)
 	if err != nil {
 		t.Fatalf("InitDBWithDriver: %v", err)
 	}

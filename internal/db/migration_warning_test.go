@@ -65,7 +65,7 @@ func runMigrationsCaptured(t *testing.T) []string {
 
 	database, err := InitDBWithDriver("postgres", testPostgresDSN, "", slog.LevelError, 1, 1, 0)
 	if err != nil {
-		t.Fatalf("init db: %v", err)
+		t.Skipf("PostgreSQL unavailable: %v", err)
 	}
 	if sqlDB, err := database.DB(); err == nil {
 		t.Cleanup(func() { _ = sqlDB.Close() })

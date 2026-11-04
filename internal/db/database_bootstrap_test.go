@@ -61,9 +61,14 @@ func TestRedactDSN(t *testing.T) {
 // file: the migrations run, a schema is created, the default admin exists, and
 // calling it twice on the same file is safe (every startup does exactly that).
 func TestInitDBCreatesSchemaAndSeedsAdmin(t *testing.T) {
+	// Skip if PostgreSQL is unavailable
+	if !postgresAvailable(t) {
+		t.Skip("PostgreSQL unavailable")
+	}
+
 	path := filepath.Join(t.TempDir(), "bootstrap.db")
 
-	conn, err := InitDB(path, 0 /* info */)
+	conn, err := InitDBWithDriver("postgres", testPostgresDSN, "", 0, 1, 1, 0)
 	if err != nil {
 		t.Fatalf("InitDB: %v", err)
 	}

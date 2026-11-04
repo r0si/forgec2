@@ -15,6 +15,11 @@ import (
 // must be a usable database with the seed applied exactly once - never a panic, a
 // half-applied migration or a duplicated admin row.
 func TestConcurrentInitDBIsSafe(t *testing.T) {
+	// Skip if PostgreSQL is unavailable
+	if !postgresAvailable(t) {
+		t.Skip("PostgreSQL unavailable")
+	}
+
 	// os.MkdirTemp rather than t.TempDir: closing every pool is best effort on
 	// Windows (a lingering handle makes RemoveAll fail), and losing the assertion
 	// because cleanup could not unlink a file would be the wrong failure.
@@ -33,7 +38,7 @@ func TestConcurrentInitDBIsSafe(t *testing.T) {
 		wg.Add(1)
 		go func(n int) {
 			defer wg.Done()
-			conn, err := InitDBWithDriver("", "", path, slog.LevelError, 5, 2, time.Minute)
+			conn, err := InitDBWithDriver("postgres", testPostgresDSN, "", slog.LevelError, 5, 2, time.Minute)
 			errs[n] = err
 			if err == nil && conn != nil {
 				if sqlDB, derr := conn.DB(); derr == nil {
