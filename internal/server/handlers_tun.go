@@ -435,7 +435,10 @@ func (s *Server) handleTunStatus(c *gin.Context) {
 		return
 	}
 	id := c.Param("id")
-	out := gin.H{"success": true, "running": false, "host": "127.0.0.1"}
+	// No "success" key: respond() adds the envelope. Keeping one here nested a
+	// second envelope, which helpers.go forbids; the console unwraps data and
+	// reads running/status/cidr/iface/udp_port, never an inner success.
+	out := gin.H{"running": false, "host": "127.0.0.1"}
 	if s.tunEngine != nil {
 		if sess := s.tunEngine.get(id); sess != nil {
 			sess.mu.Lock()

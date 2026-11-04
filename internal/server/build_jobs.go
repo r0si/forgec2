@@ -213,8 +213,13 @@ func (s *Server) handleBuildStatus(c *gin.Context) {
 		respondError(c, http.StatusNotFound, "build not found")
 		return
 	}
+	// No "success" here: respond() below adds the envelope. A "success" key in
+	// this map nested a SECOND envelope ({success, data:{success, …}}), which
+	// helpers.go forbids — and TestSuccessEnvelope could not see it, because that
+	// ratchet counts respond(c, gin.H{ literals and this payload is a variable.
+	// Consumers (the console poll and the E2E harness) unwrap the outer data and
+	// read status/error; none read the inner success, so removing it is safe.
 	resp := gin.H{
-		"success":    true,
 		"build_id":   job.ID,
 		"status":     job.Status,
 		"phase":      job.Phase,

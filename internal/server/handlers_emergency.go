@@ -369,10 +369,14 @@ func (s *Server) dispatchFleetUninstall(agents []db.Implant) (dispatched, skippe
 // itself is never exposed: it only authenticates the per-implant broadcast.
 func (s *Server) handleKillSwitchStatus(c *gin.Context) {
 	var ks db.KillSwitch
-	status := gin.H{"success": true, "armed": false}
+	// No "success" keys: respond() below adds the envelope. These maps carried
+	// one, nesting a SECOND envelope ({success, data:{success, armed, …}}) that
+	// helpers.go explicitly forbids — and it buried "armed" a level deeper than
+	// the top-level decode in TestHandleKillSwitchStatus expected, which is why
+	// that test asserted on a field that was never there.
+	status := gin.H{"armed": false}
 	if err := s.db.First(&ks, 1).Error; err == nil {
 		status = gin.H{
-			"success":      true,
 			"armed":        ks.Armed,
 			"triggered_at": ks.TriggeredAt,
 			"triggered_by": ks.TriggeredBy,

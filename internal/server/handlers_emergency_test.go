@@ -159,22 +159,48 @@ func TestHandleKillSwitchStatus(t *testing.T) {
 	s := initKillSwitchServer(t)
 	user := seedKillSwitchOperator(t, s)
 
-	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-	c.Request, _ = http.NewRequest(http.MethodGet, "/admin/killswitch/status", nil)
-	c.Set("user_id", user.ID)
-	s.handleKillSwitchStatus(c)
-	if w.Code != http.StatusOK {
-		t.Fatalf("status: expected 200 got %d", w.Code)
+	// readArmed calls the status endpoint and returns the data.armed it reports.
+	// The response is the single envelope {"success":true,"data":{"armed":…}}.
+	// The first version of this test decoded "armed" off the TOP level, where it
+	// never is, so body.Armed was always the zero false and the "must show
+	// unarmed" check passed without proving the field was readable at all — and
+	// the nested envelope was what had buried it one level down. Decoding
+	// data.armed and exercising BOTH states makes a silently-false decode fail
+	// loudly instead of looking green.
+	readArmed := func() bool {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/admin/killswitch/status", nil)
+		c.Set("user_id", user.ID)
+		s.handleKillSwitchStatus(c)
+		if w.Code != http.StatusOK {
+			t.Fatalf("status: expected 200 got %d", w.Code)
+		}
+		var body struct {
+			Success bool `json:"success"`
+			Data    struct {
+				Armed bool `json:"armed"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+			t.Fatalf("status json: %v", err)
+		}
+		if !body.Success {
+			t.Fatal("the status response lost its outer envelope")
+		}
+		return body.Data.Armed
 	}
-	var body struct {
-		Armed bool `json:"armed"`
-	}
-	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
-		t.Fatalf("status json: %v", err)
-	}
-	if body.Armed {
+
+	if readArmed() {
 		t.Fatal("status must show unarmed by default")
+	}
+
+	// The positive half: after arming the fleet, the endpoint must report
+	// armed=true. This is the assertion that makes the negative one meaningful —
+	// without it, a handler that always returned unarmed would still pass.
+	postKillSwitch(t, s, user.ID, "arm", "correct-horse", http.StatusOK)
+	if !readArmed() {
+		t.Fatal("status must show armed after arming the kill switch")
 	}
 }
 
