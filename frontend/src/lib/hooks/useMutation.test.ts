@@ -100,4 +100,35 @@ describe("useMutation", () => {
     expect(onSuccess).not.toHaveBeenCalled();
     expect(onSettled).not.toHaveBeenCalled();
   });
+
+  it("does not start an operation through a retained callback after unmount", async () => {
+    const fn = vi.fn().mockResolvedValue("unexpected");
+    const onSuccess = vi.fn();
+    const onSettled = vi.fn();
+    const { result, unmount } = renderHook(() => useMutation({ fn, onSuccess, onSettled }));
+    const mutate = result.current.mutate;
+    unmount();
+    expect(await mutate()).toBeUndefined();
+    expect(fn).not.toHaveBeenCalled();
+    expect(onSuccess).not.toHaveBeenCalled();
+    expect(onSettled).not.toHaveBeenCalled();
+  });
+
+  it("ignores a late failure after reset without reviving error or pending state", async () => {
+    const pending = deferred<string>();
+    const onError = vi.fn();
+    const onSettled = vi.fn();
+    const { result } = renderHook(() => useMutation({ fn: () => pending.promise, onError, onSettled }));
+    let completion!: Promise<string | undefined>;
+    act(() => { completion = result.current.mutate(); });
+    act(() => result.current.reset());
+    await act(async () => {
+      pending.reject(new Error("stale"));
+      await completion;
+    });
+    expect(result.current.error).toBeNull();
+    expect(result.current.isPending).toBe(false);
+    expect(onError).not.toHaveBeenCalled();
+    expect(onSettled).not.toHaveBeenCalled();
+  });
 });

@@ -14,13 +14,15 @@ export function useVisibleInterval(callback: () => void | PromiseLike<void>, del
   }, [callback])
 
   useEffect(() => {
-    if (delay <= 0) return
+    if (!Number.isFinite(delay) || delay <= 0 || delay > 2_147_483_647) return
+
+    let disposed = false
 
     const tick = () => {
       // Polling callbacks commonly start an async request. Do not allow a
       // slow request to overlap with the next interval tick and create a
       // request pile-up when the backend is under pressure.
-      if (runningRef.current) return
+      if (disposed || document.hidden || runningRef.current) return
       runningRef.current = true
       try {
         const result = savedCallback.current()
@@ -60,8 +62,11 @@ export function useVisibleInterval(callback: () => void | PromiseLike<void>, del
     document.addEventListener("visibilitychange", handleVisibility)
 
     return () => {
+      disposed = true
       if (timerRef.current) clearInterval(timerRef.current)
-      runningRef.current = false
+      timerRef.current = null
+      // The pending callback still owns the single-flight reservation. Keep
+      // it until settlement even when a new delay creates another timer.
       document.removeEventListener("visibilitychange", handleVisibility)
     }
   }, [delay])

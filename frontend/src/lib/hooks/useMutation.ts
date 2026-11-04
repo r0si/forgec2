@@ -35,6 +35,7 @@ export function useMutation<TArgs extends unknown[], TResult>(
   }, []);
 
   const mutate = useCallback(async (...args: TArgs) => {
+    if (!mountedRef.current) return undefined;
     const gen = ++generationRef.current;
     setIsPending(true);
     setError(null);
