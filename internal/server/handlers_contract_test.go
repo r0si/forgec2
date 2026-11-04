@@ -27,9 +27,12 @@ func newContractDB(t *testing.T) *gorm.DB {
 	// classic "no such table" when the pool opens a second in-memory DB —
 	// e.g. the build-queue tests race the worker's log INSERT against the
 	// test's SELECT, which is exactly how this flaked on CI).
-	if sqlDB, err := database.DB(); err == nil {
-		sqlDB.SetMaxOpenConns(1)
+	sqlDB, err := database.DB()
+	if err != nil {
+		t.Fatalf("get underlying db: %v", err)
 	}
+	sqlDB.SetMaxOpenConns(1)
+	t.Cleanup(func() { _ = sqlDB.Close() })
 	err = database.AutoMigrate(
 		&db.Implant{}, &db.Task{}, &db.AuditLog{}, &db.Listener{},
 		&db.TokenEntry{}, &db.SocksSession{}, &db.User{},

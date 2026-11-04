@@ -19,9 +19,12 @@ func SetupTestDB(t testing.TB) *gorm.DB {
 	// SQLite ":memory:" is per-connection; a single open connection keeps the
 	// schema and rows shared across all queries in the test (and avoids the
 	// classic "no such table" when the pool opens a second in-memory DB).
-	if sqlDB, err := database.DB(); err == nil {
-		sqlDB.SetMaxOpenConns(1)
+	sqlDB, err := database.DB()
+	if err != nil {
+		t.Fatalf("get underlying db: %v", err)
 	}
+	sqlDB.SetMaxOpenConns(1)
+	t.Cleanup(func() { _ = sqlDB.Close() })
 	err = database.AutoMigrate(
 		&db.Implant{}, &db.Task{}, &db.AuditLog{}, &db.Listener{},
 		&db.TokenEntry{}, &db.SocksSession{}, &db.User{},
