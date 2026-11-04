@@ -3,9 +3,9 @@ package server
 import (
 	"log/slog"
 	"math/rand"
+	"strings"
 	"time"
 
-	"github.com/forgec2/forgec2/internal/db"
 	"gorm.io/gorm"
 )
 
@@ -28,7 +28,7 @@ const dbRetryBaseBackoff = 50 * time.Millisecond
 // real-time waits.
 var busyRetrySleep = time.Sleep
 
-// withBusyRetry runs fn, retrying SQLite lock-contention failures with
+// withBusyRetry runs fn, retrying PostgreSQL connection failures with
 // linear backoff + jitter. Non-lock errors return immediately. op names the
 // call site for the DBBusyRetriesTotal metric ("claim", "result", "sweep",
 // "enroll").
@@ -39,7 +39,7 @@ func (s *Server) withBusyRetry(op string, fn func() error) error {
 		if err == nil {
 			return nil
 		}
-		if !db.IsSQLiteLockError(err) {
+		if !isPostgresConnectionError(err) {
 			return err
 		}
 		if s.metrics != nil && s.metrics.DBBusyRetriesTotal != nil {
@@ -49,10 +49,23 @@ func (s *Server) withBusyRetry(op string, fn func() error) error {
 			break
 		}
 		backoff := time.Duration(attempt)*dbRetryBaseBackoff + time.Duration(rand.Int63n(int64(dbRetryBaseBackoff)))
-		slog.Warn("SQLite busy, retrying write", "op", op, "attempt", attempt, "backoff_ms", backoff.Milliseconds())
+		slog.Warn("PostgreSQL connection busy, retrying write", "op", op, "attempt", attempt, "backoff_ms", backoff.Milliseconds())
 		busyRetrySleep(backoff)
 	}
 	return err
+}
+
+// isPostgresConnectionError reports whether err is a PostgreSQL connection
+// failure worth retrying (connection refused, too many clients, etc.).
+func isPostgresConnectionError(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := err.Error()
+	return strings.Contains(s, "connection refused") ||
+		strings.Contains(s, "too many clients") ||
+		strings.Contains(s, "database system is shutting down") ||
+		strings.Contains(s, "connection reset")
 }
 
 // withBusyRetryDB is withBusyRetry for single gorm statements: it returns the

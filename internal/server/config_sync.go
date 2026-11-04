@@ -264,12 +264,12 @@ func (s *Server) syncDBPool() error {
 	driver := s.cfg.Database.Driver
 	maxOpen, maxIdle, maxLifetime := s.cfg.Server.DBMaxOpenConns, s.cfg.Server.DBMaxIdleConns, s.cfg.Server.DBConnMaxLifetime
 	s.configMu.RUnlock()
-	// SQLite is a single-writer database: a pool larger than 1 only
-	// manufactures SQLITE_BUSY contention under beacon load. Clamp here so a
-	// hot-reloaded postgres-oriented template cannot break it at runtime.
-	if driver == "sqlite" || driver == "" {
+	// PostgreSQL is a single-writer database in this deployment: a pool larger
+	// than 1 only manufactifies connection contention under beacon load. Clamp
+	// here so a hot-reloaded postgres-oriented template cannot break it at runtime.
+	if driver == "" || driver == "postgres" {
 		if maxOpen > 1 {
-			slog.Warn("Refusing to raise sqlite connection pool above 1 (single writer)",
+			slog.Warn("Refusing to raise connection pool above 1 (single writer)",
 				"requested", maxOpen)
 		}
 		sqlDB.SetMaxOpenConns(1)

@@ -185,7 +185,7 @@ var schemaMigrations = []*gormigrate.Migration{
 	{
 		ID: "2026-07-26-add-task-acknowledged-at",
 		Migrate: func(tx *gorm.DB) error {
-			execMigration(tx, "ALTER TABLE tasks ADD COLUMN acknowledged_at DATETIME", "add_tasks_acknowledged_at")
+			execMigration(tx, "ALTER TABLE tasks ADD COLUMN acknowledged_at TIMESTAMP", "add_tasks_acknowledged_at")
 			return nil
 		},
 		Rollback: func(tx *gorm.DB) error {
@@ -309,8 +309,8 @@ var schemaMigrations = []*gormigrate.Migration{
 				m("ALTER TABLE automation_rules ADD COLUMN task_type VARCHAR(50) DEFAULT ''", "add_automation_rules_task_type")
 				m("ALTER TABLE automation_rules ADD COLUMN command TEXT", "add_automation_rules_command")
 				m("ALTER TABLE automation_rules ADD COLUMN params TEXT", "add_automation_rules_params")
-				m("ALTER TABLE automation_rules ADD COLUMN last_run DATETIME", "add_automation_rules_last_run")
-				m("ALTER TABLE automation_rules ADD COLUMN next_run DATETIME", "add_automation_rules_next_run")
+				m("ALTER TABLE automation_rules ADD COLUMN last_run TIMESTAMP", "add_automation_rules_last_run")
+				m("ALTER TABLE automation_rules ADD COLUMN next_run TIMESTAMP", "add_automation_rules_next_run")
 				m("ALTER TABLE automation_rules ADD COLUMN run_count INTEGER DEFAULT 0", "add_automation_rules_run_count")
 				m("ALTER TABLE automation_rules ADD COLUMN created_by VARCHAR(100) DEFAULT ''", "add_automation_rules_created_by")
 
@@ -401,7 +401,7 @@ var schemaMigrations = []*gormigrate.Migration{
 					execMigration(tx, sql, label)
 				}
 				m(`CREATE TABLE IF NOT EXISTS execution_logs (
-					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					id SERIAL PRIMARY KEY,
 					execution_id VARCHAR(36) NOT NULL,
 					workflow_id VARCHAR(36) NOT NULL,
 					workflow_name VARCHAR(200) DEFAULT '',
@@ -416,9 +416,9 @@ var schemaMigrations = []*gormigrate.Migration{
 					branch_action VARCHAR(50) DEFAULT '',
 					branch_target VARCHAR(255) DEFAULT '',
 					error_msg TEXT,
-					started_at DATETIME,
-					completed_at DATETIME,
-					created_at DATETIME
+					started_at TIMESTAMP,
+					completed_at TIMESTAMP,
+					created_at TIMESTAMP
 				)`, "create_execution_logs")
 
 				type legacyExec struct {
@@ -587,10 +587,10 @@ var schemaMigrations = []*gormigrate.Migration{
 			// Recreating the table restores the shape but not the seed data;
 			// the table is unused either way, so there is nothing to restore.
 			execMigration(tx, `CREATE TABLE IF NOT EXISTS role_permissions (
-				id integer PRIMARY KEY AUTOINCREMENT,
+				id SERIAL PRIMARY KEY,
 				role varchar(32),
 				permission varchar(64),
-				created_at datetime
+				created_at timestamp
 			)`, "recreate_role_permissions")
 			return nil
 		},
@@ -827,14 +827,14 @@ var indexMigrations = []*gormigrate.Migration{
 			m := func(sql, label string) {
 				execMigration(tx, sql, label)
 			}
-			m("CREATE INDEX IF NOT EXISTS idx_tasks_agent_id_nocase ON tasks(agent_id COLLATE NOCASE)", "idx_tasks_agent_id_nocase")
+			m("CREATE INDEX IF NOT EXISTS idx_tasks_agent_id_lower ON tasks(LOWER(agent_id))", "idx_tasks_agent_id_lower")
 			return nil
 		},
 		Rollback: func(tx *gorm.DB) error {
 			m := func(sql, label string) {
 				execMigration(tx, sql, label)
 			}
-			m("DROP INDEX IF EXISTS idx_tasks_agent_id_nocase", "drop_idx_tasks_agent_id_nocase")
+			m("DROP INDEX IF EXISTS idx_tasks_agent_id_lower", "drop_idx_tasks_agent_id_lower")
 			return nil
 		},
 	},
@@ -1203,11 +1203,11 @@ var indexMigrations = []*gormigrate.Migration{
 	{
 		ID: "2026-10-16-implant-id-nocase-index",
 		Migrate: func(tx *gorm.DB) error {
-			execMigration(tx, "CREATE INDEX IF NOT EXISTS idx_implants_id_nocase ON implants(id COLLATE NOCASE)", "idx_implants_id_nocase")
+			execMigration(tx, "CREATE INDEX IF NOT EXISTS idx_implants_id_lower ON implants(LOWER(id))", "idx_implants_id_lower")
 			return nil
 		},
 		Rollback: func(tx *gorm.DB) error {
-			execMigration(tx, "DROP INDEX IF EXISTS idx_implants_id_nocase", "drop_idx_implants_id_nocase")
+			execMigration(tx, "DROP INDEX IF EXISTS idx_implants_id_lower", "drop_idx_implants_id_lower")
 			return nil
 		},
 	},

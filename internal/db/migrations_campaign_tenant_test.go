@@ -3,9 +3,7 @@ package db
 import (
 	"testing"
 
-	"github.com/glebarez/sqlite"
 	"github.com/go-gormigrate/gormigrate/v2"
-	"gorm.io/gorm"
 )
 
 func findMigration(t *testing.T, id string) *gormigrate.Migration {
@@ -24,10 +22,7 @@ func findMigration(t *testing.T, id string) *gormigrate.Migration {
 // operators only) instead of staying NULL — a NULL tenant would be invisible to
 // both scoped and global reads.
 func TestCampaignsTenantMigration(t *testing.T) {
-	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open: %v", err)
-	}
+	database := openTestDB(t)
 	stmts := []string{
 		`CREATE TABLE campaigns (id TEXT PRIMARY KEY, name TEXT, status TEXT)`,
 		`INSERT INTO campaigns (id, name, status) VALUES ('c1', 'one', 'active'), ('c2', 'two', 'active')`,
@@ -76,10 +71,7 @@ func TestCampaignsTenantMigration(t *testing.T) {
 // TestCampaignsTenantMigrationRollback proves the rollback removes the column
 // and its index, so an operator can revert the schema change.
 func TestCampaignsTenantMigrationRollback(t *testing.T) {
-	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open: %v", err)
-	}
+	database := openTestDB(t)
 	if err := database.Exec(`CREATE TABLE campaigns (id TEXT PRIMARY KEY, name TEXT, status TEXT)`).Error; err != nil {
 		t.Fatalf("seed: %v", err)
 	}
@@ -102,10 +94,7 @@ func TestCampaignsTenantMigrationRollback(t *testing.T) {
 // TestCampaignsTenantMigrationSkipsMissingTable proves a fresh database where
 // AutoMigrate has not yet run does not abort the migration chain.
 func TestCampaignsTenantMigrationSkipsMissingTable(t *testing.T) {
-	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open: %v", err)
-	}
+	database := openTestDB(t)
 	mig := findMigration(t, "2026-10-13-campaigns-tenant-id")
 	if err := mig.Migrate(database); err != nil {
 		t.Fatalf("migrate on an empty database: %v", err)

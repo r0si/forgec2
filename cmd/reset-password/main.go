@@ -1,5 +1,5 @@
 // Command reset-password updates a user's password in the ForgeC2 database.
-// Usage: go run ./cmd/reset-password -db data/db/forgec2.db -user labtest -pass newpassword
+// Usage: go run ./cmd/reset-password -dsn "host=..." -user labtest -pass newpassword
 // Prefer -pass-stdin (or FORGEC2_RESET_PASS env) over -pass: argv is visible
 // in process listings and shell history.
 package main
@@ -10,11 +10,10 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 	"unicode"
 
-	_ "github.com/glebarez/go-sqlite"
+	_ "github.com/lib/pq"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -48,7 +47,7 @@ func checkPasswordPolicy(password string) error {
 }
 
 func main() {
-	dbPath := flag.String("db", filepath.Join("data", "db", "forgec2.db"), "sqlite database file")
+	dsn := flag.String("dsn", "host=localhost user=forgec2 password=forgec2 dbname=forgec2 port=5432 sslmode=disable", "PostgreSQL connection string")
 	username := flag.String("user", "", "username to reset password for (required)")
 	password := flag.String("pass", "", "new password (required unless -pass-stdin)")
 	passStdin := flag.Bool("pass-stdin", false, "read new password from stdin (avoids argv exposure)")
@@ -69,7 +68,7 @@ func main() {
 	}
 
 	if *username == "" || pass == "" {
-		fmt.Fprintf(os.Stderr, "Usage: reset-password -db <path> -user <username> (-pass <password> | -pass-stdin)\n")
+		fmt.Fprintf(os.Stderr, "Usage: reset-password -dsn <dsn> -user <username> (-pass <password> | -pass-stdin)\n")
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
@@ -79,8 +78,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	if _, err := os.Stat(*dbPath); err != nil {
-		fmt.Fprintf(os.Stderr, "db not found: %s\n", *dbPath)
+	db, err := sql.Open("postgres", *dsn)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "open db: %v\n", err)
+		os.Exit(1)
+	}
+	defer db.Close()
+
+	if err := db.Ping(); err != nil {
+		fmt.Fprintf(os.Stderr, "ping db: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -90,14 +96,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	db, err := sql.Open("sqlite", *dbPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "open db: %v\n", err)
-		os.Exit(1)
-	}
-	defer db.Close()
-
-	res, err := db.Exec("UPDATE users SET password_hash = ? WHERE username = ?", string(hash), *username)
+	res, err := db.Exec(`UPDATE "users" SET password_hash = $1 WHERE username = $2`, string(hash), *username)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "update failed: %v\n", err)
 		os.Exit(1)

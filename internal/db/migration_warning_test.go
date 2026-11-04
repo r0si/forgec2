@@ -3,7 +3,6 @@ package db
 import (
 	"context"
 	"log/slog"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -55,7 +54,7 @@ func (c *migrationLogCapture) migrationWarnings() []string {
 	return out
 }
 
-// runMigrationsCaptured opens a throwaway SQLite database, runs the full
+// runMigrationsCaptured opens a throwaway PostgreSQL database, runs the full
 // migration chain, and returns every warning it produced.
 func runMigrationsCaptured(t *testing.T) []string {
 	t.Helper()
@@ -64,9 +63,7 @@ func runMigrationsCaptured(t *testing.T) []string {
 	slog.SetDefault(slog.New(cap))
 	t.Cleanup(func() { slog.SetDefault(prev) })
 
-	path := filepath.Join(t.TempDir(), "mig.db")
-	// SQLite reads the path from fallbackPath, not dsn.
-	database, err := InitDBWithDriver("sqlite", "", path, slog.LevelError, 1, 1, 0)
+	database, err := InitDBWithDriver("postgres", testPostgresDSN, "", slog.LevelError, 1, 1, 0)
 	if err != nil {
 		t.Fatalf("init db: %v", err)
 	}

@@ -4,7 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -193,10 +192,7 @@ func hotPathProbes() []hotPathProbe {
 
 func hotPathDB(t *testing.T, p hotPathProbe) *gorm.DB {
 	t.Helper()
-	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open: %v", err)
-	}
+	database := openTestDB(t)
 	if err := database.AutoMigrate(p.creates...); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
@@ -210,16 +206,16 @@ func hotPathDB(t *testing.T, p hotPathProbe) *gorm.DB {
 
 func hotPathPlan(t *testing.T, database *gorm.DB, q string) string {
 	t.Helper()
-	rows, err := database.Raw("EXPLAIN QUERY PLAN " + q).Rows()
+	// PostgreSQL uses EXPLAIN instead of EXPLAIN QUERY PLAN
+	rows, err := database.Raw("EXPLAIN " + q).Rows()
 	if err != nil {
 		t.Fatalf("explain %q: %v", q, err)
 	}
 	defer rows.Close()
 	var parts []string
 	for rows.Next() {
-		var id, parent, notused int
 		var detail string
-		if err := rows.Scan(&id, &parent, &notused, &detail); err != nil {
+		if err := rows.Scan(&detail); err != nil {
 			t.Fatalf("scan plan: %v", err)
 		}
 		parts = append(parts, detail)
@@ -227,28 +223,27 @@ func hotPathPlan(t *testing.T, database *gorm.DB, q string) string {
 	if err := rows.Err(); err != nil {
 		t.Fatalf("iterate plan: %v", err)
 	}
-	return strings.Join(parts, " | ")
+	return strings.Join(parts, "; ")
 }
 
 func hasIndex(t *testing.T, database *gorm.DB, table, want string) bool {
 	t.Helper()
-	rows, err := database.Raw("PRAGMA index_list('" + table + "')").Rows()
+	// PostgreSQL: use pg_indexes instead of PRAGMA index_list
+	rows, err := database.Raw("SELECT indexname FROM pg_indexes WHERE tablename = ?", table).Rows()
 	if err != nil {
-		t.Fatalf("index_list(%s): %v", table, err)
+		t.Fatalf("pg_indexes(%s): %v", table, err)
 	}
 	defer rows.Close()
-	found := false
 	for rows.Next() {
-		var seq, unique, partial int
-		var name, origin string
-		if err := rows.Scan(&seq, &name, &unique, &origin, &partial); err != nil {
+		var name string
+		if err := rows.Scan(&name); err != nil {
 			t.Fatalf("scan index row: %v", err)
 		}
 		if name == want {
-			found = true
+			return true
 		}
 	}
-	return found
+	return false
 }
 
 // TestHotPathIndexesCreatedByMigration proves the migrations really create

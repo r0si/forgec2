@@ -660,15 +660,15 @@ func (s *Server) handleDBVacuum(c *gin.Context) {
 		respondError(c, http.StatusInternalServerError, "Failed to get database connection")
 		return
 	}
-	if _, err := rawDB.Exec("VACUUM"); err != nil {
-		respondError(c, http.StatusInternalServerError, "VACUUM failed")
+	if _, err := rawDB.Exec("ANALYZE"); err != nil {
+		respondError(c, http.StatusInternalServerError, "ANALYZE failed")
 		return
 	}
-	if err := s.db.Raw("SELECT page_count * page_size as size FROM pragma_page_count, pragma_page_size").Scan(&dbSize).Error; err != nil {
-		slog.Error("Failed to query database size after vacuum", "err", err)
+	if err := s.db.Raw("SELECT pg_database_size(current_database()) as size").Scan(&dbSize).Error; err != nil {
+		slog.Error("Failed to query database size after analyze", "err", err)
 	}
-	slog.Info("Database vacuum completed")
-	respond(c, gin.H{"message": "Database vacuum completed", "size": dbSize})
+	slog.Info("Database analyze completed")
+	respond(c, gin.H{"message": "Database analyze completed", "size": dbSize})
 }
 
 func (s *Server) handleDownloadConfig(c *gin.Context) {

@@ -1,3 +1,10 @@
+// Command dbq runs a SQL query against the ForgeC2 PostgreSQL database and
+// prints the results.
+//
+// Usage: go run ./cmd/dbq <dsn> <query>
+//
+// Example:
+//   go run ./cmd/dbq "host=localhost user=forgec2 password=forgec2 dbname=forgec2 port=5432 sslmode=disable" "SELECT * FROM users"
 package main
 
 import (
@@ -5,16 +12,24 @@ import (
 	"fmt"
 	"os"
 
-	_ "modernc.org/sqlite"
+	_ "github.com/lib/pq"
 )
 
 func main() {
-	db, err := sql.Open("sqlite", os.Args[1])
+	if len(os.Args) < 3 {
+		fmt.Println("usage: go run ./cmd/dbq <dsn> <query>")
+		os.Exit(1)
+	}
+	db, err := sql.Open("postgres", os.Args[1])
 	if err != nil {
 		fmt.Println("open:", err)
 		os.Exit(1)
 	}
 	defer db.Close()
+	if err := db.Ping(); err != nil {
+		fmt.Println("ping:", err)
+		os.Exit(1)
+	}
 	q := os.Args[2]
 	rows, err := db.Query(q)
 	if err != nil {

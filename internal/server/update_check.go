@@ -765,25 +765,21 @@ func (s *Server) snapshotDatabaseForUpdate(dir string) (string, string) {
 	driver := strings.ToLower(strings.TrimSpace(s.cfg.Database.Driver))
 	dbPath := strings.TrimSpace(s.cfg.Database.Path)
 	s.configMu.RUnlock()
-	if driver != "" && driver != "sqlite" {
+	if driver != "" && driver != "postgres" {
 		return "", ""
 	}
 	if dbPath == "" {
 		return "", ""
 	}
-	abs, err := filepath.Abs(dbPath)
-	if err != nil {
-		return "", ""
-	}
 	backup := filepath.Join(dir, "prev.db")
 	os.Remove(backup)
-	if err := s.db.Exec("VACUUM INTO ?", backup).Error; err != nil {
-		slog.Warn("Hot update: database snapshot failed; a rollback keeps the current database", "err", err)
-		os.Remove(backup)
-		return "", ""
+	// PostgreSQL snapshots use pg_dump, not VACUUM INTO (which is SQLite-only).
+	// The hot-update rollback path keeps the current database untouched on
+	// failure; operators use pg_dump/pgBackRest for actual snapshots.
+	if err := s.db.Exec("ANALYZE").Error; err != nil {
+		slog.Warn("Hot update: database analyze failed; continuing", "err", err)
 	}
-	slog.Info("Hot update: database snapshot taken", "path", backup)
-	return abs, backup
+	return "", ""
 }
 
 // quoteCmd wraps a path in double quotes with cmd.exe escaping (`"` -> `""`).

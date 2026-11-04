@@ -103,31 +103,19 @@ func (s *Server) cleanupOldData() {
 		slog.Error("Cleanup agent status events failed", "err", err)
 	}
 
-	// Periodic SQLite maintenance: VACUUM and ANALYZE to prevent bloat and
-	// keep query planner statistics fresh. Only runs if the DB is SQLite.
-	s.configMu.RLock()
-	dbDriver := s.cfg.Database.Driver
-	s.configMu.RUnlock()
+	// Periodic PostgreSQL maintenance: ANALYZE to keep query planner statistics
+	// fresh. SQLite's VACUUM/ANALYZE have no equivalent on Postgres here
+	// (Postgres autovacuum handles bloat); ANALYZE refreshes planner stats so
+	// beacon-dispatch and task-claim queries stay fast.
 	if sqlDB, err := s.db.DB(); err == nil {
 		if err := sqlDB.Ping(); err == nil {
-			dbName := dbDriver
-			if dbName == "" || dbName == "sqlite" {
-				s.wg.Add(1)
-				go func() {
-					defer s.wg.Done()
-					if _, err := sqlDB.Exec("PRAGMA optimize"); err != nil {
-						slog.Debug("SQLite ANALYZE failed", "err", err)
-					}
-					// The startup block sets auto_vacuum=INCREMENTAL, which
-					// queues freed pages instead of returning them to the OS;
-					// without this call the .db file grows monotonically with
-					// task-result churn (encrypted Result/Error blobs,
-					// credential re-encryption on key rotation).
-					if _, err := sqlDB.Exec("PRAGMA incremental_vacuum"); err != nil {
-						slog.Debug("SQLite incremental_vacuum failed", "err", err)
-					}
-				}()
-			}
+			s.wg.Add(1)
+			go func() {
+				defer s.wg.Done()
+				if _, err := sqlDB.Exec("ANALYZE"); err != nil {
+					slog.Debug("PostgreSQL ANALYZE failed", "err", err)
+				}
+			}()
 		}
 	}
 

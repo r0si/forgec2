@@ -5,8 +5,6 @@ import (
 	"crypto/rand"
 	"fmt"
 	"log/slog"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -14,15 +12,13 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
-	// Pure Go SQLite driver (recommended for Windows without CGO)
-	glebarez "github.com/glebarez/sqlite"
-	// PostgreSQL driver (optional, for production deployments)
+	// PostgreSQL driver (primary path — single driver for all deployments)
 	"gorm.io/driver/postgres"
 )
 
-// lockAwareLogger wraps a GORM logger so SQLite lock contention errors
-// ("database is locked") are surfaced through slog even when GORM runs in
-// Silent mode, where statement errors would otherwise be swallowed.
+// lockAwareLogger wraps a GORM logger so PostgreSQL connection errors are
+// surfaced through slog even when GORM runs in Silent mode, where statement
+// errors would otherwise be swallowed.
 type lockAwareLogger struct {
 	logger.Interface
 }
@@ -30,42 +26,22 @@ type lockAwareLogger struct {
 // Trace intercepts statement execution errors before the wrapped logger
 // applies its (possibly Silent) log level filter.
 func (l lockAwareLogger) Trace(ctx context.Context, begin time.Time, fc func() (string, int64), err error) {
-	if err != nil && isSQLiteLockError(err) {
+	if err != nil {
 		sql, rows := fc()
-		slog.Error("SQLite lock error", "error", err, "sql", sql, "rows", rows)
+		slog.Error("PostgreSQL statement error", "error", err, "sql", sql, "rows", rows)
 	}
 	l.Interface.Trace(ctx, begin, fc, err)
 }
 
-// Error surfaces lock errors reported through the logger's Error path
-// (e.g. failed transaction begin) the same way.
+// Error surfaces errors reported through the logger's Error path.
 func (l lockAwareLogger) Error(ctx context.Context, msg string, data ...interface{}) {
 	for _, d := range data {
-		if e, ok := d.(error); ok && isSQLiteLockError(e) {
-			slog.Error("SQLite lock error", "error", e)
+		if e, ok := d.(error); ok {
+			slog.Error(msg, "error", e)
 			return
 		}
 	}
 	l.Interface.Error(ctx, msg, data...)
-}
-
-func isSQLiteLockError(err error) bool {
-	return IsSQLiteLockError(err)
-}
-
-// IsSQLiteLockError reports whether err is a SQLite lock-contention failure.
-// It covers both the extended messages ("database is locked") and the short
-// SQLITE_BUSY variants drivers surface, so callers share one matcher instead
-// of each hand-rolling substring checks that miss half the cases.
-func IsSQLiteLockError(err error) bool {
-	if err == nil {
-		return false
-	}
-	s := err.Error()
-	return strings.Contains(s, "database is locked") ||
-		strings.Contains(s, "database table is locked") ||
-		strings.Contains(s, "SQLITE_BUSY") ||
-		strings.Contains(s, "database is busy")
 }
 
 // execMigration runs a migration SQL statement. Duplicate column/index errors are
@@ -81,7 +57,7 @@ func execMigration(db *gorm.DB, sql, label string) {
 	// the table from the model, columns included. Skip those, but keep recording a
 	// "no such table" for a table that DOES exist, which is the mis-ordered DDL the
 	// classification was written for.
-	if strings.Contains(err.Error(), "no such table") {
+	if strings.Contains(err.Error(), "does not exist") {
 		if table := migrationTargetTable(sql); table != "" && !db.Migrator().HasTable(table) {
 			slog.Debug("Migration targets a table AutoMigrate will create", "label", label, "table", table)
 			return
@@ -115,47 +91,14 @@ func migrationTargetTable(sql string) string {
 
 func isMigrationIgnorable(err error) bool {
 	s := err.Error()
-	// "no such table" is deliberately NOT ignorable: swallowing it masked
+	// "does not exist" is deliberately NOT ignorable: swallowing it masked
 	// genuinely mis-ordered DDL and let broken migrations "pass".
-	for _, kw := range []string{"duplicate column", "already exists"} {
+	for _, kw := range []string{"already exists", "duplicate column", "duplicate key"} {
 		if strings.Contains(s, kw) {
 			return true
 		}
 	}
 	return false
-}
-
-// VerifySQLiteFile opens a SQLite file read-mostly and runs integrity
-// checks without touching the live database: PRAGMA integrity_check must
-// report ok and the schema must contain at least one table. Used to vet a
-// restore candidate BEFORE it replaces the live DB.
-func VerifySQLiteFile(path string) error {
-	gdb, err := gorm.Open(glebarez.Open(path+"?mode=ro"), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Silent),
-	})
-	if err != nil {
-		return fmt.Errorf("open candidate: %w", err)
-	}
-	sqlDB, err := gdb.DB()
-	if err != nil {
-		return fmt.Errorf("pool candidate: %w", err)
-	}
-	defer sqlDB.Close()
-	var result string
-	if err := gdb.Raw("PRAGMA integrity_check").Scan(&result).Error; err != nil {
-		return fmt.Errorf("integrity_check failed: %w", err)
-	}
-	if result != "ok" {
-		return fmt.Errorf("integrity_check reports corruption: %.120s", result)
-	}
-	var tables int64
-	if err := gdb.Table("sqlite_master").Where("type = 'table'").Count(&tables).Error; err != nil {
-		return fmt.Errorf("schema census failed: %w", err)
-	}
-	if tables == 0 {
-		return fmt.Errorf("candidate has no tables")
-	}
-	return nil
 }
 
 // withMigrationTx wraps a data-migration body in one transaction. gormigrate
@@ -206,12 +149,6 @@ func generateRandomPassword(length int) (string, error) {
 	return string(b), nil
 }
 
-// InitDB initializes the database using glebarez/sqlite pure Go driver
-// or PostgreSQL via gorm.io/driver/postgres when driver="postgres" and dsn is set.
-func InitDB(dbPath string, logLevel slog.Level, defaultPassword ...string) (*gorm.DB, error) {
-	return InitDBWithDriver("", "", dbPath, logLevel, 25, 5, 30*time.Minute, defaultPassword...)
-}
-
 // LogGeneratedPassword controls whether the first-boot admin banner prints the
 // generated password in plaintext. It is process-wide because it is read from
 // config before the DB is opened, and only matters during that one first seed.
@@ -221,6 +158,16 @@ var LogGeneratedPassword = true
 // before InitDB/InitDBWithDriver. Defaults to true.
 func SetLogGeneratedPassword(v bool) { LogGeneratedPassword = v }
 
+// InitDB initializes the database using PostgreSQL via gorm.io/driver/postgres.
+func InitDB(dbPath string, logLevel slog.Level, defaultPassword ...string) (*gorm.DB, error) {
+	return InitDBWithDriver("", "", dbPath, logLevel, 25, 5, 30*time.Minute, defaultPassword...)
+}
+
+// InitDBWithDriver initializes the database. Only "postgres" driver is
+// supported; driver="postgres" with a non-empty DSN opens PostgreSQL, any
+// other value falls back to PostgreSQL using the DSN from the fallback path
+// interpretation. SQLite is no longer supported — the project ships a single
+// database driver (PostgreSQL).
 func InitDBWithDriver(driver, dsn, fallbackPath string, logLevel slog.Level, dbMaxOpenConns int, dbMaxIdleConns int, dbConnMaxLifetime time.Duration, defaultPassword ...string) (*gorm.DB, error) {
 	gormConfig := &gorm.Config{
 		Logger: lockAwareLogger{Interface: logger.Default.LogMode(logger.Silent)},
@@ -229,69 +176,37 @@ func InitDBWithDriver(driver, dsn, fallbackPath string, logLevel slog.Level, dbM
 		gormConfig.Logger = lockAwareLogger{Interface: logger.Default.LogMode(logger.Info)}
 	}
 
+	if driver != "" && driver != "postgres" {
+		return nil, fmt.Errorf("unsupported database driver %q: only \"postgres\" is supported (sqlite was removed in v2.8)", driver)
+	}
+
 	var db *gorm.DB
-	var isSQLite bool
 	var err error
 
-	if driver == "postgres" && dsn != "" {
+	if dsn != "" {
 		db, err = gorm.Open(postgres.Open(dsn), gormConfig)
 		if err != nil {
 			return nil, fmt.Errorf("failed to connect to PostgreSQL: %w", err)
 		}
-		sqlDB, err := db.DB()
-		if err != nil {
-			return nil, fmt.Errorf("get underlying DB: %w", err)
-		}
-		sqlDB.SetMaxOpenConns(dbMaxOpenConns)
-		sqlDB.SetMaxIdleConns(dbMaxIdleConns)
-		sqlDB.SetConnMaxLifetime(dbConnMaxLifetime)
 		slog.Info("Database initialized (PostgreSQL)", "dsn", redactDSN(dsn))
 	} else {
-		if err := os.MkdirAll(filepath.Dir(fallbackPath), 0700); err != nil {
-			return nil, err
-		}
-		// Enable foreign_keys and busy_timeout at the DSN level so every
-		// pooled connection inherits the pragmas (a per-connection PRAGMA
-		// only affects the single connection it runs on). The performance
-		// pragmas travel in the DSN for the same reason: the pool recycles
-		// its writer at ConnMaxLifetime/IdleTime, and Exec'd session
-		// pragmas would silently fall back to SQLite defaults (e.g.
-		// synchronous=FULL) on the new connection. Values mirror the
-		// one-time Exec block below. Applies to both file and in-memory
-		// DSNs; DSNs that already carry query parameters are left
-		// untouched.
-		sqliteDSN := fallbackPath
-		// A DSN that already names pragmas is left alone (the operator asked for
-		// something specific). Any OTHER query string still gets the pragmas
-		// appended: the previous code skipped them whenever a "?" was present, so
-		// "file:data.db?cache=shared" silently ran without foreign_keys - orphan
-		// rows were no longer rejected and nothing said so.
-		if !strings.Contains(sqliteDSN, "_pragma=") {
-			pragmas := fmt.Sprintf(
-				"_pragma=foreign_keys(1)&_pragma=busy_timeout(%d)&_pragma=synchronous(1)&_pragma=cache_size(-2000)&_pragma=temp_store(2)&_pragma=mmap_size(268435456)",
-				SQLiteBusyTimeoutMS,
-			)
-			if strings.Contains(sqliteDSN, "?") {
-				sqliteDSN += "&" + pragmas
-			} else {
-				sqliteDSN += "?" + pragmas
-			}
-		}
-		db, err = gorm.Open(glebarez.Open(sqliteDSN), gormConfig)
+		// No DSN: construct a default local PostgreSQL DSN. The operator
+		// must have PostgreSQL running (see docker-compose.yml --profile postgres).
+		defaultDSN := "host=localhost user=forgec2 password=forgec2 dbname=forgec2 port=5432 sslmode=disable"
+		db, err = gorm.Open(postgres.Open(defaultDSN), gormConfig)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to connect to PostgreSQL (default DSN %s): %w", defaultDSN, err)
 		}
-		isSQLite = true
-		if sqlDB, err := db.DB(); err == nil {
-			sqlDB.SetMaxOpenConns(SQLiteMaxOpenConns)
-			sqlDB.SetMaxIdleConns(SQLiteMaxIdleConns)
-			sqlDB.SetConnMaxLifetime(SQLiteConnMaxLifetime)
-			sqlDB.SetConnMaxIdleTime(SQLiteConnMaxIdleTime)
-		} else {
-			slog.Warn("Failed to configure DB connection pool", "err", err)
-		}
-		slog.Info("Database initialized (SQLite)", "path", fallbackPath)
+		slog.Info("Database initialized (PostgreSQL)", "dsn", "host=localhost user=forgec2 dbname=forgec2 port=5432 sslmode=disable")
 	}
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, fmt.Errorf("get underlying DB: %w", err)
+	}
+	sqlDB.SetMaxOpenConns(dbMaxOpenConns)
+	sqlDB.SetMaxIdleConns(dbMaxIdleConns)
+	sqlDB.SetConnMaxLifetime(dbConnMaxLifetime)
 
 	// Apply gormigrate schema migrations FIRST. They must run before AutoMigrate
 	// so table renames (e.g. agents -> implants) operate on the pre-existing
@@ -357,42 +272,22 @@ func InitDBWithDriver(driver, dsn, fallbackPath string, logLevel slog.Level, dbM
 			if !LogGeneratedPassword {
 				shown = "(redacted — set auth.log_generated_password: true to print it)"
 			}
-			slog.Warn("╔══════════════════════════════════════════════════════════╗")
+			slog.Warn("╔═════════════════════════════════════════════════════════╗")
 			slog.Warn("║  DEFAULT ADMIN CREDENTIALS (CHANGE IMMEDIATELY!)       ║")
 			slog.Warn(fmt.Sprintf("║  Username: admin  Password: %-24s  ║", shown))
-			if LogGeneratedPassword {
-				slog.Warn("║  This password is in your log file in plaintext.         ║")
-				slog.Warn("║  Delete/rotate logs, or set                             ║")
-				slog.Warn("║  auth.log_generated_password: false to redact.          ║")
-			} else {
-				slog.Warn("║  Check config.yaml for the actual password.            ║")
-			}
+			slog.Warn("║  This password is in your log file in plaintext.         ║")
+			slog.Warn("║  Delete/rotate logs, or set                             ║")
+			slog.Warn("║  auth.log_generated_password: false to redact.          ║")
 			slog.Warn("╚══════════════════════════════════════════════════════════╝")
 		}
-	}
-
-	if isSQLite {
-		// foreign_keys is the integrity switch the schema depends on (cascades, orphan
-		// rejection): it was a bare Exec whose error was discarded.
-		execPragma(db, "PRAGMA foreign_keys = ON;", "pragma_foreign_keys")
-		execPragma(db, "PRAGMA journal_mode = WAL;", "pragma_wal")
-		execPragma(db, "PRAGMA journal_size_limit = 67108864;", "pragma_journal_limit")
-		execPragma(db, "PRAGMA cache_size = -2000;", "pragma_cache")
-		execPragma(db, "PRAGMA temp_store = MEMORY;", "pragma_temp_store")
-		execPragma(db, "PRAGMA synchronous = NORMAL;", "pragma_sync")
-		execPragma(db, "PRAGMA busy_timeout = 5000;", "pragma_busy_timeout")
-		execPragma(db, "PRAGMA mmap_size = 268435456;", "pragma_mmap")
-		execPragma(db, "PRAGMA auto_vacuum = INCREMENTAL;", "pragma_auto_vacuum")
 	}
 
 	return db, nil
 }
 
-// seedRolePermissions was removed. It wrote one row per (role, permission) into
-// role_permissions, but nothing ever read that table: every permission check
-// goes through RoleHasPermission / RoleHasPermissionDB, which resolve from the
-// in-memory RolePermissionsMap plus the custom_roles table. The table is now
-// dropped by a migration; the map below is the single source of truth.
+// DefaultTenantName is the name of the bootstrap tenant all legacy assets are
+// assigned to.
+const DefaultTenantName = "default"
 
 // ensureDefaultTenant creates the singleton "default" tenant and backfills any
 // legacy (tenant_id = 0) rows so a fresh or upgraded deployment is fully
@@ -422,10 +317,6 @@ func ensureDefaultTenant(db *gorm.DB) error {
 	return nil
 }
 
-// DefaultTenantName is the name of the bootstrap tenant all legacy assets are
-// assigned to.
-const DefaultTenantName = "default"
-
 // backfillCredentialDedupKeys fills DedupKey on credential rows predating the
 // column. Keys digest the plaintext identity, so pages select the encrypted
 // columns and let AfterFind decrypt them; the Update keeps a dedup_key = ”
@@ -434,7 +325,7 @@ func backfillCredentialDedupKeys(db *gorm.DB) {
 	const pageSize = 500
 	for {
 		var rows []CredentialEntry
-		if err := db.Select("id, agent_id, domain, username, password, hash").
+		if err := db.Select("id, agent_id, domain, username, password, hash, hash_type, source").
 			Where("dedup_key = ''").
 			Order("id ASC").Limit(pageSize).Find(&rows).Error; err != nil {
 			slog.Warn("Credential dedup-key backfill failed", "err", err)

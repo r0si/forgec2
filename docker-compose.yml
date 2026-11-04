@@ -27,12 +27,12 @@ services:
       # `docker compose up` + published ports without any visible error.
       - FORGEC2_HOST=${FORGEC2_HOST:-0.0.0.0} # use 127.0.0.1 to keep the API container-local
       - FORGEC2_PORT=${FORGEC2_PORT:-8000}
-      # SQLite is the default (zero-config). For Postgres, set
+      # SQLite was the default (zero-config). For Postgres (now the default), set
       # FORGEC2_DB_DRIVER=postgres + FORGEC2_DB_DSN and enable the profile below:
       #   docker compose --profile postgres up -d --build
-      - FORGEC2_DB_DRIVER=${FORGEC2_DB_DRIVER:-sqlite}
+      - FORGEC2_DB_DRIVER=${FORGEC2_DB_DRIVER:-postgres}
       - FORGEC2_DB_PATH=${FORGEC2_DB_PATH:-/data/db/forgec2.db}
-      - FORGEC2_DB_DSN=${FORGEC2_DB_DSN:-}
+      - FORGEC2_DB_DSN=${FORGEC2_DB_DSN:-host=postgres user=forgec2 password=${DB_PASSWORD} dbname=forgec2 port=5432 sslmode=disable}
       - TZ=${TZ:-UTC}
     depends_on:
       postgres:

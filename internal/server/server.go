@@ -870,10 +870,11 @@ func (s *Server) InitOptimizations(configPath string) {
 
 	backupDir := filepath.Join(s.cfg.Server.DataDir, "backups")
 
+	// Built-in database backups are implemented for SQLite (VACUUM INTO +
+	// file replacement). On PostgreSQL the endpoints answer 501 with guidance
+	// instead of pretending to work; operators must use pg_dump/pgBackRest.
 	if !isSQLiteDB(s.db) {
-		// Backups are implemented on SQLite's VACUUM INTO; on other drivers the
-		// endpoints answer 501 with guidance instead of pretending to work.
-		slog.Warn("Built-in database backups disabled for non-SQLite driver; use an external backup tool",
+		slog.Warn("Built-in database backups disabled for PostgreSQL driver; use an external backup tool (pg_dump/pgBackRest)",
 			"driver", s.db.Dialector.Name())
 		return
 	}

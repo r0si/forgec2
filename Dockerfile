@@ -42,7 +42,7 @@ RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o healthcheck ./cmd/healthcheck
 # NOTE: no RUN in the distroless stage — it has no shell and the build fails.
 # The distroless nonroot user is uid/gid 65532 and does not exist in the
 # alpine builder image, so chown numerically instead of by name.
-RUN mkdir -p /data/db && chown -R 65532:65532 /data
+RUN mkdir -p /data && chown -R 65532:65532 /data
 
 # Stage 3: Runtime — distroless for minimal attack surface
 FROM gcr.io/distroless/static-debian12:latest@sha256:d75cdd72874d4790092fcb1b058493ecf6bb5bf2b2b897045b00ff01d91843f2
@@ -51,9 +51,7 @@ LABEL org.opencontainers.image.description="Command & Control Framework"
 COPY --from=backend-builder /build/forgec2-server /usr/local/bin/
 COPY --from=backend-builder /build/healthcheck /usr/local/bin/healthcheck
 # Docker copies image content (including ownership) into a fresh named volume,
-# so the server can write its SQLite DB there despite running as nonroot.
-# Without this, /data is root-owned and first startup crashes with
-# "unable to open database file".
+# so the server can write its data there despite running as nonroot.
 COPY --from=backend-builder --chown=nonroot:nonroot /data /data
 EXPOSE 8000 443 8443 53
 USER nonroot:nonroot

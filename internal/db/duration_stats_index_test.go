@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/glebarez/sqlite"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
@@ -16,7 +16,7 @@ import (
 // of scanning the tenant's whole task history and sorting it in a TEMP B-TREE. Measured before claiming:
 // the plans below are printed, and the assertions are on the specific access path.
 func TestDurationStatsQueryUsesAnIndex(t *testing.T) {
-	database := setupTestDB(t)
+	database := openTestDB(t)
 	if err := database.AutoMigrate(&Task{}); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
@@ -65,8 +65,8 @@ func TestDurationStatsQueryUsesAnIndex(t *testing.T) {
 // BenchmarkDurationStatsWindow measures the read the statistics endpoint performs over a window with a
 // realistic number of tasks, so a cache is only added if the measurement justifies it.
 func BenchmarkDurationStatsWindow(b *testing.B) {
-	// setupTestDB takes a *testing.T; the benchmark opens its own in-memory database instead.
-	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	// setupTestDB takes a *testing.T; the benchmark opens its own PostgreSQL database instead.
+	database, err := gorm.Open(postgres.Open(testPostgresDSN), &gorm.Config{})
 	if err != nil {
 		b.Fatalf("open test database: %v", err)
 	}

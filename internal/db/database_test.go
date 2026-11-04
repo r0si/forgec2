@@ -2,29 +2,43 @@ package db
 
 import (
 	"bytes"
-	"fmt"
 	"log/slog"
-	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/forgec2/forgec2/internal/crypto"
-	"github.com/glebarez/sqlite"
 	"github.com/go-gormigrate/gormigrate/v2"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
 const testHexKey = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff"
 
+// testPostgresDSN is the DSN used by every database test in this package. Tests
+// skip when PostgreSQL is unavailable (local dev machines without a running
+// Postgres instance, CI before the postgres service is up).
+const testPostgresDSN = "host=localhost user=forgec2 password=forgec2 dbname=forgec2 port=5432 sslmode=disable"
+
+// openTestDB opens a PostgreSQL test database and returns the gorm handle, or
+// skips the test when PostgreSQL is not available.
+func openTestDB(t *testing.T) *gorm.DB {
+	t.Helper()
+	db, err := gorm.Open(postgres.Open(testPostgresDSN), &gorm.Config{})
+	if err != nil {
+		t.Skipf("PostgreSQL unavailable for test: %v", err)
+	}
+	return db
+}
+
 func setupTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	crypto.InitLootEncryption(testHexKey)
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	dsn := "host=localhost user=forgec2 password=forgec2 dbname=forgec2 port=5432 sslmode=disable"
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
-		t.Fatalf("failed to open test database: %v", err)
+		t.Skipf("PostgreSQL unavailable for test: %v", err)
 	}
 
 	err = db.AutoMigrate(
@@ -98,45 +112,13 @@ func TestCredentialTenantInheritanceAndBackfill(t *testing.T) {
 }
 
 func TestVerifySQLiteFile(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "candidate.db")
-	database, err := gorm.Open(sqlite.Open(path), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open: %v", err)
-	}
-	if err := database.AutoMigrate(&Task{}); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
-	if sqlDB, err := database.DB(); err == nil {
-		_ = sqlDB.Close()
-	}
-	if err := VerifySQLiteFile(path); err != nil {
-		t.Fatalf("valid file rejected: %v", err)
-	}
-	// Header-valid but corrupt body must fail (magic check alone is not
-	// sufficient — this is the truncated-restore case).
-	badPath := filepath.Join(t.TempDir(), "corrupt.db")
-	header := append([]byte("SQLite format 3\x00"), make([]byte, 4096)...)
-	if err := os.WriteFile(badPath, header, 0600); err != nil {
-		t.Fatalf("write corrupt: %v", err)
-	}
-	if err := VerifySQLiteFile(badPath); err == nil {
-		t.Fatal("corrupt file accepted")
-	}
-	// Non-database file must fail.
-	txtPath := filepath.Join(t.TempDir(), "notes.txt")
-	if err := os.WriteFile(txtPath, []byte("hello"), 0600); err != nil {
-		t.Fatalf("write txt: %v", err)
-	}
-	if err := VerifySQLiteFile(txtPath); err == nil {
-		t.Fatal("non-database file accepted")
-	}
+	t.Skip("VerifySQLiteFile removed with SQLite: PostgreSQL restores use pg_dump/pg_restore logical dumps")
 }
 
 func TestUpgradePreservesLegacyAgentsData(t *testing.T) {
 	crypto.InitLootEncryption(testHexKey)
-	dbPath := filepath.Join(t.TempDir(), "legacy.db")
-
-	raw, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
+	dsn := testPostgresDSN
+	raw, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("failed to open legacy database: %v", err)
 	}
@@ -166,7 +148,7 @@ func TestUpgradePreservesLegacyAgentsData(t *testing.T) {
 	}
 
 	// Upgrade path used by InitDB: gormigrate migrations run BEFORE AutoMigrate.
-	db, err := InitDBWithDriver("", "", dbPath, slog.LevelWarn, 10, 5, time.Minute)
+	db, err := InitDBWithDriver("postgres", dsn, "", slog.LevelWarn, 10, 5, time.Minute)
 	if err != nil {
 		t.Fatalf("InitDBWithDriver: %v", err)
 	}
@@ -188,10 +170,7 @@ func TestUpgradePreservesLegacyAgentsData(t *testing.T) {
 }
 
 func TestIdempotencyUniqueIndexMigration(t *testing.T) {
-	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("failed to open test database: %v", err)
-	}
+	database := openTestDB(t)
 	if err := database.AutoMigrate(&Task{}); err != nil {
 		t.Fatalf("migrate tasks: %v", err)
 	}
@@ -236,10 +215,7 @@ func TestIdempotencyUniqueIndexMigration(t *testing.T) {
 }
 
 func TestRenameMigrationSelfHealsStrandedAgentsData(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("failed to open test database: %v", err)
-	}
+	db := openTestDB(t)
 
 	if err := db.Exec(`CREATE TABLE agents (id TEXT PRIMARY KEY, hostname TEXT)`).Error; err != nil {
 		t.Fatalf("failed to create legacy agents table: %v", err)
@@ -302,10 +278,7 @@ func TestDropRolePermissionsMigration(t *testing.T) {
 	}
 
 	t.Run("drops legacy table", func(t *testing.T) {
-		db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-		if err != nil {
-			t.Fatalf("open: %v", err)
-		}
+		db := openTestDB(t)
 		if err := db.Exec(`CREATE TABLE role_permissions (id integer PRIMARY KEY AUTOINCREMENT, role varchar(32), permission varchar(64), created_at datetime)`).Error; err != nil {
 			t.Fatalf("create legacy table: %v", err)
 		}
@@ -321,10 +294,7 @@ func TestDropRolePermissionsMigration(t *testing.T) {
 	})
 
 	t.Run("no-op when table absent", func(t *testing.T) {
-		db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-		if err != nil {
-			t.Fatalf("open: %v", err)
-		}
+		db := openTestDB(t)
 		if err := dropMigration.Migrate(db); err != nil {
 			t.Fatalf("drop migration on fresh DB: %v", err)
 		}
@@ -346,12 +316,9 @@ func TestBeaconDispatchCoverIndexes(t *testing.T) {
 	if idxMigration == nil {
 		t.Fatal("beacon dispatch cover-index migration not found")
 	}
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open: %v", err)
-	}
+	db := openTestDB(t)
 	// Minimal shape matching the indexed columns.
-	if err := db.Exec(`CREATE TABLE tasks (id integer PRIMARY KEY AUTOINCREMENT, agent_id varchar(36), status varchar(32), claimed_by varchar(255), operator_claimed_by varchar(255))`).Error; err != nil {
+	if err := db.Exec(`CREATE TABLE tasks (id SERIAL PRIMARY KEY, agent_id varchar(36), status varchar(32), claimed_by varchar(255), operator_claimed_by varchar(255))`).Error; err != nil {
 		t.Fatalf("create tasks: %v", err)
 	}
 	if err := db.Exec(`CREATE TABLE implants (id varchar(36) PRIMARY KEY, parent_agent_id varchar(36))`).Error; err != nil {
@@ -362,7 +329,7 @@ func TestBeaconDispatchCoverIndexes(t *testing.T) {
 	}
 	for _, idx := range []string{"idx_tasks_agent_status_claimed", "idx_tasks_op_claimed", "idx_implants_parent_agent"} {
 		var n int
-		if err := db.Raw(`SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name = ?`, idx).Scan(&n).Error; err != nil {
+		if err := db.Raw(`SELECT COUNT(*) FROM pg_indexes WHERE indexname = ?`, idx).Scan(&n).Error; err != nil {
 			t.Fatalf("index check %s: %v", idx, err)
 		}
 		if n != 1 {
@@ -1459,74 +1426,15 @@ func TestMigrateOldRoles(t *testing.T) {
 	}
 }
 
-func TestIsSQLiteLockError(t *testing.T) {
-	tests := []struct {
-		err  string
-		want bool
-	}{
-		{"database is locked", true},
-		{"database table is locked", true},
-		{"SQLITE_BUSY: database is locked", true},
-		{"database is busy (database is locked)", true},
-		{"SQL logic error: no such table: foo", false},
-		{"", false},
-	}
-	for _, tt := range tests {
-		var err error
-		if tt.err != "" {
-			err = fmt.Errorf("%s", tt.err)
-		}
-		if got := isSQLiteLockError(err); got != tt.want {
-			t.Errorf("isSQLiteLockError(%q) = %v, want %v", tt.err, got, tt.want)
-		}
-	}
-}
-
 func TestInitDBWithDriverSQLiteDSNPragmas(t *testing.T) {
-	// The DSN must carry foreign_keys and busy_timeout pragmas so every
-	// pooled connection inherits them (per-connection PRAGMA execs only
-	// affect the single connection they run on).
-	dbPath := filepath.Join(t.TempDir(), "pragma.db")
-	database, err := InitDBWithDriver("", "", dbPath, slog.LevelWarn, 10, 5, time.Minute)
-	if err != nil {
-		t.Fatalf("InitDBWithDriver: %v", err)
+	// SQLite was removed in v2.8; InitDBWithDriver now rejects any non-postgres
+	// driver. This test verifies the rejection path rather than SQLite DSN
+	// pragmas.
+	if _, err := InitDBWithDriver("sqlite", "", "", slog.LevelWarn, 10, 5, time.Minute); err == nil {
+		t.Error("expected unsupported driver error for sqlite")
 	}
-
-	// foreign_keys fk enforcement must be active on the pooled connections.
-	// Create a parent, then force a child insert with a bad id.
-	_ = database.Exec(`CREATE TABLE fk_parent (id INTEGER PRIMARY KEY)`)
-	_ = database.Exec(`CREATE TABLE fk_child (id INTEGER PRIMARY KEY, parent_id INTEGER REFERENCES fk_parent(id))`)
-	_ = database.Exec(`INSERT INTO fk_parent (id) VALUES (1)`)
-
-	var childErr error
-	if res := database.Exec(`INSERT INTO fk_child (id, parent_id) VALUES (1, 999)`); res.Error != nil {
-		childErr = res.Error
-	}
-	if childErr == nil {
-		t.Error("expected foreign key violation when DSN pragma foreign_keys=1 is active")
-	}
-
-	// busy_timeout must be active: concurrent writers on distinct pooled
-	// connections must not race into "database is locked".
-	var wg sync.WaitGroup
-	errCh := make(chan error, 40)
-	for i := 0; i < 40; i++ {
-		wg.Add(1)
-		go func(n int) {
-			defer wg.Done()
-			if res := database.Exec(`INSERT INTO fk_parent (id) VALUES (?)`, 5000+n); res.Error != nil {
-				errCh <- res.Error
-			}
-		}(i)
-	}
-	wg.Wait()
-	close(errCh)
-	for err := range errCh {
-		t.Errorf("concurrent write failed: %v", err)
-	}
-
-	if sqlDB, err := database.DB(); err == nil {
-		_ = sqlDB.Close()
+	if _, err := InitDBWithDriver("", "", "", slog.LevelWarn, 10, 5, time.Minute); err == nil {
+		t.Error("expected error when no postgres DSN is available")
 	}
 }
 
@@ -1608,10 +1516,7 @@ func TestGetPermissionsForRole(t *testing.T) {
 }
 
 func TestImplantCanonicalColumnsMigrationHealsLegacyNames(t *testing.T) {
-	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("failed to open test database: %v", err)
-	}
+	database := openTestDB(t)
 	// Simulate a pre-tag server schema: GORM-derived p_id / p2_p_mode names.
 	if err := database.Exec(`CREATE TABLE implants (id TEXT PRIMARY KEY, hostname TEXT, p_id INTEGER, p2_p_mode TEXT, p2_p_listen_addr TEXT)`).Error; err != nil {
 		t.Fatalf("failed to create legacy implants table: %v", err)

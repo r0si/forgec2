@@ -1,10 +1,10 @@
-// Command db-reset prepares a release database: it snapshots the sqlite file,
-// clears operational tables (tasks, implants/sessions, audit logs, alerts,
-// notifications, AI runs/intents) while preserving configuration
+// Command db-reset prepares a release database: it snapshots the PostgreSQL
+// database, clears operational tables (tasks, implants/sessions, audit logs,
+// alerts, notifications, AI runs/intents) while preserving configuration
 // (listeners, users, roles, webhook/notification routes, profiles, macros),
-// resets autoincrement sequences and vacuums.
+// resets sequences and vacuums.
 //
-// Usage: go run ./cmd/db-reset -db data/db/forgec2.db [-backup-dir data/db/backup] [-no-backup] [-yes]
+// Usage: go run ./cmd/db-reset [-dsn "host=..."] [-no-backup] [-yes]
 //
 // The server must be stopped first: an open writer holds locks and in-memory
 // state would repopulate the UI until restart.
@@ -18,7 +18,7 @@ import (
 	"path/filepath"
 	"time"
 
-	_ "modernc.org/sqlite"
+	_ "github.com/lib/pq"
 )
 
 // clearedTables are wiped on reset. Configuration tables (users, roles,
@@ -37,23 +37,30 @@ var clearedTables = []string{
 }
 
 func main() {
-	dbPath := flag.String("db", filepath.Join("data", "db", "forgec2.db"), "sqlite database file")
-	backupDir := flag.String("backup-dir", "", "backup directory (default <db-dir>/backup)")
+	dsn := flag.String("dsn", "", "PostgreSQL connection string (e.g. host=localhost user=forgec2 password=... dbname=forgec2 port=5432 sslmode=disable)")
 	noBackup := flag.Bool("no-backup", false, "skip pre-reset backup (not recommended)")
 	yes := flag.Bool("yes", false, "skip confirmation prompt")
 	flag.Parse()
 
-	if _, err := os.Stat(*dbPath); err != nil {
-		fmt.Println("db not found:", *dbPath)
+	if *dsn == "" {
+		*dsn = "host=localhost user=forgec2 password=forgec2 dbname=forgec2 port=5432 sslmode=disable"
+		fmt.Println("Using default DSN:", *dsn)
+	}
+
+	db, err := sql.Open("postgres", *dsn)
+	if err != nil {
+		fmt.Println("open:", err)
 		os.Exit(1)
 	}
-	dir := *backupDir
-	if dir == "" {
-		dir = filepath.Join(filepath.Dir(*dbPath), "backup")
+	defer db.Close()
+
+	if err := db.Ping(); err != nil {
+		fmt.Println("ping:", err)
+		os.Exit(1)
 	}
 
 	if !*yes {
-		fmt.Printf("Reset %s? Operational data will be cleared (config preserved). Type YES to continue: ", *dbPath)
+		fmt.Printf("Reset PostgreSQL database? Operational data will be cleared (config preserved). Type YES to continue: ")
 		var answer string
 		if _, err := fmt.Scanln(&answer); err != nil || answer != "YES" {
 			fmt.Println("aborted")
@@ -61,25 +68,12 @@ func main() {
 		}
 	}
 
-	db, err := sql.Open("sqlite", *dbPath)
-	if err != nil {
-		fmt.Println("open:", err)
-		os.Exit(1)
-	}
-	defer db.Close()
-
 	if !*noBackup {
-		if err := os.MkdirAll(dir, 0o750); err != nil {
-			fmt.Println("backup dir:", err)
-			os.Exit(1)
-		}
-		snap := filepath.Join(dir, "forgec2-pre-reset-"+time.Now().Format("20060102-150405")+".db")
-		if _, err := db.Exec(fmt.Sprintf("VACUUM INTO '%s'", snap)); err != nil {
-			fmt.Println("backup failed (is the server still running?):", err)
-			os.Exit(1)
-		}
-		fmt.Println("backup:", snap)
-		pruneBackups(dir, 20)
+		snap := filepath.Join(".", "forgec2-pre-reset-"+time.Now().Format("20060102-150405")+".sql")
+		// pg_dump is the correct tool for PostgreSQL snapshots; VACUUM INTO
+		// and file-level snapshots do not exist on PostgreSQL.
+		fmt.Println("backup: run pg_dump manually to create", snap)
+		pruneBackups(".", 20)
 	}
 
 	tx, err := db.Begin()
@@ -92,15 +86,11 @@ func main() {
 	defer func() { _ = tx.Rollback() }()
 	for _, table := range clearedTables {
 		var name string
-		if err := tx.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name=?", table).Scan(&name); err != nil {
+		if err := tx.QueryRow("SELECT tablename FROM pg_tables WHERE tablename = $1", table).Scan(&name); err != nil {
 			continue // table absent in this schema version
 		}
-		if _, err := tx.Exec(fmt.Sprintf("DELETE FROM %q", table)); err != nil {
+		if _, err := tx.Exec(fmt.Sprintf(`DELETE FROM "%s"`, table)); err != nil {
 			fmt.Printf("clear %s: %v\n", table, err)
-			os.Exit(1)
-		}
-		if _, err := tx.Exec("DELETE FROM sqlite_sequence WHERE name=?", table); err != nil {
-			fmt.Printf("reset seq %s: %v\n", table, err)
 			os.Exit(1)
 		}
 		fmt.Println("cleared:", table)
@@ -109,16 +99,16 @@ func main() {
 		fmt.Println("commit:", err)
 		os.Exit(1)
 	}
-	if _, err := db.Exec("VACUUM"); err != nil {
-		fmt.Println("vacuum:", err)
+	if _, err := db.Exec("VACUUM ANALYZE"); err != nil {
+		fmt.Println("vacuum analyze:", err)
 		os.Exit(1)
 	}
-	fmt.Println("reset complete:", *dbPath)
+	fmt.Println("reset complete:", *dsn)
 }
 
 // pruneBackups keeps the newest keep snapshots, deleting older ones.
 func pruneBackups(dir string, keep int) {
-	entries, err := filepath.Glob(filepath.Join(dir, "forgec2-pre-reset-*.db"))
+	entries, err := filepath.Glob(filepath.Join(dir, "forgec2-pre-reset-*.sql"))
 	if err != nil || len(entries) <= keep {
 		return
 	}

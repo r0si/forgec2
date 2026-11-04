@@ -3,18 +3,13 @@ package db
 import (
 	"testing"
 
-	"github.com/glebarez/sqlite"
 	"github.com/go-gormigrate/gormigrate/v2"
-	"gorm.io/gorm"
 )
 
 // TestMacroRunsTenantBackfillMigration proves pre-tag macro-run rows inherit
 // their parent macro's tenant, and that the migration is idempotent.
 func TestMacroRunsTenantBackfillMigration(t *testing.T) {
-	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open: %v", err)
-	}
+	database := openTestDB(t)
 	// Legacy shape: macro_runs without tenant_id, command_macros with it.
 	stmts := []string{
 		`CREATE TABLE command_macros (id INTEGER PRIMARY KEY, name TEXT, tenant_id INTEGER DEFAULT 0)`,
@@ -72,10 +67,7 @@ func TestMacroRunsTenantBackfillMigration(t *testing.T) {
 // TestMacroRunsTenantBackfillOrphanRunStaysZero proves runs whose macro was
 // deleted keep tenant 0 (legacy/unscoped) instead of failing the migration.
 func TestMacroRunsTenantBackfillOrphanRunStaysZero(t *testing.T) {
-	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open: %v", err)
-	}
+	database := openTestDB(t)
 	stmts := []string{
 		`CREATE TABLE command_macros (id INTEGER PRIMARY KEY, name TEXT, tenant_id INTEGER DEFAULT 0)`,
 		`CREATE TABLE macro_runs (id INTEGER PRIMARY KEY, macro_id INTEGER, macro_name TEXT, status TEXT)`,

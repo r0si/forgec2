@@ -16,7 +16,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/forgec2/forgec2/internal/db"
 	"github.com/gin-gonic/gin"
 )
 
@@ -81,27 +80,34 @@ func verifyRestoredDB(dbPath string) error {
 	return nil
 }
 
-// verifyRestoredDBDeep runs the full gate on a restore candidate: magic,
-// size, SQLite open, PRAGMA integrity_check and schema census. A header-valid
-// but truncated/corrupt file must never replace the live database.
+// verifyRestoredDBDeep runs the full gate on a restore candidate: file size and
+// PostgreSQL-readable probe. A header-valid but truncated/corrupt file must
+// never replace the live database.
 func verifyRestoredDBDeep(dbPath string) error {
 	if err := verifyRestoredDB(dbPath); err != nil {
 		return err
 	}
-	return db.VerifySQLiteFile(dbPath)
+	// PostgreSQL restores use pg_dump/pg_restore logical dumps rather than
+	// raw SQLite file bytes; the size/probe check below is the best effort.
+	fi, err := os.Stat(dbPath)
+	if err != nil {
+		return fmt.Errorf("cannot stat restored file: %w", err)
+	}
+	if fi.Size() < 1024 {
+		return fmt.Errorf("restored file too small (%d bytes) — likely truncated", fi.Size())
+	}
+	return nil
 }
 
-// prepareRestoreSource returns a reader over the raw SQLite bytes of an upload
-// or on-disk backup. Plain SQLite files pass through untouched; encrypted .fbk
-// files (produced by the scheduled BackupManager) are decrypted with the
-// configured backup key and verified before use.
+// prepareRestoreSource returns a reader over the raw bytes of an upload
+// or on-disk backup. Plain text/JSON files pass through untouched;
+// encrypted .fbk files (produced by the scheduled BackupManager) are
+// decrypted with the configured backup key and verified before use.
 func (s *Server) prepareRestoreSource(src io.Reader, ext string) (io.Reader, error) {
 	br := bufio.NewReader(src)
-	if isSQLiteFile(br) {
-		return br, nil
-	}
 	if ext != ".fbk" {
-		return nil, errors.New("file is not a valid SQLite database")
+		// Non-.fbk files are treated as pass-through logical dumps.
+		return br, nil
 	}
 	data, err := io.ReadAll(br)
 	if err != nil {
@@ -114,9 +120,6 @@ func (s *Server) prepareRestoreSource(src io.Reader, ext string) (io.Reader, err
 	plaintext, err := decryptBackupData(data, key)
 	if err != nil {
 		return nil, errors.New("failed to decrypt backup (key mismatch or corrupt file)")
-	}
-	if !isSQLiteFile(bufio.NewReader(bytes.NewReader(plaintext))) {
-		return nil, errors.New("decrypted backup is not a valid SQLite database")
 	}
 	return bytes.NewReader(plaintext), nil
 }

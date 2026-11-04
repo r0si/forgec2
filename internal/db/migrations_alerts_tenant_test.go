@@ -3,7 +3,6 @@ package db
 import (
 	"testing"
 
-	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -37,10 +36,7 @@ func tenantOf(t *testing.T, database *gorm.DB, table, id string) uint {
 // metrics, or an agent that was deleted) are normalized to tenant 0 rather than
 // left NULL — a NULL would be invisible to both scoped and global readers.
 func TestAlertsTenantBackfillFromAgentMigration(t *testing.T) {
-	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open: %v", err)
-	}
+	database := openTestDB(t)
 	stmts := []string{
 		`CREATE TABLE implants (id TEXT PRIMARY KEY, tenant_id INTEGER DEFAULT 0)`,
 		`CREATE TABLE alert_rules (id INTEGER PRIMARY KEY, name TEXT, type TEXT)`,
@@ -97,10 +93,7 @@ func TestAlertsTenantBackfillFromAgentMigration(t *testing.T) {
 
 // TestAlertsTenantMigrationRollback proves the migration can be reverted.
 func TestAlertsTenantMigrationRollback(t *testing.T) {
-	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open: %v", err)
-	}
+	database := openTestDB(t)
 	for _, stmt := range []string{
 		`CREATE TABLE alert_rules (id INTEGER PRIMARY KEY, name TEXT, type TEXT)`,
 		`CREATE TABLE alerts (id INTEGER PRIMARY KEY, rule_id INTEGER, source TEXT)`,
@@ -130,10 +123,7 @@ func TestAlertsTenantMigrationRollback(t *testing.T) {
 // fresh database where AutoMigrate has not created the tables yet, and on a
 // database that has alert_rules but not alerts.
 func TestAlertsTenantMigrationSkipsMissingTables(t *testing.T) {
-	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open: %v", err)
-	}
+	database := openTestDB(t)
 	runAlertMigration(t, database)
 
 	if database.Migrator().HasTable("alert_rules") {
@@ -143,10 +133,7 @@ func TestAlertsTenantMigrationSkipsMissingTables(t *testing.T) {
 		t.Fatal("the migration created alerts on a database that never had it")
 	}
 
-	partial, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open partial: %v", err)
-	}
+	partial := openTestDB(t)
 	if err := partial.Exec(`CREATE TABLE alert_rules (id INTEGER PRIMARY KEY, name TEXT, type TEXT)`).Error; err != nil {
 		t.Fatalf("seed partial: %v", err)
 	}

@@ -107,8 +107,8 @@ type Config struct {
 		RequireTLSForAuth    bool          `yaml:"require_tls_for_auth"`    // require TLS before issuing session cookies (strongly recommended in production)
 		EnableMetrics        bool          `yaml:"enable_metrics"`          // expose /metrics (default false; requires auth when enabled)
 		SocksListenHost      string        `yaml:"socks_listen_host"`       // bind host for SOCKS/rportfwd (default 127.0.0.1)
-		DBMaxOpenConns       int           `yaml:"db_max_open_conns"`       // max open connections for PostgreSQL pool (default 1; sqlite must stay 1)
-		DBMaxIdleConns       int           `yaml:"db_max_idle_conns"`       // max idle connections for PostgreSQL pool (default 1; sqlite must stay 1)
+		DBMaxOpenConns       int           `yaml:"db_max_open_conns"`       // max open connections for PostgreSQL pool (default 1; single writer)
+		DBMaxIdleConns       int           `yaml:"db_max_idle_conns"`       // max idle connections for PostgreSQL pool (default 1; single writer)
 		DBConnMaxLifetime    time.Duration `yaml:"db_conn_max_lifetime"`    // max connection lifetime for PostgreSQL pool (default 30m)
 		DNSObscure           bool          `yaml:"dns_obscure"`             // XOR-obscure DNS C2 fragments (must match implant DNSObscure)
 		AutoRecon            []string      `yaml:"auto_recon"`              // task types queued on first check-in (empty = disabled)
@@ -131,8 +131,8 @@ type Config struct {
 	} `yaml:"roe"`
 
 	Database struct {
-		Path   string `yaml:"path"`
-		Driver string `yaml:"driver"` // "sqlite" (default) or "postgres"
+		Path   string `yaml:"path"` // legacy: path for sqlite (deprecated, use DSN)
+		Driver string `yaml:"driver"` // "postgres" (default)
 		DSN    string `yaml:"dsn"`    // PostgreSQL connection string (e.g. "host=localhost user=forgec2 password=... dbname=forgec2 port=5432 sslmode=disable")
 	} `yaml:"database"`
 
@@ -403,9 +403,9 @@ func DefaultConfig() *Config {
 	cfg.Server.SocksListenHost = "127.0.0.1"
 	cfg.Server.DBMaxOpenConns = 1
 	cfg.Server.DBMaxIdleConns = 1
-	// NOTE: sqlite is a single writer — the pool stays 1/1 (enforced by
-	// Validate and syncDBPool). Postgres operators must set
-	// server.db_max_open_conns / db_max_idle_conns explicitly.
+	// NOTE: Postgres deployment uses a single writer pool (1/1) to avoid
+	// connection contention. Operators using pgBouncer or multi-writer setups
+	// must set server.db_max_open_conns / db_max_idle_conns explicitly.
 	cfg.Server.DBConnMaxLifetime = 30 * time.Minute
 	// lportfwd tunnels agent-local connections out through the teamserver.
 	// On by default (mirrors rportfwd/socks availability); operators can set
@@ -439,8 +439,8 @@ func DefaultConfig() *Config {
 	// mimikatz, kerberoast, dpapi_*) and destructive delete.
 	cfg.Security.RequireApproval = true
 
-	cfg.Database.Path = filepath.Join(cfg.Server.DataDir, "db/forgec2.db")
-	cfg.Database.Driver = "sqlite"
+	cfg.Database.Driver = "postgres"
+	cfg.Database.DSN = "host=localhost user=forgec2 password=forgec2 dbname=forgec2 port=5432 sslmode=disable"
 	cfg.Server.CertFile = filepath.Join(cfg.Server.DataDir, "server.crt")
 	cfg.Server.KeyFile = filepath.Join(cfg.Server.DataDir, "server.key")
 
@@ -805,8 +805,10 @@ func (c *Config) Validate() error {
 			errs = append(errs, errors.New("webrtc.max_sessions must be between 0 and 256"))
 		}
 	}
-	if (c.Database.Driver == "" || c.Database.Driver == "sqlite") && c.Server.DBMaxOpenConns > 1 {
-		errs = append(errs, errors.New("server.db_max_open_conns must be 1 for sqlite (single writer; larger pools cause SQLITE_BUSY under load)"))
+	if c.Database.Driver == "" || c.Database.Driver == "postgres" {
+		if c.Server.DBMaxOpenConns > 1 {
+			errs = append(errs, errors.New("server.db_max_open_conns must be 1 for postgres (single writer; larger pools cause pool exhaustion under load)"))
+		}
 	}
 	if c.Server.OfflineThreshold < 1 {
 		errs = append(errs, errors.New("server.offline_threshold must be >= 1 second"))

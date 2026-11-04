@@ -104,6 +104,9 @@ SUMMARY.md
 ANCHORED_SUMMARY.md
 .omo/
 
+# Local tools/build artifacts
+tools/
+
 # Plugin runtime caches (Windows event-log mock dbs, etc.)
 plugins/**/%SystemDrive%/
 plugins/**/Caches/

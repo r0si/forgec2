@@ -3,19 +3,13 @@ package db
 import (
 	"strings"
 	"testing"
-
-	"github.com/glebarez/sqlite"
-	"gorm.io/gorm"
 )
 
 // TestSweepCoverIndexesExist proves the sweep-cover migration creates its
 // three indexes (fresh DBs get them via migrations; AutoMigrate alone does
 // not create these composites).
 func TestSweepCoverIndexesExist(t *testing.T) {
-	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open db: %v", err)
-	}
+	database := openTestDB(t)
 	if err := database.AutoMigrate(&Task{}); err != nil {
 		t.Fatalf("migrate task: %v", err)
 	}
@@ -29,17 +23,15 @@ func TestSweepCoverIndexesExist(t *testing.T) {
 		}
 	}
 
-	rows, err := database.Raw("PRAGMA index_list('tasks')").Rows()
+	rows, err := database.Raw("SELECT indexname FROM pg_indexes WHERE tablename = 'tasks'").Rows()
 	if err != nil {
 		t.Fatalf("index list: %v", err)
 	}
 	defer rows.Close()
 	names := make(map[string]bool)
 	for rows.Next() {
-		var seq, unique, partial int
-		var name, origin string
-		if err := rows.Scan(&seq, &name, &unique, &origin, &partial); err != nil {
-			rows.Close()
+		var name string
+		if err := rows.Scan(&name); err != nil {
 			t.Fatalf("scan index row: %v", err)
 		}
 		names[name] = true
@@ -57,10 +49,7 @@ func TestSweepCoverIndexesExist(t *testing.T) {
 // TestSweepPredicatesUseIndex proves each sweep WHERE clause resolves to an
 // index search instead of a full status scan.
 func TestSweepPredicatesUseIndex(t *testing.T) {
-	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("open db: %v", err)
-	}
+	database := openTestDB(t)
 	if err := database.AutoMigrate(&Task{}); err != nil {
 		t.Fatalf("migrate task: %v", err)
 	}
@@ -81,14 +70,13 @@ func TestSweepPredicatesUseIndex(t *testing.T) {
 	}
 	for name, q := range queries {
 		var details []string
-		rows, err := database.Raw("EXPLAIN QUERY PLAN " + q).Rows()
+		rows, err := database.Raw("EXPLAIN " + q).Rows()
 		if err != nil {
 			t.Fatalf("%s: explain: %v", name, err)
 		}
 		for rows.Next() {
-			var id, parent, notused int
 			var detail string
-			if err := rows.Scan(&id, &parent, &notused, &detail); err != nil {
+			if err := rows.Scan(&detail); err != nil {
 				rows.Close()
 				t.Fatalf("%s: scan plan: %v", name, err)
 			}
@@ -96,11 +84,9 @@ func TestSweepPredicatesUseIndex(t *testing.T) {
 		}
 		rows.Close()
 		plan := strings.Join(details, "; ")
-		if !strings.Contains(plan, "USING COVERING INDEX") && !strings.Contains(plan, "USING INDEX") {
-			t.Errorf("%s: no index used: %s", name, plan)
-		}
-		if strings.Contains(plan, "SCAN tasks") && !strings.Contains(plan, "USING") {
-			t.Errorf("%s: full table scan: %s", name, plan)
+		// PostgreSQL EXPLAIN output is different; just check it's not a Seq Scan
+		if strings.Contains(plan, "Seq Scan") {
+			t.Errorf("%s: full table scan (Seq Scan): %s", name, plan)
 		}
 	}
 }

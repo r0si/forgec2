@@ -9,8 +9,8 @@
 // what it writes is byte-for-byte what the UI would have written - and the
 // running server resolves the row on the next registration, no restart needed.
 //
-//	go run ./cmd/mint-reg-secret -config config.yaml
-//	go run ./cmd/mint-reg-secret -db data/db/forgec2.db -beacon-key <hex>
+//	go run ./cmd/mint-reg-secret -dsn "host=..." -config config.yaml
+//	go run ./cmd/mint-reg-secret -dsn "host=..." -beacon-key <hex>
 //
 // -tenant <id> records the minting tenant so the first agent that registers
 // with the secret lands in that team instead of the bootstrap default tenant
@@ -34,14 +34,14 @@ import (
 
 	"github.com/forgec2/forgec2/internal/crypto"
 	"github.com/forgec2/forgec2/internal/db"
-	"github.com/glebarez/sqlite"
 	"gopkg.in/yaml.v3"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
 
 func main() {
-	dbPath := flag.String("db", "data/db/forgec2.db", "path to the server's sqlite database")
+	dsn := flag.String("dsn", "host=localhost user=forgec2 password=forgec2 dbname=forgec2 port=5432 sslmode=disable", "PostgreSQL connection string")
 	configPath := flag.String("config", "", "server config.yaml to read server.beacon_key from (ignored when -beacon-key is given)")
 	keyHex := flag.String("beacon-key", "", "server.beacon_key as hex")
 	tenantFlag := flag.String("tenant", "", "minting tenant id (numeric); omitted = legacy unscoped row")
@@ -72,12 +72,9 @@ func main() {
 		fatal(fmt.Errorf("beacon key must be the server's 64-char hex key (32 bytes): %v", err))
 	}
 
-	// A running server holds the same database file; wait out a short write
-	// lock instead of failing the mint.
-	gdb, err := gorm.Open(sqlite.Open(*dbPath+"?_pragma=busy_timeout(5000)"),
-		&gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
+	gdb, err := gorm.Open(postgres.Open(*dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	if err != nil {
-		fatal(fmt.Errorf("open %s: %w (start the server once so it creates the database)", *dbPath, err))
+		fatal(fmt.Errorf("open PostgreSQL: %w (start the server once so it creates the database)", err))
 	}
 
 	store := crypto.NewRegSecretStore(master)
@@ -106,12 +103,12 @@ func main() {
 	fmt.Println("set SECRET_B64=" + base64.StdEncoding.EncodeToString(secret))
 	if row.TenantID > 0 {
 		fmt.Fprintf(os.Stderr,
-			"minted v3 registration secret %s (tenant %d) into %s (no UI, no audit row); it binds to the first agent id that registers with it\n",
-			row.ID, row.TenantID, *dbPath)
+			"minted v3 registration secret %s (tenant %d) into PostgreSQL (no UI, no audit row); it binds to the first agent id that registers with it\n",
+			row.ID, row.TenantID)
 	} else {
 		fmt.Fprintf(os.Stderr,
-			"minted v3 registration secret %s into %s (no UI, no audit row); it binds to the first agent id that registers with it\n",
-			row.ID, *dbPath)
+			"minted v3 registration secret %s into PostgreSQL (no UI, no audit row); it binds to the first agent id that registers with it\n",
+			row.ID)
 	}
 }
 
