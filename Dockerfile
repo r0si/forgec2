@@ -8,7 +8,7 @@
 # >=24.15). Vite 7 itself only needs 20.19: require(esm) must be enabled by
 # default, otherwise loading the ESM-only @vitejs/plugin-react fails with
 # ERR_REQUIRE_ESM. The pinned builder image below is newer than the floor.
-FROM node:26.12-alpine@sha256:6f08a523443ddedf52941874c203475b0ad503e859ad70cb26ab8be9a517dbd5 AS frontend-builder
+FROM node:26.13-alpine@sha256:c6ad9e9c1d80f6eb607c26b4b0a132ff7a2344fad1c78ea3baa2a7d4c8de6d94 AS frontend-builder
 WORKDIR /build/frontend
 COPY frontend/package*.json ./
 RUN npm ci
@@ -16,7 +16,7 @@ COPY frontend/ .
 RUN npm run build
 
 # Stage 2: Build Go binary with embedded frontend
-FROM golang:1.27-alpine@sha256:f92b6ef800e499660581efdabdf25d9d817a9d124eaf900924f0504e7e27e12d AS backend-builder
+FROM golang:1.27-alpine@sha256:d200d2dd76b03a99b52651fd1325aff7dcd35422c35c01bac56571b0507f3deb AS backend-builder
 WORKDIR /build
 COPY go.mod go.sum ./
 RUN go mod download
