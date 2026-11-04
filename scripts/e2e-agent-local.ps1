@@ -145,6 +145,16 @@ try {
     if (-not (Get-Command $Curl -ErrorAction SilentlyContinue)) { throw "$Curl not found in PATH" }
     $WorkDir = [System.IO.Path]::GetFullPath($WorkDir)
     $RepoRoot = [System.IO.Path]::GetFullPath($RepoRoot)
+    # Resolved here, before any step can fail, because the finally block tails this
+    # file on a red run: if it were only assigned inside Step 3, a config-rewrite or
+    # server-build failure would leave the diagnostic path empty and the whole point
+    # of the tail ("the server log carries the real reason") would be lost exactly
+    # when it is needed. Join-Path, not a literal "\": SetupLogRotation keeps only
+    # filepath.Dir(-log-file) and writes forgec2.log under it, and on Linux a
+    # backslash is not a separator, so "$WorkDir/logs\forgec2.log" is ONE filename —
+    # the log landed at $WorkDir/forgec2.log while both the tail below and the CI
+    # step read logs/forgec2.log. Every E2E failure printed "no server log".
+    $script:LogFile = Join-Path (Join-Path $WorkDir 'logs') 'forgec2.log'
     $script:reqFile = "$WorkDir/request.json"
     $base = "http://127.0.0.1:$Port"
     Step "work dir: $WorkDir (target os: $TargetOs)"
@@ -186,10 +196,12 @@ try {
     # generation adds a `replace github.com/forgec2/forgec2 => <module root>`
     # directive found by walking up from the CWD (payload.forgeC2ModuleReplace),
     # so a server started elsewhere cannot build payloads. Logs are redirected
-    # into the work dir with -log-file to keep the repository's logs/ untouched.
+    # into the work dir with -log-file to keep the repository's logs/ untouched
+    # ($script:LogFile, resolved up top so the finally block can tail it even if a
+    # step before this one throws).
     $sp = @{
         FilePath         = "$WorkDir/$SrvExe"
-        ArgumentList     = @('-config', "$WorkDir/config.e2e.yaml", '-log-file', "$WorkDir/logs\forgec2.log")
+        ArgumentList     = @('-config', "$WorkDir/config.e2e.yaml", '-log-file', $script:LogFile)
         WorkingDirectory = $RepoRoot
         PassThru         = $true
     }
@@ -201,7 +213,7 @@ try {
         $health = & $Curl -s --max-time 2 "$base/health"
         if ($LASTEXITCODE -eq 0 -and $health -match 'ok') { $healthy = $true; break }
     }
-    if (-not $healthy) { Get-LogTail "$WorkDir/logs\forgec2.log" 30; throw "the throwaway server never became healthy on port $Port" }
+    if (-not $healthy) { Get-LogTail $script:LogFile 30; throw "the throwaway server never became healthy on port $Port" }
     Write-Host '  /health ok'
 
     Step '4/9 log in and read the CSRF cookie'
@@ -230,8 +242,13 @@ try {
         } | ConvertTo-Json -Compress)
     $created = Api-PostJson "$base/api/listeners" $listenerJson "$WorkDir/listener.json"
     if (-not $created.success) { throw "listener creation failed: $(Get-Content "$WorkDir/listener.json" -Raw)" }
-    $listenerId = $created.listener.id
-    $listenerStatus = $created.listener.status
+    # Envelope: handleCreateListener answers respond(c, {"listener": l}), so the
+    # raw curl body is {"success":true,"data":{"listener":{...}}}. The task/agent
+    # calls below already read .data; these three (listener / generate / build
+    # status) did not, so id and status came back empty and the status -ne
+    # 'running' check below threw on a listener that really was running.
+    $listenerId = $created.data.listener.id
+    $listenerStatus = $created.data.listener.status
     Write-Host "  listener id=$listenerId status=$listenerStatus"
     if ($listenerStatus -ne 'running') { throw "listener did not start (status=$listenerStatus)" }
 
@@ -243,7 +260,7 @@ try {
     if ($Modules) { $genForm += "&modules=$Modules" }
     $gen = Api-PostForm "$base$genPath" $genForm "$WorkDir/generate.json"
     if (-not $gen.success) { throw "generate request failed: $(Get-Content "$WorkDir/generate.json" -Raw)" }
-    $buildId = $gen.build_id
+    $buildId = $gen.data.build_id
     Write-Host "  build $buildId queued"
     $deadline = (Get-Date).AddSeconds($BuildTimeoutSec)
     $status = 'building'
@@ -252,12 +269,12 @@ try {
         Start-Sleep -Seconds 2
         $polls++
         $b = Api-Get "$base/generate/builds/$buildId" "$WorkDir/build.json"
-        $status = $b.status
+        $status = $b.data.status
         if ($status -ne 'building') { break }
         if ($polls % 10 -eq 0) { Write-Host "  still building ($([int]((Get-Date) - $deadline.AddSeconds($BuildTimeoutSec)).TotalSeconds)s elapsed)..." }
     }
     if ($status -ne 'completed') {
-        $err = if ($b.error) { $b.error } else { '(no error field)' }
+        $err = if ($b.data.error) { $b.data.error } else { '(no error field)' }
         throw "agent build did not complete: status=$status error=$err"
     }
     $agentPath = "$WorkDir/$agentName"
@@ -291,12 +308,18 @@ try {
     $psi.UseShellExecute = $false
     # Redirect every directory the agent persists into: identity.key lives under
     # the user cache dir, scratch files under the temp dir.
+    #
+    # Forward slashes throughout, like the TEMP lines above: on Linux a backslash
+    # is an ordinary filename character, so "$WorkDir/state\home" would be a
+    # sibling named `state\home` under the work dir rather than `home` under
+    # state/, which the isolation intent and the cleanup step (which removes
+    # state/) both assume is not the case.
     $psi.EnvironmentVariables['TEMP'] = "$WorkDir/tmp"
     $psi.EnvironmentVariables['TMP'] = "$WorkDir/tmp"
     $psi.EnvironmentVariables['TMPDIR'] = "$WorkDir/tmp"
-    $psi.EnvironmentVariables['XDG_CACHE_HOME'] = "$WorkDir/state\cache"
-    $psi.EnvironmentVariables['HOME'] = "$WorkDir/state\home"
-    $psi.EnvironmentVariables['LOCALAPPDATA'] = "$WorkDir/state\appdata"
+    $psi.EnvironmentVariables['XDG_CACHE_HOME'] = "$WorkDir/state/cache"
+    $psi.EnvironmentVariables['HOME'] = "$WorkDir/state/home"
+    $psi.EnvironmentVariables['LOCALAPPDATA'] = "$WorkDir/state/appdata"
     $agent = [System.Diagnostics.Process]::Start($psi)
     $agentId = $null
     $agentStatus = $null
@@ -304,7 +327,11 @@ try {
     for ($i = 0; $i -lt 90; $i++) {
         Start-Sleep -Seconds 1
         if ($agent.HasExited) { throw "the agent exited early with code $($agent.ExitCode)" }
-        try { $agents = @((Api-Get "$base/api/v1/agents" "$WorkDir/agents.json").data) } catch { continue }
+        # apiListAgents answers respond(c, {"agents": [...]}), so the array is at
+        # .data.agents — reading .data yields the wrapper OBJECT, $agents[0].id is
+        # then empty, and a fully registered online agent is reported as "never
+        # registered". The leftover agents.json in the work dir is the proof.
+        try { $agents = @((Api-Get "$base/api/v1/agents" "$WorkDir/agents.json").data.agents) } catch { continue }
         if ($agents.Count -gt 0) {
             $agentId = $agents[0].id
             $agentStatus = $agents[0].status
@@ -442,7 +469,7 @@ finally {
     if (-not $runGreen) {
         # Red run: the server log carries the real reason (payload build errors,
         # beacon rejections) while the HTTP responses stay generic.
-        Get-LogTail "$WorkDir/logs\forgec2.log" 60
+        Get-LogTail $script:LogFile 60
     }
     if ($runGreen -and -not $KeepWork) {
         # Drop the throwaway DB, config, cookie jar and binaries of a green run
