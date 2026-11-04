@@ -103,20 +103,28 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    const saved = localStorage.getItem("forgec2_lang") as Locale;
-    if (saved && saved !== "en") {
+    let saved: string | null = null;
+    try {
+      saved = localStorage.getItem("forgec2_lang");
+    } catch {
+      // Browser privacy policies can disable storage without disabling the UI.
+    }
+    if (saved === "zh") {
       pendingRef.current = "zh";
       loadZh().then(() => {
         if (pendingRef.current !== "zh") return;
         localeRef.current = "zh";
         activeLocale = "zh";
         setLocaleState("zh");
+      }).catch(() => {
+        // Keep the current dictionary; loadZh clears its cache for a retry.
       });
     } else if (saved === "en") {
       localeRef.current = "en";
       activeLocale = "en";
       setLocaleState("en");
     }
+    return () => { pendingRef.current = null; };
   }, []);
 
   useEffect(() => {
@@ -124,23 +132,33 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   }, [locale]);
 
   const setLocale = useCallback((newLocale: Locale) => {
-    if (newLocale === localeRef.current) return;
+    // A same-language selection must also cancel an opposite pending load.
     pendingRef.current = newLocale;
+    try {
+      localStorage.setItem("forgec2_lang", newLocale);
+    } catch {
+      // Persisting a preference is optional; switching in memory still works.
+    }
+    try {
+      document.cookie = "forgec2_lang=" + newLocale + "; path=/; max-age=31536000; SameSite=Strict";
+    } catch {
+      // Cookie access can be restricted independently of localStorage.
+    }
+    if (newLocale === localeRef.current) return;
     if (newLocale === "zh") {
       loadZh().then(() => {
         if (pendingRef.current !== "zh") return;
         localeRef.current = "zh";
         activeLocale = "zh";
         setLocaleState("zh");
+      }).catch(() => {
+        // Do not surface an unhandled rejection when the locale chunk is offline.
       });
     } else {
       localeRef.current = "en";
       activeLocale = "en";
       setLocaleState("en");
     }
-    localStorage.setItem("forgec2_lang", newLocale);
-    document.cookie = "forgec2_lang=" + newLocale + "; path=/; max-age=31536000; SameSite=Strict";
-    document.documentElement.lang = newLocale;
     document.documentElement.dir = "ltr";
   }, []);
 

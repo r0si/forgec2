@@ -42,25 +42,25 @@ class ErrorBoundaryInner extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
-      if (this.props.fallback) return this.props.fallback;
-      return <ErrorFallbackUI error={this.state.error} onReset={() => this.setState({ hasError: false, error: null })} />;
+      if (this.props.fallback !== undefined) return this.props.fallback;
+      return <ErrorFallbackUI onReset={() => this.setState({ hasError: false, error: null })} />;
     }
     return this.props.children;
   }
 }
 
-function ErrorFallbackUI({ error, onReset }: { error: Error | null; onReset: () => void }) {
+function ErrorFallbackUI({ onReset }: { onReset: () => void }) {
   const { t } = useI18n();
   return (
-    <div className="flex flex-col items-center justify-center min-h-[300px] p-8 text-center">
+    <div role="alert" className="flex flex-col items-center justify-center min-h-[300px] p-8 text-center">
       <div className="mb-4 flex size-14 items-center justify-center rounded-lg bg-destructive/10">
-        <Bug className="size-7 text-destructive-ink" />
+        <Bug aria-hidden="true" className="size-7 text-destructive-ink" />
       </div>
       <h2 className="text-lg font-semibold text-foreground mb-2">{t("error.boundary_title")}</h2>
       <p className="text-sm text-muted-foreground mb-4 max-w-md">
-        {error?.message || t("error.boundary_message")}
+        {t("error.boundary_message")}
       </p>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap justify-center gap-2">
         <Button size="sm" variant="outline" onClick={onReset}>
           {t("error.try_again")}
         </Button>

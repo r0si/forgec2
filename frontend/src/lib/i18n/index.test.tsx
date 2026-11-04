@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { useEffect } from "react";
 import { render, screen, waitFor, act } from "@testing-library/react";
 
@@ -42,6 +42,7 @@ function Probe() {
 }
 
 describe("I18nProvider", () => {
+  afterEach(() => vi.restoreAllMocks());
   beforeEach(() => {
     localStorage.clear();
     document.documentElement.lang = "en";
@@ -118,5 +119,51 @@ describe("I18nProvider", () => {
       captured.setLocale!("en");
     });
     expect(captured.t).toBe(t1);
+  });
+
+  it("keeps the final English selection when a Chinese load is pending", async () => {
+    render(<I18nProvider><Probe /></I18nProvider>);
+    await act(async () => {
+      captured.setLocale!("zh");
+      captured.setLocale!("en");
+    });
+    expect(screen.getByTestId("probe").textContent).toContain("en|Save");
+    expect(localStorage.getItem("forgec2_lang")).toBe("en");
+    expect(document.documentElement.lang).toBe("en");
+  });
+
+  it("ignores invalid saved languages instead of treating them as Chinese", async () => {
+    localStorage.setItem("forgec2_lang", "invalid-locale");
+    render(<I18nProvider><Probe /></I18nProvider>);
+    await act(async () => {});
+    expect(screen.getByTestId("probe").textContent).toContain("Save");
+    expect(document.documentElement.lang).toBe("en");
+  });
+
+  it("renders and switches language when localStorage is unavailable", async () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new DOMException("Blocked", "SecurityError");
+    });
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("Full", "QuotaExceededError");
+    });
+    render(<I18nProvider><Probe /></I18nProvider>);
+    await act(async () => { captured.setLocale!("zh"); });
+    expect(screen.getByTestId("probe").textContent).toContain("保存");
+    expect(document.documentElement.lang).toBe("zh");
+    expect(document.cookie).toContain("forgec2_lang=zh");
+    act(() => { captured.setLocale!("en"); });
+    expect(screen.getByTestId("probe").textContent).toContain("Save");
+  });
+
+  it("switches language even if the browser rejects cookie writes", async () => {
+    vi.spyOn(document, "cookie", "set").mockImplementation(() => {
+      throw new DOMException("Blocked", "SecurityError");
+    });
+    render(<I18nProvider><Probe /></I18nProvider>);
+    await act(async () => { captured.setLocale!("zh"); });
+    expect(screen.getByTestId("probe").textContent).toContain("保存");
+    expect(localStorage.getItem("forgec2_lang")).toBe("zh");
+    act(() => { captured.setLocale!("en"); });
   });
 });
