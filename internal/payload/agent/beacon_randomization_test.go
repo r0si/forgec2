@@ -66,27 +66,31 @@ func TestComputeBeaconIntervalWithMode(t *testing.T) {
 }
 
 func TestApplyMaxRandomCap(t *testing.T) {
-	// Set base interval for the cap calculation
-	Interval = 10
-
 	tests := []struct {
 		name        string
+		base        time.Duration
 		interval    time.Duration
 		maxCapMs    int
 		expectedMax time.Duration
 	}{
-		{"no cap", 15 * time.Second, 0, 15 * time.Second},
-		{"cap not reached", 12 * time.Second, 10000, 12 * time.Second},
-		{"cap reached", 15 * time.Second, 1000, 11 * time.Second},
-		{"negative cap", 15 * time.Second, -1, 15 * time.Second},
+		{"no cap", 10 * time.Second, 15 * time.Second, 0, 15 * time.Second},
+		{"cap not reached", 10 * time.Second, 12 * time.Second, 10000, 12 * time.Second},
+		{"cap reached", 10 * time.Second, 15 * time.Second, 1000, 11 * time.Second},
+		{"negative cap", 10 * time.Second, 15 * time.Second, -1, 15 * time.Second},
+		// Cap keys off the PASSED base, not the global Interval: with a 1s
+		// fast-mode base a 1000ms cap allows only 2s, even if Interval (a
+		// global) is much larger. Pins the fix for the fast-mode mismatch.
+		{"fast-mode base governs", 1 * time.Second, 5 * time.Second, 1000, 2 * time.Second},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			MaxRandomIntervalMs = tt.maxCapMs
-			result := applyMaxRandomCap(tt.interval)
+			// Set a large global Interval to prove it is NOT the reference.
+			Interval = 3600
+			result := applyMaxRandomCap(tt.base, tt.interval)
 			if result > tt.expectedMax {
-				t.Errorf("applyMaxRandomCap(%v) = %v, want <= %v", tt.interval, result, tt.expectedMax)
+				t.Errorf("applyMaxRandomCap(%v,%v) = %v, want <= %v", tt.base, tt.interval, result, tt.expectedMax)
 			}
 		})
 	}

