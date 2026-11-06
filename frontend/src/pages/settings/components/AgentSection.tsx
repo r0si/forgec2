@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { CardHeaderRow } from "@/components/ui/card-header-row";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Toggle from "./Toggle";
 import { Bot, Save } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
@@ -57,6 +58,30 @@ export default function AgentSection({
               </Field>
             </div>
             <p className="text-micro-sm text-muted-foreground mt-2">{t("settings.agent.working_hint")}</p>
+          </div>
+          <div className="border-t pt-4">
+            <h3 className="text-sm font-medium text-muted-foreground mb-3">{t("settings.agent.rand_title")}</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <Field label={t("settings.agent.rand_mode")} htmlFor="agent-beacon-randomization">
+                <Select value={form.beacon_randomization} onValueChange={(v) => v && setForm({ ...form, beacon_randomization: v })}>
+                  <SelectTrigger id="agent-beacon-randomization" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="linear">{t("generate.rand_linear")}</SelectItem>
+                    <SelectItem value="gaussian">{t("generate.rand_gaussian")}</SelectItem>
+                    <SelectItem value="exponential">{t("generate.rand_exponential")}</SelectItem>
+                    <SelectItem value="two_stage">{t("generate.rand_two_stage")}</SelectItem>
+                    <SelectItem value="adaptive">{t("generate.rand_adaptive")}</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-micro-sm text-muted-foreground mt-1">{t("settings.agent.rand_hint")}</p>
+              </Field>
+              <Field label={t("settings.agent.max_rand")} htmlFor="agent-max-random-ms">
+                <Input id="agent-max-random-ms" type="number" min={0} max={600000} step={100} value={form.max_random_interval_ms} onChange={(e) => setForm({ ...form, max_random_interval_ms: Math.min(600000, Math.max(0, Number(e.target.value) || 0)) })} />
+                <p className="text-micro-sm text-muted-foreground mt-1">{t("settings.agent.max_rand_hint")}</p>
+              </Field>
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <Button type="submit" size="lg" disabled={saving || !settingsLoaded} className="px-6 text-sm font-medium transition-colors disabled:opacity-50">

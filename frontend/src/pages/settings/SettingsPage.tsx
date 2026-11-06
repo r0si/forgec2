@@ -109,7 +109,7 @@ export default function SettingsPage() {
   const { mutate: saveAgent, isPending: savingAgent } = useMutation({
     fn: async (e: React.FormEvent) => {
       e.preventDefault();
-      await api.post(paths.settings.agent, { interval: String(agentForm.interval), jitter: String(agentForm.jitter), skip_tls: String(agentForm.skip_tls), user_agent: agentForm.user_agent, working_start: agentForm.working_start, working_end: agentForm.working_end, working_tz: agentForm.working_tz });
+      await api.post(paths.settings.agent, { interval: String(agentForm.interval), jitter: String(agentForm.jitter), skip_tls: String(agentForm.skip_tls), user_agent: agentForm.user_agent, working_start: agentForm.working_start, working_end: agentForm.working_end, working_tz: agentForm.working_tz, beacon_randomization: agentForm.beacon_randomization, max_random_interval_ms: String(agentForm.max_random_interval_ms) });
     },
     onSuccess: () => toast.success(t("settings.toast.agent_saved")),
     onError: (e) => toastError(e, "settings.toast.save_failed"),

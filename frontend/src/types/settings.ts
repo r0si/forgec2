@@ -49,6 +49,10 @@ export interface SettingsData {
   working_start?: string;
   working_end?: string;
   working_tz?: string;
+  /** Fleet-default heartbeat timing randomization algorithm. */
+  beacon_randomization?: string;
+  /** Fleet-default per-beacon random-delay cap in ms (0 = uncapped). */
+  max_random_interval_ms?: number;
   cert_subject?: string;
   cert_issuer?: string;
   cert_expires_at?: string;
@@ -65,6 +69,8 @@ export interface AgentForm {
   working_start: string;
   working_end: string;
   working_tz: string;
+  beacon_randomization: string;
+  max_random_interval_ms: number;
 }
 
 export interface ServerForm {

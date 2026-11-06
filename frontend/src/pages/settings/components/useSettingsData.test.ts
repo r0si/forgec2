@@ -51,6 +51,27 @@ describe("useSettingsData", () => {
     expect(result.current.malleableForm.append).toBe("--></body></html>");
   });
 
+  it("hydrates the fleet-default beacon randomization fields from the server", async () => {
+    getMock.mockResolvedValueOnce({
+      default_interval: 15,
+      default_jitter: 30,
+      beacon_randomization: "gaussian",
+      max_random_interval_ms: 2500,
+    });
+    const { result } = renderHook(() => useSettingsData());
+    await waitFor(() => expect(result.current.loaded).toBe(true));
+    expect(result.current.agentForm.beacon_randomization).toBe("gaussian");
+    expect(result.current.agentForm.max_random_interval_ms).toBe(2500);
+  });
+
+  it("defaults the randomization fields when the server omits them", async () => {
+    getMock.mockResolvedValueOnce({ default_interval: 8, default_jitter: 12 });
+    const { result } = renderHook(() => useSettingsData());
+    await waitFor(() => expect(result.current.loaded).toBe(true));
+    expect(result.current.agentForm.beacon_randomization).toBe("linear");
+    expect(result.current.agentForm.max_random_interval_ms).toBe(0);
+  });
+
   it("falls back to an empty header field only when the server sends no headers", async () => {
     getMock.mockResolvedValueOnce({ malleable_enabled: false });
 

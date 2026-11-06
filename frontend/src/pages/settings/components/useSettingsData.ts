@@ -14,6 +14,8 @@ const defaultAgentForm = (): AgentForm => ({
   working_start: "",
   working_end: "",
   working_tz: "",
+  beacon_randomization: "linear",
+  max_random_interval_ms: 0,
 });
 
 const defaultServerForm = (): ServerForm => ({
@@ -61,6 +63,8 @@ export function useSettingsData() {
         working_start: d.working_start ?? "",
         working_end: d.working_end ?? "",
         working_tz: d.working_tz ?? "",
+        beacon_randomization: d.beacon_randomization || "linear",
+        max_random_interval_ms: d.max_random_interval_ms ?? 0,
       });
       setServerForm({
         log_level: d.log_level ?? "info",
