@@ -84,6 +84,8 @@ func (s *Server) handleAPISettings(c *gin.Context) {
 		defaultInterval, defaultJitter                          int
 		defaultSkipTLS                                          bool
 		defaultUA                                               string
+		beaconRandomization                                     string
+		maxRandomIntervalMs                                     int
 	}{
 		port:             s.cfg.Server.Port,
 		host:             s.cfg.Server.Host,
@@ -98,6 +100,11 @@ func (s *Server) handleAPISettings(c *gin.Context) {
 		defaultJitter:    s.cfg.Implant.DefaultJitter,
 		defaultSkipTLS:   s.cfg.Implant.DefaultSkipTLS,
 		defaultUA:        s.cfg.Implant.DefaultUA,
+		// Fleet-default heartbeat timing randomization, kept consistent with the
+		// primary Settings GET (handleSettingsPage) so the two agent-default
+		// surfaces do not disagree.
+		beaconRandomization: s.cfg.Implant.BeaconRandomization,
+		maxRandomIntervalMs: s.cfg.Implant.MaxRandomIntervalMs,
 	}
 	s.configMu.RUnlock()
 	if fi, err := os.Stat(dbPath); err == nil {
@@ -141,10 +148,12 @@ func (s *Server) handleAPISettings(c *gin.Context) {
 			"protocol_outdated_agents": outdatedProtocolAgents,
 		},
 		"agent": gin.H{
-			"default_interval": cfgSnap.defaultInterval,
-			"default_jitter":   cfgSnap.defaultJitter,
-			"default_skip_tls": cfgSnap.defaultSkipTLS,
-			"default_ua":       cfgSnap.defaultUA,
+			"default_interval":       cfgSnap.defaultInterval,
+			"default_jitter":         cfgSnap.defaultJitter,
+			"default_skip_tls":       cfgSnap.defaultSkipTLS,
+			"default_ua":             cfgSnap.defaultUA,
+			"beacon_randomization":   cfgSnap.beaconRandomization,
+			"max_random_interval_ms": cfgSnap.maxRandomIntervalMs,
 		},
 	})
 }

@@ -38,6 +38,8 @@ func TestAPISettingsStats(t *testing.T) {
 	s.cfg.Server.OfflineThreshold = 300
 	s.cfg.Implant.DefaultInterval = 15
 	s.cfg.Implant.DefaultJitter = 20
+	s.cfg.Implant.BeaconRandomization = "gaussian"
+	s.cfg.Implant.MaxRandomIntervalMs = 2500
 	s.startTime = time.Now().Add(-time.Minute)
 
 	c, w := missingAPICtx(http.MethodGet, "/api/settings", "", nil)
@@ -62,8 +64,10 @@ func TestAPISettingsStats(t *testing.T) {
 			GoVersion              string `json:"go_version"`
 		} `json:"server"`
 		Agent struct {
-			DefaultInterval int `json:"default_interval"`
-			DefaultJitter   int `json:"default_jitter"`
+			DefaultInterval     int    `json:"default_interval"`
+			DefaultJitter       int    `json:"default_jitter"`
+			BeaconRandomization string `json:"beacon_randomization"`
+			MaxRandomIntervalMs int    `json:"max_random_interval_ms"`
 		} `json:"agent"`
 	}
 	unmarshalData(t, w.Body.Bytes(), &out)
@@ -85,6 +89,14 @@ func TestAPISettingsStats(t *testing.T) {
 	}
 	if out.Agent.DefaultInterval != 15 || out.Agent.DefaultJitter != 20 {
 		t.Fatalf("agent defaults = %+v", out.Agent)
+	}
+	// The two fleet-default randomization keys must appear here too, matching
+	// the primary Settings GET so the two agent-default surfaces agree.
+	if out.Agent.BeaconRandomization != "gaussian" {
+		t.Fatalf("agent beacon_randomization = %q, want gaussian", out.Agent.BeaconRandomization)
+	}
+	if out.Agent.MaxRandomIntervalMs != 2500 {
+		t.Fatalf("agent max_random_interval_ms = %d, want 2500", out.Agent.MaxRandomIntervalMs)
 	}
 	if out.Server.Uptime == "" || out.Server.GoVersion == "" {
 		t.Fatalf("missing runtime info: %+v", out.Server)
