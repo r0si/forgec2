@@ -414,8 +414,12 @@ func (s *Server) handleAIRunsCreate(c *gin.Context) {
 				return
 			}
 		}
-		// Retry once on SQLITE_BUSY
-		if strings.Contains(txErr.Error(), "database is locked") || strings.Contains(txErr.Error(), "busy") {
+		// Retry once on transient write contention (PostgreSQL deadlock /
+		// serialization failure, or a connection blip) — the analog of the old
+		// SQLITE_BUSY. Matching only "database is locked"/"busy" (the SQLite
+		// strings) would leave a PostgreSQL deployment falling through to the
+		// generic error path on exactly the conflict this branch recovers from.
+		if isTransientDBError(txErr) {
 			time.Sleep(50 * time.Millisecond)
 			// The blind fallback below runs without the transaction's early
 			// lock, so re-verify idempotency + concurrency caps first —
