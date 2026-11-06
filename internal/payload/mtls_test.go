@@ -160,6 +160,52 @@ func TestBootstrapBlobCarriesMTLSMaterial(t *testing.T) {
 	}
 }
 
+// TestBootstrapBlobCarriesBeaconRandomization pins that a config-over-wire
+// (bootstrap) implant keeps the operator's heartbeat timing randomization.
+// Beacon randomization has NO over-the-wire NetworkConfig slot (adding it there
+// would overwrite the per-implant choice with the fleet default on every
+// refresh), so the only place it can survive for this build flavor is the
+// bootstrap blob. A regression here silently ships "linear" for a build the
+// operator chose as gaussian/exponential/two_stage/adaptive.
+func TestBootstrapBlobCarriesBeaconRandomization(t *testing.T) {
+	profile := defaultMalleableProfile()
+	cfg := ImplantConfig{
+		C2URL:                 "https://10.4.4.4:8443",
+		Protocol:              "https",
+		Interval:              10,
+		Jitter:                25,
+		BeaconKey:             testHexFiller,
+		NetworkConfigOverWire: true,
+		BeaconRandomization:   "gaussian",
+		MaxRandomIntervalMs:   3000,
+	}
+	blob, sConfigKey := buildConfigBlobKeyed(cfg, profile)
+	keyHex, ok := recoverBlobKeyHex(sConfigKey)
+	if !ok {
+		t.Fatal("failed to recover per-build key")
+	}
+	raw, ok := decodeBlobForTestKeyed(blob, keyHex)
+	if !ok {
+		t.Fatal("bootstrap blob did not decode")
+	}
+	var got agentConfigJSON
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.BeaconRandomization != "gaussian" {
+		t.Errorf("bootstrap beacon_randomization = %q, want gaussian (config-over-wire implant silently reverted to linear)", got.BeaconRandomization)
+	}
+	if got.MaxRandomIntervalMs != "3000" {
+		t.Errorf("bootstrap max_random_interval_ms = %q, want 3000", got.MaxRandomIntervalMs)
+	}
+	// Interval/jitter are NOT burned into a bootstrap build (they arrive over
+	// the wire), so they must be absent here -- asserting both directions so the
+	// fix can't be "cheated" by dumping the whole full-build blob into bootstrap.
+	if got.Interval != "" || got.Jitter != "" {
+		t.Errorf("bootstrap blob must NOT bake interval/jitter (delivered over the wire), got interval=%q jitter=%q", got.Interval, got.Jitter)
+	}
+}
+
 func TestValidateMTLSMaterial(t *testing.T) {
 	validCert, validKey := selfSignedMTLSPair(t)
 	_, otherKey := selfSignedMTLSPair(t)

