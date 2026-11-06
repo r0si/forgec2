@@ -84,7 +84,13 @@ func TestForceReanalyzeDoesNotDeadlock(t *testing.T) {
 		if p == nil {
 			t.Fatal("nil profile")
 		}
-	case <-time.After(10 * time.Second):
+	// ForceReanalyze -> Analyze does real WMI / process-environment probing
+	// (~4s when the suite runs this package alone). Under the full `-count=1`
+	// run many packages contend for CPU and the probe can take 3x that, so a
+	// tight 10s deadline false-failed as "deadlocked" while the work was only
+	// slow. A genuine deadlock NEVER returns, so a generous bound still catches
+	// it; 60s removes the contention flake without weakening the guard.
+	case <-time.After(60 * time.Second):
 		t.Fatal("ForceReanalyze deadlocked")
 	}
 }
