@@ -66,9 +66,9 @@ func TestSQLiteOnlyMaintenanceRefusedOnPostgres(t *testing.T) {
 }
 
 // TestDBVacuumRunsAnalyzeOnPostgres pins the intended behavior: the maintenance
-// endpoint works on PostgreSQL (the production driver), running ANALYZE and
-// reporting a real size, instead of answering 501 like a driver it no longer
-// supports. Skipped when no PostgreSQL is reachable.
+// endpoint works on PostgreSQL (the production driver), running VACUUM ANALYZE
+// and reporting a real size, instead of answering 501 like a driver it no
+// longer supports. Skipped when no PostgreSQL is reachable.
 func TestDBVacuumRunsAnalyzeOnPostgres(t *testing.T) {
 	ginSetTestMode(t)
 	gdb, err := db.InitDBWithDriver("postgres", testPostgresDSN, "", slog.LevelWarn, 1, 1, time.Minute)

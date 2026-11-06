@@ -651,27 +651,45 @@ func (s *Server) handleRegenerateJWT(c *gin.Context) {
 }
 
 func (s *Server) handleDBVacuum(c *gin.Context) {
-	// "Vacuum" is the maintenance label kept for the endpoint's history; on the
-	// PostgreSQL deployment it runs ANALYZE to refresh the planner (physical
-	// compaction is autovacuum's job and an external concern). ANALYZE is valid
-	// on SQLite too, so the endpoint stays meaningful for the in-memory test
-	// harness instead of being gated to one driver. The old requireSQLiteDB gate
-	// was a migration leftover that made the endpoint answer 501 on exactly the
-	// PostgreSQL deployment whose ANALYZE + pg_database_size it had been rewritten
-	// to run — so the endpoint worked for neither driver.
-	var dbSize int64
+	// The endpoint is named "vacuum" and the Settings button reads "Vacuum /
+	// 压缩整理", promising reclaim of unused space plus planner optimization. The
+	// v2.8 migration rewrote the body to ANALYZE only while keeping the requireSQLiteDB
+	// gate -- so it answered 501 on the only production driver and did the wrong
+	// thing on SQLite, matching neither its name nor its label.
+	//
+	// It now does what the label promises, driver-aware:
+	//   PostgreSQL: VACUUM ANALYZE (one statement) reclaims dead-tuple space
+	//               concurrently (non-blocking, not VACUUM FULL) and refreshes
+	//               planner stats in the same pass.
+	//   SQLite (test harness / legacy): VACUUM then ANALYZE (SQLite has no
+	//               combined "VACUUM ANALYZE"). Both are valid outside a
+	//               transaction on the autocommit *sql.DB handle.
+	// Size is reported for both. ANALYZE-only would leave the button lying about
+	// reclaiming space; a plain VACUUM is safe and is exactly the on-demand
+	// counterpart to background autovacuum.
 	rawDB, err := s.db.DB()
 	if err != nil {
 		respondError(c, http.StatusInternalServerError, "Failed to get database connection")
 		return
 	}
-	if _, err := rawDB.Exec("ANALYZE"); err != nil {
-		respondError(c, http.StatusInternalServerError, "ANALYZE failed")
-		return
+	if isPostgresDB(s.db) {
+		if _, err := rawDB.Exec("VACUUM (ANALYZE)"); err != nil {
+			respondError(c, http.StatusInternalServerError, "VACUUM failed")
+			return
+		}
+	} else {
+		if _, err := rawDB.Exec("VACUUM"); err != nil {
+			respondError(c, http.StatusInternalServerError, "VACUUM failed")
+			return
+		}
+		if _, err := rawDB.Exec("ANALYZE"); err != nil {
+			respondError(c, http.StatusInternalServerError, "ANALYZE failed")
+			return
+		}
 	}
-	dbSize = s.databaseSizeBytes()
-	slog.Info("Database analyze completed", "size", dbSize)
-	respond(c, gin.H{"message": "Database analyze completed", "size": dbSize})
+	dbSize := s.databaseSizeBytes()
+	slog.Info("Database vacuum completed", "size", dbSize)
+	respond(c, gin.H{"message": "Database vacuum completed", "size": dbSize})
 }
 
 // databaseSizeBytes returns the live database's on-disk size in bytes, using
