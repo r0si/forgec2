@@ -627,6 +627,25 @@ func normalizeBeaconRandomization(mode string) string {
 	return ""
 }
 
+// resolveBeaconRandomization applies the documented precedence for the beacon
+// randomization mode: an explicit, recognized form selection wins; otherwise the
+// server-wide fleet default (also normalized). It returns "" only when NEITHER
+// side names a valid mode, in which case the implant keeps its own compile-time
+// default ("linear").
+//
+// The subtle point this encodes: the frontend sends an explicit mode whenever the
+// operator picks one — including "linear" — and omits "default" (which arrives as
+// ""). An omitted/unknown/"default" form value falls back to the fleet default;
+// an explicit "linear" does NOT, so choosing Linear is honored even when the
+// fleet default is Gaussian. (The pre-fix frontend conflated "linear" with unset,
+// letting a Gaussian fleet default silently override an explicit Linear choice.)
+func resolveBeaconRandomization(formMode, defMode string) string {
+	if m := normalizeBeaconRandomization(formMode); m != "" {
+		return m
+	}
+	return normalizeBeaconRandomization(defMode)
+}
+
 // clampMaxRandomIntervalMs bounds the per-beacon random-delay cap to a sane
 // range: negative input is meaningless (0 = disabled) and anything past 10 min
 // is an operator mistake that would push beacons far past their interval.

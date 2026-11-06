@@ -441,13 +441,12 @@ func (s *Server) buildImplantConfig(form *binaryGenForm) (payload.ImplantConfig,
 	dnsObscure := s.cfg != nil && s.cfg.Server.DNSObscure
 	s.configMu.RUnlock()
 
-	// Beacon randomization: explicit form value wins; otherwise the server-wide
-	// default. Unknown values are normalized to "linear" server-side so a typo
-	// never ships a mode the agent would silently ignore.
-	form.BeaconRandomization = normalizeBeaconRandomization(form.BeaconRandomization)
-	if form.BeaconRandomization == "" {
-		form.BeaconRandomization = normalizeBeaconRandomization(defBeaconRand)
-	}
+	// Beacon randomization: an explicit recognized selection wins, else the
+	// server-wide fleet default; both normalized so a typo never ships a mode the
+	// agent would silently ignore. resolveBeaconRandomization encodes the
+	// precedence (see its doc) so an explicit "linear" is honored over a Gaussian
+	// fleet default.
+	form.BeaconRandomization = resolveBeaconRandomization(form.BeaconRandomization, defBeaconRand)
 	form.MaxRandomIntervalMs = clampMaxRandomIntervalMs(form.MaxRandomIntervalMs)
 
 	var err error

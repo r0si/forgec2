@@ -164,3 +164,32 @@ func TestClampMaxRandomIntervalMs(t *testing.T) {
 		}
 	}
 }
+
+// TestResolveBeaconRandomization pins the precedence the Generate form relies on.
+// The critical case: an explicit "linear" form value must be honored even when
+// the fleet default is Gaussian -- conflating "linear" with unset (the pre-fix
+// bug) silently shipped Gaussian instead.
+func TestResolveBeaconRandomization(t *testing.T) {
+	cases := []struct {
+		name     string
+		formMode string
+		defMode  string
+		want     string
+	}{
+		{"explicit linear beats gaussian fleet default", "linear", "gaussian", "linear"},
+		{"explicit gaussian", "gaussian", "linear", "gaussian"},
+		{"default sentinel falls to fleet default", "default", "gaussian", "gaussian"},
+		{"empty (omitted) falls to fleet default", "", "gaussian", "gaussian"},
+		{"case-insensitive form wins", "  GAUSSIAN ", "linear", "gaussian"},
+		{"garbage form falls to valid fleet default", "nonsense", "adaptive", "adaptive"},
+		{"garbage form, invalid fleet default -> empty (agent keeps built-in)", "nonsense", "bogus", ""},
+		{"both empty -> empty (agent keeps built-in linear)", "", "", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := resolveBeaconRandomization(tc.formMode, tc.defMode); got != tc.want {
+				t.Errorf("resolveBeaconRandomization(%q,%q) = %q, want %q", tc.formMode, tc.defMode, got, tc.want)
+			}
+		})
+	}
+}
