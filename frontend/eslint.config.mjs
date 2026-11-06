@@ -4,7 +4,7 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["out/**", "build/**", "public/js/**", "node_modules/**"] },
+  { ignores: ["out/**", "build/**", "public/js/**", "node_modules/**", "**/.tmp-*"] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   reactHooks.configs.flat["recommended-latest"],

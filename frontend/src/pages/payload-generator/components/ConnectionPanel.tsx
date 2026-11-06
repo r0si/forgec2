@@ -328,6 +328,29 @@ export default function ConnectionPanel({
             <Input aria-label={t("generate.jitter_pct")} type="number" min={0} max={100} disabled={profileLocked} value={shared.jitter} onChange={(e) => setShared(s => ({ ...s, jitter: clampJitter(e.target.value) }))} />
           </div>
         </div>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <div>
+            <span className="mb-1.5 block text-xs font-semibold text-muted-foreground">{t("generate.beacon_randomization")}</span>
+            <Select disabled={profileLocked} value={shared.beacon_randomization} onValueChange={(v) => v && setShared(s => ({ ...s, beacon_randomization: v }))}>
+              <SelectTrigger aria-label={t("generate.beacon_randomization")} className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="linear">{t("generate.rand_linear")}</SelectItem>
+                <SelectItem value="gaussian">{t("generate.rand_gaussian")}</SelectItem>
+                <SelectItem value="exponential">{t("generate.rand_exponential")}</SelectItem>
+                <SelectItem value="two_stage">{t("generate.rand_two_stage")}</SelectItem>
+                <SelectItem value="adaptive">{t("generate.rand_adaptive")}</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="mt-1 text-micro-sm text-muted-foreground">{t("generate.beacon_randomization_hint")}</p>
+          </div>
+          <div>
+            <span className="mb-1.5 block text-xs font-semibold text-muted-foreground">{t("generate.max_random_interval_ms")}</span>
+            <Input aria-label={t("generate.max_random_interval_ms")} type="number" min={0} max={600000} step={100} disabled={profileLocked} value={shared.max_random_interval_ms} onChange={(e) => setShared(s => ({ ...s, max_random_interval_ms: String(Math.min(600000, Math.max(0, parseInt(e.target.value) || 0))) }))} />
+            <p className="mt-1 text-micro-sm text-muted-foreground">{t("generate.max_random_interval_ms_hint")}</p>
+          </div>
+        </div>
       </ConfigSection>
 
       {/* ── Keys & OPSEC ── */}

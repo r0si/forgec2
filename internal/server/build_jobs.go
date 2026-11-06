@@ -604,6 +604,42 @@ func clampIntervalJitter(interval, jitter, beaconTime int) (int, int) {
 	return interval, jitter
 }
 
+// validBeaconRandomizationModes mirrors the agent's initBeaconRandomization()
+// switch plus the empty value (unset = build-time default "linear"). Anything
+// else is normalized away so a typo can never ship a mode the implant would
+// silently ignore.
+var validBeaconRandomizationModes = map[string]bool{
+	"":            true,
+	"linear":      true,
+	"gaussian":    true,
+	"exponential": true,
+	"two_stage":   true,
+	"adaptive":    true,
+}
+
+// normalizeBeaconRandomization lowercases/trims a mode string and maps an
+// unrecognized value to "" (the build-time default) instead of passing it on.
+func normalizeBeaconRandomization(mode string) string {
+	mode = strings.ToLower(strings.TrimSpace(mode))
+	if validBeaconRandomizationModes[mode] {
+		return mode
+	}
+	return ""
+}
+
+// clampMaxRandomIntervalMs bounds the per-beacon random-delay cap to a sane
+// range: negative input is meaningless (0 = disabled) and anything past 10 min
+// is an operator mistake that would push beacons far past their interval.
+func clampMaxRandomIntervalMs(ms int) int {
+	if ms < 0 {
+		return 0
+	}
+	if ms > 600000 {
+		return 600000
+	}
+	return ms
+}
+
 // parseArchitecture returns the normalized architecture string.
 func parseArchitecture(arch string) string {
 	arch = strings.TrimSpace(arch)

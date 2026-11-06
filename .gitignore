@@ -26,6 +26,9 @@ config.*.yaml
 *.out
 go.work
 
+# Scratch/debug artifacts (never commit; e.g. ad-hoc screenshot probe scripts)
+**/.tmp-*
+
 # IDE / editor
 .idea/
 .vscode/

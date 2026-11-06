@@ -1,0 +1,174 @@
+package main
+
+import (
+	"testing"
+	"time"
+)
+
+func TestBeaconRandomizationInit(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected BeaconRandomizationMode
+	}{
+		{"default linear", "", RandomizationLinear},
+		{"explicit linear", "linear", RandomizationLinear},
+		{"gaussian", "gaussian", RandomizationGaussian},
+		{"exponential", "exponential", RandomizationExponential},
+		{"two_stage", "two_stage", RandomizationTwoStage},
+		{"adaptive", "adaptive", RandomizationAdaptive},
+		{"unknown falls back to linear", "unknown", RandomizationLinear},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			BeaconRandomizationStr = tt.input
+			initBeaconRandomization()
+			if beaconRandomizationMode != tt.expected {
+				t.Errorf("initBeaconRandomization() = %v, want %v", beaconRandomizationMode, tt.expected)
+			}
+		})
+	}
+}
+
+func TestComputeBeaconIntervalWithMode(t *testing.T) {
+	base := 10 * time.Second
+	jitter := 20.0
+
+	tests := []struct {
+		name       string
+		mode       BeaconRandomizationMode
+		minSeconds float64
+		maxSeconds float64
+	}{
+		{"linear mode", RandomizationLinear, 8.0, 12.0},
+		{"gaussian mode", RandomizationGaussian, 4.0, 16.0},
+		{"exponential mode", RandomizationExponential, 8.0, 14.0},
+		{"two_stage mode", RandomizationTwoStage, 5.6, 15.6},
+		{"adaptive mode", RandomizationAdaptive, 4.0, 16.0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			beaconRandomizationMode = tt.mode
+			// Test multiple times to check variance
+			for i := 0; i < 100; i++ {
+				interval := computeBeaconIntervalWithMode(base, jitter)
+				seconds := interval.Seconds()
+				if seconds < tt.minSeconds || seconds > tt.maxSeconds {
+					t.Errorf("computeBeaconIntervalWithMode(%v, %v) = %v, want [%v, %v]",
+						base, jitter, interval, tt.minSeconds, tt.maxSeconds)
+					break
+				}
+			}
+		})
+	}
+}
+
+func TestApplyMaxRandomCap(t *testing.T) {
+	// Set base interval for the cap calculation
+	Interval = 10
+
+	tests := []struct {
+		name        string
+		interval    time.Duration
+		maxCapMs    int
+		expectedMax time.Duration
+	}{
+		{"no cap", 15 * time.Second, 0, 15 * time.Second},
+		{"cap not reached", 12 * time.Second, 10000, 12 * time.Second},
+		{"cap reached", 15 * time.Second, 1000, 11 * time.Second},
+		{"negative cap", 15 * time.Second, -1, 15 * time.Second},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			MaxRandomIntervalMs = tt.maxCapMs
+			result := applyMaxRandomCap(tt.interval)
+			if result > tt.expectedMax {
+				t.Errorf("applyMaxRandomCap(%v) = %v, want <= %v", tt.interval, result, tt.expectedMax)
+			}
+		})
+	}
+}
+
+func TestGaussianRandom(t *testing.T) {
+	// Test that gaussian random values are within [-3, 3]
+	for i := 0; i < 1000; i++ {
+		val := gaussianRandom()
+		if val < -3.0 || val > 3.0 {
+			t.Errorf("gaussianRandom() = %v, want in [-3, 3]", val)
+		}
+	}
+}
+
+func TestExponentialRandom(t *testing.T) {
+	// Test that exponential random values are non-negative and bounded
+	for i := 0; i < 1000; i++ {
+		val := exponentialRandom()
+		if val < 0 || val > 3.0 {
+			t.Errorf("exponentialRandom() = %v, want in [0, 3]", val)
+		}
+	}
+}
+
+func TestBeaconRandomizationDistribution(t *testing.T) {
+	base := 10 * time.Second
+	jitter := 20.0
+
+	// Test that gaussian mode produces a distribution centered around the base
+	beaconRandomizationMode = RandomizationGaussian
+	sum := 0.0
+	count := 1000
+	for i := 0; i < count; i++ {
+		interval := computeBeaconIntervalWithMode(base, jitter)
+		sum += interval.Seconds()
+	}
+	mean := sum / float64(count)
+
+	// Mean should be close to base (10 seconds)
+	if mean < 9.0 || mean > 11.0 {
+		t.Errorf("gaussian distribution mean = %v, want ~10.0", mean)
+	}
+}
+
+func TestFloorBeaconInterval(t *testing.T) {
+	// base 10s -> floor is max(1s, 1s) = 1s
+	if got := floorBeaconInterval(10*time.Second, -5*time.Second); got != time.Second {
+		t.Errorf("negative clamped to %v, want 1s", got)
+	}
+	if got := floorBeaconInterval(10*time.Second, 0); got != time.Second {
+		t.Errorf("zero clamped to %v, want 1s", got)
+	}
+	if got := floorBeaconInterval(10*time.Second, 50*time.Second); got != 50*time.Second {
+		t.Errorf("in-range value altered: %v", got)
+	}
+	// base 60s -> floor is max(1s, 6s) = 6s
+	if got := floorBeaconInterval(60*time.Second, 2*time.Second); got != 6*time.Second {
+		t.Errorf("long-cadence floor = %v, want 6s", got)
+	}
+	if got := floorBeaconInterval(1*time.Second, 500*time.Millisecond); got != time.Second {
+		t.Errorf("short-cadence floor = %v, want 1s", got)
+	}
+}
+
+// TestNoBeaconStormAcrossModes drives every randomization mode at the extremes
+// (interval 1s, jitter 100%) and asserts the floored result is always strictly
+// positive, so no mode can produce the zero/negative sleep that reads as a
+// dead-or-flapping implant. This pins the floor wiring used by sleepWithJitter.
+func TestNoBeaconStormAcrossModes(t *testing.T) {
+	Interval = 1
+	modes := []BeaconRandomizationMode{
+		RandomizationLinear, RandomizationGaussian, RandomizationExponential,
+		RandomizationTwoStage, RandomizationAdaptive,
+	}
+	for _, m := range modes {
+		beaconRandomizationMode = m
+		for i := 0; i < 2000; i++ {
+			next := floorBeaconInterval(time.Second, computeBeaconIntervalWithMode(time.Second, 100.0))
+			if next <= 0 {
+				t.Fatalf("mode %q produced non-positive sleep %v (beacon storm)", m, next)
+			}
+		}
+	}
+}

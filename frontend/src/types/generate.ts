@@ -37,6 +37,11 @@ export interface SharedState {
   beacon_transport: string;
   interval: string;
   jitter: string;
+  // Beacon randomization mode: how the heartbeat interval is randomized
+  // ("linear" = default uniform jitter, "gaussian", "exponential", "two_stage", "adaptive").
+  beacon_randomization: string;
+  // Cap on the random delay added per beacon, in milliseconds (0 = no cap).
+  max_random_interval_ms: string;
   ua: string;
   proxy: string;
   failover: string;

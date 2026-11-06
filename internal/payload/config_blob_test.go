@@ -376,3 +376,57 @@ func TestBuildConfigBlobKeyedRoundTrip(t *testing.T) {
 		t.Errorf("per-build keys must differ between builds")
 	}
 }
+
+// TestConfigBlobCarriesBeaconRandomization pins that the heartbeat
+// randomization mode and its per-beacon delay cap survive the AES-GCM blob
+// round-trip: the agent's initBeaconRandomization() and MaxRandomIntervalMs
+// depend on these exact JSON keys, so a dropped field would silently revert
+// every implant to plain linear jitter.
+func TestConfigBlobCarriesBeaconRandomization(t *testing.T) {
+	profile := defaultMalleableProfile()
+	cfg := ImplantConfig{
+		C2URL:               "https://c2.example",
+		Interval:            30,
+		Jitter:              25,
+		BeaconRandomization: "gaussian",
+		MaxRandomIntervalMs: 5000,
+	}
+	blob, sConfigKey := buildConfigBlobKeyed(cfg, profile)
+	if blob == "" || sConfigKey == "" {
+		t.Fatal("buildConfigBlobKeyed returned empty")
+	}
+	keyHex, ok := recoverBlobKeyHex(sConfigKey)
+	if !ok {
+		t.Fatal("sConfigKey decode failed")
+	}
+	aesKey, err := hex.DecodeString(keyHex)
+	if err != nil || len(aesKey) != 32 {
+		t.Fatalf("aes key: len=%d err=%v", len(aesKey), err)
+	}
+	block, err := aes.NewCipher(aesKey)
+	if err != nil {
+		t.Fatalf("aes newcipher: %v", err)
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		t.Fatalf("gcm: %v", err)
+	}
+	raw, err := base64.StdEncoding.DecodeString(blob)
+	if err != nil || len(raw) < gcm.NonceSize() {
+		t.Fatal("blob decode")
+	}
+	plain, err := gcm.Open(nil, raw[:gcm.NonceSize()], raw[gcm.NonceSize():], nil)
+	if err != nil {
+		t.Fatalf("gcm open: %v", err)
+	}
+	var got agentConfigJSON
+	if err := json.Unmarshal(plain, &got); err != nil {
+		t.Fatalf("json: %v", err)
+	}
+	if got.BeaconRandomization != "gaussian" {
+		t.Errorf("BeaconRandomization = %q, want gaussian", got.BeaconRandomization)
+	}
+	if got.MaxRandomIntervalMs != "5000" {
+		t.Errorf("MaxRandomIntervalMs = %q, want 5000", got.MaxRandomIntervalMs)
+	}
+}

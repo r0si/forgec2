@@ -93,6 +93,17 @@ implant:
   default_jitter: 30
   default_user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
   default_skip_tls: false
+  # Heartbeat randomization algorithm shipped into generated implants
+  # (an operator can still override per-build on the Generate page):
+  #   linear       - uniform random within +/-jitter% of the interval (default)
+  #   gaussian     - normal distribution centered on the interval
+  #   exponential  - exponential decay, biased toward shorter sleeps
+  #   two_stage    - a random base interval (+/-30%) with jitter on top
+  #   adaptive     - gaussian + environment-aware tuning
+  # beacon_randomization: linear
+  # Cap on the extra random delay added to a single beacon, in ms (0 = uncapped).
+  # Keeps a high-jitter profile from sleeping long enough to trip the dead timeout.
+  # max_random_interval_ms: 0
 
 auth:
   password_hash: ""

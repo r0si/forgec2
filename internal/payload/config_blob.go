@@ -69,6 +69,10 @@ type agentConfigJSON struct {
 	// Startup delay window in seconds (0/0 = disabled).
 	StartDelayMin string `json:"start_delay_min"`
 	StartDelayMax string `json:"start_delay_max"`
+	// Beacon randomization mode (linear, gaussian, exponential, two_stage, adaptive)
+	BeaconRandomization string `json:"beacon_randomization"`
+	// Max random delay in milliseconds added per beacon (0 = no cap)
+	MaxRandomIntervalMs string `json:"max_random_interval_ms"`
 	// v2 chains + rotation (agent parses ServerOutput via MalleableRespDecode).
 	MalleableRespDecode string `json:"malleable_resp_decode"`
 	MalleableClientID   string `json:"malleable_client_id"`
@@ -264,6 +268,8 @@ func marshalConfigBlobJSON(cfg ImplantConfig, profile MalleableProfile) []byte {
 		ContentLengthJitter:     fmt.Sprintf("%d", cfg.ContentLengthJitter),
 		StartDelayMin:           fmt.Sprintf("%d", cfg.StartDelayMin),
 		StartDelayMax:           fmt.Sprintf("%d", cfg.StartDelayMax),
+		BeaconRandomization:     cfg.BeaconRandomization,
+		MaxRandomIntervalMs:     fmt.Sprintf("%d", cfg.MaxRandomIntervalMs),
 		MalleableRespDecode:     cfg.MalleableServerOutput,
 		MalleableClientID:       cfg.MalleableClientID,
 		MalleableClientMeta:     cfg.MalleableClientMetadata,

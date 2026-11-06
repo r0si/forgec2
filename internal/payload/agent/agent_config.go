@@ -104,6 +104,17 @@ var (
 	StartDelayMinStr      string   = "0"                           // startup delay window floor, seconds (0 = disabled)
 	StartDelayMaxStr      string   = "0"                           // startup delay window ceiling, seconds (0 = disabled)
 
+	// Beacon randomization: controls how the beacon interval is randomized.
+	// "linear" (default): uniform random within ±jitter% of interval
+	// "gaussian": normal distribution centered at interval, stddev = interval * jitter%
+	// "exponential": exponential decay (more frequent shorter intervals)
+	// "two_stage": random base interval [interval*0.7..interval*1.3] + jitter within that
+	// "adaptive": dynamically adjust based on network conditions and time of day
+	BeaconRandomizationStr string = "linear"
+	// MaxRandomIntervalMs caps the maximum random delay added per beacon (0 = no cap).
+	// Prevents excessive delays that could cause session expiry.
+	MaxRandomIntervalMs int = 0
+
 	// Certificate pinning (SHA-256 hex of server DER cert; empty = disabled)
 	PinnedCertSHA256Str string = ""
 
@@ -285,6 +296,10 @@ type agentConfigBlob struct {
 	// Startup delay window in seconds (0/0 = disabled).
 	StartDelayMin string `json:"start_delay_min"`
 	StartDelayMax string `json:"start_delay_max"`
+	// Beacon randomization mode (linear, gaussian, exponential, two_stage, adaptive)
+	BeaconRandomization string `json:"beacon_randomization"`
+	// Max random delay in milliseconds added per beacon (0 = no cap)
+	MaxRandomIntervalMs string `json:"max_random_interval_ms"`
 	// Request-side transforms applied by the agent to outbound beacons.
 	MalleableRequestPrepend string            `json:"malleable_request_prepend"`
 	MalleableRequestAppend  string            `json:"malleable_request_append"`
@@ -736,5 +751,14 @@ func (b *agentConfigBlob) apply() {
 	}
 	if b.StartDelayMax != "" {
 		StartDelayMaxStr = b.StartDelayMax
+	}
+	if b.BeaconRandomization != "" {
+		BeaconRandomizationStr = b.BeaconRandomization
+		initBeaconRandomization()
+	}
+	if b.MaxRandomIntervalMs != "" {
+		if v, err := strconv.Atoi(b.MaxRandomIntervalMs); err == nil && v >= 0 {
+			MaxRandomIntervalMs = v
+		}
 	}
 }

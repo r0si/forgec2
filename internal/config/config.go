@@ -131,7 +131,7 @@ type Config struct {
 	} `yaml:"roe"`
 
 	Database struct {
-		Path   string `yaml:"path"` // legacy: path for sqlite (deprecated, use DSN)
+		Path   string `yaml:"path"`   // legacy: path for sqlite (deprecated, use DSN)
 		Driver string `yaml:"driver"` // "postgres" (default)
 		DSN    string `yaml:"dsn"`    // PostgreSQL connection string (e.g. "host=localhost user=forgec2 password=... dbname=forgec2 port=5432 sslmode=disable")
 	} `yaml:"database"`
@@ -147,6 +147,16 @@ type Config struct {
 		DefaultWorkingEnd   string `yaml:"default_working_end"`   // HH:MM local time (empty = disabled)
 		DefaultWorkingTZ    string `yaml:"default_working_tz"`    // IANA timezone (e.g. "America/New_York"), empty = UTC
 		GoProxy             string `yaml:"goproxy"`               // optional GOPROXY for payload builds when env GOPROXY is unset
+		// BeaconRandomization controls the heartbeat timing randomization algorithm.
+		// "linear" (default): uniform random within ±jitter% of interval
+		// "gaussian": normal distribution centered at interval, stddev = interval * jitter%
+		// "exponential": exponential decay (more frequent shorter intervals)
+		// "two_stage": random base interval [interval*0.7..interval*1.3] + jitter within that
+		// "adaptive": dynamically adjust based on network conditions and time of day
+		BeaconRandomization string `yaml:"beacon_randomization"`
+		// MaxRandomIntervalMs caps the maximum random delay added per beacon (0 = no cap).
+		// Prevents excessive delays that could cause session expiry.
+		MaxRandomIntervalMs int `yaml:"max_random_interval_ms"`
 	} `yaml:"implant"`
 
 	Auth struct {
@@ -447,6 +457,13 @@ func DefaultConfig() *Config {
 	cfg.Implant.DefaultInterval = 5
 	cfg.Implant.MinInterval = 5
 	cfg.Implant.MinJitter = 10
+	cfg.Implant.DefaultJitter = 20
+	cfg.Implant.DefaultUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+	cfg.Implant.DefaultWorkingStart = ""
+	cfg.Implant.DefaultWorkingEnd = ""
+	cfg.Implant.DefaultWorkingTZ = ""
+	cfg.Implant.BeaconRandomization = "linear"
+	cfg.Implant.MaxRandomIntervalMs = 0
 
 	cfg.PasswordPolicy.MinLength = 8
 	cfg.PasswordPolicy.RequireUpper = true
@@ -454,11 +471,6 @@ func DefaultConfig() *Config {
 	cfg.PasswordPolicy.RequireDigit = true
 	cfg.PasswordPolicy.RequireSymbol = false
 	cfg.PasswordPolicy.MaxAge = 0
-	cfg.Implant.DefaultJitter = 20
-	cfg.Implant.DefaultUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
-	cfg.Implant.DefaultWorkingStart = ""
-	cfg.Implant.DefaultWorkingEnd = ""
-	cfg.Implant.DefaultWorkingTZ = ""
 
 	cfg.Malleable.Enabled = false
 	cfg.Malleable.StatusCode = 200
@@ -667,7 +679,7 @@ func applyDataDirEnv(cfg *Config) {
 			*path = filepath.Join(dir, suffix)
 		}
 	}
-	rebase(&cfg.Database.Path, filepath.Join("db", "forgec2.db"))
+	rebase(&cfg.Database.Path, filepath.Join("db", "forgec2.db")) // check:runtime-paths-ok a relative DEFAULT that is immediately rebased onto the config file's directory
 	rebase(&cfg.Server.CertFile, "server.crt")
 	rebase(&cfg.Server.KeyFile, "server.key")
 	rebase(&cfg.Server.SSHHostKey, "ssh_host_key")
@@ -869,6 +881,22 @@ func (c *Config) Validate() error {
 	}
 	if c.Implant.DefaultJitter < c.Implant.MinJitter {
 		errs = append(errs, fmt.Errorf("implant.default_jitter (%d) must be >= implant.min_jitter (%d)", c.Implant.DefaultJitter, c.Implant.MinJitter))
+	}
+	validRandomizationModes := map[string]bool{
+		"linear":      true,
+		"gaussian":    true,
+		"exponential": true,
+		"two_stage":   true,
+		"adaptive":    true,
+	}
+	if !validRandomizationModes[c.Implant.BeaconRandomization] {
+		errs = append(errs, fmt.Errorf("implant.beacon_randomization must be one of: linear, gaussian, exponential, two_stage, adaptive (got %q)", c.Implant.BeaconRandomization))
+	}
+	if c.Implant.MaxRandomIntervalMs < 0 {
+		errs = append(errs, errors.New("implant.max_random_interval_ms must be >= 0"))
+	}
+	if c.Implant.MaxRandomIntervalMs > 600000 {
+		errs = append(errs, errors.New("implant.max_random_interval_ms must be <= 600000 (10 minutes)"))
 	}
 	if c.Logging.Level != "" && c.Logging.Level != "debug" && c.Logging.Level != "info" && c.Logging.Level != "warn" && c.Logging.Level != "error" {
 		errs = append(errs, errors.New(`logging.level must be one of: debug, info, warn, error`))

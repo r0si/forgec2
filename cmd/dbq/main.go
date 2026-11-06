@@ -4,7 +4,8 @@
 // Usage: go run ./cmd/dbq <dsn> <query>
 //
 // Example:
-//   go run ./cmd/dbq "host=localhost user=forgec2 password=forgec2 dbname=forgec2 port=5432 sslmode=disable" "SELECT * FROM users"
+//
+//	go run ./cmd/dbq "host=localhost user=forgec2 password=forgec2 dbname=forgec2 port=5432 sslmode=disable" "SELECT * FROM users"
 package main
 
 import (

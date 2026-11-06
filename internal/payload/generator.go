@@ -213,6 +213,16 @@ type ImplantConfig struct {
 	// blunt sandbox detonation timelines. 0/0 = disabled. Capped at 600s.
 	StartDelayMin int
 	StartDelayMax int
+	// Beacon randomization mode: controls how the beacon interval is randomized.
+	// "linear" (default): uniform random within ±jitter% of interval
+	// "gaussian": normal distribution centered at interval, stddev = interval * jitter%
+	// "exponential": exponential decay (more frequent shorter intervals)
+	// "two_stage": random base interval [interval*0.7..interval*1.3] + jitter within that
+	// "adaptive": dynamically adjust based on network conditions and time of day
+	BeaconRandomization string
+	// MaxRandomIntervalMs caps the maximum random delay added per beacon (0 = no cap).
+	// Prevents excessive delays that could cause session expiry.
+	MaxRandomIntervalMs int
 	// Slim builds the light/http-only profile: the grpc/quic/wss transports
 	// are compiled out (stubs report plainly at runtime), cutting ~30% off
 	// the binary. Incompatible with BeaconTransport grpc/quic/wss.

@@ -22,7 +22,6 @@ const root = process.argv[2] ? process.argv[2] : join(dirname(fileURLToPath(impo
 
 // Relative paths that are deliberate, keyed "<file>:<line>".
 const ALLOWLIST = new Map([
-  ["internal/config/config.go:670", "a relative DEFAULT that is immediately rebased onto the config file's directory"],
   ["internal/payload/stager.go:44", "default only; cmd/server calls SetStagerKeyFile with the configured data dir before first use"],
   ["internal/payload/update_signing.go:28", "default only; cmd/server calls SetUpdateSigningKeyFile with the configured data dir before first use"],
   ["internal/server/handlers_file_thumb.go:288", "the fallback branch only fires when data_dir is empty, and matches the documented data/ convention"],

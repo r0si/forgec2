@@ -81,6 +81,10 @@ func init() {
 	if Jitter > 100 {
 		Jitter = 100
 	}
+
+	// Initialize beacon randomization mode
+	initBeaconRandomization()
+
 	Persist = strings.ToLower(PersistStr) == "true" || PersistStr == "1"
 	SkipTLSVerify = strings.ToLower(SkipTLSVerifyStr) == "true" || SkipTLSVerifyStr == "1"
 	Debug = strings.ToLower(DebugStr) == "true" || DebugStr == "1"

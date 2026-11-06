@@ -122,3 +122,45 @@ func TestSha256OfFile(t *testing.T) {
 		t.Fatalf("missing file must return empty/0, got %q/%d", sum2, size2)
 	}
 }
+
+func TestNormalizeBeaconRandomization(t *testing.T) {
+	cases := []struct {
+		in   string
+		want string
+	}{
+		{"", ""},
+		{"linear", "linear"},
+		{"gaussian", "gaussian"},
+		{"exponential", "exponential"},
+		{"two_stage", "two_stage"},
+		{"adaptive", "adaptive"},
+		{"  GAUSSIAN  ", "gaussian"}, // trims + lowercases
+		{"ExpOnEnTial", "exponential"},
+		{"garbage", ""},    // unknown maps to build-time default
+		{"two-stage", ""},  // wrong separator is not silently accepted
+		{"normaldist", ""}, // a real word that is not a supported mode
+	}
+	for _, tc := range cases {
+		if got := normalizeBeaconRandomization(tc.in); got != tc.want {
+			t.Errorf("normalizeBeaconRandomization(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
+func TestClampMaxRandomIntervalMs(t *testing.T) {
+	cases := []struct {
+		in   int
+		want int
+	}{
+		{0, 0},       // disabled
+		{1500, 1500}, // in range
+		{600000, 600000},
+		{600001, 600000}, // over the 10-minute ceiling
+		{-5, 0},          // negative means disabled, never a negative delay
+	}
+	for _, tc := range cases {
+		if got := clampMaxRandomIntervalMs(tc.in); got != tc.want {
+			t.Errorf("clampMaxRandomIntervalMs(%d) = %d, want %d", tc.in, got, tc.want)
+		}
+	}
+}

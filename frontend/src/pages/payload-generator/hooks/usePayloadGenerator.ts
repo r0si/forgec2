@@ -105,6 +105,7 @@ export function usePayloadGenerator() {
   const [shared, setShared] = useState<SharedState>({
     listener_id: "", c2_url: "", protocol: "http", beacon_transport: "http",
     interval: "15", jitter: "30",
+    beacon_randomization: "linear", max_random_interval_ms: "0",
     ua: DEFAULT_UA, proxy: "", failover: "", crypto_key: "", beacon_key: "", profile: "",
     dns_doh_url: "", dns_dot_addr: "", ssh_user: "forgec2", ssh_password: "", ssh_key: "", ssh_host_key: "",
     mtls_cert: "", mtls_key: "", mtls_ca: "",
@@ -253,6 +254,8 @@ export function usePayloadGenerator() {
     formData.set("profile", s.profile);
     formData.set("interval", s.interval);
     formData.set("jitter", s.jitter);
+    if (shared.beacon_randomization && shared.beacon_randomization !== "linear") formData.set("beacon_randomization", shared.beacon_randomization);
+    if (shared.max_random_interval_ms && shared.max_random_interval_ms !== "0") formData.set("max_random_interval_ms", shared.max_random_interval_ms);
     formData.set("user_agent", s.user_agent);
     formData.set("proxy", s.proxy);
     formData.set("crypto_key", s.crypto_key);
@@ -264,7 +267,7 @@ export function usePayloadGenerator() {
     if (shared.mtls_key) formData.set("mtls_key", shared.mtls_key);
     if (shared.mtls_ca) formData.set("mtls_ca", shared.mtls_ca);
     if (extra) for (const [k, v] of Object.entries(extra)) formData.set(k, v);
-  }, [getSharedSettings, shared.listener_id, shared.mtls_cert, shared.mtls_key, shared.mtls_ca]);
+  }, [getSharedSettings, shared.listener_id, shared.mtls_cert, shared.mtls_key, shared.mtls_ca, shared.beacon_randomization, shared.max_random_interval_ms]);
 
   const buildC2URL = useCallback(() => {
     const info = getListenerInfo(shared.listener_id);

@@ -78,7 +78,11 @@ type binaryGenForm struct {
 	SelfCheck        bool   `form:"self_check"`               // embed + verify a SHA-256 self-integrity hash
 	NetCfgOverWire   bool   `form:"network_config_over_wire"` // bootstrap-only compile; server delivers full config at registration
 	// Max random bytes appended to the HTTP/WS beacon body (0=disabled).
-	ContentLengthJitter int    `form:"content_length_jitter"`
+	ContentLengthJitter int `form:"content_length_jitter"`
+	// Beacon randomization mode: linear, gaussian, exponential, two_stage, adaptive
+	BeaconRandomization string `form:"beacon_randomization"`
+	// Max random delay in milliseconds added per beacon (0 = no cap)
+	MaxRandomIntervalMs int    `form:"max_random_interval_ms"`
 	IconB64             string `form:"icon_b64"`
 	IconPreset          string `form:"icon_preset"`
 	FileDescription     string `form:"file_description"`
@@ -433,8 +437,18 @@ func (s *Server) buildImplantConfig(form *binaryGenForm) (payload.ImplantConfig,
 	// wired into builds.
 	s.configMu.RLock()
 	defWorkStart, defWorkEnd, defWorkTZ := s.cfg.Implant.DefaultWorkingStart, s.cfg.Implant.DefaultWorkingEnd, s.cfg.Implant.DefaultWorkingTZ
+	defBeaconRand := s.cfg.Implant.BeaconRandomization
 	dnsObscure := s.cfg != nil && s.cfg.Server.DNSObscure
 	s.configMu.RUnlock()
+
+	// Beacon randomization: explicit form value wins; otherwise the server-wide
+	// default. Unknown values are normalized to "linear" server-side so a typo
+	// never ships a mode the agent would silently ignore.
+	form.BeaconRandomization = normalizeBeaconRandomization(form.BeaconRandomization)
+	if form.BeaconRandomization == "" {
+		form.BeaconRandomization = normalizeBeaconRandomization(defBeaconRand)
+	}
+	form.MaxRandomIntervalMs = clampMaxRandomIntervalMs(form.MaxRandomIntervalMs)
 
 	var err error
 	var regSecretID, regSecretB64 string
@@ -493,6 +507,8 @@ func (s *Server) buildImplantConfig(form *binaryGenForm) (payload.ImplantConfig,
 		ExpiryDate:            form.ExpiryDate,
 		SelfCheck:             form.SelfCheck,
 		ContentLengthJitter:   form.ContentLengthJitter,
+		BeaconRandomization:   form.BeaconRandomization,
+		MaxRandomIntervalMs:   form.MaxRandomIntervalMs,
 		DNSObscure:            dnsObscure,
 		IconB64:               form.IconB64,
 		IconPreset:            form.IconPreset,
