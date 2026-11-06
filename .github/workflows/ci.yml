@@ -106,11 +106,20 @@ jobs:
           grep -qa "ci/stamp-check" forgec2-repo-check
           rm -f forgec2-repo-check
       - name: API smoke (unauth + default admin)
+        # v2.8 made PostgreSQL the only supported backend, so the smoke server
+        # needs a real database. Start one here (AFTER the unit tests, which
+        # skip when PostgreSQL is absent, so this does not change their
+        # behavior) on the port config.example.yaml points at, and wait for it
+        # to accept connections before booting the server.
         run: |
-          # Fresh DB. config.example.yaml leaves auth.default_password empty
-          # (secure default -> random password printed on first boot), so CI
-          # injects a strong password for the login test and tells the smoke
-          # script what it is.
+          docker run -d --name forgec2-pg \
+            -e POSTGRES_USER=forgec2 -e POSTGRES_PASSWORD=forgec2 -e POSTGRES_DB=forgec2 \
+            -p 5432:5432 postgres:16-alpine
+          for i in $(seq 1 30); do
+            if docker exec forgec2-pg pg_isready -U forgec2 -d forgec2 >/dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          docker exec forgec2-pg pg_isready -U forgec2 -d forgec2 || { echo "PostgreSQL did not become ready"; exit 1; }
           SMOKE_ADMIN_PASSWORD="S1mokeC2-$(openssl rand -hex 8)-9z!Z"
           sed "s/^  default_password:.*/  default_password: $SMOKE_ADMIN_PASSWORD/" config.example.yaml > config.ci.yaml
           rm -rf data/db

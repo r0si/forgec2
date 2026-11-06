@@ -84,9 +84,13 @@ listeners:
     addr: ":8081"               # cleartext HTTP/2 (h2c) beacon listener bind addr
 
 database:
-  path: data/db/forgec2.db
-  driver: sqlite
-  # dsn: "host=postgres user=forgec2 password=change_me dbname=forgec2 port=5432 sslmode=disable"
+  # v2.8 removed the SQLite driver: PostgreSQL is the only supported backend.
+  # path: below is legacy and ignored when driver is postgres (kept so a
+  # pre-2.8 config still parses). Point dsn at your PostgreSQL instance; the
+  # docker-compose profile overrides these via FORGEC2_DB_DRIVER / FORGEC2_DB_DSN.
+  driver: postgres
+  dsn: "host=127.0.0.1 user=forgec2 password=forgec2 dbname=forgec2 port=5432 sslmode=disable"
+  # path: data/db/forgec2.db   # legacy sqlite path, ignored under postgres
 
 implant:
   default_interval: 15
