@@ -285,7 +285,14 @@ func TestDropRolePermissionsMigration(t *testing.T) {
 
 	t.Run("drops legacy table", func(t *testing.T) {
 		db := openTestDB(t)
-		if err := db.Exec(`CREATE TABLE role_permissions (id integer PRIMARY KEY AUTOINCREMENT, role varchar(32), permission varchar(64), created_at datetime)`).Error; err != nil {
+		// Portable fixture: openTestDB is a PostgreSQL handle here (and skips
+		// when it is unavailable), so this CREATE must use SQL PostgreSQL
+		// accepts. AUTOINCREMENT is SQLite-only and fails on PostgreSQL with a
+		// syntax error, and `datetime` is not a PostgreSQL type -- both passed
+		// only because the local run skips. The exact columns do not matter to
+		// the drop migration (it removes the whole table); id/role/permission/
+		// created_at with integer PK + timestamp is valid on both drivers.
+		if err := db.Exec(`CREATE TABLE role_permissions (id integer PRIMARY KEY, role varchar(32), permission varchar(64), created_at timestamp)`).Error; err != nil {
 			t.Fatalf("create legacy table: %v", err)
 		}
 		if err := db.Exec(`INSERT INTO role_permissions (role, permission) VALUES ('admin', 'agents.read')`).Error; err != nil {
