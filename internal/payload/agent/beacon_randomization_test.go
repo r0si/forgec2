@@ -74,13 +74,26 @@ func TestAdaptiveFactor(t *testing.T) {
 	old := getWorkingHours()
 	t.Cleanup(func() { setWorkingHours(old.start, old.end, old.tz) })
 
-	// No window configured: local (UTC) business hour -> active, night -> idle.
+	// No window, no tz: the heuristic tracks the VICTIM HOST's local clock
+	// (not forced UTC). Times are built in time.Local so now.Local().Hour()
+	// equals the constructed hour regardless of the runner's zone.
 	setWorkingHours("", "", "")
+	if scale, spread := adaptiveFactor(time.Date(2026, 1, 1, 12, 0, 0, 0, time.Local)); scale != 1.0 || spread != 1.0 {
+		t.Errorf("daytime(no tz) = (%v,%v), want (1.0,1.0) active", scale, spread)
+	}
+	if scale, spread := adaptiveFactor(time.Date(2026, 1, 1, 3, 0, 0, 0, time.Local)); scale <= 1.0 || spread <= 1.0 {
+		t.Errorf("night(no tz) = (%v,%v), want idle (>1.0 scale, >1.0 spread)", scale, spread)
+	}
+
+	// No window, operator-set tz: the configured zone is honored. With tz=UTC a
+	// UTC-built instant maps to the same hour, so the branch (not the runner's
+	// local zone) decides active vs idle -- deterministic everywhere.
+	setWorkingHours("", "", "UTC")
 	if scale, spread := adaptiveFactor(time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)); scale != 1.0 || spread != 1.0 {
-		t.Errorf("daytime(no window) = (%v,%v), want (1.0,1.0) active", scale, spread)
+		t.Errorf("daytime(tz=UTC) = (%v,%v), want (1.0,1.0) active", scale, spread)
 	}
 	if scale, spread := adaptiveFactor(time.Date(2026, 1, 1, 3, 0, 0, 0, time.UTC)); scale <= 1.0 || spread <= 1.0 {
-		t.Errorf("night(no window) = (%v,%v), want idle (>1.0 scale, >1.0 spread)", scale, spread)
+		t.Errorf("night(tz=UTC) = (%v,%v), want idle (>1.0 scale, >1.0 spread)", scale, spread)
 	}
 
 	// Configured 09:00-17:00 window: inside -> active, outside -> dormant.
