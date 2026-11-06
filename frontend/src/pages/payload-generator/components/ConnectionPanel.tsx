@@ -336,6 +336,7 @@ export default function ConnectionPanel({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="default">{t("generate.rand_default")}</SelectItem>
                 <SelectItem value="linear">{t("generate.rand_linear")}</SelectItem>
                 <SelectItem value="gaussian">{t("generate.rand_gaussian")}</SelectItem>
                 <SelectItem value="exponential">{t("generate.rand_exponential")}</SelectItem>
@@ -347,7 +348,10 @@ export default function ConnectionPanel({
           </div>
           <div>
             <span className="mb-1.5 block text-xs font-semibold text-muted-foreground">{t("generate.max_random_interval_ms")}</span>
-            <Input aria-label={t("generate.max_random_interval_ms")} type="number" min={0} max={600000} step={100} disabled={profileLocked} value={shared.max_random_interval_ms} onChange={(e) => setShared(s => ({ ...s, max_random_interval_ms: String(Math.min(600000, Math.max(0, parseInt(e.target.value) || 0))) }))} />
+            {/* Empty = follow the server default (unset); an explicit 0 means "uncap"
+                and is sent as-is, so an operator who set a fleet-wide cap can still
+                opt a single build back out of it. */}
+            <Input aria-label={t("generate.max_random_interval_ms")} type="number" min={0} max={600000} step={100} placeholder={t("generate.max_random_interval_ms_default")} disabled={profileLocked} value={shared.max_random_interval_ms} onChange={(e) => { const raw = e.target.value; setShared(s => ({ ...s, max_random_interval_ms: raw.trim() === "" ? "" : String(Math.min(600000, Math.max(0, parseInt(raw) || 0))) })); }} />
             <p className="mt-1 text-micro-sm text-muted-foreground">{t("generate.max_random_interval_ms_hint")}</p>
           </div>
         </div>

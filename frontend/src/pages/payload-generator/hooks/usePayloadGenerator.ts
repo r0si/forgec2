@@ -105,7 +105,8 @@ export function usePayloadGenerator() {
   const [shared, setShared] = useState<SharedState>({
     listener_id: "", c2_url: "", protocol: "http", beacon_transport: "http",
     interval: "15", jitter: "30",
-    beacon_randomization: "linear", max_random_interval_ms: "0",
+    // "default" = follow the server fleet-wide default; empty cap = follow server default too.
+    beacon_randomization: "default", max_random_interval_ms: "",
     ua: DEFAULT_UA, proxy: "", failover: "", crypto_key: "", beacon_key: "", profile: "",
     dns_doh_url: "", dns_dot_addr: "", ssh_user: "forgec2", ssh_password: "", ssh_key: "", ssh_host_key: "",
     mtls_cert: "", mtls_key: "", mtls_ca: "",
@@ -254,8 +255,14 @@ export function usePayloadGenerator() {
     formData.set("profile", s.profile);
     formData.set("interval", s.interval);
     formData.set("jitter", s.jitter);
-    if (shared.beacon_randomization && shared.beacon_randomization !== "linear") formData.set("beacon_randomization", shared.beacon_randomization);
-    if (shared.max_random_interval_ms && shared.max_random_interval_ms !== "0") formData.set("max_random_interval_ms", shared.max_random_interval_ms);
+    // "default" means follow the server fleet-wide default -> omitted, so the
+    // server applies cfg.Implant.BeaconRandomization. Any explicit mode (even
+    // "linear") is SENT, so choosing "Linear" on the form is honored even when
+    // the fleet default is Gaussian -- omitting linear was conflating the two.
+    if (shared.beacon_randomization && shared.beacon_randomization !== "default") formData.set("beacon_randomization", shared.beacon_randomization);
+    // Empty cap -> omitted (server default); a typed value (including "0" =
+    // explicit uncap) is sent, so an operator can override a fleet-wide cap.
+    if (shared.max_random_interval_ms !== "") formData.set("max_random_interval_ms", shared.max_random_interval_ms);
     formData.set("user_agent", s.user_agent);
     formData.set("proxy", s.proxy);
     formData.set("crypto_key", s.crypto_key);
