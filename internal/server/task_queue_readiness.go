@@ -25,7 +25,7 @@ func (s *Server) stalledQueueSummary(c *gin.Context) (stalled int, queued int) {
 			SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending,
 			SUM(CASE WHEN status = 'running' THEN 1 ELSE 0 END) AS running,
 			COALESCE(MAX(CASE WHEN status = 'pending'
-				THEN CAST(strftime('%s', ?) - strftime('%s', created_at) AS INTEGER) END), 0) AS oldest_age`, now).
+				THEN `+secondsSinceExpr(s.db, "?", "created_at")+` END), 0) AS oldest_age`, now).
 		Where("status IN ?", []string{"pending", "running"}).
 		Group("agent_id").Scan(&rows).Error; err != nil {
 		// A probe that cannot count must not claim zero: "unknown" is the honest answer, and zero stalled would be a reassurance

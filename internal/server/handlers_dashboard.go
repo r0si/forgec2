@@ -103,7 +103,7 @@ func (s *Server) handleDashboardActivityHeatmap(c *gin.Context) {
 	}
 	var buckets []hourBucket
 	if err := s.tenantScope(s.db.Model(&db.Task{}), c).
-		Select("CAST((julianday('now') - julianday(created_at)) AS INTEGER) as day, strftime('%H', created_at) as hour, COUNT(*) as count").
+		Select(dayAgoHourBucketSelect(s.db, "created_at")).
 		Where("created_at >= ?", startTime).
 		Group("day, hour").Scan(&buckets).Error; err != nil {
 		handleQueryError(c, err, "Failed to query activity heatmap")

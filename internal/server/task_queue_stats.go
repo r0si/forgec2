@@ -61,7 +61,7 @@ func (s *Server) handleTaskQueueStats(c *gin.Context) {
 			SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending,
 			SUM(CASE WHEN status = 'running' THEN 1 ELSE 0 END) AS running,
 			COALESCE(MAX(CASE WHEN status = 'pending'
-				THEN CAST(strftime('%s', ?) - strftime('%s', created_at) AS INTEGER) END), 0) AS oldest_age`,
+				THEN `+secondsSinceExpr(s.db, "?", "created_at")+` END), 0) AS oldest_age`,
 			now.UTC().Format("2006-01-02 15:04:05")).
 		Where("status IN ?", []string{"pending", "running"}).
 		Group("agent_id")

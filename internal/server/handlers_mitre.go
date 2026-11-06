@@ -317,7 +317,7 @@ func (s *Server) handleMitreHeatmap(c *gin.Context) {
 	var counts []dayType
 	if len(types) > 0 {
 		if err := s.db.Table("tasks").
-			Select("type, strftime('%Y-%m-%d', created_at) as day, COUNT(*) as count").
+			Select("type, "+dayStringSelectExpr(s.db, "created_at")+", COUNT(*) as count").
 			Where("created_at >= ? AND type IN ?", start, types).
 			Group("type, day").Scan(&counts).Error; err != nil {
 			slog.Error("Heatmap: failed to group tasks", "err", err)
