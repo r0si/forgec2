@@ -73,7 +73,7 @@ var (
 		"CREATE INDEX IF NOT EXISTS idx_token_entries_agent_active ON token_entries(agent_id, active)",
 	}
 	buildLogBaseline = []string{
-		"CREATE INDEX IF NOT EXISTS idx_build_logs_user ON build_logs(user)",
+		"CREATE INDEX IF NOT EXISTS idx_build_logs_user ON build_logs(\"user\")",
 		"CREATE INDEX IF NOT EXISTS idx_build_logs_status ON build_logs(status)",
 		"CREATE INDEX IF NOT EXISTS idx_build_logs_listener_id ON build_logs(listener_id)",
 	}

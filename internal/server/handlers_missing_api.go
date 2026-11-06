@@ -267,7 +267,7 @@ func (s *Server) handleAPITimelineData(c *gin.Context) {
 		Success   bool
 	}
 	if err := s.db.Table("audit_logs").
-		Select("id, created_at, user, action, details, agent_id, ip, success").
+		Select("id, created_at, \"user\", action, details, agent_id, ip, success").
 		Order("created_at DESC").Limit(200).Find(&auditLogs).Error; err != nil {
 		// The timeline merges two feeds; dropping one silently would show
 		// a partial history as if it were complete.

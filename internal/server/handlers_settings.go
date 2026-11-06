@@ -831,7 +831,7 @@ func (s *Server) handleGetAuditLogs(c *gin.Context) {
 	query := s.auditTenantScope(s.db.Model(&db.AuditLog{}), c).Order("created_at DESC")
 
 	if search != "" {
-		query = query.Where("(user LIKE ? ESCAPE '\\' OR resource LIKE ? ESCAPE '\\' OR details LIKE ? ESCAPE '\\')",
+		query = query.Where("(\"user\" LIKE ? ESCAPE '\\' OR resource LIKE ? ESCAPE '\\' OR details LIKE ? ESCAPE '\\')",
 			"%"+escapeLike(search)+"%", "%"+escapeLike(search)+"%", "%"+escapeLike(search)+"%")
 	}
 
@@ -840,7 +840,7 @@ func (s *Server) handleGetAuditLogs(c *gin.Context) {
 	}
 
 	if user != "" {
-		query = query.Where("user = ?", user)
+		query = query.Where("\"user\" = ?", user)
 	}
 
 	var total int64

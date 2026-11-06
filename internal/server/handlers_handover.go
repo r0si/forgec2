@@ -206,7 +206,7 @@ func (s *Server) handleHandoverExport(c *gin.Context) {
 	// Audit rows belong to operator usernames: contain through the
 	// caller's tenant (reportUsernames mirrors the dashboard pattern).
 	var audits []db.AuditLog
-	s.db.Where("user IN (?) AND created_at >= ?", s.reportUsernames(c), since).Order("created_at asc").Limit(50000).Find(&audits)
+	s.db.Where("\"user\" IN (?) AND created_at >= ?", s.reportUsernames(c), since).Order("created_at asc").Limit(50000).Find(&audits)
 	addJSON("audit.jsonl", audits)
 
 	// ── Screenshot manifest (filenames only; binaries stay on server) ──

@@ -75,14 +75,14 @@ func (s *Server) buildTimelineEvents(c *gin.Context, filterType, filterUser, fil
 		Success   bool
 	}
 
-	query := s.db.Table("audit_logs").Select("id, created_at as timestamp, user, action, details, agent_id, ip, success").
-		Where("user IN (?)", s.reportUsernames(c))
+	query := s.db.Table("audit_logs").Select("id, created_at as timestamp, \"user\", action, details, agent_id, ip, success").
+		Where("\"user\" IN (?)", s.reportUsernames(c))
 
 	if filterType != "" && filterType != "audit" {
 		// Skip audit logs if filtering by other types
 	} else {
 		if filterUser != "" {
-			query = query.Where("user LIKE ? ESCAPE '\\'", "%"+escapeLike(filterUser)+"%")
+			query = query.Where("\"user\" LIKE ? ESCAPE '\\'", "%"+escapeLike(filterUser)+"%")
 		}
 		if filterAgent != "" {
 			query = query.Where("agent_id LIKE ? ESCAPE '\\'", "%"+escapeLike(filterAgent)+"%")

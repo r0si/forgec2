@@ -494,7 +494,7 @@ func (s *Server) apiListAuditLogs(c *gin.Context) {
 		query = query.Where("action = ?", action)
 	}
 	if user := c.Query("user"); user != "" {
-		query = query.Where("user LIKE ? ESCAPE '\\'", "%"+escapeLike(user)+"%")
+		query = query.Where("\"user\" LIKE ? ESCAPE '\\'", "%"+escapeLike(user)+"%")
 	}
 
 	if err := query.Limit(APIAuditLogListLimit).Find(&logs).Error; err != nil {

@@ -254,7 +254,10 @@ func (s *Server) handleExportAuditChain(c *gin.Context) {
 	// a metadata line into the NDJSON, because a verifier must be able to treat every line as a row.
 	filtered := false
 	if actor := strings.TrimSpace(c.Query("user")); actor != "" {
-		query = query.Where("user = ?", actor)
+		// "user" quoted: it is a PostgreSQL reserved word (resolves to the
+		// current_user() function unquoted), and this is the audit_logs.user
+		// column. Portable: SQLite accepts the double-quoted identifier too.
+		query = query.Where("\"user\" = ?", actor)
 		filtered = true
 	}
 	if action := strings.TrimSpace(c.Query("action")); action != "" {

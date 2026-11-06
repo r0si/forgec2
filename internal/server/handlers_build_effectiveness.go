@@ -38,7 +38,7 @@ func (s *Server) handleBuildEffectiveness(c *gin.Context) {
 		CreatedAt  time.Time `json:"created_at"`
 	}
 	if err := s.db.Table("build_logs").
-		Select("id, platform, format, filename, c2_url, listener_id, user, created_at").
+		Select("id, platform, format, filename, c2_url, listener_id, \"user\", created_at").
 		Where("status = ? AND created_at >= ?", "success", since).
 		Order("created_at desc").Limit(500).Scan(&builds).Error; err != nil {
 		respondError(c, http.StatusInternalServerError, "query failed")

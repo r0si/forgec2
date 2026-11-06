@@ -26,7 +26,7 @@ var initialSchemaIndexes = []struct{ sql, label string }{
 	{"CREATE INDEX IF NOT EXISTS idx_credential_entries_agent_id ON credential_entries(agent_id)", "idx_credential_entries_agent_id"},
 	{"CREATE INDEX IF NOT EXISTS idx_credential_entries_source ON credential_entries(source)", "idx_credential_entries_source"},
 	{"CREATE INDEX IF NOT EXISTS idx_credential_entries_created ON credential_entries(created_at)", "idx_credential_entries_created"},
-	{"CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_logs(user)", "idx_audit_user"},
+	{"CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_logs(\"user\")", "idx_audit_user"},
 	{"CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_logs(action)", "idx_audit_action"},
 	{"CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs(created_at)", "idx_audit_created"},
 	{"CREATE INDEX IF NOT EXISTS idx_scan_agent_id ON scan_results(agent_id)", "idx_scan_agent_id"},
@@ -47,7 +47,7 @@ var initialSchemaIndexes = []struct{ sql, label string }{
 	{"CREATE INDEX IF NOT EXISTS idx_socks_sessions_status ON socks_sessions(status)", "idx_socks_sessions_status"},
 	{"CREATE INDEX IF NOT EXISTS idx_credentials_type ON credential_entries(type)", "idx_credentials_type"},
 	{"CREATE INDEX IF NOT EXISTS idx_credentials_confirmed ON credential_entries(confirmed)", "idx_credentials_confirmed"},
-	{"CREATE INDEX IF NOT EXISTS idx_build_logs_user ON build_logs(user)", "idx_build_logs_user"},
+	{"CREATE INDEX IF NOT EXISTS idx_build_logs_user ON build_logs(\"user\")", "idx_build_logs_user"},
 	{"CREATE INDEX IF NOT EXISTS idx_build_logs_status ON build_logs(status)", "idx_build_logs_status"},
 	{"CREATE INDEX IF NOT EXISTS idx_network_hosts_ip ON network_hosts(ip)", "idx_network_hosts_ip"},
 	{"CREATE INDEX IF NOT EXISTS idx_command_templates_category ON command_templates(category)", "idx_command_templates_category"},
@@ -72,7 +72,7 @@ var initialSchemaIndexes = []struct{ sql, label string }{
 	{"CREATE INDEX IF NOT EXISTS idx_network_hosts_agent_ip ON network_hosts(agent_id, ip)", "idx_network_hosts_agent_ip"},
 	{"CREATE INDEX IF NOT EXISTS idx_phishing_events_type_created ON phishing_events(event_type, created_at)", "idx_phishing_events_type_created"},
 	{"CREATE INDEX IF NOT EXISTS idx_credential_domain_created ON credential_entries(domain, created_at)", "idx_credential_domain_created"},
-	{"CREATE INDEX IF NOT EXISTS idx_audit_user_created ON audit_logs(user, created_at)", "idx_audit_user_created"},
+	{"CREATE INDEX IF NOT EXISTS idx_audit_user_created ON audit_logs(\"user\", created_at)", "idx_audit_user_created"},
 }
 
 // schemaMigrations mutate tables/columns/data and run BEFORE AutoMigrate.

@@ -183,7 +183,7 @@ func (s *Server) handleGenerateReport(c *gin.Context) {
 		}
 	}
 	if req.Include.Audit {
-		if err := s.db.Model(&db.AuditLog{}).Where("user IN (?) AND created_at BETWEEN ? AND ?", s.reportUsernames(c), startDate, endDate).Count(&auditCount).Error; err != nil {
+		if err := s.db.Model(&db.AuditLog{}).Where("\"user\" IN (?) AND created_at BETWEEN ? AND ?", s.reportUsernames(c), startDate, endDate).Count(&auditCount).Error; err != nil {
 			markReportSectionPartial(report, "audit", err)
 		}
 	}
@@ -265,7 +265,7 @@ func (s *Server) handleGenerateReport(c *gin.Context) {
 	// Audit
 	if req.Include.Audit {
 		var audits []db.AuditLog
-		if err := s.db.Where("user IN (?) AND created_at BETWEEN ? AND ?", s.reportUsernames(c), startDate, endDate).Order("created_at desc").Limit(100).Find(&audits).Error; err != nil {
+		if err := s.db.Where("\"user\" IN (?) AND created_at BETWEEN ? AND ?", s.reportUsernames(c), startDate, endDate).Order("created_at desc").Limit(100).Find(&audits).Error; err != nil {
 			markReportSectionPartial(report, "audit", err)
 		}
 		auditList := make([]gin.H, 0, len(audits))
@@ -880,7 +880,7 @@ func (s *Server) buildReportData(c *gin.Context, startDate, endDate string, sect
 		}
 	}
 	if sectionSet["audit"] || sectionSet["summary"] {
-		if err := s.db.Model(&db.AuditLog{}).Where("user IN (?) AND created_at BETWEEN ? AND ?", s.reportUsernames(c), start, end).Count(&auditCount).Error; err != nil {
+		if err := s.db.Model(&db.AuditLog{}).Where("\"user\" IN (?) AND created_at BETWEEN ? AND ?", s.reportUsernames(c), start, end).Count(&auditCount).Error; err != nil {
 			markReportSectionPartial(report, "audit", err)
 		}
 	}
@@ -945,7 +945,7 @@ func (s *Server) buildReportData(c *gin.Context, startDate, endDate string, sect
 
 	if sectionSet["audit"] {
 		var audits []db.AuditLog
-		if err := s.db.Where("user IN (?) AND created_at BETWEEN ? AND ?", s.reportUsernames(c), start, end).Order("created_at desc").Limit(100).Find(&audits).Error; err != nil {
+		if err := s.db.Where("\"user\" IN (?) AND created_at BETWEEN ? AND ?", s.reportUsernames(c), start, end).Order("created_at desc").Limit(100).Find(&audits).Error; err != nil {
 			markReportSectionPartial(report, "audit", err)
 		}
 		auditList := make([]gin.H, 0, len(audits))
