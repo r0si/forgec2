@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/forgec2/forgec2/internal/config"
+	"github.com/forgec2/forgec2/internal/db"
 	"github.com/forgec2/forgec2/internal/testutil"
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/postgres"
@@ -43,9 +45,13 @@ func operatorCtxFor(method, path string) (*gin.Context, *httptest.ResponseRecord
 	return c, w
 }
 
-// TestSQLiteOnlyMaintenanceRefusedOnPostgres proves backup, restore and VACUUM
-// answer 501 with actionable guidance on a non-SQLite driver instead of
-// failing with a cryptic SQL error (or "restoring" a file nothing reads).
+// TestSQLiteOnlyMaintenanceRefusedOnPostgres proves backup and restore answer
+// 501 with actionable guidance on a non-SQLite driver instead of failing with a
+// cryptic SQL error (or "restoring" a file nothing reads). VACUUM is NOT in this
+// list: the maintenance endpoint was rewritten to run PostgreSQL's ANALYZE and
+// report pg_database_size, so refusing it on the only production driver would
+// make the button dead in every real deployment (it is covered by
+// TestDBVacuumRunsAnalyzeOnPostgres instead).
 func TestSQLiteOnlyMaintenanceRefusedOnPostgres(t *testing.T) {
 	ginSetTestMode(t)
 	s := &Server{db: newFakePostgresDB(t), cfg: config.DefaultConfig()}
@@ -57,10 +63,37 @@ func TestSQLiteOnlyMaintenanceRefusedOnPostgres(t *testing.T) {
 	c, w = operatorCtxFor(http.MethodPost, "/settings/db/restore")
 	s.handleDBRestore(c)
 	assertNotImplemented(t, "restore", w)
+}
 
-	c, w = operatorCtxFor(http.MethodPost, "/settings/db/vacuum")
+// TestDBVacuumRunsAnalyzeOnPostgres pins the intended behavior: the maintenance
+// endpoint works on PostgreSQL (the production driver), running ANALYZE and
+// reporting a real size, instead of answering 501 like a driver it no longer
+// supports. Skipped when no PostgreSQL is reachable.
+func TestDBVacuumRunsAnalyzeOnPostgres(t *testing.T) {
+	ginSetTestMode(t)
+	gdb, err := db.InitDBWithDriver("postgres", testPostgresDSN, "", slog.LevelWarn, 1, 1, time.Minute)
+	if err != nil {
+		t.Skipf("PostgreSQL unavailable: %v", err)
+	}
+	t.Cleanup(func() {
+		if sqlDB, err := gdb.DB(); err == nil {
+			_ = sqlDB.Close()
+		}
+	})
+	s := &Server{db: gdb, cfg: config.DefaultConfig()}
+
+	c, w := operatorCtxFor(http.MethodPost, "/settings/maintenance/vacuum")
 	s.handleDBVacuum(c)
-	assertNotImplemented(t, "vacuum", w)
+	if w.Code != http.StatusOK {
+		t.Fatalf("vacuum on postgres = %d, want 200; body=%s", w.Code, w.Body.String())
+	}
+	if strings.Contains(w.Body.String(), "SQLite only") {
+		t.Fatalf("vacuum still refuses postgres: %s", w.Body.String())
+	}
+	// size is advisory but must be reported as a field.
+	if !strings.Contains(w.Body.String(), "\"size\"") {
+		t.Fatalf("vacuum response missing size field: %s", w.Body.String())
+	}
 }
 
 func assertNotImplemented(t *testing.T, name string, w *httptest.ResponseRecorder) {

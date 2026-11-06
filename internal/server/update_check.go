@@ -753,31 +753,27 @@ func acquireUpdateLock(dir string) (func(), error) {
 	return nil, fmt.Errorf("could not acquire the update lock: %s", lockPath)
 }
 
-// snapshotDatabaseForUpdate copies the SQLite database next to the update
-// markers so a rollback can also undo a schema migration. It returns the
-// database path and the snapshot path; an empty snapshot means the database
-// was not snapshotted (unsupported driver or a failed copy).
+// snapshotDatabaseForUpdate used to copy the SQLite database next to the update
+// markers so a rollback could also undo a schema migration, via VACUUM INTO.
+// SQLite was removed in v2.8, and a hot-update rollback for PostgreSQL must rely
+// on a real external snapshot (pg_dump/pgBackRest) taken before the update — not
+// a file this process writes and then hands to the update script, which the
+// script would try to restore even though it is not a consistent PostgreSQL
+// dump. So this function now always reports "no inline snapshot": it returns
+// empty strings for every driver and never touches the live connection. The
+// update script's DB restore step is skipped whenever the snapshot path is
+// empty, which is now the normal PostgreSQL case.
 func (s *Server) snapshotDatabaseForUpdate(dir string) (string, string) {
-	if s.cfg == nil || s.db == nil {
+	if s.cfg == nil {
 		return "", ""
 	}
 	s.configMu.RLock()
 	driver := strings.ToLower(strings.TrimSpace(s.cfg.Database.Driver))
-	dbPath := strings.TrimSpace(s.cfg.Database.Path)
 	s.configMu.RUnlock()
 	if driver != "" && driver != "postgres" {
-		return "", ""
-	}
-	if dbPath == "" {
-		return "", ""
-	}
-	backup := filepath.Join(dir, "prev.db")
-	os.Remove(backup)
-	// PostgreSQL snapshots use pg_dump, not VACUUM INTO (which is SQLite-only).
-	// The hot-update rollback path keeps the current database untouched on
-	// failure; operators use pg_dump/pgBackRest for actual snapshots.
-	if err := s.db.Exec("ANALYZE").Error; err != nil {
-		slog.Warn("Hot update: database analyze failed; continuing", "err", err)
+		slog.Warn("Hot update: unsupported database driver, no rollback snapshot available", "driver", driver)
+	} else {
+		slog.Info("Hot update: PostgreSQL rollback relies on an external pg_dump/pgBackRest snapshot; no inline snapshot taken")
 	}
 	return "", ""
 }

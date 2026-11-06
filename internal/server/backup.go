@@ -183,7 +183,7 @@ func NewBackupManager(db *gorm.DB, dbPath, backupDir, key string) (*BackupManage
 // fail with a confusing SQL error or, worse, "restore" by writing a file that
 // nothing reads. Refusing loudly is the honest behaviour until a driver-aware
 // logical dump path exists.
-var errNonSQLiteBackup = errors.New("database backup/restore/vacuum are implemented for SQLite only; use an external PostgreSQL backup tool (pg_dump/pgBackRest) for this deployment")
+var errNonSQLiteBackup = errors.New("database backup/restore are implemented for SQLite only; use an external PostgreSQL backup tool (pg_dump/pgBackRest) for this deployment")
 
 // isSQLiteDB reports whether the live connection is SQLite.
 func isSQLiteDB(db *gorm.DB) bool {

@@ -651,9 +651,14 @@ func (s *Server) handleRegenerateJWT(c *gin.Context) {
 }
 
 func (s *Server) handleDBVacuum(c *gin.Context) {
-	if !s.requireSQLiteDB(c) {
-		return
-	}
+	// "Vacuum" is the maintenance label kept for the endpoint's history; on the
+	// PostgreSQL deployment it runs ANALYZE to refresh the planner (physical
+	// compaction is autovacuum's job and an external concern). ANALYZE is valid
+	// on SQLite too, so the endpoint stays meaningful for the in-memory test
+	// harness instead of being gated to one driver. The old requireSQLiteDB gate
+	// was a migration leftover that made the endpoint answer 501 on exactly the
+	// PostgreSQL deployment whose ANALYZE + pg_database_size it had been rewritten
+	// to run — so the endpoint worked for neither driver.
 	var dbSize int64
 	rawDB, err := s.db.DB()
 	if err != nil {
@@ -664,11 +669,32 @@ func (s *Server) handleDBVacuum(c *gin.Context) {
 		respondError(c, http.StatusInternalServerError, "ANALYZE failed")
 		return
 	}
-	if err := s.db.Raw("SELECT pg_database_size(current_database()) as size").Scan(&dbSize).Error; err != nil {
-		slog.Error("Failed to query database size after analyze", "err", err)
-	}
-	slog.Info("Database analyze completed")
+	dbSize = s.databaseSizeBytes()
+	slog.Info("Database analyze completed", "size", dbSize)
 	respond(c, gin.H{"message": "Database analyze completed", "size": dbSize})
+}
+
+// databaseSizeBytes returns the live database's on-disk size in bytes, using
+// whichever expression the active driver understands. PostgreSQL answers via
+// pg_database_size; the SQLite test harness (in-memory) has no file to stat, so
+// its page_count × page_size pragma product reports the real in-memory footprint.
+// An unrecognized driver reports 0 (size is advisory, not required).
+func (s *Server) databaseSizeBytes() int64 {
+	var size int64
+	switch {
+	case isSQLiteDB(s.db):
+		// page_count × page_size works for :memory: as well as on-disk databases.
+		if err := s.db.Raw("SELECT (SELECT page_count FROM pragma_page_count()) * (SELECT page_size FROM pragma_page_size())").Scan(&size).Error; err != nil {
+			slog.Error("Failed to query sqlite database size", "err", err)
+			return 0
+		}
+	default:
+		if err := s.db.Raw("SELECT pg_database_size(current_database())").Scan(&size).Error; err != nil {
+			slog.Error("Failed to query database size after analyze", "err", err)
+			return 0
+		}
+	}
+	return size
 }
 
 func (s *Server) handleDownloadConfig(c *gin.Context) {

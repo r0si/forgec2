@@ -8,76 +8,52 @@ import (
 	"testing"
 
 	"github.com/forgec2/forgec2/internal/config"
-	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
 
-// TestSnapshotDatabaseForUpdate covers the rollback snapshot: a sqlite database
-// is copied with VACUUM INTO and the copy is a real, queryable database.
+// TestSnapshotDatabaseForUpdate pins the v2.8 contract: the hot-update path no
+// longer produces an inline database snapshot. SQLite (whose VACUUM INTO made
+// this cheap) was removed; a PostgreSQL rollback must come from a real external
+// snapshot (pg_dump/pgBackRest), never a half-restorable file the update script
+// would silently try to restore. So every driver returns an empty snapshot, and
+// a snapshot is only ever reported by an operator's own tooling.
 func TestSnapshotDatabaseForUpdate(t *testing.T) {
 	dir := t.TempDir()
 
-	// Non-sqlite driver: no snapshot.
-	cfg := &config.Config{}
-	cfg.Database.Driver = "postgres"
-	s := &Server{cfg: cfg, db: &gorm.DB{}}
-	if _, backup := s.snapshotDatabaseForUpdate(dir); backup != "" {
-		t.Fatal("a non-sqlite driver produced a snapshot")
+	cases := []struct {
+		name   string
+		driver string
+		path   string
+	}{
+		{"postgres dsn (no inline snapshot)", "postgres", ""},
+		{"postgres with stale path", "postgres", filepath.Join(dir, "should_be_ignored")},
+		{"legacy sqlite driver rejected", "sqlite", filepath.Join(dir, "legacy.db")},
+		{"empty driver", "", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := &config.Config{}
+			cfg.Database.Driver = tc.driver
+			cfg.Database.Path = tc.path
+			// A nil-safe db handle is enough: the function must refuse without
+			// dereferencing it (no snapshot means no EXEC on the real database).
+			s := &Server{cfg: cfg, db: &gorm.DB{}}
+			dbPath, backup := s.snapshotDatabaseForUpdate(dir)
+			if backup != "" {
+				t.Fatalf("driver %q produced a snapshot %q; hot-update must never inline-snapshot PostgreSQL", tc.driver, backup)
+			}
+			// The database path is only surfaced when a snapshot actually exists,
+			// so a caller cannot restore a file that was never written.
+			if dbPath != "" {
+				t.Fatalf("driver %q returned a db path %q with no snapshot", tc.driver, dbPath)
+			}
+		})
 	}
 
-	// sqlite but no configured path: no snapshot.
-	cfg2 := &config.Config{}
-	cfg2.Database.Driver = "sqlite"
-	s2 := &Server{cfg: cfg2, db: &gorm.DB{}}
-	if _, backup := s2.snapshotDatabaseForUpdate(dir); backup != "" {
-		t.Fatal("an empty database path produced a snapshot")
+	// nil config / nil db are safe no-ops.
+	if _, b := (&Server{}).snapshotDatabaseForUpdate(dir); b != "" {
+		t.Fatal("nil-everything server produced a snapshot")
 	}
-
-	// A real sqlite file gets a snapshot that contains the data.
-	dbPath := filepath.Join(t.TempDir(), "live.db")
-	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	sqlDB, _ := db.DB()
-	if err := db.Exec("CREATE TABLE t (id INTEGER PRIMARY KEY, name TEXT)").Error; err != nil {
-		t.Fatal(err)
-	}
-	if err := db.Exec("INSERT INTO t (name) VALUES ('row-one')").Error; err != nil {
-		t.Fatal(err)
-	}
-
-	cfg3 := &config.Config{}
-	cfg3.Database.Driver = "sqlite"
-	cfg3.Database.Path = dbPath
-	s3 := &Server{cfg: cfg3, db: db}
-	abs, backup := s3.snapshotDatabaseForUpdate(dir)
-	if backup == "" {
-		t.Fatal("no snapshot was taken for a real sqlite database")
-	}
-	if abs != dbPath && filepath.Base(abs) != filepath.Base(dbPath) {
-		t.Fatalf("returned database path = %q, want %q", abs, dbPath)
-	}
-	if _, err := os.Stat(backup); err != nil {
-		t.Fatalf("snapshot file missing: %v", err)
-	}
-	backupDB, err := gorm.Open(sqlite.Open(backup), &gorm.Config{})
-	if err != nil {
-		t.Fatalf("snapshot is not a usable database: %v", err)
-	}
-	// Windows cannot delete the temp dir while the snapshot connection is
-	// open, so close both handles before the test returns.
-	if sqlBackup, err := backupDB.DB(); err == nil {
-		defer sqlBackup.Close()
-	}
-	var name string
-	if err := backupDB.Raw("SELECT name FROM t WHERE id = 1").Scan(&name).Error; err != nil {
-		t.Fatalf("query snapshot: %v", err)
-	}
-	if name != "row-one" {
-		t.Fatalf("snapshot row = %q", name)
-	}
-	_ = sqlDB.Close()
 }
 
 // TestDownloadUpdateFile covers the download step: a 200 writes the exact bytes

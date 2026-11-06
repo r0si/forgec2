@@ -3,27 +3,29 @@ package server
 import (
 	"bytes"
 	"log/slog"
-	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/forgec2/forgec2/internal/config"
 	"github.com/forgec2/forgec2/internal/db"
+	"github.com/forgec2/forgec2/internal/testutil"
 	"gorm.io/gorm"
 )
 
+// testPostgresDSN matches the internal/db test harness: the default local
+// PostgreSQL instance used when a test must exercise the real migration path.
+const testPostgresDSN = "host=localhost user=forgec2 password=forgec2 dbname=forgec2 port=5432 sslmode=disable"
+
+// newCleanupTestDB returns a migrated database for the cleanup/monitor tests.
+// The cleanup and status-sweep logic is plain gorm ORM (portable across
+// drivers), so it runs on the shared in-memory SQLite harness like the rest of
+// the server suite rather than requiring a live PostgreSQL — the old
+// InitDBWithDriver call resolved an empty driver to "postgres" and made every
+// test that touched this helper fail with a connection error on machines with
+// no PostgreSQL, while asserting nothing driver-specific.
 func newCleanupTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	gdb, err := db.InitDBWithDriver("", "", filepath.Join(t.TempDir(), "test.db"), slog.LevelWarn, 10, 5, time.Minute)
-	if err != nil {
-		t.Fatalf("init db: %v", err)
-	}
-	t.Cleanup(func() {
-		if sqlDB, err := gdb.DB(); err == nil {
-			_ = sqlDB.Close()
-		}
-	})
-	return gdb
+	return testutil.SetupTestDB(t)
 }
 
 func TestCleanupOldDataPurgesStaleSystemMetrics(t *testing.T) {
@@ -101,35 +103,37 @@ func TestCleanupOldDataPurgesTerminalTasks(t *testing.T) {
 	}
 }
 
-func TestSystemMetricsCreatedAtIndexApplied(t *testing.T) {
-	gdb := newCleanupTestDB(t)
-
-	rows, err := gdb.Raw("PRAGMA index_list('system_metrics')").Rows()
+// newMigratedDB runs the REAL schema migration against PostgreSQL and returns
+// the handle, skipping when PostgreSQL is unavailable. Tests that assert a
+// migration created an index must exercise the migration itself: AutoMigrate on
+// the shared test harness does not run the raw CREATE INDEX statements in
+// migrations.go, so an index-only guarantee can only be checked this way.
+func newMigratedDB(t *testing.T) *gorm.DB {
+	t.Helper()
+	gdb, err := db.InitDBWithDriver("postgres", testPostgresDSN, "", slog.LevelWarn, 1, 1, time.Minute)
 	if err != nil {
-		t.Fatalf("query index list: %v", err)
+		t.Skipf("PostgreSQL unavailable: %v", err)
 	}
-	defer rows.Close()
+	t.Cleanup(func() {
+		if sqlDB, err := gdb.DB(); err == nil {
+			_ = sqlDB.Close()
+		}
+	})
+	return gdb
+}
 
-	found := false
-	for rows.Next() {
-		var seq int
-		var name string
-		var unique int
-		var origin string
-		var partial int
-		if err := rows.Scan(&seq, &name, &unique, &origin, &partial); err != nil {
-			t.Fatalf("scan index row: %v", err)
-		}
-		if name == "idx_system_metrics_created_at" {
-			found = true
-			break
-		}
+func TestSystemMetricsCreatedAtIndexApplied(t *testing.T) {
+	gdb := newMigratedDB(t)
+
+	// PostgreSQL exposes indexes through pg_indexes, not SQLite's PRAGMA.
+	var count int64
+	if err := gdb.Raw(
+		"SELECT COUNT(*) FROM pg_indexes WHERE tablename = 'system_metrics' AND indexname = 'idx_system_metrics_created_at'",
+	).Scan(&count).Error; err != nil {
+		t.Fatalf("query pg_indexes: %v", err)
 	}
-	if err := rows.Err(); err != nil {
-		t.Fatalf("iterate index rows: %v", err)
-	}
-	if !found {
-		t.Fatal("expected idx_system_metrics_created_at index to exist")
+	if count == 0 {
+		t.Fatal("expected idx_system_metrics_created_at index to exist after migration")
 	}
 }
 
