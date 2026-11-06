@@ -3,6 +3,7 @@
 package main
 
 import (
+	"crypto/rand"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -388,9 +389,18 @@ func utf16Decode(s []uint16) string {
 func generateNTLMChallenge() []byte {
 	// Build a minimal NTLM CHALLENGE_MESSAGE (type 2)
 	serverChallenge := make([]byte, 8)
-	// random challenge
-	for i := range serverChallenge {
-		serverChallenge[i] = byte(i*37 + 13) // pseudo-random for now
+	// The server challenge is the per-session nonce the client binds its
+	// Net-NTLM response to (NtProofStr = HMAC-MD5(..., ServerChallenge||...)).
+	// It must be unpredictable and unique per session. This previously shipped
+	// a FIXED constant ("pseudo-random for now"), so every relay session
+	// emitted the same nonce: predictable, and two concurrent relays collided,
+	// letting a response captured for one session be tied to (or replayed into)
+	// another. Draw fresh bytes from the CSPRNG each call.
+	if _, err := rand.Read(serverChallenge); err != nil {
+		// CSPRNG failure is effectively unreachable on Windows, but never fall
+		// back to the fixed value: derive from the clock so the nonce is still
+		// session-varying.
+		binary.LittleEndian.PutUint64(serverChallenge, uint64(time.Now().UnixNano()))
 	}
 
 	// NTLMSSP header + Type 2 fields
@@ -476,11 +486,17 @@ func generateNTLMChallenge() []byte {
 	// MaxWriteSize: 65536
 	binary.LittleEndian.PutUint32(buf, 65536)
 	negResp = append(negResp, buf...)
-	// SystemTime (8 bytes)
-	binary.LittleEndian.PutUint64(buf[:8], uint64(time.Now().UnixNano()/100))
-	negResp = append(negResp, buf[:8]...)
-	// ServerStartTime (8 bytes)
-	negResp = append(negResp, buf[:8]...)
+	// SystemTime (8 bytes) + ServerStartTime (8 bytes). These MUST use an
+	// 8-byte buffer: the shared `buf` above is only 4 bytes (sized for the
+	// 32-bit Capabilities/Max* fields), so an earlier `buf[:8]` here sliced a
+	// 4-byte buffer out of range and PANICKED on every negotiate — silently
+	// breaking the whole NTLM relay. It went unnoticed because this file is
+	// //go:build windows and CI compiles the agent package on Linux, so the
+	// function was never executed in the suite.
+	var sysTime [8]byte
+	binary.LittleEndian.PutUint64(sysTime[:], uint64(time.Now().UnixNano()/100))
+	negResp = append(negResp, sysTime[:]...)
+	negResp = append(negResp, sysTime[:]...)
 	// SecurityBufferOffset: offset from start
 	secOff := uint16(64 + 65) // header + fixed body
 	binary.LittleEndian.PutUint16(buf[:2], secOff)
