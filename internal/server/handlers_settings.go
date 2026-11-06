@@ -46,6 +46,8 @@ func (s *Server) handleSettingsPage(c *gin.Context) {
 		defaultInterval, defaultJitter                 int
 		defaultSkipTLS                                 bool
 		defaultUA, workingStart, workingEnd, workingTZ string
+		beaconRandomization                            string
+		maxRandomIntervalMs                            int
 		serverPort                                     int
 		serverHost                                     string
 		tlsEnabled, tcpEnabled                         bool
@@ -57,34 +59,36 @@ func (s *Server) handleSettingsPage(c *gin.Context) {
 		malReqPrepend, malReqAppend                    string
 		malHeaders, malReqHeaders                      map[string]string
 	}{
-		dbPath:           s.cfg.Database.Path,
-		jwtSecret:        s.cfg.Server.JWTSecret,
-		certFile:         s.cfg.Server.CertFile,
-		defaultInterval:  s.cfg.Implant.DefaultInterval,
-		defaultJitter:    s.cfg.Implant.DefaultJitter,
-		defaultSkipTLS:   s.cfg.Implant.DefaultSkipTLS,
-		defaultUA:        s.cfg.Implant.DefaultUA,
-		workingStart:     s.cfg.Implant.DefaultWorkingStart,
-		workingEnd:       s.cfg.Implant.DefaultWorkingEnd,
-		workingTZ:        s.cfg.Implant.DefaultWorkingTZ,
-		serverPort:       s.cfg.Server.Port,
-		serverHost:       s.cfg.Server.Host,
-		tlsEnabled:       s.cfg.Server.TLSEnabled,
-		tcpEnabled:       s.cfg.Server.TCPEnabled,
-		tcpAddr:          s.cfg.Server.TCPAddr,
-		logLevel:         s.cfg.Logging.Level,
-		offlineThreshold: s.cfg.Server.OfflineThreshold,
-		sessionMaxAge:    s.cfg.Server.SessionMaxAgeHours,
-		cleanupRet:       s.cfg.Server.CleanupRetentionDays,
-		malEnabled:       s.cfg.Malleable.Enabled,
-		malStatus:        s.cfg.Malleable.StatusCode,
-		malCT:            s.cfg.Malleable.ContentType,
-		malPrepend:       s.cfg.Malleable.Prepend,
-		malAppend:        s.cfg.Malleable.Append,
-		malReqPrepend:    s.cfg.Malleable.RequestPrepend,
-		malReqAppend:     s.cfg.Malleable.RequestAppend,
-		malHeaders:       s.cfg.Malleable.Headers,
-		malReqHeaders:    s.cfg.Malleable.RequestHeaders,
+		dbPath:              s.cfg.Database.Path,
+		jwtSecret:           s.cfg.Server.JWTSecret,
+		certFile:            s.cfg.Server.CertFile,
+		defaultInterval:     s.cfg.Implant.DefaultInterval,
+		defaultJitter:       s.cfg.Implant.DefaultJitter,
+		defaultSkipTLS:      s.cfg.Implant.DefaultSkipTLS,
+		defaultUA:           s.cfg.Implant.DefaultUA,
+		workingStart:        s.cfg.Implant.DefaultWorkingStart,
+		workingEnd:          s.cfg.Implant.DefaultWorkingEnd,
+		workingTZ:           s.cfg.Implant.DefaultWorkingTZ,
+		beaconRandomization: s.cfg.Implant.BeaconRandomization,
+		maxRandomIntervalMs: s.cfg.Implant.MaxRandomIntervalMs,
+		serverPort:          s.cfg.Server.Port,
+		serverHost:          s.cfg.Server.Host,
+		tlsEnabled:          s.cfg.Server.TLSEnabled,
+		tcpEnabled:          s.cfg.Server.TCPEnabled,
+		tcpAddr:             s.cfg.Server.TCPAddr,
+		logLevel:            s.cfg.Logging.Level,
+		offlineThreshold:    s.cfg.Server.OfflineThreshold,
+		sessionMaxAge:       s.cfg.Server.SessionMaxAgeHours,
+		cleanupRet:          s.cfg.Server.CleanupRetentionDays,
+		malEnabled:          s.cfg.Malleable.Enabled,
+		malStatus:           s.cfg.Malleable.StatusCode,
+		malCT:               s.cfg.Malleable.ContentType,
+		malPrepend:          s.cfg.Malleable.Prepend,
+		malAppend:           s.cfg.Malleable.Append,
+		malReqPrepend:       s.cfg.Malleable.RequestPrepend,
+		malReqAppend:        s.cfg.Malleable.RequestAppend,
+		malHeaders:          s.cfg.Malleable.Headers,
+		malReqHeaders:       s.cfg.Malleable.RequestHeaders,
 	}
 	// Copied out so the template never reads a map the next save could replace.
 	malHeaders := make(map[string]string, len(cfgSnap.malHeaders))
@@ -209,6 +213,8 @@ func (s *Server) handleSettingsPage(c *gin.Context) {
 		"WorkingStart":            cfgSnap.workingStart,
 		"WorkingEnd":              cfgSnap.workingEnd,
 		"WorkingTZ":               cfgSnap.workingTZ,
+		"BeaconRandomization":     cfgSnap.beaconRandomization,
+		"MaxRandomIntervalMs":     cfgSnap.maxRandomIntervalMs,
 	}
 	for k, v := range stats {
 		data[k] = v
@@ -296,14 +302,35 @@ func (s *Server) handleSaveAgentConfig(c *gin.Context) {
 	s.cfg.Implant.DefaultWorkingEnd = workingEnd
 	s.cfg.Implant.DefaultWorkingTZ = workingTZ
 
+	// Fleet-default beacon timing randomization. Backwards-safe: an omitted
+	// value (older client / form that does not expose the field) leaves the
+	// current setting untouched rather than clobbering it, so this cannot reset
+	// a fleet default an operator set via config.yaml. An explicit recognized
+	// mode is applied; garbage (normalizes to "") is ignored rather than
+	// persisted, keeping the value within the set Validate() will accept.
+	if rawRand := c.PostForm("beacon_randomization"); rawRand != "" {
+		if mode := normalizeBeaconRandomization(rawRand); mode != "" {
+			s.cfg.Implant.BeaconRandomization = mode
+		}
+	}
+	// Cap: empty keeps current; a typed number (including 0 = uncap) is applied
+	// and clamped, so a single save cannot push it out of range.
+	if rawCap := c.PostForm("max_random_interval_ms"); rawCap != "" {
+		var capMs int
+		if _, err := fmt.Sscanf(rawCap, "%d", &capMs); err == nil {
+			s.cfg.Implant.MaxRandomIntervalMs = clampMaxRandomIntervalMs(capMs)
+		}
+	}
+
 	if !s.validateAndSaveConfigLocked(c, "agent_config") {
 		s.configMu.Unlock()
 		return
 	}
 	intervalOut, jitterOut, skipOut := s.cfg.Implant.DefaultInterval, s.cfg.Implant.DefaultJitter, s.cfg.Implant.DefaultSkipTLS
+	randOut, capOut := s.cfg.Implant.BeaconRandomization, s.cfg.Implant.MaxRandomIntervalMs
 	s.configMu.Unlock()
 
-	slog.Info("Agent config updated", "interval", intervalOut, "jitter", jitterOut, "skip_tls", skipOut)
+	slog.Info("Agent config updated", "interval", intervalOut, "jitter", jitterOut, "skip_tls", skipOut, "beacon_randomization", randOut, "max_random_interval_ms", capOut)
 	respond(c, gin.H{"message": "Agent configuration saved successfully"})
 }
 
