@@ -108,7 +108,7 @@ C2 infrastructure is a high-value target, so the release path is built to be che
 - **Signed releases.** Every binary and archive ships with a `.sha256` and a detached Ed25519 `.sig`. Tag builds **fail closed** when the signing key is missing.
 - **SBOM** attached to the release, next to the per-artifact checksums.
 - **Verifiable hot updates.** The server downloads the matching asset, verifies checksum and signature, snapshots the database, restarts through a generated restarter, and records the outcome in `.update/last`. A boot that fails to come back healthy rolls back to the previous binary. Concurrent updates are refused with `409` and a lock file.
-- **12 CI jobs** cover formatting and vet, golangci-lint (with gosec), govulncheck, gitleaks, the race detector, fuzzing, the C-implant build, Docker, API smoke, agent E2E, the frontend gates and live E2E.
+- **13 CI jobs** cover formatting and vet, golangci-lint (with gosec), govulncheck, gitleaks, the race detector, Windows agent-logic tests, fuzzing, the C-implant build, Docker, API smoke, agent E2E, the frontend gates and live E2E.
 - **410 Go test files and 182 frontend test files**, plus OpenAPI contract checks, i18n key coverage and a byte-identical embedded-bundle check.
 
 ## How it compares

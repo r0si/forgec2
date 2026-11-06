@@ -191,6 +191,34 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+  # Windows-only attack code is compiled for GOOS=windows by the build jobs, but
+  # every test job runs on ubuntu-latest, where //go:build windows files (and
+  # their tests) are EXCLUDED -- so a runtime defect in that code ships with a
+  # green CI. This is not hypothetical: the NTLM relay challenge builder had an
+  # out-of-range slice that panicked on every negotiate, and CI never executed
+  # it. This job runs the windows-gated tests on a Windows runner so they are
+  # actually executed. It targets pure-logic tests only (relay parsing, beacon
+  # timing math -- no OS/WMI probing), so it stays deterministic, and it omits
+  # -race on purpose: the agent's Windows syscall code trips Go's checkptr under
+  # the race detector on Windows (documented in AGENTS.md).
+  windows-agent-tests:
+    name: Windows agent logic tests
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.26.10'
+          cache: true
+          cache-dependency-path: go.sum
+      - run: go mod download
+      - name: go test (windows-gated agent logic)
+        shell: bash
+        run: |
+          set -o pipefail
+          go test ./internal/payload/agent/ -count=1 -timeout 10m \
+            -run 'TestGenerateNTLMChallengeIsRandom|TestParseNTLMAuthMalformedIsBounded|TestBeaconRandomization|TestAdaptiveFactor|TestNoBeaconStorm|TestFloorBeaconInterval|TestComputeBeacon|TestApplyMaxRandomCap|TestGaussianRandom|TestExponentialRandom|TestComputeSleepDuration'
+
   # The C implant ships as source and is assembled on operator machines, so no
   # other job would notice a syntax error, a fresh compiler warning, a task type
   # that is dispatched but unreachable, or a WASM sample that no longer builds.

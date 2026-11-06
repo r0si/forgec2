@@ -105,7 +105,7 @@ C2 基础设施本身就是高价值目标，所以发布链路的目标是“�
 - **签名发布。** 每个二进制与归档都带 `.sha256` 和独立的 Ed25519 `.sig`。tag 构建缺少签名密钥会**直接失败**（fail closed）。
 - **SBOM** 随 Release 一起发布，与逐个产物的校验和放在一起。
 - **可验证的热更新。** 服务端下载匹配资产 → 校验 checksum 与签名 → 快照数据库 → 通过生成的 restarter 重启 → 把结果写进 `.update/last`。新版本起不来会回滚到上一个二进制。并发更新用 `409` + 锁文件拒绝。
-- **12 个 CI job** 覆盖格式化与 vet、golangci-lint（含 gosec）、govulncheck、gitleaks、race detector、fuzz、C 植入体构建、Docker、API smoke、agent E2E、前端门禁与 live E2E。
+- **13 个 CI job** 覆盖格式化与 vet、golangci-lint（含 gosec）、govulncheck、gitleaks、race detector、Windows 代理逻辑测试、fuzz、C 植入体构建、Docker、API smoke、agent E2E、前端门禁与 live E2E。
 - **410 个 Go 测试文件、182 个前端测试文件**，外加 OpenAPI 契约校验、i18n 键覆盖、内嵌前端产物字节级一致校验。
 
 ## 与其他框架的对比
