@@ -160,33 +160,6 @@ func adaptiveFactor(now time.Time) (float64, float64) {
 	return 1.35, 1.4
 }
 
-// withinWindowAt mirrors isWithinWorkingHours but evaluates a supplied instant
-// (the beacon decision is made at `now`, and testing must control that instant).
-// A malformed or absent window reports "in window" so activity is not throttled
-// on a bad config -- the same fail-open the existing helper uses.
-func withinWindowAt(now time.Time, wh workingHoursState) bool {
-	if wh.start == "" || wh.end == "" {
-		return true
-	}
-	loc := loadWorkingTZ()
-	local := now.In(loc)
-	startTime, err := time.ParseInLocation("15:04", wh.start, loc)
-	if err != nil {
-		return true
-	}
-	endTime, err := time.ParseInLocation("15:04", wh.end, loc)
-	if err != nil {
-		return true
-	}
-	cur := local.Hour()*60 + local.Minute()
-	s := startTime.Hour()*60 + startTime.Minute()
-	e := endTime.Hour()*60 + endTime.Minute()
-	if s <= e {
-		return cur >= s && cur < e
-	}
-	return cur >= s || cur < e
-}
-
 // applyMaxRandomCap clamps the computed interval if MaxRandomIntervalMs is set.
 // The caller passes the SAME base the distribution was centered on (FastInterval
 // in interactive fast mode, otherwise Interval) so the cap's reference never

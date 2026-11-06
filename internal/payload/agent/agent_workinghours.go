@@ -5,10 +5,23 @@ package main
 
 import "time"
 
-// isWithinWorkingHours checks if the current time is within the configured working hours window.
+// isWithinWorkingHours checks if the current time is within the configured
+// working hours window. It is the wall-clock convenience wrapper over
+// withinWindowAt (the single implementation of the membership rule) — the
+// beacon main loop uses it directly, the adaptive randomization passes an
+// explicit instant to withinWindowAt, so both read one source of truth.
 func isWithinWorkingHours() bool {
-	now := time.Now()
-	wh := getWorkingHours()
+	return withinWindowAt(time.Now(), getWorkingHours())
+}
+
+// withinWindowAt is the one implementation of the working-hours membership
+// rule, evaluated at a supplied instant (the adaptive beacon decision and any
+// test must control the instant). It fails open — a malformed or absent window
+// reports "in window" so activity is never throttled on a bad config.
+func withinWindowAt(now time.Time, wh workingHoursState) bool {
+	if wh.start == "" || wh.end == "" {
+		return true
+	}
 	loc := loadWorkingTZ()
 	local := now.In(loc)
 
