@@ -102,6 +102,10 @@ const PAGE_DATA_ROUTES = {
   // /report's section fetches (agents/tasks/credentials/network/findings/
   // history) are all GETs in reconRead, so any of them pins the permission.
   "/report": ["/api/report/agents"], // agents.read
+  // /api/automation/health is the odd one out: a GET that requires
+  // automation.write because the diagnostics scan writes an audit row. The
+  // page's data comes from the read endpoints.
+  "/automation": ["/api/automation/rules"], // automation.read
 };
 
 // Group the GET routes by first segment: /api/dns, /api/dns/status and /api/dns/start all answer for
@@ -142,6 +146,21 @@ for (const item of items) {
   const segment = item.href.split("/").filter(Boolean)[0];
   const direct = routes.get(`/api/${segment}`);
   const grouped = segmentPerms.get(segment);
+  // A documented cross-segment data route resolves even a mixed-permission
+  // segment (e.g. /automation, where one GET requires automation.write):
+  // the page's own data is at the listed endpoints.
+  const dataPaths = !direct && grouped === null ? PAGE_DATA_ROUTES[item.href] : undefined;
+  if (dataPaths) {
+    const union = new Set();
+    for (const p of dataPaths) {
+      for (const perm of routes.get(p) ?? []) union.add(perm);
+    }
+    if (union.size > 0) {
+      exact++;
+      compare(item, union, `GET ${dataPaths.join(" | ")}`);
+      continue;
+    }
+  }
   if (!direct && grouped === null) {
     ambiguous++;
     continue;
