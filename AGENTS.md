@@ -10,6 +10,17 @@ The `bash` tool runs **PowerShell 5.1**, not bash. Adapt accordingly:
 - Prefer full cmdlet names (`Get-ChildItem`, `Remove-Item`) over aliases.
 - `cd` is discouraged; use the `workdir` parameter of the shell tool instead.
 
+### Completion contract
+
+"Done" for an optimization round = every applicable box checked, not "looks clean":
+
+- `npm run check` green (nav-perms 44/44, webdist byte-identical, bundle 800/900 kB, coverage ≥ 36.5%).
+- CI on the tip is `completed/success` (fuzz alone skipped).
+- When a container image ships, the demo host pins the new digest by UI or
+  compose value and the boundary checks (read-only edges, 404 controls) pass.
+- Every numbers claim (floors, measurements) is updated in the same commit
+  that raises it — a floor never raised stops guarding anything.
+
 ## Project overview
 ForgeC2 is a mature Go (net/http + sqlite) C2 server plus a Vite + React TypeScript frontend.
 - Server binary: `forgec2-server.exe` (built with `go build ./cmd/server`).
