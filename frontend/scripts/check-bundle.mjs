@@ -35,7 +35,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const TOTAL_LIMIT_BYTES = 5.5 * 1024 * 1024;
+const TOTAL_LIMIT_BYTES = 5.0 * 1024 * 1024;
 // Tightened from 1200 KiB after batches S/T held the critical path at 968 kB, which left ~122 kB.
 // Re-measured 2026-10-28: the critical path is down to 798 kB, so that same 1090 kB limit now left
 // 292 kB - enough for a 200 kB route chunk to start leaking again and still pass, which is exactly
