@@ -1,0 +1,63 @@
+name: forgec2-demo
+
+# The demo backend runs in the host network namespace so it can reach the
+# host's PostgreSQL on 127.0.0.1:5432 and bind only to 127.0.0.1:18000, where
+# the read-only nginx gateway (../../deploy/demo/nginx.conf) proxies it.
+# Nothing is published on a public interface by this container.
+#
+# The image defaults to the published edge build. Pin the digest when you need
+# a byte-identical deployment:
+#
+#   FORGEC2_IMAGE=ghcr.io/r0si/forgec2@sha256:ae17609cd35c5a3f724855bde8d230c06018081d9dc0ce1156e1b35740d1cfc2
+#
+# `edge` and its sha-<commit> tag resolve to the same manifest. On hosts where
+# GHCR is unreachable, a read-only mirror serves the identical manifest; set
+# FORGEC2_IMAGE to that path in .env and note in the runbook which mirror was
+# used and why.
+services:
+  forgec2:
+    image: ${FORGEC2_IMAGE:-ghcr.io/r0si/forgec2:edge}
+    container_name: forgec2-demo
+    restart: unless-stopped
+    network_mode: host
+    # Plugin discovery is relative to the process working directory; /data is
+    # the only writable path in this read-only container, and running from /
+    # made every boot log "open plugins: permission denied".
+    working_dir: /data
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /home/nonroot
+    volumes:
+      # The config is mounted read-only: the server never rewrites it (secrets
+      # arrive through the environment, so Load has nothing to persist).
+      - /opt/forgec2-demo/compose/config.yaml:/data/config.yaml:ro
+      - /opt/forgec2-demo/container-data:/data
+    environment:
+      - FORGEC2_JWT_SECRET=${FORGEC2_JWT_SECRET:?set in .env}
+      - FORGEC2_LOOT_KEY=${FORGEC2_LOOT_KEY:?set in .env}
+      - FORGEC2_EXTC2_KEY=${FORGEC2_EXTC2_KEY:?set in .env}
+      - FORGEC2_BACKUP_KEY=${FORGEC2_BACKUP_KEY:?set in .env}
+      - FORGEC2_TOTP_KEY=${FORGEC2_TOTP_KEY:?set in .env}
+      - FORGEC2_CSRF_KEY=${FORGEC2_CSRF_KEY:?set in .env}
+      - FORGEC2_DATA_DIR=/data
+      # Loopback only: nginx owns the public port.
+      - FORGEC2_HOST=127.0.0.1
+      - FORGEC2_PORT=18000
+      - FORGEC2_DB_DRIVER=postgres
+      - FORGEC2_DB_DSN=host=127.0.0.1 port=5432 user=forgec2 password=${DB_PASSWORD:?set in .env} dbname=forgec2 sslmode=disable
+      - TZ=Asia/Shanghai
+    mem_limit: 1g
+    pids_limit: 512
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      # The image ships /usr/local/bin/healthcheck, which tries HTTPS then
+      # HTTP on FORGEC2_HOST/FORGEC2_PORT.
+      test: ["CMD", "/usr/local/bin/healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s

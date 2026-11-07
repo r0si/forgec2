@@ -1,0 +1,131 @@
+# Public read-only demo
+
+An isolated, disposable ForgeC2 instance that anyone can look at:
+
+- URL: `http://43.143.162.139:8000/`
+- Account: `demo` / `ForgeC2Demo2026!`
+
+It exists to show the console, not to collect anything. It runs an empty
+database, one HTTP listener, and **no** beacon transport.
+
+> **Never point this at real data.** It runs on plain HTTP with
+> `CookieSecure=false`; the database, keys, and accounts are public. Do not
+> reuse them, do not import a production DB, and do not leave it running as a
+> general-purpose deployment. Build a normal deployment (`config.example.yaml`
+> + TLS) for real work.
+
+## What is deployed
+
+| layer | detail |
+|---|---|
+| backend | container `forgec2-demo` from `ghcr.io/r0si/forgec2:edge`, `network_mode: host`, `read_only`, `working_dir: /data`, binds `127.0.0.1:18000` only |
+| database | PostgreSQL 18 on the host (`127.0.0.1:5432`, role `forgec2`, db `forgec2`) |
+| edge | standalone nginx (`deploy/demo/nginx.conf`) listening on `0.0.0.0:8000`, proxying everything to the backend |
+| state | `/opt/forgec2-demo/container-data` (uid/gid 65532), config mounted read-only from `/opt/forgec2-demo/compose/config.yaml` |
+| secrets | `/opt/forgec2-demo/compose/.env` (mode 600); storage keys reach the process as `FORGEC2_*` env vars |
+
+The host's own nginx is untouched: the demo gateway is a separate instance
+(`nginx -c /opt/forgec2-demo/nginx.conf`).
+
+## Read-only, at two layers
+
+1. **Edge** — only `GET`/`HEAD` are proxied. The exceptions are `GET|POST
+   /login`, `POST /api/login`, `POST /api/logout`, `POST /api/auth/extend`, and
+   `POST /infra/front/list` (the Domain Fronting list is a read registered as
+   POST; the handler returns in-memory config and mutates nothing). Everything
+   else answers `403` before the handler runs.
+2. **Handler** — the `demo-observer` custom role holds only read permissions
+   (`agents,listeners,tasks,files,groups,campaigns,opsec,intel,automation,
+   notifications,settings,credentials.read` plus `ai.use`). Every mutating
+   route calls `RequirePermission(<resource>.write)` and refuses.
+
+Not reachable by design: `/ws` and `/extc2/ws` (404 — no operator socket to
+anonymous visitors, the console will report the live channel as unavailable),
+`/payloads/*`, `/api/v1/collect|generate_204|th`, `/phishing/l/*`,
+`/phishing/oauth/*`. The `/phishing` page itself is a normal read-only console
+page.
+
+The first-boot `admin` is **disabled** and its sessions are revoked at the end
+of `deploy.sh`, so the public password list contains exactly one account.
+
+## Reproduce from scratch
+
+On a fresh Debian/Ubuntu host with Docker, nginx and PostgreSQL installed:
+
+```bash
+sudo BASE=/opt/forgec2-demo \
+     PUBLIC_URL=http://<host>:8000 \
+     DEMO_PASSWORD='<pick one>' \
+     bash deploy/demo/deploy.sh
+```
+
+The script generates `.env` (random DB password and storage keys) and
+`config.yaml` when they are missing, keeps them on re-runs, creates the
+PostgreSQL role/database, installs and reloads the gateway, starts the
+container, defines the role and the `demo` account through the API, verifies
+`/api/me`, disables the admin, and asserts the edge behaviour (login 302,
+`/ws` 404, `POST`/`PUT` 403, `/payloads` 404). It exits non-zero if any check
+fails.
+
+Requirements specific to this host and documented rather than hidden:
+
+- **GHCR is not reachable directly.** The image is pulled through a read-only
+  mirror serving the identical manifest (`ghcr.nju.edu.cn/r0si/forgec2:edge`).
+  Set `FORGEC2_IMAGE` to the mirror or to a digest in `.env`.
+- **Docker Hub is not reachable**, so PostgreSQL is the host package rather
+  than the compose `postgres` profile. Swapping to the profile only means
+  changing `FORGEC2_DB_DSN` and dropping the PostgreSQL section of `deploy.sh`.
+- Node/Go are not needed on the host: the published image carries the embedded
+  console.
+
+## Verify
+
+```bash
+curl -s http://127.0.0.1:8000/health                      # ok
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8000/ws        # 404
+curl -s -o /dev/null -w '%{http_code}\n' -X POST http://127.0.0.1:8000/api/agents  # 403
+curl -s -c /tmp/cj -o /dev/null -w '%{http_code}\n' \
+  --data-urlencode 'username=demo' --data-urlencode 'password=ForgeC2Demo2026!' \
+  http://127.0.0.1:8000/api/login                        # 302
+curl -s -b /tmp/cj -H 'Accept: application/json' http://127.0.0.1:8000/loot | head -c 120
+```
+
+`/loot` returns the page shell for a browser navigation and the JSON envelope
+for `Accept: application/json` — that is the dual-use contract, not a bug.
+
+## Known limitations
+
+- **The live channel is unavailable.** `/ws` answers 404 by design, so the
+  header shows "Reconnecting…" and later "Offline", and the console logs a
+  failed WebSocket handshake. Pages still poll for data.
+- **The published image logs PostgreSQL statements it should skip.** `edge`
+  still runs SQLite-only DDL (the `ai_knowledge_fts` FTS5 index) and selects a
+  removed `hash_type` column during the credential dedup backfill, and it logs
+  expected `record not found` lookups at ERROR. All three are fixed in the
+  tree (`deploy/demo/README.md` is written against the fixed behaviour) and
+  disappear with the next image; none of them affects a page.
+- **AI knowledge search uses the LIKE fallback.** There is no FTS5 index under
+  PostgreSQL, so search scans the token column. Fine for the demo, noticeable
+  with a large knowledge base.
+- **Built-in backups are disabled** for PostgreSQL (the server logs this at
+  boot); use `pg_dump` as shown above.
+
+## Operations
+
+
+```bash
+cd /opt/forgec2-demo/compose
+docker compose ps
+docker compose logs --tail=100 forgec2
+docker compose restart forgec2
+```
+
+Back up with `pg_dump` (the built-in backup is SQLite-only and logs a warning
+under PostgreSQL):
+
+```bash
+pg_dump -h 127.0.0.1 -U forgec2 forgec2 | gzip > /var/backups/forgec2-demo-$(date +%F).sql.gz
+```
+
+Rollback to the previous native deployment (kept from before the container
+migration): stop the container, then `systemctl enable --now forgec2-demo.service`.

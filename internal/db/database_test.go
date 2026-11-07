@@ -117,6 +117,41 @@ func TestCredentialTenantInheritanceAndBackfill(t *testing.T) {
 	}
 }
 
+// TestCredentialDedupKeyBackfill pins the columns the backfill selects. It
+// used to select a `hash_type` column that no model has any more, so every
+// startup logged "Credential dedup-key backfill failed" and rows predating the
+// dedup column kept an empty key (vault dedup then compared "" with "" and
+// treated every pair as a duplicate).
+func TestCredentialDedupKeyBackfill(t *testing.T) {
+	database := setupTestDB(t)
+	agent := Implant{ID: "dedup-backfill-agent", Hostname: "dedup-host"}
+	if err := database.Create(&agent).Error; err != nil {
+		t.Fatalf("create implant: %v", err)
+	}
+	// Only the row seeded here may lack a key, so a leftover from another test
+	// cannot decide the outcome.
+	if err := database.Exec("UPDATE credential_entries SET dedup_key = 'pre-existing' WHERE dedup_key = ''").Error; err != nil {
+		t.Fatalf("park pre-existing rows: %v", err)
+	}
+	if err := database.Exec(
+		"INSERT INTO credential_entries (tenant_id, agent_id, domain, username, password, hash, source, dedup_key) VALUES (0, ?, 'corp.local', 'bob', 'hunter2', '', 'manual', '')",
+		agent.ID,
+	).Error; err != nil {
+		t.Fatalf("insert legacy credential: %v", err)
+	}
+
+	backfillCredentialDedupKeys(database)
+
+	var row CredentialEntry
+	if err := database.Where("agent_id = ? AND username = ?", agent.ID, "bob").First(&row).Error; err != nil {
+		t.Fatalf("load backfilled credential: %v", err)
+	}
+	want := ComputeCredDedupKey(agent.ID, "corp.local", "bob", "hunter2", "")
+	if row.DedupKey != want {
+		t.Fatalf("dedup key = %q, want %q", row.DedupKey, want)
+	}
+}
+
 func TestVerifySQLiteFile(t *testing.T) {
 	t.Skip("VerifySQLiteFile removed with SQLite: PostgreSQL restores use pg_dump/pg_restore logical dumps")
 }

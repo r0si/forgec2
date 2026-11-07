@@ -1,3 +1,7 @@
+# DEPRECATED - deploy.sh starts the gateway itself (`nginx -c ...`), so this
+# unit is only useful on a host that keeps nginx under systemd. It is kept for
+# the native rollback path; it depends on forgec2-demo.service, which the
+# container deployment disables.
 [Unit]
 Description=ForgeC2 read-only HTTP demo gateway
 After=network.target forgec2-demo.service

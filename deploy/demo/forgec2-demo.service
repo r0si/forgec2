@@ -1,3 +1,6 @@
+# DEPRECATED - the demo now runs as a container (docker-compose.yml, started by
+# deploy.sh). This unit is kept only so a host migrated from the native layout
+# can be rolled back; deploy.sh disables it when it exists.
 [Unit]
 Description=ForgeC2 isolated read-only demo backend
 After=network.target

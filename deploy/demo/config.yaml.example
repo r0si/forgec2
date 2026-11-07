@@ -1,21 +1,35 @@
-# Copy outside the repository to /opt/forgec2-demo/config.yaml.
-# First boot generates unique secrets. The random admin password is deliberately
-# not logged; set it with cmd/reset-password before operator provisioning.
-# Never reuse production data, keys, credentials, or listener configuration.
+# Copy outside the repository to /opt/forgec2-demo/compose/config.yaml and
+# mount it read-only at /data/config.yaml. deploy.sh writes the live file with
+# freshly generated keys; this example documents the same sections, so keep
+# the two in sync.
+#
+# Secrets (JWT, loot/ExtC2/backup/TOTP/CSRF keys) are supplied through the
+# FORGEC2_* environment variables in .env, not here: a mounted config file is
+# world-readable inside the container and a plaintext key next to the data it
+# protects protects nothing. The two values below have no environment override
+# and must exist in the file - replace them before the first start.
+#
+# This profile is a disposable, isolated observer demo on plain HTTP. Never
+# reuse these values, this database, or these keys for real operators, agents,
+# credentials or collected data.
 server:
-  host: 127.0.0.1
+  host: 127.0.0.1          # the container uses host networking; nginx is the only public listener
   port: 18000
   # Public HTTP is only acceptable for this isolated, disposable observer demo.
-  # Never use these values with real operators, Agents, credentials, or data.
   tls_enabled: false
   require_tls_for_auth: false
-  data_dir: /opt/forgec2-demo/data
-  cert_file: /opt/forgec2-demo/data/server.crt
-  key_file: /opt/forgec2-demo/data/server.key
+  data_dir: /data
+  cert_file: /data/server.crt
+  key_file: /data/server.key
   allowed_origins:
     - http://43.143.162.139:8000
   trusted_proxies:
     - 127.0.0.1
+  update_check_enabled: false
+  # Replace with: openssl rand -hex 32
+  beacon_key: "REPLACE_WITH_64_HEX_CHARS"
+  # Extra transports stay off: the demo has one HTTP listener and no beacon
+  # surface behind it.
   tcp_enabled: false
   dns_enabled: false
   grpc_enabled: false
@@ -26,8 +40,32 @@ server:
   lportfwd_enabled: false
   auto_recon: []
 database:
-  path: /opt/forgec2-demo/data/db/forgec2.db
-  driver: sqlite
+  # The DSN comes from FORGEC2_DB_DSN in .env so the password is not in this
+  # file. driver/dsn here are the fallback if that variable is unset.
+  driver: postgres
+  dsn: ""
 auth:
+  # Used only on first boot, while the users table is empty. The admin is
+  # disabled again at the end of deploy.sh; this value exists so provisioning
+  # can log in.
   default_password: ""
   log_generated_password: false
+  # The public demo allows concurrent visitors; do not cap them at one.
+  session_max_concurrent: 0
+crypto:
+  key: "ecdh:"
+rate_limit:
+  extc2:
+    # No environment override for this one; the demo disables ExtC2 anyway.
+    # Replace with: openssl rand -hex 32
+    api_token: "REPLACE_WITH_64_HEX_CHARS"
+plugins:
+  # The demo ships no signed plugin tree; keep the policy permissive so an
+  # empty plugins directory does not fail startup.
+  require_signed: false
+backup:
+  # Built-in backups are SQLite-only; PostgreSQL deployments use pg_dump.
+  retain: 0
+security:
+  # Every mutating AI/tool action needs approval even if a role is misconfigured.
+  require_approval: true

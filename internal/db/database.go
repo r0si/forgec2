@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -27,8 +28,14 @@ type lockAwareLogger struct {
 // applies its (possibly Silent) log level filter.
 func (l lockAwareLogger) Trace(ctx context.Context, begin time.Time, fc func() (string, int64), err error) {
 	if err != nil {
-		sql, rows := fc()
-		slog.Error("PostgreSQL statement error", "error", err, "sql", sql, "rows", rows)
+		// A missing row is not a statement failure: First on an optional row
+		// (kill_switches, server_configs, ...) returns gorm.ErrRecordNotFound,
+		// and logging that as an ERROR made an empty fresh database look
+		// broken on every boot.
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			sql, rows := fc()
+			slog.Error("PostgreSQL statement error", "error", err, "sql", sql, "rows", rows)
+		}
 	}
 	l.Interface.Trace(ctx, begin, fc, err)
 }
@@ -325,7 +332,7 @@ func backfillCredentialDedupKeys(db *gorm.DB) {
 	const pageSize = 500
 	for {
 		var rows []CredentialEntry
-		if err := db.Select("id, agent_id, domain, username, password, hash, hash_type, source").
+		if err := db.Select("id, agent_id, domain, username, password, hash, source").
 			Where("dedup_key = ''").
 			Order("id ASC").Limit(pageSize).Find(&rows).Error; err != nil {
 			slog.Warn("Credential dedup-key backfill failed", "err", err)

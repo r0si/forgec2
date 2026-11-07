@@ -1,4 +1,12 @@
 #!/bin/bash
+# DEPRECATED - superseded by deploy.sh + docker-compose.yml in this directory.
+#
+# This script provisions the older NATIVE (binary + SQLite) demo described in
+# forgec2-demo.service. The deployed demo now runs the published container
+# image against PostgreSQL and is provisioned end to end by deploy.sh, which
+# also disables the first-boot admin. Kept for reference and rollback only; do
+# not run it against the current demo database (it edits SQLite directly).
+#
 # Provision the isolated read-only demo instance. Run after the first boot:
 #
 #   sudo bash deploy/demo/provision.sh [DB_PATH] [ROLE_NAME]

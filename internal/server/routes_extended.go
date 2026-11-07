@@ -24,6 +24,11 @@ func (s *Server) registerExtendedRoutes(auth *gin.RouterGroup) {
 		extRead.GET("/chain/graph", s.handleAPIChainGraph)
 		extRead.GET("/chain", s.handleAPIChainList)
 		extRead.GET("/domain-fronting", s.handleAPIDomainFronting)
+		// The front list only returns in-memory config; requiring agents.write
+		// here answered 403 for every read-only role (the demo observer) even
+		// though the page grants agents.read. Mutations (config) stay in
+		// extWrite.
+		extRead.POST("/infra/front/list", s.handleAPIInfraFrontList)
 		extRead.GET("/rportfwd/sessions", s.handleAPIRPortFwdStatus)
 		extRead.GET("/stager/tokens", s.handleAPIStagerTokens)
 		extRead.GET("/ntlm/relay_status", s.handleNTLMRelayStatus)
@@ -42,7 +47,6 @@ func (s *Server) registerExtendedRoutes(auth *gin.RouterGroup) {
 		extWrite.POST("/payload/bundle", s.handlePackerBundle)
 		extWrite.POST("/mesh/route/:agentId", s.handleMeshRoute)
 		extWrite.POST("/chat/send", s.handleAPISendChatMessage)
-		extWrite.POST("/infra/front/list", s.handleAPIInfraFrontList)
 		extWrite.POST("/infra/front/check", s.handleAPIInfraFrontCheck)
 		extWrite.POST("/infra/front/config", s.handleAPIInfraFrontConfig)
 		extWrite.POST("/stager/register", s.handleAPIStagerRegister)

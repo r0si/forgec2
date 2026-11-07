@@ -42,6 +42,27 @@ func TestRequirePermissionMiddlewareGate(t *testing.T) {
 	}
 }
 
+// TestInfraFrontListIsARegisteredRead pins the Domain Fronting list endpoint.
+// The handler only returns in-memory configuration, so requiring agents.write
+// answered 403 for every read-only role (the demo observer holds agents.read).
+// The config write must stay in the write group.
+func TestInfraFrontListIsARegisteredRead(t *testing.T) {
+	src, err := os.ReadFile("routes_extended.go")
+	if err != nil {
+		t.Fatalf("read routes_extended.go: %v", err)
+	}
+	all := string(src)
+	if strings.Contains(all, `extWrite.POST("/infra/front/list"`) {
+		t.Fatal("/infra/front/list is back in the agents.write group; read-only roles lose the page")
+	}
+	if !strings.Contains(all, `extRead.POST("/infra/front/list", s.handleAPIInfraFrontList)`) {
+		t.Fatal("/infra/front/list is not registered on the read group")
+	}
+	if !strings.Contains(all, `extWrite.POST("/infra/front/config"`) {
+		t.Fatal("/infra/front/config lost its write guard")
+	}
+}
+
 // TestUpdateCheckRefreshRouteIsPermissionGuarded is a source-contract test: the
 // route is registered on the root auth group, so nothing else would stop a
 // viewer from forcing outbound update checks if the permission middleware were
