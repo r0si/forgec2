@@ -21,6 +21,9 @@ config.yaml
 config.*.yaml
 !config.example.yaml
 
+# Local golangci-lint debt reports (scripts/check-lint-debt.sh inputs).
+lint-debt-*.json
+
 # Go
 *.test
 *.out
