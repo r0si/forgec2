@@ -28,7 +28,9 @@ import { fileURLToPath } from "node:url";
 // without this check noticing, i.e. the ratchet had stopped ratcheting. It is now 33.5, keeping the
 // documented ~1.3-point headroom so a large new component shipping without tests still trips it
 // while ordinary page work does not.
-const FLOOR = Number(process.env.COVERAGE_FLOOR ?? 33.5);
+// Re-measured 2026-11-07 (CI linux): 37.71% statements (9189/24365). The floor
+// is raised to 36.5, keeping ~1.2-point headroom.
+const FLOOR = Number(process.env.COVERAGE_FLOOR ?? 36.5);
 
 const root = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 const summaryPath = join(root, "coverage", "coverage-summary.json");
