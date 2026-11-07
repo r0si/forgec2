@@ -118,8 +118,18 @@ jobs:
           docker run -d --name forgec2-pg \
             -e POSTGRES_USER=forgec2 -e POSTGRES_PASSWORD=forgec2 -e POSTGRES_DB=forgec2 \
             -p 5432:5432 postgres:16-alpine
+          # The docker-entrypoint starts a temporary server during initdb that
+          # accepts connections for a moment, creates the database, then shuts
+          # down before the real server starts. One pg_isready success can
+          # land in that window, so require two consecutive successes.
+          pg_ready=0
           for i in $(seq 1 90); do
-            if docker exec forgec2-pg pg_isready -U forgec2 -d forgec2 >/dev/null 2>&1; then break; fi
+            if docker exec forgec2-pg pg_isready -U forgec2 -d forgec2 >/dev/null 2>&1; then
+              pg_ready=$((pg_ready + 1))
+              if [ "$pg_ready" -ge 2 ]; then break; fi
+            else
+              pg_ready=0
+            fi
             sleep 1
           done
           docker exec forgec2-pg pg_isready -U forgec2 -d forgec2 || { echo "PostgreSQL did not become ready"; docker logs forgec2-pg | tail -n 50; exit 1; }
@@ -445,8 +455,17 @@ jobs:
           docker run -d --name forgec2-pg \
             -e POSTGRES_USER=forgec2 -e POSTGRES_PASSWORD=forgec2 -e POSTGRES_DB=forgec2 \
             -p 5432:5432 postgres:16-alpine
+          # Require two consecutive successes: the docker-entrypoint's
+          # temporary init server accepts briefly then shuts down, and one
+          # success can land in that window (see the API smoke step).
+          pg_ready=0
           for i in $(seq 1 90); do
-            if docker exec forgec2-pg pg_isready -U forgec2 -d forgec2 >/dev/null 2>&1; then break; fi
+            if docker exec forgec2-pg pg_isready -U forgec2 -d forgec2 >/dev/null 2>&1; then
+              pg_ready=$((pg_ready + 1))
+              if [ "$pg_ready" -ge 2 ]; then break; fi
+            else
+              pg_ready=0
+            fi
             sleep 1
           done
           docker exec forgec2-pg pg_isready -U forgec2 -d forgec2 || { docker logs forgec2-pg | tail -n 50; exit 1; }
@@ -634,8 +653,17 @@ jobs:
           docker run -d --name forgec2-pg \
             -e POSTGRES_USER=forgec2 -e POSTGRES_PASSWORD=forgec2 -e POSTGRES_DB=forgec2 \
             -p 5432:5432 postgres:16-alpine
+          # Require two consecutive successes: the docker-entrypoint's
+          # temporary init server accepts briefly then shuts down, and one
+          # success can land in that window (see the API smoke step).
+          pg_ready=0
           for i in $(seq 1 90); do
-            if docker exec forgec2-pg pg_isready -U forgec2 -d forgec2 >/dev/null 2>&1; then break; fi
+            if docker exec forgec2-pg pg_isready -U forgec2 -d forgec2 >/dev/null 2>&1; then
+              pg_ready=$((pg_ready + 1))
+              if [ "$pg_ready" -ge 2 ]; then break; fi
+            else
+              pg_ready=0
+            fi
             sleep 1
           done
           docker exec forgec2-pg pg_isready -U forgec2 -d forgec2 || { docker logs forgec2-pg | tail -n 50; exit 1; }
