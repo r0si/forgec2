@@ -99,6 +99,9 @@ const PAGE_DATA_ROUTES = {
   "/opsec": ["/api/opsec/rules"], // opsec.read
   "/circuit-breaker": ["/api/circuit-breaker/status"], // opsec.read
   "/autotag": ["/api/autotag/rules"], // settings.read
+  // /report's section fetches (agents/tasks/credentials/network/findings/
+  // history) are all GETs in reconRead, so any of them pins the permission.
+  "/report": ["/api/report/agents"], // agents.read
 };
 
 // Group the GET routes by first segment: /api/dns, /api/dns/status and /api/dns/start all answer for

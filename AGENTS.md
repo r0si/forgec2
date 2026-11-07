@@ -147,8 +147,10 @@ by hand at least once; do not weaken one to make a change pass — fix the chang
   `/api/ai/runs` require `ai.use`. The built-in `user` role carries all three, so only **custom-role**
   deployments saw it — a page that answers 403 everywhere, or a page you can use but cannot reach. The
   gate parses route groups (`X.Use(RequirePermission(db.PermFoo))` plus inline overrides) and compares
-  the first path segment; it **only** compares nav items whose `/api/<segment>` GET routes agree on one
-  permission set, so 17 of 44 are checked and the rest are counted, not guessed. It resolves `PermFoo`
+  the first path segment, bare dual-use GETs at the page's own path (`/loot`, `/tokens`, ...), and a
+  hand-verified PAGE_DATA_ROUTES map for pages whose data lives at cross-segment endpoints. Pages
+  whose `/api/<segment>` GETs disagree on permission are skipped as ambiguous (currently only
+  `/automation`), so 43 of 44 are checked and the rest are counted, not guessed. It resolves `PermFoo`
   to its string through `internal/db/models.go` after a CamelCase guess turned `PermAIUse` into
   `AIUse` and produced a false mismatch.
 - `check:discarded-results` (`frontend/scripts/check-discarded-results.mjs`) — a delivery that failed must
