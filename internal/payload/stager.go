@@ -83,7 +83,7 @@ func InitStagerKey() error {
 			slog.Error("Failed to create stager key directory", "path", filepath.Dir(stagerKeyPath), "error", err)
 			return
 		}
-		if err := os.WriteFile(stagerKeyPath, stagerKey, 0640); err != nil {
+		if err := os.WriteFile(stagerKeyPath, stagerKey, 0600); err != nil {
 			slog.Error("Failed to persist stager key; tokens will not survive a restart", "path", stagerKeyPath, "error", err)
 			return
 		}

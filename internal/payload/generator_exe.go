@@ -160,7 +160,7 @@ func GenerateWindowsEXE(cfg ImplantConfig, outputDir string) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("lnk bundle: create shortcut: %w", err)
 		}
-		if err := os.WriteFile(lnkPath, lnkData, 0644); err != nil {
+		if err := os.WriteFile(lnkPath, lnkData, 0600); err != nil {
 			return "", fmt.Errorf("lnk bundle: write shortcut: %w", err)
 		}
 		zipName := strings.TrimSuffix(exeName, ".exe")
@@ -251,7 +251,7 @@ func GeneratePowerShell(cfg ImplantConfig, outputDir string) (string, error) {
 	if err := os.MkdirAll(outputDir, 0750); err != nil {
 		return "", err
 	}
-	if err := os.WriteFile(outPath, []byte(ps1Code), 0644); err != nil {
+	if err := os.WriteFile(outPath, []byte(ps1Code), 0600); err != nil {
 		return "", err
 	}
 	return outPath, nil

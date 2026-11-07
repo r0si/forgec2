@@ -488,13 +488,13 @@ func writeProfileFiles(dataDir string, p MalleableProfile, source string) (Malle
 	if err != nil {
 		return p, err
 	}
-	if err := os.WriteFile(jsonPath, out, 0644); err != nil {
+	if err := os.WriteFile(jsonPath, out, 0600); err != nil {
 		return p, err
 	}
 	if strings.TrimSpace(source) == "" {
 		source = RenderProfileCS(p)
 	}
-	if err := os.WriteFile(profileSourcePath(dataDir, p.Name), []byte(source), 0644); err != nil {
+	if err := os.WriteFile(profileSourcePath(dataDir, p.Name), []byte(source), 0600); err != nil {
 		_ = os.Remove(jsonPath)
 		return p, err
 	}
@@ -577,7 +577,7 @@ func SaveCSProfile(dataDir, name, source string) (MalleableProfile, error) {
 	if err != nil {
 		return p, err
 	}
-	if err := os.WriteFile(profileSourcePath(dataDir, p.Name), []byte(source), 0644); err != nil {
+	if err := os.WriteFile(profileSourcePath(dataDir, p.Name), []byte(source), 0600); err != nil {
 		_ = os.Remove(profileDataPath(dataDir, p.Name))
 		return p, err
 	}

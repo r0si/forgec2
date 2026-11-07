@@ -150,7 +150,9 @@ func (s *Server) handleACMECertProvision(c *gin.Context) {
 	certFile := filepath.Join(dataDir, "fullchain.pem")
 	keyFile := filepath.Join(dataDir, "privkey.pem")
 
-	if err := os.WriteFile(certFile, certPEM, 0644); err != nil {
+	// #nosec G306 -- the public fullchain certificate is meant to be served;
+	// only the private key below is kept owner-readable.
+	if err := os.WriteFile(certFile, certPEM, 0644); err != nil { // #nosec G306
 		respondError(c, http.StatusInternalServerError, sanitizeError(err, "Write cert"))
 		return
 	}

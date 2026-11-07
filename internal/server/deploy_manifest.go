@@ -52,7 +52,7 @@ func GenerateDeployManifest(configPath string) *DeployManifest {
 			slog.Warn("Failed to marshal deploy manifest", "error", err)
 			return
 		}
-		if err := os.WriteFile(manifestPath, data, 0644); err != nil {
+		if err := os.WriteFile(manifestPath, data, 0600); err != nil {
 			slog.Warn("Failed to write deploy manifest", "path", manifestPath, "error", err)
 			return
 		}

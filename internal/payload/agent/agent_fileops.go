@@ -239,5 +239,5 @@ func downloadFromURL(urlStr, destPath string) error {
 	if len(data) > maxURLDownloadSize {
 		return fmt.Errorf("download exceeds size cap (%d bytes)", maxURLDownloadSize)
 	}
-	return os.WriteFile(cleanDest, data, 0644)
+	return os.WriteFile(cleanDest, data, 0600)
 }

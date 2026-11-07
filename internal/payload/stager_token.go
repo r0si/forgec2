@@ -129,7 +129,7 @@ func WriteStage2Blob(dataDir, token string, plaintext []byte) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0750); err != nil {
 		return err
 	}
-	return os.WriteFile(path, enc, 0640)
+	return os.WriteFile(path, enc, 0600)
 }
 
 // LoadStage2Blob reads the encrypted stage-2 blob for a token.

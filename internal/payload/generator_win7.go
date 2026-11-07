@@ -75,12 +75,12 @@ func materializeWin7Shim(buildDir string) error {
 			if err != nil {
 				return err
 			}
-			if err := os.WriteFile(filepath.Join(dstDir, e.Name()), data, 0o644); err != nil {
+			if err := os.WriteFile(filepath.Join(dstDir, e.Name()), data, 0o600); err != nil {
 				return err
 			}
 		}
 	}
-	if err := os.WriteFile(filepath.Join(stubRoot, "go.mod"), []byte("module github.com/forgec2/forgec2\n\ngo 1.20\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(stubRoot, "go.mod"), []byte("module github.com/forgec2/forgec2\n\ngo 1.20\n"), 0o600); err != nil {
 		return err
 	}
 	// Repoint the parent replace at the stub. forgeC2ModuleReplace emits a
@@ -101,7 +101,7 @@ func materializeWin7Shim(buildDir string) error {
 	if !rewrote {
 		return fmt.Errorf("win7shim: parent replace line not found in generated go.mod")
 	}
-	return os.WriteFile(gomodPath, []byte(strings.Join(lines, "\n")), 0o644)
+	return os.WriteFile(gomodPath, []byte(strings.Join(lines, "\n")), 0o600)
 }
 
 // buildGoModWin7 emits the legacy module file for Win7/2008R2 targets:

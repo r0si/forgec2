@@ -299,7 +299,7 @@ func (c *BuildCache) saveToDisk() error {
 		return err
 	}
 
-	return os.WriteFile(indexPath, data, 0644)
+	return os.WriteFile(indexPath, data, 0600)
 }
 
 // loadFromDisk loads the cache index from disk.

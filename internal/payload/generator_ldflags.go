@@ -72,7 +72,7 @@ func writeConfigInjectFile(workDir, configBlob, sConfigKey string, selfCheck boo
 	if b := make([]byte, 3); func() bool { _, err := rand.Read(b); return err == nil }() {
 		name = "aa_" + hex.EncodeToString(b) + "_inject.go"
 	}
-	return os.WriteFile(filepath.Join(workDir, name), []byte(src), 0644)
+	return os.WriteFile(filepath.Join(workDir, name), []byte(src), 0600)
 }
 
 // patchSelfCheckHash computes the SHA-256 of the (already finalized) binary and
@@ -114,7 +114,9 @@ func patchSelfCheckHash(outPath string) error {
 		return fmt.Errorf("internal: computed self-check hash is not 64 bytes")
 	}
 	copy(data[idx:idx+len(needle)], []byte(real))
-	if err := os.WriteFile(outPath, data, 0755); err != nil {
+	// #nosec G306 -- the patched artifact is a built binary the agent must
+	// execute; it is operator-generated content, not a secret.
+	if err := os.WriteFile(outPath, data, 0755); err != nil { // #nosec G306
 		return fmt.Errorf("write self-check patch: %w", err)
 	}
 	return nil

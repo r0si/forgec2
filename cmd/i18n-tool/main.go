@@ -226,7 +226,7 @@ func runExport(lang, format, output string) {
 	}
 
 	if output != "" {
-		err = os.WriteFile(output, data, 0644)
+		err = os.WriteFile(output, data, 0600)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error writing file: %v\n", err)
 			os.Exit(1)

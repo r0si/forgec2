@@ -78,7 +78,8 @@ func finalizePE(outPath string, cfg ImplantConfig, goarch string) error {
 		}
 		data = out
 	}
-	if err := os.WriteFile(outPath, data, 0755); err != nil {
+	// #nosec G306 -- finalized PE artifacts are executables by contract.
+	if err := os.WriteFile(outPath, data, 0755); err != nil { // #nosec G306
 		return fmt.Errorf("write finalized PE: %w", err)
 	}
 	return nil
@@ -163,7 +164,8 @@ func stripPEArtifacts(path string) error {
 	if _, err := stripPEArtifactsInPlace(data); err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0755)
+	// #nosec G306 -- stripped PE artifacts are executables by contract.
+	return os.WriteFile(path, data, 0755) // #nosec G306
 }
 
 // windowsMachine maps the requested architecture to the PE Machine field so we

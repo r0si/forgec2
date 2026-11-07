@@ -340,7 +340,7 @@ func (s *Server) handleGenerateOneLiner(c *gin.Context) {
 	hostPath := filepath.Join(payloadSubDir, filename)
 
 	if payloadType == "ps1" {
-		if err := os.WriteFile(hostPath, []byte(ps1Code), 0644); err != nil {
+		if err := os.WriteFile(hostPath, []byte(ps1Code), 0600); err != nil {
 			s.logBuild(format, "oneliner", form.C2URL, form.ListenerID, filename, "failed", "build error", "")
 			respondError(c, http.StatusInternalServerError, sanitizeError(err, "Payload generation"))
 			return
@@ -352,7 +352,7 @@ func (s *Server) handleGenerateOneLiner(c *gin.Context) {
 			respondError(c, http.StatusInternalServerError, sanitizeError(readErr, "Payload generation"))
 			return
 		}
-		if err := os.WriteFile(hostPath, input, 0644); err != nil {
+		if err := os.WriteFile(hostPath, input, 0600); err != nil {
 			s.logBuild(format, "oneliner", form.C2URL, form.ListenerID, filename, "failed", "build error", "")
 			respondError(c, http.StatusInternalServerError, sanitizeError(err, "Payload generation"))
 			return

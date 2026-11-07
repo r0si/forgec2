@@ -124,7 +124,7 @@ func (m *Manifest) Save(dir string) error {
 		return fmt.Errorf("failed to marshal manifest: %w", err)
 	}
 	path := filepath.Join(dir, "manifest.yaml")
-	return os.WriteFile(path, out, 0644)
+	return os.WriteFile(path, out, 0600)
 }
 
 // DefaultTimeout returns the configured timeout or a sensible default.

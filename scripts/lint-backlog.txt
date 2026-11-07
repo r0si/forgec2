@@ -94,8 +94,16 @@
 # policy routed through setSSNTable instead of a direct field write, and the
 # SA4006/S1023 test cleanups. Both targets are again the pure gosec backlog:
 # 65 (win, local), 66 (lin); errcheck 0/0, staticcheck 0/0, unused 0/0,
-# mechanical zero on both targets. The windows ceiling is set to the CI
+# mechanical zero on both targets. The windows ceiling was set to the CI
 # measurement (66: 65 gosec + 1 staticcheck) rather than the local Windows
 # host (65 gosec only) — the +1 CI observation headroom noted in Batch O.
-windows=66
-linux=66
+#
+# Batch Q (2026-11): all 29 G306 write-permission findings paid down (0644 /
+# 0640 -> 0600; the three built-binary writes at 0755 and the public
+# fullchain certificate at 0644 carry #nosec G306 with rationale instead of a
+# broken mode). Totals are now the pure gosec backlog minus G306: 36 (win),
+# 41 (lin). The linux target carries five more because it analyzes the
+# linux-only transport/relay sources the windows target skips; both ceilings
+# are the local GOOS-pinned measurements.
+windows=36
+linux=41

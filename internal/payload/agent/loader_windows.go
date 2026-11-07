@@ -58,7 +58,7 @@ func executeAssemblyForkRun(b64Data string) (string, error) {
 
 	tmpDir := os.Getenv("TEMP")
 	assemblyPath := filepath.Join(tmpDir, fmt.Sprintf("fga_%x.dll", time.Now().UnixNano()))
-	if err := os.WriteFile(assemblyPath, data, 0644); err != nil {
+	if err := os.WriteFile(assemblyPath, data, 0600); err != nil {
 		return "", fmt.Errorf("write temp assembly: %v", err)
 	}
 	defer os.Remove(assemblyPath)

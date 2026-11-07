@@ -44,7 +44,7 @@ func handleSharpHound(task Task, res *TaskResult) {
 	}
 
 	binaryPath := filepath.Join(tmpDir, fmt.Sprintf("sh_%x.exe", time.Now().UnixNano()))
-	if err := os.WriteFile(binaryPath, binary, 0644); err != nil {
+	if err := os.WriteFile(binaryPath, binary, 0600); err != nil {
 		res.Error = fmt.Sprintf("write sharphound binary: %v", err)
 		return
 	}

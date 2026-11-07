@@ -26,15 +26,15 @@ func writeLoaderModule(workDir string, blob, key []byte, method ShellcodeEncode,
 		if err != nil {
 			return fmt.Errorf("read embedded loader/%s: %w", e.Name(), err)
 		}
-		if err := os.WriteFile(filepath.Join(workDir, e.Name()), data, 0644); err != nil {
+		if err := os.WriteFile(filepath.Join(workDir, e.Name()), data, 0600); err != nil {
 			return err
 		}
 	}
-	if err := os.WriteFile(filepath.Join(workDir, "go.mod"), []byte("module loader\n\ngo 1.25\n"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(workDir, "go.mod"), []byte("module loader\n\ngo 1.25\n"), 0600); err != nil {
 		return err
 	}
 	gen := writePayloadGen(blob, key, method, entry)
-	return os.WriteFile(filepath.Join(workDir, "zz_payload_gen.go"), gen, 0644)
+	return os.WriteFile(filepath.Join(workDir, "zz_payload_gen.go"), gen, 0600)
 }
 
 // writePayloadGen renders the source file that injects the per-build payload
