@@ -124,8 +124,12 @@ docker compose restart forgec2
 
 Container logs are capped by the compose `logging` options (10M × 3
 files). The gateway's own access/error logs under `/opt/forgec2-demo/logs/`
-are covered by the host `logrotate` policy for that directory; add it if your
-distribution does not ship one.
+are covered by `deploy/demo/logrotate.conf` (daily, 14 days, compressed) —
+install it with:
+
+```bash
+sudo install -m 0644 deploy/demo/logrotate.conf /etc/logrotate.d/forgec2-demo
+```
 
 Back up with `deploy/demo/backup.sh` (the built-in backup is SQLite-only and
 logs a warning under PostgreSQL). It reads `DB_PASSWORD` from the same `.env`
