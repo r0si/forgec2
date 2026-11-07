@@ -508,6 +508,18 @@ func (s *Server) searchAIKnowledge(principal aiPrincipal, req aiKnowledgeSearchR
 	if len(hashed) == 0 {
 		return []aiKnowledgeSearchResult{}, nil
 	}
+	// A repeated query token must not double its LIKE branch or its score
+	// weight: the same term typed twice is one signal, not two.
+	seen := make(map[string]bool, len(hashed))
+	deduped := hashed[:0]
+	for _, h := range hashed {
+		if seen[h] {
+			continue
+		}
+		seen[h] = true
+		deduped = append(deduped, h)
+	}
+	hashed = deduped
 	query := s.db.Where("tenant_id = ? AND collection_id IN ?", principal.TenantID, allowed)
 	parts := make([]string, 0, len(hashed))
 	params := make([]interface{}, 0, len(hashed))
@@ -540,8 +552,11 @@ func (s *Server) searchAIKnowledge(principal aiPrincipal, req aiKnowledgeSearchR
 	if !useIndex {
 		query = query.Where("("+strings.Join(parts, " OR ")+")", params...)
 	}
+	// Fetched before Go-side ranking. 500 is cheap now that the trigram
+	// index answers the LIKEs, and it avoids the cap silently discarding a
+	// better chunk beyond the first 100 while returning only req.Limit (<=12).
 	var chunks []db.AIKnowledgeChunk
-	if err := query.Limit(100).Find(&chunks).Error; err != nil {
+	if err := query.Limit(500).Find(&chunks).Error; err != nil {
 		return nil, err
 	}
 	var sources []db.AIKnowledgeSource

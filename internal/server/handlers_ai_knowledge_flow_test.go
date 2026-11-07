@@ -351,6 +351,60 @@ func TestAIKnowledgePromoteSourcesAndSearch(t *testing.T) {
 	}
 }
 
+// TestSearchDedupesQueryTerms pins that a repeated query token is counted
+// once in scoring (a term typed twice is one signal).
+func TestSearchDedupesQueryTerms(t *testing.T) {
+	s := knowledgeTestServer(t)
+	principal := aiPrincipal{UserID: 1, Username: "alice", TenantID: 1, Role: db.RoleAdmin}
+
+	collection := db.AIKnowledgeCollection{TenantID: 1, OwnerID: 1, Name: "ranked"}
+	if err := s.db.Create(&collection).Error; err != nil {
+		t.Fatal(err)
+	}
+	source := db.AIKnowledgeSource{TenantID: 1, CollectionID: collection.ID, Name: "seeded"}
+	if err := s.db.Create(&source).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	mkChunks := func(n int, content string) {
+		for i := 0; i < n; i++ {
+			chunk := db.AIKnowledgeChunk{
+				TenantID: 1, CollectionID: collection.ID, SourceID: source.ID,
+				Position: i, Content: content, SearchTokens: s.blindAIKnowledgeTokens(content),
+			}
+			if err := s.db.Create(&chunk).Error; err != nil {
+				t.Fatalf("seed chunk: %v", err)
+			}
+			// The harness is SQLite, so search takes the MATCH branch; production
+			// promote inserts into ai_knowledge_fts the same way.
+			if err := s.db.Exec("INSERT INTO ai_knowledge_fts(chunk_id, tokens) VALUES(?, ?)", chunk.ID, chunk.SearchTokens).Error; err != nil {
+				t.Fatalf("seed fts: %v", err)
+			}
+		}
+	}
+	// One strong chunk: both query terms in one chunk body.
+	mkChunks(1, "unique bravo targetpair")
+
+	// Query repeats the strong term three times; the repeated term must count once.
+	results, err := s.searchAIKnowledge(principal, aiKnowledgeSearchRequest{
+		Query: "bravo bravo bravo targetpair", CollectionIDs: []uint{collection.ID}, Limit: 5,
+	})
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if len(results) == 0 {
+		t.Fatal("expected results")
+	}
+	top := results[0]
+	// Two distinct terms (bravo, targetpair), counted once each.
+	if top.Score != 2 {
+		t.Fatalf("top score = %d, want 2 (repeated terms counted once)", top.Score)
+	}
+	if !strings.Contains(top.Content, "targetpair") {
+		t.Fatalf("top result is not the strong chunk: %+v", top)
+	}
+}
+
 func TestTruncateAIRunes(t *testing.T) {
 	if got := truncateAIRunes("short", 10); got != "short" {
 		t.Fatalf("short value changed: %q", got)
