@@ -120,11 +120,19 @@ docker compose logs --tail=100 forgec2
 docker compose restart forgec2
 ```
 
-Back up with `pg_dump` (the built-in backup is SQLite-only and logs a warning
-under PostgreSQL):
+Container logs are capped by the compose `logging` options (10M × 3
+files). The gateway's own access/error logs under `/opt/forgec2-demo/logs/`
+are covered by the host `logrotate` policy for that directory; add it if your
+distribution does not ship one.
+
+Back up with `deploy/demo/backup.sh` (the built-in backup is SQLite-only and
+logs a warning under PostgreSQL). It reads `DB_PASSWORD` from the same `.env`
+as the server, writes a gzipped dump to `/var/backups/forgec2-demo/` and
+prunes older than 7 days. Schedule it with cron or a systemd timer, e.g.
+`0 2 * * * root /opt/forgec2-demo/compose/backup.sh`:
 
 ```bash
-pg_dump -h 127.0.0.1 -U forgec2 forgec2 | gzip > /var/backups/forgec2-demo-$(date +%F).sql.gz
+sudo bash deploy/demo/backup.sh
 ```
 
 Rollback to the previous native deployment (kept from before the container
