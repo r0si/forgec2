@@ -1,0 +1,7 @@
+# ForgeC2 public landing. The operational console is a different surface
+# (authenticated, and its API data must not be indexed; it ships its own
+# disallow-all robots.txt embedded in the binary).
+User-agent: *
+Allow: /
+
+Sitemap: https://r0si.github.io/forgec2/sitemap.xml
