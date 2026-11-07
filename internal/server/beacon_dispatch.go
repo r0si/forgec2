@@ -36,7 +36,9 @@ func (s *Server) fetchPendingTasks(uuid string, limits ...int) []task {
 				// I/O and fires a pointless AfterFind AES-GCM decrypt per row on
 				// every beacon. Command/Data/Shell stay loaded because the wire
 				// builder re-encrypts them with the session key below.
-				Select("id, type, command, shell, path, data, `offset`, size, prev_mac, mac, task_key").
+				// "offset" is double-quoted: it is a reserved word in
+				// PostgreSQL and MySQL-style backticks are a syntax error there.
+				Select("id, type, command, shell, path, data, \"offset\", size, prev_mac, mac, task_key").
 				Where("agent_id = ? AND status = ?", uuid, "pending").
 				Where("NOT (type = ? AND (mac = '' OR mac IS NULL))", "upload").
 				Order("priority DESC, created_at ASC").
@@ -62,7 +64,7 @@ func (s *Server) fetchPendingTasks(uuid string, limits ...int) []task {
 				if result.RowsAffected < int64(len(ids)) {
 					slog.Debug("Some tasks already claimed by concurrent connection", "agent_id", uuid, "attempted", len(ids), "claimed", result.RowsAffected)
 				}
-				if err := tx.Select("id, type, command, shell, path, data, `offset`, size, prev_mac, mac, task_key").Where("id IN ? AND status = ? AND claimed_by = ?", ids, "running", uuid).
+				if err := tx.Select("id, type, command, shell, path, data, \"offset\", size, prev_mac, mac, task_key").Where("id IN ? AND status = ? AND claimed_by = ?", ids, "running", uuid).
 					Order("priority DESC, created_at ASC").Limit(len(ids)).Find(&claimedTasks).Error; err != nil {
 					return err
 				}
@@ -78,7 +80,7 @@ func (s *Server) fetchPendingTasks(uuid string, limits ...int) []task {
 				for _, ct := range claimedTasks {
 					claimedIDs = append(claimedIDs, ct.ID)
 				}
-				q := tx.Select("id, type, command, shell, path, data, `offset`, size, prev_mac, mac, task_key").Where("agent_id = ? AND status = ? AND claimed_by = ? AND acknowledged_at IS NULL", uuid, "running", uuid)
+				q := tx.Select("id, type, command, shell, path, data, \"offset\", size, prev_mac, mac, task_key").Where("agent_id = ? AND status = ? AND claimed_by = ? AND acknowledged_at IS NULL", uuid, "running", uuid)
 				if len(claimedIDs) > 0 {
 					q = q.Where("id NOT IN ?", claimedIDs)
 				}

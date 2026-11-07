@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -47,6 +48,31 @@ func TestFetchPendingTasksClaimsOnlyPendingTasks(t *testing.T) {
 		if claimedTask.Status != "running" || claimedTask.ClaimedBy != agentID || claimedTask.ClaimedAt.IsZero() {
 			t.Fatalf("task was not recorded as claimed: %+v", claimedTask)
 		}
+	}
+}
+
+// TestFetchPendingTasksOnPostgres pins the task-claim SQL against the only
+// production driver. The claim query selects `offset` with manual quoting; a
+// MySQL-style backtick makes PostgreSQL fail the whole claim with a syntax
+// error (42601) while the SQLite claim tests stayed green, so no dispatched
+// task was ever delivered under PostgreSQL. Skips when Postgres is absent.
+func TestFetchPendingTasksOnPostgres(t *testing.T) {
+	gdb := newMigratedDB(t)
+	s := &Server{db: gdb}
+	// Unique per run: newMigratedDB shares one database across test runs, so a
+	// fixed id would collide with the row a previous run left behind.
+	agentID := fmt.Sprintf("pg-claim-agent-%d", time.Now().UnixNano())
+	if err := gdb.Create(&db.Implant{ID: agentID, Hostname: "pg-claim-host"}).Error; err != nil {
+		t.Fatalf("seed agent: %v", err)
+	}
+	task := db.Task{AgentID: agentID, Type: "shell", Status: "pending", Command: "whoami", Offset: 7}
+	if err := gdb.Create(&task).Error; err != nil {
+		t.Fatalf("seed task: %v", err)
+	}
+
+	claimed := s.fetchPendingTasks(agentID)
+	if len(claimed) != 1 || claimed[0].ID != task.ID || claimed[0].Offset != 7 {
+		t.Fatalf("PostgreSQL claim returned %+v, want the seeded task with its offset", claimed)
 	}
 }
 
