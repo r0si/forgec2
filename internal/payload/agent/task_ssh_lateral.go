@@ -209,8 +209,9 @@ func trySSHConnect(host string, port int, cred SSHCredential, command string) SS
 
 	addr := fmt.Sprintf("%s:%d", host, port)
 	config := &ssh.ClientConfig{
-		User:            cred.User,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		User: cred.User,
+		// #nosec G106 -- the agent has no known_hosts store; lateral targets are operator-specified.
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // #nosec G106
 		Timeout:         10 * time.Second,
 	}
 
@@ -397,8 +398,9 @@ func startSSHTunnel(host, remotePort, localPort, user, password, keyPEM string) 
 		return "", fmt.Errorf("ssh_tunnel requires a password (command extra arg or task shell) or a private key (task path)")
 	}
 	config := &ssh.ClientConfig{
-		User:            user,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // lab default; pin host keys in production via ssh_lateral
+		User: user,
+		// #nosec G106 -- lab default; pin host keys in production via ssh_lateral.
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // #nosec G106
 		Timeout:         10 * time.Second,
 		Auth:            auth,
 	}
@@ -502,9 +504,10 @@ func handleSCPUploadImpl(task Task, res *TaskResult) {
 
 	addr := fmt.Sprintf("%s:22", host)
 	config := &ssh.ClientConfig{
-		User:            user,
-		Auth:            []ssh.AuthMethod{ssh.Password(password)},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		User: user,
+		Auth: []ssh.AuthMethod{ssh.Password(password)},
+		// #nosec G106 -- same lateral rationale: no known_hosts on the implant.
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // #nosec G106
 		Timeout:         10 * time.Second,
 	}
 

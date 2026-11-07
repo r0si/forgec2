@@ -330,7 +330,8 @@ func parseClaimsWithGrace(tokenStr string, claims *Claims) (*jwt.Token, error) {
 // Gin's SetCookie does not support SameSite, so we use http.SetCookie directly.
 func SetCookieWithSameSite(c *gin.Context, name, value string, maxAge int, path string, secure, httpOnly bool, sameSite http.SameSite) {
 	domain := CookieDomain
-	http.SetCookie(c.Writer, &http.Cookie{
+	// #nosec G124 -- secure/httpOnly/sameSite are caller-supplied; every caller passes the deployment-wide values.
+	http.SetCookie(c.Writer, &http.Cookie{ // #nosec G124
 		Name:     name,
 		Value:    value,
 		MaxAge:   maxAge,

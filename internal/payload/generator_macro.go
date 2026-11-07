@@ -33,7 +33,7 @@ type macroVarPool struct {
 
 func newMacroVarPool(seed int64) *macroVarPool {
 	return &macroVarPool{
-		rng:    rand.New(rand.NewSource(seed)),
+		rng: rand.New(rand.NewSource(seed)), // #nosec G404 -- macro variable names only; not security randomness
 		used:   make(map[string]bool),
 		prefix: "f",
 	}

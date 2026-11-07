@@ -413,7 +413,8 @@ func runFileScan(opts fileScanOpts) (string, error) {
 			return fs.SkipAll
 		}
 
-		data, err := os.ReadFile(p)
+		// #nosec G122 -- the scan runs as the victim user over its own tree; the race window is its own files.
+		data, err := os.ReadFile(p) // #nosec G122
 		if err != nil {
 			result.Errors++
 			return nil

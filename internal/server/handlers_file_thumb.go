@@ -296,7 +296,8 @@ func (s *Server) cleanupOldThumbs() {
 		if err != nil || !info.ModTime().Before(cutoff) {
 			return nil
 		}
-		_ = os.Remove(path)
+		// #nosec G122 -- stale-thumbnail cleanup over the data dir; the walk is cleanup, not trust.
+		_ = os.Remove(path) // #nosec G122
 		return nil
 	})
 }

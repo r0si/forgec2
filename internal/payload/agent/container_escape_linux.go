@@ -195,7 +195,8 @@ func probeKubernetesAPI(token, ns string) (string, error) {
 	}
 	base := "https://" + net.JoinHostPort(host, port)
 
-	tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
+	// #nosec G402 -- probing the local Docker daemons the escape check targets; self-signed by design.
+	tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}} // #nosec G402
 	client := &http.Client{Transport: tr, Timeout: 20 * time.Second}
 
 	query := func(path string) (int, string) {

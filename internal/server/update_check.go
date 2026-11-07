@@ -209,7 +209,7 @@ func fetchLatestVersion(repo string) (string, error) {
 		if err != nil {
 			lastErr = fmt.Errorf("github api: %w", err)
 			if attempt < 2 {
-				time.Sleep(backoff[attempt])
+				time.Sleep(backoff[attempt]) // #nosec G602 -- guarded by attempt < 2, backoff has 2 entries
 				continue
 			}
 			return "", lastErr
@@ -238,7 +238,7 @@ func fetchLatestVersion(repo string) (string, error) {
 		if resp.StatusCode != http.StatusOK {
 			lastErr = fmt.Errorf("github api status %d", resp.StatusCode)
 			if attempt < 2 && resp.StatusCode >= 500 {
-				time.Sleep(backoff[attempt])
+				time.Sleep(backoff[attempt]) // #nosec G602 -- guarded by attempt < 2, backoff has 2 entries
 				continue
 			}
 			return "", lastErr
@@ -848,7 +848,7 @@ func fetchReleaseAssets(repo, tag string) ([]GitHubAsset, error) {
 		if err != nil {
 			lastErr = fmt.Errorf("github api: %w", err)
 			if attempt < 2 {
-				time.Sleep(backoff[attempt])
+				time.Sleep(backoff[attempt]) // #nosec G602 -- guarded by attempt < 2, backoff has 2 entries
 				continue
 			}
 			return nil, lastErr
@@ -863,7 +863,7 @@ func fetchReleaseAssets(repo, tag string) ([]GitHubAsset, error) {
 		if resp.StatusCode != http.StatusOK {
 			lastErr = fmt.Errorf("github api status %d", resp.StatusCode)
 			if attempt < 2 && resp.StatusCode >= 500 {
-				time.Sleep(backoff[attempt])
+				time.Sleep(backoff[attempt]) // #nosec G602 -- guarded by attempt < 2, backoff has 2 entries
 				continue
 			}
 			return nil, lastErr

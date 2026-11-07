@@ -57,6 +57,7 @@ func (l *lockedRand) Shuffle(n int, swap func(i, j int)) {
 func newCryptoRand() *lockedRand {
 	seed := make([]byte, 8)
 	rand.Read(seed)
-	src := mathRand.NewSource(int64(binary.LittleEndian.Uint64(seed)))
-	return &lockedRand{r: mathRand.New(src)}
+	// #nosec G404 -- math/rand here is only a shuffle order seeded from crypto/rand; no key material is drawn from it.
+	src := mathRand.NewSource(int64(binary.LittleEndian.Uint64(seed))) // #nosec G404
+	return &lockedRand{r: mathRand.New(src)}                              // #nosec G404
 }

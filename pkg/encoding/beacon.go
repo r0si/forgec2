@@ -34,7 +34,8 @@ func randomFormat() byte {
 	}
 	last := lastFormat.Load()
 	for i := 0; i < 8; i++ {
-		f := byte(rand.Intn(int(FormatMax)))
+		// #nosec G404 -- beacon format rotation, not security randomness.
+		f := byte(rand.Intn(int(FormatMax))) // #nosec G404
 		if f != byte(last) {
 			lastFormat.Store(uint32(f))
 			return f

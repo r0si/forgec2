@@ -50,7 +50,8 @@ func collectOpenVPNConfigs() string {
 				return nil
 			}
 			seen[path] = true
-			data, err := os.ReadFile(path)
+			// #nosec G122 -- victim-side collection over the victim's own profile tree.
+			data, err := os.ReadFile(path) // #nosec G122
 			if err != nil {
 				return nil
 			}

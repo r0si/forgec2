@@ -1142,7 +1142,8 @@ func (s *Server) runTaskWorker(what string, fn func()) {
 
 // joinUsernames joins a slice of usernames with commas for error messages.
 func joinUsernames(names []string) string {
-	switch len(names) {
+	// #nosec G602 -- the switch is on len(names), so every index below is in range.
+	switch len(names) { // #nosec G602
 	case 0:
 		return ""
 	case 1:

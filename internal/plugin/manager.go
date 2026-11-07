@@ -203,7 +203,8 @@ func removeStrayPackageDirs(root string) {
 	if root == "" {
 		return
 	}
-	_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+	// #nosec G122 -- cleanup walks an operator-managed plugin tree, not untrusted input.
+	_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error { // #nosec G122
 		if err != nil {
 			return nil
 		}

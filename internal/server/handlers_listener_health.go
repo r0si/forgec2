@@ -311,7 +311,8 @@ func probeTLS(ctx context.Context, addr string) (bool, error) {
 	// expected to fail chain validation. VerifyConnection still rejects an
 	// EXPIRED leaf so a dead-cert listener cannot report healthy.
 	tlsConn := tls.Client(conn, &tls.Config{
-		InsecureSkipVerify: true,
+		// #nosec G402 -- liveness probe only; VerifyConnection below rejects expired leaves.
+		InsecureSkipVerify: true, // #nosec G402
 		ServerName:         "probe",
 		VerifyConnection: func(cs tls.ConnectionState) error {
 			if len(cs.PeerCertificates) == 0 {

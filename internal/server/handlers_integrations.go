@@ -15,7 +15,7 @@ import (
 // integrationConfig stores type-specific secrets in WebhookConfig.Headers as JSON.
 type integrationConfig struct {
 	Type      string `json:"type"`
-	Secret    string `json:"secret,omitempty"`
+	Secret    string `json:"secret,omitempty"` // #nosec G117 -- stored in WebhookConfig.Headers, encrypted at rest by the model hook; never logged or returned.
 	To        string `json:"to,omitempty"`
 	SMTPHost  string `json:"smtp_host,omitempty"`
 	SMTPPort  int    `json:"smtp_port,omitempty"`
@@ -37,7 +37,8 @@ func parseIntegrationConfig(headers string) integrationConfig {
 }
 
 func marshalIntegrationConfig(cfg integrationConfig) string {
-	b, err := json.Marshal(cfg)
+	// #nosec G117 -- the secret lives in WebhookConfig.Headers, encrypted at rest; never logged or returned.
+	b, err := json.Marshal(cfg) // #nosec G117
 	if err != nil {
 		return "{}"
 	}

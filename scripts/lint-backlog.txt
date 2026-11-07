@@ -107,5 +107,18 @@
 # ceiling is the CI measurement (36 gosec + 1 staticcheck); the local Windows
 # host reports 36 gosec only, so as before windows carries the +1 CI
 # observation headroom.
-windows=37
-linux=41
+#
+# Batch R (2026-11): the remaining gosec findings. Real fixes: verify-plugin
+# extraction is capped (declared total plus a LimitReader copy with
+# truncation detection, so a bomb cannot fill the disk before the manifest
+# check runs), and the ACME challenge server has Read/Write/Idle/Header
+# timeouts. Everything else is intentional design documented with #nosec:
+# jitter/decoy/cipher-order randomness that is not key material (G404),
+# beacon TLS with operator SkipTLSVerify or cert pinning and liveness probes
+# that only prove aliveness (G402), host-key-less SSH lateral movement
+# (G106), walks over trusted or victim-owned trees (G122), and provably-safe
+# loop bounds the analyzer cannot see. Windows target now reports 0 locally
+# (CI shows one staticcheck the local host does not reproduce, so the
+# ceiling keeps that +1 headroom); linux reports 0.
+windows=1
+linux=0

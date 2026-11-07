@@ -78,7 +78,8 @@ func sendEmailWithRetry(cfg EmailConfig, msg []byte) error {
 		if err := smtp.SendMail(cfg.addr(), cfg.auth(), cfg.From, []string{cfg.To}, msg); err != nil {
 			if attempt < emailMaxRetries {
 				slog.Warn("Email delivery failed, retrying", "to", cfg.To, "attempt", attempt+1, "error", err)
-				time.Sleep(backoff[attempt])
+				// #nosec G602 -- attempt <= 2 here (emailMaxRetries=3, backoff has 3 entries).
+				time.Sleep(backoff[attempt]) // #nosec G602
 				continue
 			}
 			return fmt.Errorf("email delivery failed after %d retries: %w", emailMaxRetries, err)

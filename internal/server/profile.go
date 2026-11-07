@@ -275,14 +275,16 @@ func (s *Server) applyDecoyHeaders(c *gin.Context, profileName string) {
 			break
 		}
 	}
+	// #nosec G404 -- decoy headers and reply jitter: unpredictability here is cosmetic, not key material.
 	if !has("Server") {
-		c.Header("Server", pool[rand.Intn(len(pool))])
+		c.Header("Server", pool[rand.Intn(len(pool))]) // #nosec G404
 	}
 	if !has("X-Request-Id") {
-		c.Header("X-Request-Id", fmt.Sprintf("%016x", rand.Uint64()))
+		// #nosec G404 -- a tracing id, never a security token.
+		c.Header("X-Request-Id", fmt.Sprintf("%016x", rand.Uint64())) // #nosec G404
 	}
 	if !has("Cache-Control") {
-		c.Header("Cache-Control", decoyCacheControls[rand.Intn(len(decoyCacheControls))])
+		c.Header("Cache-Control", decoyCacheControls[rand.Intn(len(decoyCacheControls))]) // #nosec G404
 	}
 }
 
@@ -303,7 +305,8 @@ func (s *Server) jitterBeaconResponse() {
 	if maxMs <= 0 {
 		return
 	}
-	beaconJitterSleep(time.Duration(rand.Intn(maxMs+1)) * time.Millisecond)
+	// #nosec G404 -- reply-timing jitter only.
+	beaconJitterSleep(time.Duration(rand.Intn(maxMs+1)) * time.Millisecond) // #nosec G404
 }
 
 // sanitizeProfileName strips a profile name to filesystem-safe characters

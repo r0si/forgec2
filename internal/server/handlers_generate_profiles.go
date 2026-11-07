@@ -400,7 +400,8 @@ func (s *Server) handleGeneratePage(c *gin.Context) {
 		"DefaultUA":          defUA,
 		"DefaultSkipTLS":     defSkipTLS,
 		"Listeners":          listeners,
-		"ProfilePresetsJSON": template.JS(strings.ReplaceAll(string(presetsJSON), "</script>", "<\\/script>")),
+		// #nosec G203 -- html/template auto-escapes; template.JS is the explicit escape hatch for embedded JSON.
+		"ProfilePresetsJSON": template.JS(strings.ReplaceAll(string(presetsJSON), "</script>", "<\\/script>")), // #nosec G203
 	}
 	for k, v := range stats {
 		data[k] = v

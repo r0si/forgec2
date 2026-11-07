@@ -161,7 +161,8 @@ func NewTLSFingerprintManager(jarmEnabled, ja3Enabled bool, rotateInterval, prof
 		rotateDur: dur,
 		rotateAt:  time.Now().Add(dur),
 	}
-	tfm.current = pool[rand.Intn(len(pool))]
+	// #nosec G404 -- cipher-order profile pick: OPSEC shape, not key material.
+	tfm.current = pool[rand.Intn(len(pool))] // #nosec G404
 	return tfm
 }
 
@@ -192,7 +193,8 @@ func (tfm *TLSFingerprintManager) rotate() {
 		}
 	}
 	if len(cands) > 0 {
-		tfm.current = cands[rand.Intn(len(cands))]
+		// #nosec G404 -- profile rotation pick, same rationale as New.
+		tfm.current = cands[rand.Intn(len(cands))] // #nosec G404
 	}
 	// Single-entry pool (pinned profile): current unchanged, deadline extends.
 	tfm.rotateAt = time.Now().Add(tfm.rotateDur)

@@ -27,7 +27,8 @@ func sendQUICBeacon(body []byte) []byte {
 func sendQUICBeaconAt(hostPort string, body []byte) []byte {
 	tlsCfg := newAgentTLSConfig("")
 	if tlsCfg == nil {
-		tlsCfg = &tls.Config{InsecureSkipVerify: SkipTLSVerify}
+		// #nosec G402 -- SkipTLSVerify is an operator build option; false runs the standard verifier.
+		tlsCfg = &tls.Config{InsecureSkipVerify: SkipTLSVerify} // #nosec G402
 	}
 	tlsCfg.NextProtos = []string{"h3", "fc2"}
 	// QUIC requires TLS 1.3.

@@ -33,7 +33,8 @@ func initTLSPinning() {
 
 func newAgentTLSConfig(serverName string) *tls.Config {
 	cfg := &tls.Config{
-		InsecureSkipVerify: SkipTLSVerify,
+		// #nosec G402 -- operator option; pinned-cert mode below hard-fails on mismatch.
+		InsecureSkipVerify: SkipTLSVerify, // #nosec G402
 	}
 	if serverName != "" {
 		cfg.ServerName = serverName
@@ -48,7 +49,8 @@ func newAgentTLSConfig(serverName string) *tls.Config {
 		cfg.InsecureSkipVerify = true
 		// Read ServerName at verification time: quic-go fills it in after the
 		// config is built, and the pin check should still see the real name.
-		cfg.VerifyPeerCertificate = func(rawCerts [][]byte, _ [][]*x509.Certificate) error {
+		// #nosec G123 -- pin mode replaces chain validation by design; the callback below is the check.
+		cfg.VerifyPeerCertificate = func(rawCerts [][]byte, _ [][]*x509.Certificate) error { // #nosec G123
 			return verifyPinnedCert(rawCerts, cfg.ServerName)
 		}
 	}

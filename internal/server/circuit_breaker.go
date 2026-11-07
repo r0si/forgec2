@@ -163,7 +163,8 @@ func (cb *CircuitBreaker) probeTarget(target ProbeTarget) ProbeResult {
 	var err error
 	switch target.Scheme {
 	case "https", "tls":
-		conn, err = tls.DialWithDialer(&net.Dialer{Timeout: CBDialTimeout}, "tcp", fmt.Sprintf("%s:%d", target.Host, target.Port), &tls.Config{InsecureSkipVerify: true})
+		// #nosec G402 -- availability probe, not a secret-bearing session; the expired-leaf check below still applies.
+		conn, err = tls.DialWithDialer(&net.Dialer{Timeout: CBDialTimeout}, "tcp", fmt.Sprintf("%s:%d", target.Host, target.Port), &tls.Config{InsecureSkipVerify: true}) // #nosec G402
 	default:
 		conn, err = net.DialTimeout("tcp", fmt.Sprintf("%s:%d", target.Host, target.Port), CBDialTimeout)
 	}

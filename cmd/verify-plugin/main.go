@@ -98,6 +98,20 @@ func extractPackage(path string) (string, func(), error) {
 	}
 	cleanup := func() { _ = os.RemoveAll(dir) }
 
+	// Plugin packages are small (a manifest plus code). Refuse zip bombs
+	// before copying: the declared sizes give the total up front, and the
+	// copy itself is capped so a lying header cannot inflate past it.
+	const maxExtracted = 64 << 20
+	var total int64
+	for _, file := range archive.File {
+		total += file.FileInfo().Size()
+	}
+	if total > maxExtracted {
+		cleanup()
+		return "", nil, fmt.Errorf("package declares %d bytes uncompressed, more than the %d-byte cap", total, maxExtracted)
+	}
+	var extracted int64
+
 	for _, file := range archive.File {
 		target, err := safeJoin(dir, file.Name)
 		if err != nil {
@@ -126,13 +140,35 @@ func extractPackage(path string) (string, func(), error) {
 			cleanup()
 			return "", nil, err
 		}
-		_, copyErr := io.Copy(destination, source)
-		_ = destination.Close()
-		_ = source.Close()
+		remaining := maxExtracted - extracted
+		written, copyErr := io.Copy(destination, io.LimitReader(source, remaining))
+		extracted += written
 		if copyErr != nil {
+			_ = destination.Close()
+			_ = source.Close()
 			cleanup()
 			return "", nil, copyErr
 		}
+		// A truncated copy is not an error by itself; the pre-check above
+		// bounds honest archives. The LimitReader is defence-in-depth for a
+		// header that lies, so treat hitting the cap exactly with data still
+		// unread as an over-cap archive.
+		if written == remaining {
+			var extra [1]byte
+			n, readErr := source.Read(extra[:])
+			if n > 0 || readErr == nil {
+				_ = destination.Close()
+				_ = source.Close()
+				cleanup()
+				return "", nil, fmt.Errorf("extracted more than the %d-byte cap", maxExtracted)
+			}
+		}
+		if err := destination.Close(); err != nil {
+			_ = source.Close()
+			cleanup()
+			return "", nil, fmt.Errorf("close %s: %w", file.Name, err)
+		}
+		_ = source.Close()
 	}
 
 	// A zip of a single top-level directory is the common shape: use it, so the manifest is found where the packager

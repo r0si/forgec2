@@ -1,8 +1,9 @@
 package server
 
 import (
+	"crypto/rand"
 	"log/slog"
-	"math/rand"
+	"math/big"
 	"strings"
 	"time"
 
@@ -53,7 +54,8 @@ func (s *Server) withBusyRetry(op string, fn func() error) error {
 		if attempt == dbRetryAttempts {
 			break
 		}
-		backoff := time.Duration(attempt)*dbRetryBaseBackoff + time.Duration(rand.Int63n(int64(dbRetryBaseBackoff)))
+		jitter, _ := rand.Int(rand.Reader, big.NewInt(int64(dbRetryBaseBackoff)))
+		backoff := time.Duration(attempt)*dbRetryBaseBackoff + time.Duration(jitter.Int64())
 		slog.Warn("PostgreSQL write contention, retrying", "op", op, "attempt", attempt, "backoff_ms", backoff.Milliseconds(), "error", err)
 		busyRetrySleep(backoff)
 	}

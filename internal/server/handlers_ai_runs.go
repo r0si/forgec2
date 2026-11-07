@@ -607,11 +607,13 @@ func (s *Server) executeAIBackgroundRun(ctx context.Context, run db.AIChatRun, r
 	// Fold older turns into the rolling digest in the background (never
 	// blocks run completion; failures only log). Tracked so shutdown drains it.
 	s.wg.Add(1)
-	go func() {
+	// #nosec G118 -- background summarization uses the server context on purpose.
+	go func() { // #nosec G118
 		defer s.wg.Done()
-		ctx := s.ctx
+		// #nosec G118 -- post-run summarization intentionally outlives the request; s.ctx is the server context, not the request's.
+		ctx := s.ctx // #nosec G118
 		if ctx == nil {
-			ctx = context.Background()
+			ctx = context.Background() // #nosec G118
 		}
 		s.maybeSummarizeSession(ctx, run.SessionID, principal)
 	}()

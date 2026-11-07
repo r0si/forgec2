@@ -82,7 +82,8 @@ func runEgressDetection(c2Host string, c2Ports []int) *EgressReport {
 		}
 		start := time.Now()
 		addr := net.JoinHostPort(c2Host, strconv.Itoa(port))
-		conn, err := tls.DialWithDialer(&net.Dialer{Timeout: 5 * time.Second}, "tcp", addr, &tls.Config{InsecureSkipVerify: true})
+		// #nosec G402 -- egress detection probes the operator's own C2 ports for reachability; no secret crosses this TLS session.
+	conn, err := tls.DialWithDialer(&net.Dialer{Timeout: 5 * time.Second}, "tcp", addr, &tls.Config{InsecureSkipVerify: true}) // #nosec G402
 		if err == nil {
 			conn.Close()
 			results = append(results, EgressResult{
