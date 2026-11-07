@@ -522,12 +522,6 @@ func (s *Server) searchAIKnowledge(principal aiPrincipal, req aiKnowledgeSearchR
 	}
 	hashed = deduped
 	query := s.db.Where("tenant_id = ? AND collection_id IN ?", principal.TenantID, allowed)
-	parts := make([]string, 0, len(hashed))
-	params := make([]interface{}, 0, len(hashed))
-	for _, token := range hashed {
-		parts = append(parts, "search_tokens LIKE ?")
-		params = append(params, "%"+token+"%")
-	}
 	// The FTS5 side index only exists on SQLite, which this build no longer
 	// supports. On PostgreSQL the tokens column and its LIKE predicates answer
 	// the query; pg_trgm's GIN index over search_tokens (created advisory in
@@ -550,15 +544,44 @@ func (s *Server) searchAIKnowledge(principal aiPrincipal, req aiKnowledgeSearchR
 			query = query.Where("id IN ?", indexedIDs)
 		}
 	}
-	if !useIndex {
-		query = query.Where("("+strings.Join(parts, " OR ")+")", params...)
-	}
-	// Fetched before Go-side ranking. 500 is cheap now that the trigram
-	// index answers the LIKEs, and it avoids the cap silently discarding a
-	// better chunk beyond the first 100 while returning only req.Limit (<=12).
 	var chunks []db.AIKnowledgeChunk
-	if err := query.Limit(500).Find(&chunks).Error; err != nil {
-		return nil, err
+	// Document frequency per query token is counted exactly (a COUNT over the
+	// filtered set); it is the IDF the ranking below weights by.
+	dfByToken := make(map[string]int, len(hashed))
+	if !useIndex {
+		// Per-token candidate fan-out: one bounded fetch (and one COUNT) per
+		// term, unioned. An OR over all terms with one LIMIT can discard the
+		// rare term's single chunk behind hundreds of ubiquitous matches;
+		// per-term limits keep recall for distinctive terms while bounding
+		// cost to terms*limit rows instead of the whole matched set.
+		const candidatePerToken = 200
+		byID := make(map[uint]db.AIKnowledgeChunk)
+		for _, token := range hashed {
+			tokenWhere := strings.TrimSpace("search_tokens LIKE ?")
+			pattern := "%" + token + "%"
+			var count int64
+			if err := s.db.Model(&db.AIKnowledgeChunk{}).
+				Where("tenant_id = ? AND collection_id IN ? AND "+tokenWhere, principal.TenantID, allowed, pattern).
+				Count(&count).Error; err != nil {
+				return nil, err
+			}
+			dfByToken[token] = int(count)
+			var rows []db.AIKnowledgeChunk
+			if err := s.db.Where("tenant_id = ? AND collection_id IN ? AND "+tokenWhere, principal.TenantID, allowed, pattern).
+				Limit(candidatePerToken).Find(&rows).Error; err != nil {
+				return nil, err
+			}
+			for _, row := range rows {
+				byID[row.ID] = row
+			}
+		}
+		for _, chunk := range byID {
+			chunks = append(chunks, chunk)
+		}
+	} else {
+		if err := query.Limit(500).Find(&chunks).Error; err != nil {
+			return nil, err
+		}
 	}
 	var sources []db.AIKnowledgeSource
 	sourceIDs := make([]uint, 0, len(chunks))
@@ -581,10 +604,14 @@ func (s *Server) searchAIKnowledge(principal aiPrincipal, req aiKnowledgeSearchR
 	// matching the single distinctive word the operator actually typed.
 	weights := make(map[string]float64, len(hashed))
 	for _, token := range hashed {
-		df := 0
-		for _, chunk := range chunks {
-			if strings.Contains(chunk.SearchTokens, token) {
-				df++
+		df, ok := dfByToken[token]
+		if !ok {
+			// SQLite MATCH path: estimate df over the candidate set.
+			df = 0
+			for _, chunk := range chunks {
+				if strings.Contains(chunk.SearchTokens, token) {
+					df++
+				}
 			}
 		}
 		// BM25-style inverse document frequency (0.5-smoothed). df is at

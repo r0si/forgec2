@@ -122,6 +122,23 @@ func newMigratedDB(t *testing.T) *gorm.DB {
 	return gdb
 }
 
+// newMigratedDBB is the benchmark twin of newMigratedDB: same migrated
+// handle, but *testing.B has no Skipf. Callers skip themselves when the
+// returned error is non-nil.
+func newMigratedDBB(b *testing.B) (*gorm.DB, error) {
+	b.Helper()
+	gdb, err := db.InitDBWithDriver("postgres", testPostgresDSN, "", slog.LevelWarn, 1, 1, time.Minute)
+	if err != nil {
+		return nil, err
+	}
+	b.Cleanup(func() {
+		if sqlDB, err := gdb.DB(); err == nil {
+			_ = sqlDB.Close()
+		}
+	})
+	return gdb, nil
+}
+
 func TestSystemMetricsCreatedAtIndexApplied(t *testing.T) {
 	gdb := newMigratedDB(t)
 
