@@ -11,9 +11,10 @@
 // Defaults hid this: the built-in `user` role happens to carry listeners.read, settings.read and
 // agents.read, so only custom-role deployments were affected.
 //
-// Scope is deliberately narrow: only NAV items whose path has an EXACT `/api/<segment>` GET route are
-// checked. A prefix match would compare a page against unrelated sibling endpoints and report noise;
-// the 44 nav items yield a stable set of exact matches, and the rest are counted, not guessed.
+// Scope is deliberately narrow: only NAV items whose path has an EXACT `/api/<segment>` GET route **or** an
+// exact bare dual-use GET route at the same path (/loot, /tokens, /users, ...) are checked. A prefix
+// match would compare a page against unrelated sibling endpoints and report noise; the rest are
+// counted, not guessed.
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -89,8 +90,25 @@ for (const [path, perms] of routes) {
 }
 
 const problems = [];
+const compare = (item, backend, where) => {
+  const backendPerms = [...backend].filter((p) => p !== "(none)");
+  // A route group with no permission requirement is reachable by every authenticated operator, so a
+  // nav entry may legitimately be ungated.
+  if (backendPerms.length === 0) return true;
+  if (item.perms.length === 0) {
+    problems.push(`${item.href}: the sidebar shows it to everyone, but ${where} requires ${backendPerms.join(" or ")}`);
+    return false;
+  }
+  if (!item.perms.some((p) => backendPerms.includes(p))) {
+    problems.push(`${item.href}: nav requires ${item.perms.join(" or ")}, but ${where} requires ${backendPerms.join(" or ")}`);
+    return false;
+  }
+  return true;
+};
+
 let exact = 0;
 let ambiguous = 0;
+let bare = 0;
 for (const item of items) {
   const segment = item.href.split("/").filter(Boolean)[0];
   const direct = routes.get(`/api/${segment}`);
@@ -99,20 +117,21 @@ for (const item of items) {
     ambiguous++;
     continue;
   }
-  if (!direct && !grouped) continue;
-  const backend = direct ?? new Set(grouped.perms);
-  exact++;
-  const backendPerms = [...backend].filter((p) => p !== "(none)");
-  // A route group with no permission requirement is reachable by every authenticated operator, so a
-  // nav entry may legitimately be ungated.
-  if (backendPerms.length === 0) continue;
-  if (item.perms.length === 0) {
-    problems.push(`${item.href}: the sidebar shows it to everyone, but /api/${segment} requires ${backendPerms.join(" or ")}`);
+  if (!direct && !grouped) {
+    // No /api/<segment> route. Many pages are dual-use GETs at their bare
+    // path (/loot, /tokens, /users, ...): compare against that exact route
+    // instead of skipping, since its permission is the one the page checks.
+    const bareRoute = routes.get(item.href);
+    if (bareRoute) {
+      bare++;
+      exact++;
+      compare(item, new Set(bareRoute), `GET ${item.href}`);
+    }
     continue;
   }
-  if (!item.perms.some((p) => backendPerms.includes(p))) {
-    problems.push(`${item.href}: nav requires ${item.perms.join(" or ")}, but /api/${segment} requires ${backendPerms.join(" or ")}`);
-  }
+  const backend = direct ?? new Set(grouped.perms);
+  exact++;
+  compare(item, backend, `/api/${segment}`);
 }
 
 // The footer Settings shortcut in Sidebar.tsx is not in NAV_ITEMS, so the
@@ -135,6 +154,7 @@ if (problems.length > 0) {
 }
 
 console.log(
-  `check-nav-perms: OK (${exact} of ${items.length} nav item(s) checked against their backend routes; ` +
+  `check-nav-perms: OK (${exact} of ${items.length} nav item(s) checked against their backend routes ` +
+    `(${bare} via bare dual-use GET); ` +
     `${ambiguous} skipped as ambiguous, ${items.length - exact - ambiguous} have no backend route)`,
 );
