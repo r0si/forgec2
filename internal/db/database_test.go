@@ -117,6 +117,60 @@ func TestCredentialTenantInheritanceAndBackfill(t *testing.T) {
 	}
 }
 
+// TestEnsureAIKnowledgeTrgmIndexIsIdempotent proves the pg_trgm index over
+// the blinded knowledge tokens exists after the advisory ensure step, that
+// calling it again does not error, and that the search-shape LIKE predicate
+// runs against it. Skips when PostgreSQL is unavailable (like every other
+// PG-backed test here). This is the user-visible speedup for knowledge search:
+// without the index every query is a sequential scan over all chunks.
+func TestEnsureAIKnowledgeTrgmIndex(t *testing.T) {
+	database := setupTestDB(t)
+	// setupTestDB does not run the production InitDB advisory step, so the
+	// index only exists if this test is the one to create it.
+	if err := database.AutoMigrate(&AIKnowledgeChunk{}); err != nil {
+		t.Fatalf("migrate chunks: %v", err)
+	}
+	// A chunk is the unit search scans; seed two with distinct tokens.
+	if err := database.Create(&AIKnowledgeChunk{
+		TenantID: 1, CollectionID: 1, SourceID: 1, Position: 0,
+		Content: "ignored", SearchTokens: "ab12cd ef34gh",
+	}).Error; err != nil {
+		t.Fatalf("seed chunk: %v", err)
+	}
+	if err := database.Create(&AIKnowledgeChunk{
+		TenantID: 1, CollectionID: 1, SourceID: 1, Position: 1,
+		Content: "ignored", SearchTokens: "zz99yy xx77vv",
+	}).Error; err != nil {
+		t.Fatalf("seed second chunk: %v", err)
+	}
+
+	ensureAIKnowledgeTrgmIndex(database)
+	// Idempotent: a second run (e.g. a restart) must be a no-op, not an error.
+	ensureAIKnowledgeTrgmIndex(database)
+
+	var count int64
+	if err := database.Raw(
+		"SELECT COUNT(*) FROM pg_indexes WHERE tablename = 'ai_knowledge_chunks' AND indexname = 'idx_ai_knowledge_chunks_search_trgm'",
+	).Scan(&count).Error; err != nil {
+		t.Fatalf("query pg_indexes: %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("trigram index count = %d, want 1", count)
+	}
+
+	// The search predicate shape: OR of LIKEs over search_tokens.
+	var ids []uint
+	if err := database.Raw(
+		"SELECT id FROM ai_knowledge_chunks WHERE search_tokens LIKE ? OR search_tokens LIKE ?",
+		"%ab12cd%", "%ef34gh%",
+	).Scan(&ids).Error; err != nil {
+		t.Fatalf("search predicate: %v", err)
+	}
+	if len(ids) != 1 {
+		t.Fatalf("LIKE predicate matched %d rows, want the one chunk", len(ids))
+	}
+}
+
 // TestCredentialDedupKeyBackfill pins the columns the backfill selects. It
 // used to select a `hash_type` column that no model has any more, so every
 // startup logged "Credential dedup-key backfill failed" and rows predating the

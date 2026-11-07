@@ -104,9 +104,11 @@ for `Accept: application/json` — that is the dual-use contract, not a bug.
   expected `record not found` lookups at ERROR. Fixed in the tree and in the
   current `edge` image; an older image shows those lines at boot but no page is
   affected.
-- **AI knowledge search uses the LIKE fallback.** There is no FTS5 index under
-  PostgreSQL, so search scans the token column. Fine for the demo, noticeable
-  with a large knowledge base.
+- **AI knowledge search is trigram-indexed LIKE, not FTS5.** Under PostgreSQL
+  there is no `ai_knowledge_fts` table; a pg_trgm GIN index over the blinded
+  `search_tokens` column makes the LIKE predicates index scans. If the role
+  cannot create the extension the index is skipped and search falls back to a
+  sequential scan, which is fine at demo scale.
 - **Built-in backups are disabled** for PostgreSQL (the server logs this at
   boot); use `pg_dump` as shown above.
 

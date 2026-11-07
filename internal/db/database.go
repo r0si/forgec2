@@ -247,6 +247,13 @@ func InitDBWithDriver(driver, dsn, fallbackPath string, logLevel slog.Level, dbM
 	// DB costs one bounded probe.
 	backfillCredentialDedupKeys(db)
 
+	// AI knowledge search is a set of `%token%` LIKE predicates over
+	// search_tokens. A pg_trgm GIN index over that column makes the planner
+	// use an index scan instead of a full scan on every query. Advisory only:
+	// if the extension cannot be created (insufficient privilege) or the
+	// index fails, the LIKE fallback still runs correctly, just slower.
+	ensureAIKnowledgeTrgmIndex(db)
+
 	// Seed default admin user if none exist
 	var userCount int64
 	if err := db.Model(&User{}).Count(&userCount).Error; err != nil {
@@ -355,6 +362,25 @@ func backfillCredentialDedupKeys(db *gorm.DB) {
 			slog.Warn("Credential dedup-key backfill aborted, will retry on next start", "err", err)
 			return
 		}
+	}
+}
+
+// ensureAIKnowledgeTrgmIndex creates the pg_trgm GIN index over
+// ai_knowledge_chunks.search_tokens so knowledge search can use the index
+// for its `%token%` LIKE predicates. It is advisory: on non-PostgreSQL
+// dialectors it is a no-op, and on PostgreSQL a failure (for example the
+// role cannot create extensions) only logs a warning — the LIKE fallback
+// still answers correctly, just with a sequential scan.
+func ensureAIKnowledgeTrgmIndex(db *gorm.DB) {
+	if db.Dialector.Name() != "postgres" {
+		return
+	}
+	if err := db.Exec("CREATE EXTENSION IF NOT EXISTS pg_trgm").Error; err != nil {
+		slog.Warn("AI knowledge trigram index unavailable; search will scan", "err", err)
+		return
+	}
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_ai_knowledge_chunks_search_trgm ON ai_knowledge_chunks USING gin (search_tokens gin_trgm_ops)").Error; err != nil {
+		slog.Warn("AI knowledge trigram index unavailable; search will scan", "err", err)
 	}
 }
 

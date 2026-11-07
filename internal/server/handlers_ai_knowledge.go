@@ -516,9 +516,12 @@ func (s *Server) searchAIKnowledge(principal aiPrincipal, req aiKnowledgeSearchR
 		params = append(params, "%"+token+"%")
 	}
 	// The FTS5 side index only exists on SQLite, which this build no longer
-	// supports. On PostgreSQL the tokens column and its LIKE predicate answer
-	// the query; running the MATCH statement anyway made every search a failed
-	// statement with an ERROR log line.
+	// supports. On PostgreSQL the tokens column and its LIKE predicates answer
+	// the query; pg_trgm's GIN index over search_tokens (created advisory in
+	// InitDB) makes those LIKEs index scans instead of sequential scans. The
+	// MATCH statement was skipped for the same reason FTS5 was: there is no
+	// ai_knowledge_fts table under PostgreSQL, and running it just logged a
+	// failed statement per search.
 	useIndex := s.aiKnowledgeFTSEnabled()
 	if useIndex {
 		var indexedIDs []uint
