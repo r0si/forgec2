@@ -241,8 +241,14 @@ func (c *BuildCache) Put(key, sourcePath string) error {
 	c.currentSize += info.Size()
 	c.mu.Unlock()
 
-	// Persist to disk asynchronously
-	go c.saveToDisk()
+	// Persist to disk asynchronously. The failure is logged, not dropped: a
+	// cache that silently never persists looks like a memory leak in every
+	// later "why did my artifact vanish" report.
+	go func() {
+		if err := c.saveToDisk(); err != nil {
+			slog.Warn("Failed to save build cache index", "err", err)
+		}
+	}()
 
 	return nil
 }
@@ -350,8 +356,12 @@ func (c *BuildCache) cleanupExpired() {
 		}
 	}
 
-	// Save updated index
-	go c.saveToDisk()
+	// Save updated index (async; the error is logged, see the Store call site).
+	go func() {
+		if err := c.saveToDisk(); err != nil {
+			slog.Warn("Failed to save build cache index", "err", err)
+		}
+	}()
 }
 
 // Stats returns cache statistics.

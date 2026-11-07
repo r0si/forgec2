@@ -1,9 +1,7 @@
 package server
 
 import (
-	"encoding/json"
 	"fmt"
-
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -404,10 +402,6 @@ func TestSIEMWebhookReloadRulesFallsBackToDefault(t *testing.T) {
 }
 
 // ── Small local helpers ─────────────────────────────────────────────────────
-
-func jsonUnmarshal(data []byte, dest interface{}) error {
-	return json.Unmarshal(data, dest)
-}
 
 func strconvOf(id uint) string {
 	return fmt.Sprint(id)

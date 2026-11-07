@@ -149,7 +149,6 @@ func directoryWritable(dir string) (bool, string) {
 // of the process, not of a tenant.
 var (
 	toolchainReportMu       sync.Mutex
-	toolchainReportCached   gin.H
 	toolchainReportProblems []string
 	toolchainReportAt       time.Time
 )
@@ -157,11 +156,12 @@ var (
 // toolchainReportTTL is how long a probe result is reused.
 const toolchainReportTTL = 2 * time.Minute
 
-// cacheToolchainReport stores a fresh probe for the readiness probe to reuse.
+// cacheToolchainReport stores the problems slice of a fresh probe. The full
+// report is not cached: the only reader is toolchainProblems, and it needs
+// just the problems and the timestamp.
 func (s *Server) cacheToolchainReport(report gin.H) {
 	toolchainReportMu.Lock()
 	defer toolchainReportMu.Unlock()
-	toolchainReportCached = report
 	if problems, ok := report["problems"].([]string); ok {
 		toolchainReportProblems = problems
 	}

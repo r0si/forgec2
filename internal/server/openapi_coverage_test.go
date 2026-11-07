@@ -131,8 +131,6 @@ func (d specDocument) has(path string) bool {
 	return len(d.operations[path]) > 0
 }
 
-func (d specDocument) count() int { return len(d.operations) }
-
 func (d specDocument) operationCount() int {
 	total := 0
 	for _, ops := range d.operations {

@@ -91,10 +91,7 @@ var (
 
 	// Runtime state for the independent syscall policy (option B): shared with
 	// syscall_policy_windows.go so startup resolution is testable and observable.
-	syscallPolicyEnabled  bool                                     // runtime: syscall policy engaged (parsed from SyscallPolicyStr / FORGEC2_SYSCALL_POLICY)
-	syscallPolicyResolved bool                                     // runtime: startup resolution completed
-	syscallPolicySource   string                                   // runtime: ntdll file the table was resolved from
-	syscallPolicyFailed   []string                                 // runtime: required syscalls that failed to resolve
+	syscallPolicyEnabled bool // runtime: syscall policy engaged (parsed from SyscallPolicyStr / FORGEC2_SYSCALL_POLICY)
 	SSHUserStr            string   = ""                            // SSH username for SSH transport (defaults to persistencePrefix)
 	SSHPasswordStr        string   = ""                            // SSH password for SSH transport
 	SSHKeyStr             string   = ""                            // base64-encoded PEM private key for SSH transport

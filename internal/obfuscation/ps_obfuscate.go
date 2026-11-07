@@ -255,8 +255,6 @@ func renameVariables(code string, r *jitterRand) string {
 	})
 }
 
-var strLitRegex = regexp.MustCompile(`'[^'\n]{2,32}'`)
-
 // safeKeywords are PowerShell keywords/cmdlets safe to case-randomize
 // (the language is case-insensitive for them, and they never appear as
 // case-sensitive .NET member names in the matched lowercase form below).

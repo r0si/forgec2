@@ -1,7 +1,6 @@
 package malleable
 
 import (
-	"strings"
 	"sync"
 )
 
@@ -72,6 +71,4 @@ func resetParsedWireCache() {
 	parsedWireMu.Unlock()
 }
 
-// normalizedWireKey exists so callers that build the same chain with different
-// surrounding whitespace share one entry.
-func normalizedWireKey(wire string) string { return strings.TrimSpace(wire) }
+

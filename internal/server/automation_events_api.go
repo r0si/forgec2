@@ -57,11 +57,3 @@ func (s *Server) handleAutomationEvents(c *gin.Context) {
 	})
 }
 
-// automationEventTypes returns the catalogue as plain strings, for tests and for other handlers.
-func automationEventTypes() []string {
-	out := make([]string, 0, len(automationEventCatalogue))
-	for _, entry := range automationEventCatalogue {
-		out = append(out, string(entry.Event))
-	}
-	return out
-}

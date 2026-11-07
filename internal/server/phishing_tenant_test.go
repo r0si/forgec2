@@ -70,7 +70,8 @@ func TestPhishingAssetsAreTenantScoped(t *testing.T) {
 
 	// Update-by-id does not reach the template.
 	patch, _ := json.Marshal(map[string]string{"subject": "attacker-subject", "html": "<p>attacker</p>"})
-	c, w = ctxFor(http.MethodPut, "/api/phishing/templates/"+uintString(tpl.ID), patch)
+	// Only the DB is asserted below, so the recorder is discarded (`_`).
+	c, _ = ctxFor(http.MethodPut, "/api/phishing/templates/"+uintString(tpl.ID), patch)
 	c.Params = gin.Params{{Key: "id", Value: uintString(tpl.ID)}}
 	s.handleAPIUpdatePhishingTemplate(c)
 	var after db.PhishingTemplate
@@ -82,7 +83,7 @@ func TestPhishingAssetsAreTenantScoped(t *testing.T) {
 	}
 
 	// Delete-by-id does not remove it, and launching it is refused.
-	c, w = ctxFor(http.MethodDelete, "/api/phishing/templates/"+uintString(tpl.ID), nil)
+	c, _ = ctxFor(http.MethodDelete, "/api/phishing/templates/"+uintString(tpl.ID), nil)
 	c.Params = gin.Params{{Key: "id", Value: uintString(tpl.ID)}}
 	s.handleAPIDeletePhishingTemplate(c)
 	var tplRemaining int64

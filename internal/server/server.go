@@ -725,8 +725,12 @@ func New(cfg *config.Config, database *gorm.DB) *Server { // config-lock: constr
 	// Package trust: verify manifests against the operator's Ed25519 plugin
 	// signing keys before anything becomes callable. Unsigned packages still
 	// load (with a warning) unless plugins.require_signed is set, so the
-	// bundled plugins keep working out of the box.
-	s.applyPluginTrust()
+	// bundled plugins keep working out of the box. The function also logs the
+	// failure itself; this line matters for the hot-reload hook, which shares
+	// the same call and must not silently keep the old policy.
+	if err := s.applyPluginTrust(); err != nil {
+		slog.Warn("Failed to apply plugin trust policy; packages load unverified", "err", err)
+	}
 
 	pluginDir := filepath.Join(s.cfg.Server.DataDir, "plugins")
 	if err := os.MkdirAll(pluginDir, 0750); err != nil {

@@ -179,6 +179,4 @@ func TestRDWebRTCSignalOperatorLoop(t *testing.T) {
 	if frame := readFrame(); frame["type"] != "error" {
 		t.Fatalf("empty offer frame = %+v", frame)
 	}
-
-	return
 }

@@ -136,6 +136,11 @@ func TestSocksStopSessionIsIdempotent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	e.stopSession(s, "socks-stop")
-	e.stopSession(s, "socks-stop") // second call must not panic
+	if err := e.stopSession(s, "socks-stop"); err != nil {
+		t.Fatalf("stopSession: %v", err)
+	}
+	// Second call reports "no active relay" instead of panicking.
+	if err := e.stopSession(s, "socks-stop"); err == nil {
+		t.Fatal("second stopSession succeeded; want a 'no active' error, not a panic and not silence")
+	}
 }

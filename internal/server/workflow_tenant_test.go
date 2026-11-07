@@ -65,7 +65,7 @@ func TestWorkflowsAreTenantScoped(t *testing.T) {
 	if err := s.db.Where("id = ?", wf.ID).First(&before).Error; err != nil {
 		t.Fatal(err)
 	}
-	c, w = ctxFor(http.MethodPost, "/api/workflows/"+wf.ID+"/toggle")
+	c, _ = ctxFor(http.MethodPost, "/api/workflows/"+wf.ID+"/toggle")
 	s.handleAPIWorkflowsToggle(c)
 	after := db.Workflow{}
 	if err := s.db.Where("id = ?", wf.ID).First(&after).Error; err != nil {
@@ -90,7 +90,7 @@ func TestWorkflowsAreTenantScoped(t *testing.T) {
 	}
 
 	// It cannot be deleted.
-	c, w = ctxFor(http.MethodDelete, "/api/workflows/"+wf.ID)
+	c, _ = ctxFor(http.MethodDelete, "/api/workflows/"+wf.ID)
 	s.handleAPIDeleteWorkflow(c)
 	var remaining int64
 	if err := s.db.Model(&db.Workflow{}).Where("id = ?", wf.ID).Count(&remaining).Error; err != nil {

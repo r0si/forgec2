@@ -58,7 +58,7 @@ func TestScriptsAreTenantScoped(t *testing.T) {
 		"name": "victim-script",
 		"code": "return 'attacker-code'",
 	})
-	c, w = ctxFor(http.MethodPost, "/api/scripting/scripts", patch, 2)
+	c, _ = ctxFor(http.MethodPost, "/api/scripting/scripts", patch, 2)
 	s.handleAPISaveScript(c)
 	var after db.Script
 	if err := s.db.First(&after, victim.ID).Error; err != nil {

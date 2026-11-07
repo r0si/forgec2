@@ -82,5 +82,18 @@
 # lower-cased (ST1005). Both targets are down to the pure gosec backlog:
 # 67 (win) and 68 (lin), with the windows number carrying the +1 CI
 # observation headroom as before.
-windows=68
-linux=68
+#
+# Batch P (2026-11): errcheck 14, unused 12 and staticcheck 6 had crept back in
+# (unconvert was already fixed by the pe_exports cleanup). All were point
+# fixes, not exclusions: executeAction dispatch errors asserted in the
+# automation tests (script runtime failures stay logged, not returned),
+# applyPluginTrust and saveToDisk failures logged instead of dropped,
+# stopSession idempotency pinned by error, dead code removed (pragma.go,
+# normalizedWireKey, initialis, strLitRegex, automationEventTypes,
+# toolchainReportCached, jsonUnmarshal, specDocument.count), the syscall
+# policy routed through setSSNTable instead of a direct field write, and the
+# SA4006/S1023 test cleanups. Both targets are again the pure gosec backlog:
+# 65 (win), 66 (lin); errcheck 0/0, staticcheck 0/0, unused 0/0, mechanical
+# zero on both targets.
+windows=65
+linux=66

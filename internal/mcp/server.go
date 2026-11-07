@@ -72,12 +72,11 @@ type registeredTool struct {
 
 // Server holds the tool registry and the transport.
 type Server struct {
-	name      string
-	version   string
-	tools     map[string]registeredTool
-	order     []string
-	out       io.Writer
-	initialis bool
+	name    string
+	version string
+	tools   map[string]registeredTool
+	order   []string
+	out     io.Writer
 }
 
 // NewServer builds an empty server; tools are added with Register.

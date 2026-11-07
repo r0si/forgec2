@@ -19,11 +19,23 @@ func TestAutomationScriptFailureIsLogged(t *testing.T) {
 	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug})))
 	t.Cleanup(func() { slog.SetDefault(previous) })
 
+	// executeAction reports dispatch failures only; a script that fails at
+	// runtime is logged, not returned, so every call here must still succeed
+	// at dispatch. Asserting the nil pins that distinction: if a later change
+	// starts returning script errors, the log assertions below should be told
+	// to expect them.
+	execMust := func(action RuleAction, evt Event) {
+		t.Helper()
+		if err := s.executeAction(AutomationRule{ID: "test"}, action, evt); err != nil {
+			t.Fatalf("executeAction(%s) dispatch failed: %v", action.Type, err)
+		}
+	}
+
 	action := RuleAction{
 		Type:   ActionRunScript,
 		Params: []byte(`{"code":"throw new Error('boom')"}`),
 	}
-	s.executeAction(AutomationRule{ID: "test"}, action, Event{Type: EventImplantCheckin, AgentID: "a-1", TenantID: 1})
+	execMust(action, Event{Type: EventImplantCheckin, AgentID: "a-1", TenantID: 1})
 
 	out := logs.String()
 	if !strings.Contains(out, "script failed") {
@@ -39,14 +51,14 @@ func TestAutomationScriptFailureIsLogged(t *testing.T) {
 	// A rule that cannot act must say so too: skipping used to be indistinguishable from a rule
 	// that never matched.
 	logs.Reset()
-	s.executeAction(AutomationRule{ID: "test"}, RuleAction{Type: ActionCreateTask, Params: []byte(`{"type":"shell","command":"whoami"}`)},
+	execMust(RuleAction{Type: ActionCreateTask, Params: []byte(`{"type":"shell","command":"whoami"}`)},
 		Event{Type: EventImplantCheckin, TenantID: 1})
 	if !strings.Contains(logs.String(), "create_task skipped") {
 		t.Fatalf("a create_task action with no target was skipped silently: %q", logs.String())
 	}
 
 	logs.Reset()
-	s.executeAction(AutomationRule{ID: "test"}, RuleAction{Type: ActionSetSleep, Params: []byte(`{"agent_id":"a-1","interval":0}`)},
+	execMust(RuleAction{Type: ActionSetSleep, Params: []byte(`{"agent_id":"a-1","interval":0}`)},
 		Event{Type: EventImplantCheckin, AgentID: "a-1", TenantID: 1})
 	if !strings.Contains(logs.String(), "set_sleep skipped") {
 		t.Fatalf("a set_sleep action with interval 0 was skipped silently: %q", logs.String())
@@ -54,7 +66,7 @@ func TestAutomationScriptFailureIsLogged(t *testing.T) {
 
 	// A successful run stays at debug level, so routine automation does not spam the log.
 	logs.Reset()
-	s.executeAction(AutomationRule{ID: "test"}, RuleAction{Type: ActionRunScript, Params: []byte(`{"code":"1 + 1"}`)},
+	execMust(RuleAction{Type: ActionRunScript, Params: []byte(`{"code":"1 + 1"}`)},
 		Event{Type: EventImplantCheckin, AgentID: "a-1", TenantID: 1})
 	if !strings.Contains(logs.String(), "script ran") {
 		t.Fatalf("a successful automation script was not logged at debug: %q", logs.String())
