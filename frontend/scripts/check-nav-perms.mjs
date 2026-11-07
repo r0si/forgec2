@@ -75,6 +75,32 @@ for (const line of nav.split("\n")) {
   items.push({ href: href[1], perms });
 }
 
+// Pages whose data does not share their URL segment. This is the complete
+// documented map after manual verification against each page's fetches and
+// the backend route's group permission; a page is only listed here when its
+// primary read endpoint is one of these paths. Add an entry when you move a
+// page's data endpoint — the alternative (a prefix heuristic) produced
+// false matches before. A page must not list a WRITE endpoint it only calls
+// for mutations: that is exactly what check:nav-perms exists to catch.
+const PAGE_DATA_ROUTES = {
+  "/beacons": ["/agents"], // GET agents list, agents.read
+  "/events": ["/api/timeline/data"], // timeline stream, reconRead agents.read
+  "/payload-generator": ["/api/listeners", "/api/generate/profiles"], // listeners.read + genRead agents.read
+  "/privilege-escalation": ["/api/privesc/history/:id"], // privesc history, reconRead agents.read
+  "/bloodhound": ["/bloodhound/list"], // intel.read
+  "/attack": ["/mitre/phases"], // campaigns.read
+  "/campaign": ["/campaigns"], // campaigns.read
+  "/chat": ["/chat/history"], // extRead agents.read
+  "/asset-management": ["/groups"], // groups.read
+  "/phishing": ["/phishing/templates"], // campaigns.read
+  "/cloud": ["/cloud/:agentId/results"], // intel.read
+  "/ntlm": ["/ntlm/relay_status"], // extRead agents.read
+  "/proxy-chains": ["/chain/graph"], // extRead agents.read
+  "/opsec": ["/api/opsec/rules"], // opsec.read
+  "/circuit-breaker": ["/api/circuit-breaker/status"], // opsec.read
+  "/autotag": ["/api/autotag/rules"], // settings.read
+};
+
 // Group the GET routes by first segment: /api/dns, /api/dns/status and /api/dns/start all answer for
 // the DNS page. Only segments where every GET route agrees on the permission set are compared, so a
 // page that touches unrelated endpoints is skipped instead of reported.
@@ -126,6 +152,22 @@ for (const item of items) {
       bare++;
       exact++;
       compare(item, new Set(bareRoute), `GET ${item.href}`);
+      continue;
+    }
+    // No exact route either. Pages whose data lives at a documented
+    // cross-segment endpoint (PAGE_DATA_ROUTES) are compared against the
+    // union of those endpoints' permissions: nav perms are any-of, so the
+    // page must share at least one permission with its data union.
+    const dataPaths = PAGE_DATA_ROUTES[item.href];
+    if (dataPaths) {
+      const union = new Set();
+      for (const p of dataPaths) {
+        for (const perm of routes.get(p) ?? []) union.add(perm);
+      }
+      if (union.size > 0) {
+        exact++;
+        compare(item, union, `GET ${dataPaths.join(" | ")}`);
+      }
     }
     continue;
   }
