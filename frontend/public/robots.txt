@@ -1,0 +1,5 @@
+# ForgeC2 console is closed to crawlers: it is an authenticated operator
+# application, and its API data must not be indexed. The public description
+# of the project lives on GitHub (https://github.com/r0si/forgec2).
+User-agent: *
+Disallow: /

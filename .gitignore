@@ -58,6 +58,9 @@ Thumbs.db
 *.txt
 # The release archives ship this one: the operator-facing quickstart.
 !packaging/QUICKSTART.txt
+# Console crawler policy: the deployed app is authenticated and its data must
+# stay out of search indexes. See frontend/public/robots.txt.
+!frontend/public/robots.txt
 # Test data, not temp output: pins the response-envelope migration backlog
 # (see TestSuccessEnvelope). It has to be committed or the gate cannot pass.
 !internal/server/envelope_baseline.txt
