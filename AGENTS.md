@@ -138,7 +138,8 @@ by hand at least once; do not weaken one to make a change pass — fix the chang
   campaigns, workflows, one-shot schedules, agent status history, agent tags), each time with the
   same fix and each time reachable by any operator who guessed an id. The gate knows the table →
   helper mapping, accepts any approved scope helper (including the `findVisible*` wrappers) and
-  documents its known gap: `agent_groups` has neither a tenant nor a creator column yet.
+  documents its known gap: `agent_groups`' tenant column was added (round 200) and its `created_by`
+  column added 2026-11-07; the tenant scope is the isolation boundary.
 - `check:nav-perms` (`frontend/scripts/check-nav-perms.mjs`) — a sidebar entry must not be gated by a
   permission its page's API does not check. The nav hides entries with `perms` the operator lacks
   ("any-of"); the keys are typed, so a typo is a compile error, but **nothing compared them to the

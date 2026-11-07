@@ -431,6 +431,7 @@ func (s *Server) handleAPICreateGroup(c *gin.Context) {
 		Color:       req.Color,
 		ParentID:    req.ParentID,
 		TenantID:    s.currentTenantID(c),
+		CreatedBy:   c.GetString("user"),
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 	}

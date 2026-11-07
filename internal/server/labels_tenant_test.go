@@ -47,6 +47,15 @@ func TestTagsAndGroupsAreTenantScoped(t *testing.T) {
 		t.Fatalf("tenant 1 group create = %d (%s)", w.Code, w.Body.String())
 	}
 
+	// The group records which operator created it, for attribution.
+	var stored db.AgentGroup
+	if err := s.db.Where("name = ?", "sekrit-group").First(&stored).Error; err != nil {
+		t.Fatalf("load created group: %v", err)
+	}
+	if stored.CreatedBy != "op" {
+		t.Fatalf("group created_by = %q, want the calling operator %q", stored.CreatedBy, "op")
+	}
+
 	// Tenant 2 does not see either.
 	c, w = ctxFor(http.MethodGet, "/api/tags", nil, 2)
 	s.handleAPITagList(c)

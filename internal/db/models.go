@@ -1572,7 +1572,12 @@ type AgentGroup struct {
 	// TenantID scopes the group to its tenant. Groups are labels over agents, and without this
 	// column every tenant saw (and could rename or delete) every other tenant's groups: the
 	// handler could only scope by "contains one of my agents", which an empty group defeats.
-	TenantID  uint      `gorm:"index" json:"tenant_id"`
+	TenantID uint `gorm:"index" json:"tenant_id"`
+	// CreatedBy records which operator created the group, for parity with the
+	// other scoped tables (scripts, workflows, phishing) and for visibility in
+	// incident reviews. tenantScope is the isolation boundary; this is
+	// attribution, not a scope.
+	CreatedBy string    `gorm:"size:100" json:"created_by,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
