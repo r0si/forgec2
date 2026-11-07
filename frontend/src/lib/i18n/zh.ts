@@ -2522,6 +2522,7 @@ export const zh: Record<string, string> = {
     "groups.a11y_name": "分组名称",
     "groups.a11y_parent": "父分组",
     "groups.agent_count": "个 Beacon",
+    "groups.created_by": "Created by", // English fallback pending translation
     "groups.cancel": "取消",
     "groups.create": "创建分组",
     "groups.create_btn": "创建",

@@ -2488,6 +2488,7 @@ export const en: Record<string, string> = {
     "groups.a11y_name": "Group name",
     "groups.a11y_parent": "Parent group",
     "groups.agent_count": "beacons",
+    "groups.created_by": "Created by",
     "groups.cancel": "Cancel",
     "groups.create": "Create Group",
     "groups.create_btn": "Create",
