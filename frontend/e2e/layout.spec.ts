@@ -220,6 +220,15 @@ test.describe("light and dark visual baselines", () => {
         await prepare(page, theme);
         await page.goto(`/${route}.html`);
         await waitForPageSurface(page, route);
+        // The mocked socket is aborted, so the console reports Offline once
+        // the fast-offline probe observes two health-ok failures. Waiting for
+        // the banner under the header pins that state before the screenshot;
+        // without it the banner raced the capture and the baselines flaked
+        // by a few thousand pixels on whichever pages captured first.
+        if (route !== "login") {
+          await expect(page.getByText(/Connection lost|Real-time updates paused/)).toBeVisible({ timeout: 15_000 });
+          await page.waitForTimeout(300);
+        }
         await expect(page).toHaveScreenshot(`${route}-${theme}.png`, {
           animations: "disabled",
           fullPage: true,
