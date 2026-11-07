@@ -5969,10 +5969,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
-        put?: never;
         /** Domain front list */
-        post: operations["infraFrontList"];
+        get: operations["infraFrontList"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;

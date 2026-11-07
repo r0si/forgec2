@@ -52,11 +52,11 @@ func TestInfraFrontListIsARegisteredRead(t *testing.T) {
 		t.Fatalf("read routes_extended.go: %v", err)
 	}
 	all := string(src)
-	if strings.Contains(all, `extWrite.POST("/infra/front/list"`) {
+	if strings.Contains(all, `extWrite.POST("/infra/front/list"`) || strings.Contains(all, `extWrite.GET("/infra/front/list"`) {
 		t.Fatal("/infra/front/list is back in the agents.write group; read-only roles lose the page")
 	}
-	if !strings.Contains(all, `extRead.POST("/infra/front/list", s.handleAPIInfraFrontList)`) {
-		t.Fatal("/infra/front/list is not registered on the read group")
+	if !strings.Contains(all, `extRead.GET("/infra/front/list", s.handleAPIInfraFrontList)`) {
+		t.Fatal("/infra/front/list is not registered as a read GET")
 	}
 	if !strings.Contains(all, `extWrite.POST("/infra/front/config"`) {
 		t.Fatal("/infra/front/config lost its write guard")

@@ -186,5 +186,47 @@ func TestRestoreDomainFrontConfigCaps(t *testing.T) {
 	}
 }
 
+// TestHandleAPIInfraFrontListReturnsConfig pins the GET list endpoint: it
+// returns the in-memory config the Domain Fronting page renders, and does
+// not mutate anything.
+func TestHandleAPIInfraFrontListReturnsConfig(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	s := &Server{}
+	s.domainFrontMu.Lock()
+	s.domainFrontDomains = []string{"cdn.example.com"}
+	s.domainFrontAuto = false
+	s.domainFrontStatus = map[string]*frontDomainState{
+		"cdn.example.com": {Domain: "cdn.example.com", Healthy: true, Active: true},
+	}
+	s.domainFrontMu.Unlock()
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/infra/front/list", nil)
+	s.handleAPIInfraFrontList(c)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 (%s)", w.Code, w.Body.String())
+	}
+	var got struct {
+		Data struct {
+			Domains []struct {
+				Domain  string `json:"domain"`
+				Healthy bool   `json:"healthy"`
+			} `json:"domains"`
+			AutoFailover bool `json:"auto_failover"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(got.Data.Domains) != 1 || got.Data.Domains[0].Domain != "cdn.example.com" {
+		t.Fatalf("domains = %+v", got.Data.Domains)
+	}
+	if got.Data.AutoFailover {
+		t.Fatal("auto_failover = true, want false")
+	}
+}
+
 // Ensure the gorm import stays used if more assertions are added.
 var _ = gorm.DB{}

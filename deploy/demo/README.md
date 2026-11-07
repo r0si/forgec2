@@ -30,10 +30,8 @@ The host's own nginx is untouched: the demo gateway is a separate instance
 ## Read-only, at two layers
 
 1. **Edge** — only `GET`/`HEAD` are proxied. The exceptions are `GET|POST
-   /login`, `POST /api/login`, `POST /api/logout`, `POST /api/auth/extend`, and
-   `POST /infra/front/list` (the Domain Fronting list is a read registered as
-   POST; the handler returns in-memory config and mutates nothing). Everything
-   else answers `403` before the handler runs.
+   /login`, `POST /api/login`, `POST /api/logout` and `POST /api/auth/extend`.
+   Everything else answers `403` before the handler runs.
 2. **Handler** — the `demo-observer` custom role holds only read permissions
    (`agents,listeners,tasks,files,groups,campaigns,opsec,intel,automation,
    notifications,settings,credentials.read` plus `ai.use`). Every mutating

@@ -53,7 +53,7 @@ export default function DomainFrontingPage() {
 
   const { data, loading, error, refresh: fetchStatus } = useApiResource<{ domains: FrontDomain[]; auto_failover?: boolean }>({
     fetcher: async () => {
-      const data = await api.postJson(paths.domainFront.list, {});
+      const data = await api.get(paths.domainFront.list);
       return data as { domains: FrontDomain[]; auto_failover?: boolean };
     },
     toastThrottleMs: POLL.toastThrottle,

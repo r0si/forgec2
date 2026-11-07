@@ -8355,7 +8355,7 @@ paths:
           description: OK
 
   /infra/front/list:
-    post:
+    get:
       tags: [Infrastructure]
       summary: Domain front list
       operationId: infraFrontList

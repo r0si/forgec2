@@ -26,9 +26,10 @@ func (s *Server) registerExtendedRoutes(auth *gin.RouterGroup) {
 		extRead.GET("/domain-fronting", s.handleAPIDomainFronting)
 		// The front list only returns in-memory config; requiring agents.write
 		// here answered 403 for every read-only role (the demo observer) even
-		// though the page grants agents.read. Mutations (config) stay in
-		// extWrite.
-		extRead.POST("/infra/front/list", s.handleAPIInfraFrontList)
+		// though the page grants agents.read. It is a GET because it has no
+		// body and does not mutate; mutations (config/check) stay in extWrite
+		// and front/check stays a POST because it probes every domain.
+		extRead.GET("/infra/front/list", s.handleAPIInfraFrontList)
 		extRead.GET("/rportfwd/sessions", s.handleAPIRPortFwdStatus)
 		extRead.GET("/stager/tokens", s.handleAPIStagerTokens)
 		extRead.GET("/ntlm/relay_status", s.handleNTLMRelayStatus)
