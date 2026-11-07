@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { getWSURL } from "./wsContext";
+import { getWSURL, getHealthURL } from "./wsContext";
 
 describe("getWSURL", () => {
   afterEach(() => {
@@ -26,5 +26,15 @@ describe("getWSURL", () => {
     vi.stubEnv("VITE_FORGEC2_WS_URL", "");
     vi.stubEnv("VITE_FORGEC2_BACKEND_PORT", "");
     expect(getWSURL()).toBe("wss://c2.example:443/ws");
+  });
+});
+
+describe("getHealthURL", () => {
+  it("maps the socket URL to the HTTP health endpoint", () => {
+    const loc = { protocol: "https:", hostname: "c2.example", port: "443" };
+    Object.defineProperty(window, "location", { configurable: true, value: loc, writable: true });
+    vi.stubEnv("VITE_FORGEC2_WS_URL", "");
+    vi.stubEnv("VITE_FORGEC2_BACKEND_PORT", "");
+    expect(getHealthURL()).toBe("https://c2.example:443/health");
   });
 });

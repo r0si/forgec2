@@ -1,4 +1,4 @@
-import { act, render } from "@testing-library/react";
+import { act, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { probeSessionExpiry } from "./api";
 import { useWS, WebSocketProvider, WS_OUTBOX_DROP_EVENT } from "./wsContext";
@@ -41,9 +41,12 @@ class FakeWebSocket {
 type Ctx = ReturnType<typeof useWS>;
 
 function renderProvider() {
-  let ctx: Ctx | null = null;
+  // Holder stays current across re-renders: the useWS() value is a fresh
+  // object per commit, so asserting on a destructured snapshot would test the
+  // initial render forever.
+  const holder: { value: Ctx | null } = { value: null };
   function Probe() {
-    ctx = useWS();
+    holder.value = useWS();
     return null;
   }
   const view = render(
@@ -51,8 +54,8 @@ function renderProvider() {
       <Probe />
     </WebSocketProvider>,
   );
-  if (!ctx) throw new Error("context not captured");
-  return { ctx: ctx as Ctx, ...view };
+  if (!holder.value) throw new Error("context not captured");
+  return { get ctx() { return holder.value as Ctx; }, holder, ...view };
 }
 
 describe("WebSocketProvider outbox", () => {
@@ -119,6 +122,37 @@ describe("WebSocketProvider outbox", () => {
         FakeWebSocket.instances[0].triggerClose(1006);
       });
       expect(vi.mocked(probeSessionExpiry)).toHaveBeenCalled();
+      unmount();
+    } catch (e) {
+      unmount();
+      throw e;
+    }
+  });
+
+  it("goes offline fast when the backend is up but the socket 404s twice", async () => {
+    const fetchMock = vi.fn(async () => ({ ok: true, status: 200 }) as Response);
+    vi.stubGlobal("fetch", fetchMock);
+    const { holder, unmount } = renderProvider();
+    try {
+      await act(async () => {
+        FakeWebSocket.instances[0].triggerOpen();
+      });
+      await waitFor(() => expect(holder.value?.connected).toBe(true));
+
+      // First abnormal closure: one health-ok failure is not enough yet.
+      await act(async () => {
+        FakeWebSocket.instances[0].triggerClose(1006);
+      });
+      await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+      expect(holder.value?.reconnectFailed).toBe(false);
+
+      // The fast backoff schedules a reconnect (~1s). Wait for the 2nd socket.
+      await waitFor(() => expect(FakeWebSocket.instances.length).toBeGreaterThan(1), { timeout: 8000 });
+      await act(async () => {
+        FakeWebSocket.instances[FakeWebSocket.instances.length - 1].triggerClose(1006);
+      });
+      // Two backend-up failures in a row: Offline immediately, no 10min wait.
+      await waitFor(() => expect(holder.value?.reconnectFailed).toBe(true), { timeout: 8000 });
       unmount();
     } catch (e) {
       unmount();

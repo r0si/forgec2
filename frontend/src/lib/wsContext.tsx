@@ -65,6 +65,13 @@ type WSMethodsValue = Pick<WSContextValue, "subscribe" | "send" | "reconnect">;
 const WSStatusContext = createContext<WSStatusValue>({ connected: false, reconnectFailed: false });
 const WSMethodsContext = createContext<WSMethodsValue | null>(null);
 
+export function getHealthURL(): string {
+  // Same origin as the socket: derive the HTTP(S) URL from getWSURL so the
+  // Vite-dev backend-port override applies to both.
+  const ws = getWSURL("/health");
+  return ws.replace(/^ws:/, "http:").replace(/^wss:/, "https:");
+}
+
 export function getWSURL(path = "/ws"): string {
   const envURL = import.meta.env.VITE_FORGEC2_WS_URL;
   if (envURL) return envURL + path;
@@ -96,6 +103,10 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   const lastPongRef = useRef(0);
   const listenersRef = useRef<Set<WSListener>>(new Set());
   const reconnectAttemptRef = useRef(0);
+  // Consecutive closes where /health answered 200 but the socket still
+  // failed. Two in a row means the endpoint itself is absent (the public
+  // demo's gateway answers /ws with 404) rather than a backend restart.
+  const backendUpFailuresRef = useRef(0);
   const sendBufferRef = useRef<string[]>([]);
   const criticalBufferRef = useRef<string[]>([]);
   const droppedOutboxRef = useRef(0);
@@ -171,8 +182,24 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       const ws = new WebSocket(getWSURL());
       wsRef.current = ws;
 
+      const probeHealth = async (): Promise<boolean> => {
+        try {
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), 3000);
+          try {
+            const res = await fetch(getHealthURL(), { signal: ctrl.signal, credentials: "include" });
+            return res.ok;
+          } finally {
+            clearTimeout(timer);
+          }
+        } catch {
+          return false;
+        }
+      };
+
       ws.onopen = () => {
         reconnectAttemptRef.current = 0;
+        backendUpFailuresRef.current = 0;
         setReconnectFailed(false);
         // Critical intent first, then the normal backlog, both in order.
         while (criticalBufferRef.current.length > 0) {
@@ -204,12 +231,31 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
           reconnectRef.current = setTimeout(connect, 1000);
           return;
         }
-        // Abnormal closure (backend gone OR session dead server-side): probe
-        // now instead of only after the ~10min backoff is exhausted. A dead
-        // backend just fails the fetch (reconnect path continues); a dead
-        // session 401s straight to /login through the debounced handler.
+        // Abnormal closure (backend gone OR session dead server-side OR the
+        // endpoint is absent): probe now instead of only after the ~10min
+        // backoff is exhausted. A dead backend just fails the fetch
+        // (reconnect path continues); a dead session 401s straight to
+        // /login through the debounced handler.
         if (event.code === 1006) {
           probeSessionExpiry();
+          // If /health answers but the socket still fails, the endpoint
+          // itself is gone — the public demo gateway answers /ws with 404.
+          // Two consecutive such failures are enough to stop the fast retry
+          // loop and show Offline immediately instead of "Reconnecting..."
+          // for the whole backoff. A backend restart fails the health probe
+          // too and keeps the fast retry.
+          void probeHealth().then((up) => {
+            if (disposed || up === false) {
+              if (up === false) backendUpFailuresRef.current = 0;
+              return;
+            }
+            backendUpFailuresRef.current += 1;
+            if (backendUpFailuresRef.current < 2) return;
+            setReconnectFailed(true);
+            reconnectAttemptRef.current = 0;
+            if (reconnectRef.current) clearTimeout(reconnectRef.current);
+            reconnectRef.current = setTimeout(connect, BACKGROUND_RETRY_DELAY_MS);
+          });
         }
         if (reconnectAttemptRef.current < MAX_RECONNECT_ATTEMPTS) {
           // Jittered backoff: without it every tab reconnects in lockstep
@@ -283,6 +329,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   const reconnect = useCallback(() => {
     setReconnectFailed(false);
     reconnectAttemptRef.current = 0;
+    backendUpFailuresRef.current = 0;
     if (reconnectRef.current) { clearTimeout(reconnectRef.current); reconnectRef.current = null; }
     // If socket is still OPEN, close it so connect() can create a fresh one.
     // If already CLOSED/CLOSING, just call connect() — it creates a new socket.
