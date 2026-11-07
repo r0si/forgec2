@@ -130,7 +130,7 @@ describe("WebSocketProvider outbox", () => {
   });
 
   it("goes offline fast when the backend is up but the socket 404s twice", async () => {
-    const fetchMock = vi.fn(async () => ({ ok: true, status: 200 }) as Response);
+    const fetchMock = vi.fn(async () => ({ ok: true, status: 200, headers: new Headers({ "content-type": "application/json" }) }) as Response);
     vi.stubGlobal("fetch", fetchMock);
     const { holder, unmount } = renderProvider();
     try {

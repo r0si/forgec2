@@ -188,7 +188,11 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
           const timer = setTimeout(() => ctrl.abort(), 3000);
           try {
             const res = await fetch(getHealthURL(), { signal: ctrl.signal, credentials: "include" });
-            return res.ok;
+            // The real endpoint answers JSON. A static preview serves the SPA
+            // shell for /health too (200 text/html from the fallback), which
+            // must NOT count as "backend up" — that would flip every preview
+            // screenshot to the offline banner.
+            return res.ok && (res.headers.get("content-type") ?? "").includes("application/json");
           } finally {
             clearTimeout(timer);
           }
