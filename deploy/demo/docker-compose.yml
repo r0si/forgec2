@@ -2,18 +2,18 @@ name: forgec2-demo
 
 # The demo backend runs in the host network namespace so it can reach the
 # host's PostgreSQL on 127.0.0.1:5432 and bind only to 127.0.0.1:18000, where
-# the read-only nginx gateway (../../deploy/demo/nginx.conf) proxies it.
-# Nothing is published on a public interface by this container.
+# the read-only nginx gateway (deploy/demo/nginx.conf) proxies it. Nothing is
+# published on a public interface by this container.
 #
 # The image defaults to the published edge build. Pin the digest when you need
-# a byte-identical deployment:
+# a byte-identical deployment; this is the build the current demo runs:
 #
-#   FORGEC2_IMAGE=ghcr.io/r0si/forgec2@sha256:ae17609cd35c5a3f724855bde8d230c06018081d9dc0ce1156e1b35740d1cfc2
+#   FORGEC2_IMAGE=ghcr.io/r0si/forgec2@sha256:db1efe956d01c9bc5af24288abc2af55bb742689069a9815722c05a7ad45197f
 #
 # `edge` and its sha-<commit> tag resolve to the same manifest. On hosts where
 # GHCR is unreachable, a read-only mirror serves the identical manifest; set
-# FORGEC2_IMAGE to that path in .env and note in the runbook which mirror was
-# used and why.
+# FORGEC2_IMAGE to that mirror (tag or digest) in .env and note in the runbook
+# which mirror was used and why.
 services:
   forgec2:
     image: ${FORGEC2_IMAGE:-ghcr.io/r0si/forgec2:edge}
