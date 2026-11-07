@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ForgeC2 — Self-hosted open-source C2 framework (single binary)</title>
+<meta name="description" content="ForgeC2 is a self-hosted, open-source command and control (C2) framework for authorized red team operations: 223 implant tasks, 9 transports, an in-browser payload factory and an AI copilot. Single binary, signed releases, hot updates that roll back. MIT.">
+<link rel="canonical" href="https://r0si.github.io/forgec2/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="ForgeC2 — Self-hosted open-source C2 framework (single binary)">
+<meta property="og:description" content="223 implant tasks, 9 transports, an in-browser payload factory and an AI copilot. Signed releases, hot updates that roll back. MIT.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="assets/social-preview.png">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"ForgeC2","applicationCategory":"SecurityApplication","operatingSystem":"Windows, Linux, macOS","license":"https://opensource.org/licenses/MIT","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"url":"https://github.com/r0si/forgec2"}
+</script>
+<style>
+  body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;max-width:780px;margin:3em auto;padding:0 1em;line-height:1.55;color:#1c2430}
+  h1{font-size:2em;margin-bottom:.2em} .tag{color:#555;font-size:1.1em}
+  a{color:#2563eb} code{background:#f1f5f9;padding:.1em .35em;border-radius:4px;font-size:.92em}
+  table{border-collapse:collapse;margin:1em 0} th,td{border:1px solid #d6dde5;padding:.4em .7em;text-align:left}
+  .cta a{display:inline-block;background:#0f172a;color:#fff;padding:.6em 1.1em;border-radius:8px;margin:.2em .2em 0 0;text-decoration:none}
+  .warn{border:1px solid #f0c36d;background:#fff8e6;padding:.7em 1em;border-radius:8px}
+  .muted{color:#666;font-size:.9em}
+</style>
+</head>
+<body>
+<h1>⚒️ ForgeC2</h1>
+<p class="tag">Self-hosted, open-source command and control (C2) that ships as a single binary — 223 implant tasks, 9 transports, an in-browser payload factory and an AI copilot.</p>
+
+<p class="cta">
+  <a href="https://github.com/r0si/forgec2/releases">Download a release</a>
+  <a href="https://github.com/r0si/forgec2/blob/main/README.md">Read the README</a>
+</p>
+
+<pre><code>docker pull ghcr.io/r0si/forgec2:edge
+docker run -p 8000:8000 -e FORGEC2_JWT_SECRET=&lt;random-hex&gt; \
+  ghcr.io/r0si/forgec2:edge</code></pre>
+
+<h2>Why ForgeC2</h2>
+<table>
+<tr><th></th><th>ForgeC2</th><th>Sliver</th><th>Mythic</th><th>Havoc</th><th>Cobalt Strike</th></tr>
+<tr><td>Packaging</td><td>One binary, embedded web UI</td><td>Server + CLI client</td><td>Docker Compose stack</td><td>Teamserver + Qt client</td><td>Java teamserver + desktop client</td></tr>
+<tr><td>Web console</td><td>✓ built in</td><td>—</td><td>—</td><td>— (Qt desktop)</td><td>— (desktop)</td></tr>
+<tr><td>Transports</td><td>9 built in + QUIC/UDP/SMB P2P</td><td>mTLS, WireGuard, HTTP(S), DNS</td><td>via C2 profiles</td><td>HTTP(S), SMB, External C2</td><td>HTTP(S), DNS, SMB, TCP</td></tr>
+<tr><td>AI copilot</td><td>✓</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td>License</td><td>MIT</td><td>GPL-3.0</td><td>BSD-3-Clause</td><td>GPL-3.0</td><td>Commercial</td></tr>
+</table>
+<p class="muted">Structural comparison of packaging and delivery as of 2026, from each project's public documentation.</p>
+
+<h2>Documentation</h2>
+<ul>
+  <li><a href="https://github.com/r0si/forgec2/blob/main/docs/DEPLOY.md">Deployment, TLS, upgrades</a></li>
+  <li><a href="https://github.com/r0si/forgec2/blob/main/docs/CAPABILITY_MATRIX.md">Capability matrix</a></li>
+  <li><a href="https://github.com/r0si/forgec2/blob/main/docs/COMMAND_REFERENCE.md">Command reference</a></li>
+  <li><a href="https://github.com/r0si/forgec2/blob/main/ARCHITECTURE.md">Architecture</a></li>
+</ul>
+
+<div class="warn">
+<strong>Authorized security testing only.</strong> Use ForgeC2 only with explicit written permission from the system owner. This page describes the framework; nothing here authorizes scanning anyone's systems.
+</div>
+<p class="muted">ForgeC2 is open source under the MIT license. <a href="https://github.com/r0si/forgec2">GitHub repository</a> · <a href="https://github.com/r0si/forgec2/releases">Releases</a> · <a href="https://github.com/r0si/forgec2/blob/main/SECURITY.md">Security policy</a></p>
+</body>
+</html>

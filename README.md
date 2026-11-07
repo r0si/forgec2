@@ -1,6 +1,8 @@
 # ⚒️ ForgeC2
 
-**Self-hosted command and control that ships as a single binary.** <!--fact:tasks-->223<!--/fact--> implant tasks, 9 transports, an in-browser payload factory and an AI copilot — with signed releases and hot updates that roll back on failure.
+**Self-hosted, open-source command and control (C2) that ships as a single binary.** <!--fact:tasks-->223<!--/fact--> implant tasks, 9 transports, an in-browser payload factory and an AI copilot — with signed releases and hot updates that roll back on failure. Built for authorized red team operations and adversary simulation.
+
+Website: [https://r0si.github.io/forgec2/](https://r0si.github.io/forgec2/) · Source & releases: <https://github.com/r0si/forgec2/releases>
 
 [![CI](https://github.com/r0si/forgec2/actions/workflows/ci.yml/badge.svg)](https://github.com/r0si/forgec2/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/r0si/forgec2)](https://github.com/r0si/forgec2/releases)
