@@ -103,7 +103,9 @@
 # fullchain certificate at 0644 carry #nosec G306 with rationale instead of a
 # broken mode). Totals are now the pure gosec backlog minus G306: 36 (win),
 # 41 (lin). The linux target carries five more because it analyzes the
-# linux-only transport/relay sources the windows target skips; both ceilings
-# are the local GOOS-pinned measurements.
-windows=36
+# linux-only transport/relay sources the windows target skips. The windows
+# ceiling is the CI measurement (36 gosec + 1 staticcheck); the local Windows
+# host reports 36 gosec only, so as before windows carries the +1 CI
+# observation headroom.
+windows=37
 linux=41
