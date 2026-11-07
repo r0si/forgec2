@@ -112,14 +112,17 @@ jobs:
         # behavior) on the port config.example.yaml points at, and wait for it
         # to accept connections before booting the server.
         run: |
+          # Cold pulls of postgres:16-alpine plus first-boot init routinely
+          # exceed 30s on CI runners. Wait long enough and dump the container
+          # log on timeout so the failure says WHY instead of just "not ready".
           docker run -d --name forgec2-pg \
             -e POSTGRES_USER=forgec2 -e POSTGRES_PASSWORD=forgec2 -e POSTGRES_DB=forgec2 \
             -p 5432:5432 postgres:16-alpine
-          for i in $(seq 1 30); do
+          for i in $(seq 1 90); do
             if docker exec forgec2-pg pg_isready -U forgec2 -d forgec2 >/dev/null 2>&1; then break; fi
             sleep 1
           done
-          docker exec forgec2-pg pg_isready -U forgec2 -d forgec2 || { echo "PostgreSQL did not become ready"; exit 1; }
+          docker exec forgec2-pg pg_isready -U forgec2 -d forgec2 || { echo "PostgreSQL did not become ready"; docker logs forgec2-pg | tail -n 50; exit 1; }
           SMOKE_ADMIN_PASSWORD="S1mokeC2-$(openssl rand -hex 8)-9z!Z"
           sed "s/^  default_password:.*/  default_password: $SMOKE_ADMIN_PASSWORD/" config.example.yaml > config.ci.yaml
           rm -rf data/db
@@ -433,6 +436,20 @@ jobs:
           cache: true
           cache-dependency-path: go.sum
       - run: go mod download
+      # The e2e server is PostgreSQL-only since v2.8 and config.example.yaml
+      # points at 127.0.0.1:5432. Start it beside the runner with the same
+      # role/db as config.example.yaml, waiting long enough for a cold pull +
+      # init (see the API smoke step for why 30s is not enough).
+      - name: Start PostgreSQL for the agent E2E
+        run: |
+          docker run -d --name forgec2-pg \
+            -e POSTGRES_USER=forgec2 -e POSTGRES_PASSWORD=forgec2 -e POSTGRES_DB=forgec2 \
+            -p 5432:5432 postgres:16-alpine
+          for i in $(seq 1 90); do
+            if docker exec forgec2-pg pg_isready -U forgec2 -d forgec2 >/dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          docker exec forgec2-pg pg_isready -U forgec2 -d forgec2 || { docker logs forgec2-pg | tail -n 50; exit 1; }
       - name: Generated-agent E2E (login -> listener -> generate -> beacon -> tasks)
         shell: pwsh
         run: ./scripts/e2e-agent-local.ps1 -WorkDir "$env:RUNNER_TEMP/e2e-agent" -KeepWork
@@ -608,6 +625,20 @@ jobs:
       - run: npm --prefix frontend ci
       # The server embeds internal/webdist/dist, which the frontend job proves
       # byte-identical to frontend/out — so the real binary serves the real UI.
+      #
+      # PostgreSQL is the only supported backend (v2.8) and config.example.yaml
+      # points at 127.0.0.1:5432. Without this the server exits on startup and
+      # the health poll only ever sees "connection refused".
+      - name: Start PostgreSQL for the live E2E
+        run: |
+          docker run -d --name forgec2-pg \
+            -e POSTGRES_USER=forgec2 -e POSTGRES_PASSWORD=forgec2 -e POSTGRES_DB=forgec2 \
+            -p 5432:5432 postgres:16-alpine
+          for i in $(seq 1 90); do
+            if docker exec forgec2-pg pg_isready -U forgec2 -d forgec2 >/dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          docker exec forgec2-pg pg_isready -U forgec2 -d forgec2 || { docker logs forgec2-pg | tail -n 50; exit 1; }
       - name: Build server
         run: go build -o "$RUNNER_TEMP/forgec2-server" ./cmd/server
       - name: Prepare e2e config (plain HTTP + seeded admin)

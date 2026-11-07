@@ -212,9 +212,11 @@ func TestUpgradePreservesLegacyAgentsData(t *testing.T) {
 
 func TestIdempotencyUniqueIndexMigration(t *testing.T) {
 	database := openTestDB(t)
-	if err := database.AutoMigrate(&Task{}); err != nil {
+	if err := database.AutoMigrate(&Implant{}, &Task{}); err != nil {
 		t.Fatalf("migrate tasks: %v", err)
 	}
+	// fk_tasks_agent references implants, so the parent row must exist first.
+	ensureTestImplant(t, database, "a1")
 	// Pre-existing live duplicates must collapse (newest kept) before the
 	// UNIQUE index is created.
 	for i, st := range []string{"running", "running"} {

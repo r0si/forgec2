@@ -115,7 +115,7 @@ func FindExportRVA(image []byte, name string) (uint32, error) {
 		return 0, &ErrNoExports{Reason: "the image declares no data directories"}
 	}
 	exportEntry := optional + int64(directoryOffset)
-	if int64(exportEntry+8) > int64(len(image)) {
+	if exportEntry+8 > int64(len(image)) {
 		return 0, &ErrNotPE{Reason: "export directory entry is outside the image"}
 	}
 	exportRVA := binary.LittleEndian.Uint32(image[exportEntry : exportEntry+4])
@@ -126,7 +126,7 @@ func FindExportRVA(image []byte, name string) (uint32, error) {
 
 	// Translate the export directory's RVA into a file offset. In a file image the two differ by the section mapping, which is why
 	// this walks the section table instead of assuming RVA == offset.
-	dirOffset, err := fileOffsetForRVA(image, int64(optional), sections, exportRVA)
+	dirOffset, err := fileOffsetForRVA(image, optional, sections, exportRVA)
 	if err != nil {
 		return 0, &ErrNoExports{Reason: err.Error()}
 	}
@@ -141,15 +141,15 @@ func FindExportRVA(image []byte, name string) (uint32, error) {
 		return 0, &ErrNoExports{Reason: "the export table has no names"}
 	}
 
-	namesOffset, err := fileOffsetForRVA(image, int64(optional), sections, addressOfNames)
+	namesOffset, err := fileOffsetForRVA(image, optional, sections, addressOfNames)
 	if err != nil {
 		return 0, &ErrNoExports{Reason: err.Error()}
 	}
-	ordinalsOffset, err := fileOffsetForRVA(image, int64(optional), sections, addressOfNameOrdinals)
+	ordinalsOffset, err := fileOffsetForRVA(image, optional, sections, addressOfNameOrdinals)
 	if err != nil {
 		return 0, &ErrNoExports{Reason: err.Error()}
 	}
-	functionsOffset, err := fileOffsetForRVA(image, int64(optional), sections, addressOfFunctions)
+	functionsOffset, err := fileOffsetForRVA(image, optional, sections, addressOfFunctions)
 	if err != nil {
 		return 0, &ErrNoExports{Reason: err.Error()}
 	}
@@ -160,7 +160,7 @@ func FindExportRVA(image []byte, name string) (uint32, error) {
 		if nameRVAAt+4 > int64(len(image)) || ordinalAt+2 > int64(len(image)) {
 			return 0, &ErrNoExports{Reason: "the export name table is truncated"}
 		}
-		nameOffset, err := fileOffsetForRVA(image, int64(optional), sections,
+		nameOffset, err := fileOffsetForRVA(image, optional, sections,
 			binary.LittleEndian.Uint32(image[nameRVAAt:nameRVAAt+4]))
 		if err != nil {
 			continue

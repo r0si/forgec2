@@ -115,6 +115,18 @@ for (const item of items) {
   }
 }
 
+// The footer Settings shortcut in Sidebar.tsx is not in NAV_ITEMS, so the
+// comparison above never saw it. A custom role without settings.read used to
+// get the button and a 403 page. Pin its guard mechanically: the /settings
+// link must be conditional on can(permissions, "settings.read").
+const sidebar = readFileSync(join(root, "frontend", "src", "components", "Sidebar.tsx"), "utf8");
+const settingsLink = sidebar.indexOf('to="/settings"');
+if (settingsLink < 0) {
+  problems.push("Sidebar.tsx: the footer /settings shortcut is missing");
+} else if (!sidebar.slice(Math.max(0, settingsLink - 600), settingsLink + 200).includes('can(permissions, "settings.read")')) {
+  problems.push('Sidebar.tsx: the footer /settings shortcut is not gated by settings.read (a role without it gets a 403 page)');
+}
+
 if (problems.length > 0) {
   console.error(`check-nav-perms: ${problems.length} sidebar/route permission mismatch(es):`);
   for (const p of problems) console.error(`  - ${p}`);

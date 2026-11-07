@@ -18,6 +18,7 @@ import { StatusDot } from "@/components/ui/status-dot";
 import { Shield, ChevronDown, LayoutGrid, Settings, Search, X } from "lucide-react";
 import { NAV_SECTIONS, sidebarNavSections, filterNavByPermissions } from "@/lib/navigation";
 import { prefetchRoute } from "@/lib/route-prefetch";
+import { can } from "@/lib/permissions";
 import type { PermissionKey } from "@/lib/permission-keys";
 import {
   defaultSidebarSections as defaultSections,
@@ -204,13 +205,14 @@ const SidebarNav = memo(function SidebarNav({ collapsed, sections, toggleSection
   );
 });
 
-const SidebarFooter = memo(function SidebarFooter({ collapsed, connected, onlineUsers, currentUsername, t, onOpenTools }: {
+const SidebarFooter = memo(function SidebarFooter({ collapsed, connected, onlineUsers, currentUsername, t, onOpenTools, permissions }: {
   collapsed: boolean;
   connected: boolean;
   onlineUsers: Array<{ username: string }>;
   currentUsername: string;
   t: (key: string, params?: Record<string, string | number>) => string;
   onOpenTools: () => void;
+  permissions: readonly PermissionKey[] | null | undefined;
 }) {
   return (
     <div className={`border-t border-border/60 ${collapsed ? 'px-2 py-2' : 'px-3 py-2.5'} space-y-2`}>
@@ -242,16 +244,24 @@ const SidebarFooter = memo(function SidebarFooter({ collapsed, connected, online
           <LayoutGrid className="size-4" />
           {!collapsed && <span>{t("sidebar.more_tools")}</span>}
         </Button>
-        <Button
-          variant="ghost"
-          size={collapsed ? "icon" : "sm"}
-          render={<Link to="/settings" />}
-          aria-label={t("nav.settings")}
-          className={collapsed ? "mx-auto" : "justify-start"}
-        >
-          <Settings className="size-4" />
-          {!collapsed && <span>{t("nav.settings")}</span>}
-        </Button>
+        {/*
+          The footer Settings shortcut is not part of NAV_SECTIONS, so
+          filterNavByPermissions never gated it: a custom read-only role without
+          settings.read saw the button and got a 403 page. Mirror the nav rule
+          here (unknown permissions while loading still show the button).
+        */}
+        {(!permissions || can(permissions, "settings.read")) && (
+          <Button
+            variant="ghost"
+            size={collapsed ? "icon" : "sm"}
+            render={<Link to="/settings" />}
+            aria-label={t("nav.settings")}
+            className={collapsed ? "mx-auto" : "justify-start"}
+          >
+            <Settings className="size-4" />
+            {!collapsed && <span>{t("nav.settings")}</span>}
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -386,6 +396,7 @@ const stats = useAppStore((s) => s.stats);
         currentUsername={currentUsername}
         t={t}
         onOpenTools={() => setCommandPaletteOpen(true)}
+        permissions={permissions}
       />
     </>
   );

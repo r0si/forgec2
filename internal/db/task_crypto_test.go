@@ -5,7 +5,22 @@ import (
 	"testing"
 
 	"github.com/forgec2/forgec2/internal/crypto"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
+
+// ensureTestImplant seeds the implant row a task references. Task.Agent is a
+// foreignKey association, so PostgreSQL enforces fk_tasks_agent; creating a
+// task with an arbitrary AgentID without the parent row fails there (SQLite
+// does not enforce it by default, which is why this only bites when the
+// PostreSQL-backed tests actually run).
+func ensureTestImplant(t *testing.T, db *gorm.DB, id string) {
+	t.Helper()
+	if err := db.Clauses(clause.OnConflict{DoNothing: true}).
+		Create(&Implant{ID: id, Hostname: "test-host", Status: "online"}).Error; err != nil {
+		t.Fatalf("seed implant %s: %v", id, err)
+	}
+}
 
 // TestTaskResultEncryptionAtRest verifies that task Result/Error are encrypted
 // for storage (FC2ENC: marker) and transparently decrypted on load via the
@@ -60,6 +75,7 @@ func TestTaskResultAfterFindLegacyPlaintext(t *testing.T) {
 // decrypted task re-saved via Save() does not leak plaintext back to disk.
 func TestTaskSensitiveCommandEncryptionAtRest(t *testing.T) {
 	db := setupTestDB(t)
+	ensureTestImplant(t, db, "agent-enc")
 
 	// Create a sensitive task: hooks must encrypt on first write.
 	task := Task{AgentID: "agent-enc", Type: "password_spray", Command: "P@ssw0rd!|CORP||0", Data: "jsmith\nsvc_sql"}
@@ -122,6 +138,7 @@ func TestTaskSensitiveCommandEncryptionAtRest(t *testing.T) {
 // is searchable by operators) are never encrypted at rest.
 func TestTaskNonSensitiveCommandStaysPlaintext(t *testing.T) {
 	db := setupTestDB(t)
+	ensureTestImplant(t, db, "agent-enc")
 
 	task := Task{AgentID: "agent-enc", Type: "shell", Command: "whoami /all"}
 	if err := db.Create(&task).Error; err != nil {
@@ -137,6 +154,7 @@ func TestTaskNonSensitiveCommandStaysPlaintext(t *testing.T) {
 // that the Shell field of ordinary types (shell interpreter) stays plaintext.
 func TestTaskTokenMakeShellEncryptionAtRest(t *testing.T) {
 	db := setupTestDB(t)
+	ensureTestImplant(t, db, "agent-enc")
 
 	task := Task{AgentID: "agent-enc", Type: "token_make", Command: "CORP\\jsmith", Shell: "S3cretP@ss!", Path: "2"}
 	if err := db.Create(&task).Error; err != nil {

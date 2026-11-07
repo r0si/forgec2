@@ -10,9 +10,10 @@
 # ldflag injection, registration, the beacon loop, task dispatch and result
 # storage fails here - not in a lab VM a week later.
 #
-#   * builds a throwaway server (fresh data dir, plain-HTTP lab config,
+#   * builds a throwaway server (fresh state dir, plain-HTTP lab config,
 #     generated beacon key and admin password; nothing is written outside
-#     -WorkDir)
+#     -WorkDir except the throwaway PostgreSQL database named by -PgDsn,
+#     which the server schema-migrates on boot)
 #   * creates an HTTP listener through POST /api/listeners
 #   * asks POST /generate/{linux,exe} for a real agent, polls the build job and
 #     downloads the artifact (the server mints the v3 registration secret)
@@ -27,7 +28,8 @@
 #     excluded module must fail with the named "not compiled into this build"
 #     error, and the help listing must mark the exclusions
 #
-# Requires: go, curl, PowerShell 5.1+ (Windows) or pwsh (Linux).
+# Requires: go, curl, PowerShell 5.1+ (Windows) or pwsh (Linux), and a running
+# PostgreSQL reachable by -PgDsn (CI starts a postgres container for it).
 # The Windows variant is the primary implant; the Linux variant runs in CI.
 [CmdletBinding()]
 param(
@@ -43,6 +45,12 @@ param(
     [ValidateSet('auto', 'windows', 'linux')][string]$TargetOs = 'auto',
     [int]$BuildTimeoutSec = 900,
     [int]$TaskTimeoutSec = 120,
+    # PostgreSQL only since v2.8 (config.example.yaml's dsn). CI starts a
+    # container on 127.0.0.1:5432; locally the same DSN is reused unless
+    # -PgDsn is given. The database must already exist (the migration runs at
+    # server start), so the CI container creates it and the throwaway server
+    # schema-migrates it on boot.
+    [string]$PgDsn = 'host=127.0.0.1 user=forgec2 password=forgec2 dbname=forgec2 port=5432 sslmode=disable',
     [switch]$KeepWork
 )
 
@@ -177,12 +185,16 @@ try {
     # No end-of-line anchor: the example carries a trailing comment on the
     # data_dir line, and the trailing text must survive the rewrite.
     $cfg = $cfg -replace '(?m)^([ \t]*)data_dir: data\b', "`${1}data_dir: $WorkDir/data"
-    $cfg = $cfg -replace '(?m)^(\s*)path: data/db/forgec2.db', "`${1}path: $WorkDir/data/db/forgec2.db"
+    # PostgreSQL is the only supported backend since v2.8; the old
+    # `path: data/db/forgec2.db` line is a commented legacy key, so the DSN
+    # anchor is the dsn line itself. Keep the throwaway DSN in -PgDsn so the
+    # database can be dropped without touching the repo.
+    $cfg = $cfg -replace '(?m)^(\s*)dsn: .*', "`${1}dsn: `"$PgDsn`""
     $cfg = $cfg -replace '(?m)^(\s*)beacon_key: ""', "`${1}beacon_key: `"$BeaconKey`""
     $cfg = $cfg -replace '(?m)^(\s*)default_password: ""', "`${1}default_password: `"$Password`""
     if ($cfg -notmatch "port: $Port" -or $cfg -notmatch 'tls_enabled: false' -or
         $cfg -notmatch 'require_tls_for_auth: false' -or $cfg -notmatch [regex]::Escape("data_dir: $WorkDir/data") -or
-        $cfg -notmatch [regex]::Escape("path: $WorkDir/data/db/forgec2.db") -or
+        $cfg -notmatch [regex]::Escape("dsn: `"$PgDsn`"") -or
         $cfg -notmatch [regex]::Escape($Password) -or $cfg -notmatch [regex]::Escape($BeaconKey)) {
         throw 'config rewrite did not apply cleanly - is config.example.yaml unchanged?'
     }
