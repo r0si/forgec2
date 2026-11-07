@@ -325,11 +325,11 @@ Two habits produced all of these, and both are cheap:
 
 Both sides carry a coverage floor, and **a floor that is never raised stops guarding anything**:
 
-| side | floor | measured (2026-10-28) | where |
+| side | floor | measured (2026-11-07) | where |
 |---|---|---|---|
-| Go | **51.5%** | 52.8% (was 50 at a 50.4 measurement — a 2.8-point regression would have passed) | `.github/workflows/ci.yml` "Coverage floor" |
-| frontend | **33.5%** | 34.84% statements / 23 313 | `frontend/scripts/check-coverage.mjs` (override with `COVERAGE_FLOOR`) |
-| first-paint bundle | **900 kB** | 798 kB critical path (4.54 MB total under a 5.5 MB cap) | `frontend/scripts/check-bundle.mjs` |
+| Go | **58%** | 59.1% (was 51.5 at a 52.8 measurement — a 7-point regression would have passed) | `.github/workflows/ci.yml` "Coverage floor" |
+| frontend | **36.5%** | 37.71% statements / 24 365 | `frontend/scripts/check-coverage.mjs` (override with `COVERAGE_FLOOR`) |
+| first-paint bundle | **900 kB** | 800 kB critical path (4.55 MB total under a 5.5 MB cap) | `frontend/scripts/check-bundle.mjs` |
 
 Raise a floor in the same change that adds tests; lower it only as part of that change, never to make
 a regression pass. ~1 point of headroom is deliberate: it absorbs ordinary page work while a large
