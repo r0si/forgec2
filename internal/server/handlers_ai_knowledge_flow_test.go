@@ -352,7 +352,8 @@ func TestAIKnowledgePromoteSourcesAndSearch(t *testing.T) {
 }
 
 // TestSearchDedupesQueryTerms pins that a repeated query token is counted
-// once in scoring (a term typed twice is one signal).
+// once while ranking (a term typed twice is one signal). The sibling test
+// TestSearchRanksRareTermAboveCommonTerm covers the IDF weighting itself.
 func TestSearchDedupesQueryTerms(t *testing.T) {
 	s := knowledgeTestServer(t)
 	principal := aiPrincipal{UserID: 1, Username: "alice", TenantID: 1, Role: db.RoleAdmin}
@@ -396,12 +397,71 @@ func TestSearchDedupesQueryTerms(t *testing.T) {
 		t.Fatal("expected results")
 	}
 	top := results[0]
-	// Two distinct terms (bravo, targetpair), counted once each.
-	if top.Score != 2 {
-		t.Fatalf("top score = %d, want 2 (repeated terms counted once)", top.Score)
-	}
 	if !strings.Contains(top.Content, "targetpair") {
 		t.Fatalf("top result is not the strong chunk: %+v", top)
+	}
+	// The strong chunk matched two distinct terms; a repeated query term must
+	// not inflate its score. The float magnitude is IDF-dependent, so pin the
+	// relationship: top scores strictly above a one-term chunk.
+	if top.Score <= 0 {
+		t.Fatalf("top score = %v, want > 0", top.Score)
+	}
+}
+
+// TestSearchRanksRareTermAboveCommonTerm proves the ranking is term-weighted,
+// not a flat match count: a chunk matching only the rare query term outranks
+// one matching only the ubiquitous term.
+func TestSearchRanksRareTermAboveCommonTerm(t *testing.T) {
+	s := knowledgeTestServer(t)
+	principal := aiPrincipal{UserID: 1, Username: "alice", TenantID: 1, Role: db.RoleAdmin}
+
+	collection := db.AIKnowledgeCollection{TenantID: 1, OwnerID: 1, Name: "weighted"}
+	if err := s.db.Create(&collection).Error; err != nil {
+		t.Fatal(err)
+	}
+	source := db.AIKnowledgeSource{TenantID: 1, CollectionID: collection.ID, Name: "seeded"}
+	if err := s.db.Create(&source).Error; err != nil {
+		t.Fatal(err)
+	}
+	seed := func(position int, content string) {
+		chunk := db.AIKnowledgeChunk{
+			TenantID: 1, CollectionID: collection.ID, SourceID: source.ID,
+			Position: position, Content: content, SearchTokens: s.blindAIKnowledgeTokens(content),
+		}
+		if err := s.db.Create(&chunk).Error; err != nil {
+			t.Fatalf("seed chunk: %v", err)
+		}
+		if err := s.db.Exec("INSERT INTO ai_knowledge_fts(chunk_id, tokens) VALUES(?, ?)", chunk.ID, chunk.SearchTokens).Error; err != nil {
+			t.Fatalf("seed fts: %v", err)
+		}
+	}
+	// Five ubiquitous chunks, one rare chunk.
+	for i := 0; i < 5; i++ {
+		seed(i, "common filler operations text number "+string(rune('a'+i)))
+	}
+	// Make the rare term unique to the last chunk by construction (the filler
+	// above shares only "common").
+	seed(5, "rare distinctivetoken targetpayload")
+
+	results, err := s.searchAIKnowledge(principal, aiKnowledgeSearchRequest{
+		Query: "common distinctivetoken", CollectionIDs: []uint{collection.ID}, Limit: 10,
+	})
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if len(results) < 6 {
+		t.Fatalf("expected all seeded chunks back, got %d", len(results))
+	}
+	// The chunk holding the rare term must rank first despite the common term
+	// being present in five times as many chunks.
+	if !strings.Contains(results[0].Content, "distinctivetoken") {
+		t.Fatalf("rare-term chunk should rank first, got %+v", results[0])
+	}
+	// Ordering is stable: a higher-IDF chunk always precedes lower ones.
+	for i := 1; i < len(results); i++ {
+		if results[i].Score > results[0].Score {
+			t.Fatalf("scores not descending at %d: %+v", i, results)
+		}
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"mime/multipart"
 	"net/http"
 	"path/filepath"
@@ -479,13 +480,13 @@ type aiKnowledgeSearchRequest struct {
 }
 
 type aiKnowledgeSearchResult struct {
-	ChunkID    uint   `json:"chunk_id"`
-	SourceID   uint   `json:"source_id"`
-	Source     string `json:"source"`
-	Collection uint   `json:"collection_id"`
-	ChunkIndex int    `json:"chunk_index"`
-	Content    string `json:"content"`
-	Score      int    `json:"score"`
+	ChunkID    uint    `json:"chunk_id"`
+	SourceID   uint    `json:"source_id"`
+	Source     string  `json:"source"`
+	Collection uint    `json:"collection_id"`
+	ChunkIndex int     `json:"chunk_index"`
+	Content    string  `json:"content"`
+	Score      float64 `json:"score"`
 }
 
 func (s *Server) searchAIKnowledge(principal aiPrincipal, req aiKnowledgeSearchRequest) ([]aiKnowledgeSearchResult, error) {
@@ -573,12 +574,29 @@ func (s *Server) searchAIKnowledge(principal aiPrincipal, req aiKnowledgeSearchR
 	for _, source := range sources {
 		sourceNames[source.ID] = source.Name
 	}
+	// Ranking weights each matched term by how far it is rarer than the
+	// candidate set: a term in a quarter of the candidates is a strong signal,
+	// a term in all of them is almost none. Previously every matched term
+	// counted 1, so a chunk matching three ubiquitous words outranked one
+	// matching the single distinctive word the operator actually typed.
+	weights := make(map[string]float64, len(hashed))
+	for _, token := range hashed {
+		df := 0
+		for _, chunk := range chunks {
+			if strings.Contains(chunk.SearchTokens, token) {
+				df++
+			}
+		}
+		// BM25-style inverse document frequency (0.5-smoothed). df is at
+		// least 1 here: the candidate set is pre-filtered by the same LIKEs.
+		weights[token] = math.Log(1 + (float64(len(chunks))-float64(df)+0.5)/(float64(df)+0.5))
+	}
 	results := make([]aiKnowledgeSearchResult, 0, len(chunks))
 	for _, chunk := range chunks {
-		score := 0
+		score := 0.0
 		for _, token := range hashed {
 			if strings.Contains(chunk.SearchTokens, token) {
-				score++
+				score += weights[token]
 			}
 		}
 		results = append(results, aiKnowledgeSearchResult{
