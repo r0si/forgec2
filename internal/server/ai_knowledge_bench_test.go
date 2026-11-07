@@ -18,8 +18,8 @@ import (
 // Run with:
 //   go test ./internal/server/ -run XXX -bench BenchmarkAISearchKnowledgeLat -benchtime 5x -v
 //
-// Measured 2026-11-07 (PostgreSQL 18, local): ~157ms/op (664KB/op) for a
-// two-term query against 10k chunks — ~75x faster than the previous
+// Measured 2026-11-07 (PostgreSQL 18, local): ~241ms/op (665KB/op) for a
+// two-term query against 10k chunks — ~50x faster than the previous
 // fetch-all-matches then rank design (12.3s/op), with the distinctive chunk
 // still ranked first by the IDF scorer. Numbers move with hardware; the
 // contract assertions are the binding part.
