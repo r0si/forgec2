@@ -32,13 +32,13 @@ const errorToast = vi.mocked(toast.error);
 
 const TEMPLATE = {
   id: 1, ID: 1, name: "tpl-a", subject: "Reset", body: "<p>x</p>",
-  from_name: "IT", from_email: "it@lab", type: "html", created_by: "admin", created_at: "",
+  from_name: "IT", from_email: "it@lab", type: "html", created_by: "template-owner", created_at: "",
 };
 const DRAFT_CAMPAIGN = {
   id: 11, ID: 11, name: "draft-camp", template_id: 1, target_list: "[]",
   smtp_host: "smtp.lab", smtp_port: 587, smtp_user: "", smtp_pass: "",
   status: "draft", sent_count: 0, failed_count: 0, open_count: 0, cred_count: 0,
-  created_by: "admin", created_at: "",
+  created_by: "campaign-owner", created_at: "",
 };
 const RUNNING_CAMPAIGN = { ...DRAFT_CAMPAIGN, id: 12, ID: 12, name: "run-camp", status: "running" };
 
@@ -79,6 +79,20 @@ async function openCampaignsTab() {
   fireEvent.click(screen.getByRole("tab", { name: /phishing\.tab_campaigns/ }));
   await screen.findByText("draft-camp");
 }
+
+describe("PhishingPageContent creator attribution", () => {
+  it("shows who created each template", async () => {
+    await renderPage();
+    expect(screen.getByText("template-owner")).toBeTruthy();
+  });
+
+  it("shows who created each campaign on the campaigns tab", async () => {
+    await renderPage();
+    await openCampaignsTab();
+    // Both the draft and the running fixture campaign share the same creator.
+    expect(screen.getAllByText("campaign-owner").length).toBeGreaterThanOrEqual(2);
+  });
+});
 
 describe("PhishingPageContent mutations", () => {
   it("shows the inline load error with a retry instead of empty tables", async () => {
