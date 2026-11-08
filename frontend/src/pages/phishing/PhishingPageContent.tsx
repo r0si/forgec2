@@ -375,6 +375,7 @@ export default function PhishingPageContent() {
                   <TableHead className="text-right px-4 py-3 sm:py-3.5">{t("common.total")}</TableHead>
                   <TableHead className="text-right px-4 py-3 sm:py-3.5">{t("phishing.col_from")}</TableHead>
                   <TableHead className="text-right px-4 py-3 sm:py-3.5">{t("phishing.col_subject")}</TableHead>
+                  <TableHead className="text-right px-4 py-3 sm:py-3.5">{t("groups.created_by")}</TableHead>
                   <TableHead className="text-right px-4 py-3 sm:py-3.5">{t("phishing.col_actions")}</TableHead>
                 </TableRow>
               </TableHeader>
@@ -388,6 +389,7 @@ export default function PhishingPageContent() {
                       <TableCell className="px-4 py-3 sm:py-3.5 text-right text-muted-foreground">{c.sent_count}{c.failed_count > 0 && <span className="text-destructive-ink"> ({t("phishing.sends_failed", { n: c.failed_count })})</span>}</TableCell>
                       <TableCell className="px-4 py-3 sm:py-3.5 text-right text-muted-foreground">{c.open_count}</TableCell>
                       <TableCell className="px-4 py-3 sm:py-3.5 text-right text-muted-foreground">{c.cred_count}</TableCell>
+                      <TableCell className="px-4 py-3 sm:py-3.5 text-right text-muted-foreground text-xs">{c.created_by || "-"}</TableCell>
                       <TableCell className="px-4 py-3 sm:py-3.5 text-right">
                         {c.status === "draft" && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-xs" disabled={launchingId === cid} onClick={() => handleLaunch(cid)} className="text-primary hover:text-primary dark:hover:text-primary mr-3" aria-label={t("phishing.launch")} />}><Play className="size-4" /></TooltipTrigger><TooltipContent>{t("phishing.launch")}</TooltipContent></Tooltip>}
                         {c.status === "running" && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-xs" onClick={() => { void stopCampaign(cid); }} className="text-warning-ink hover:text-warning-ink/80 mr-3" aria-label={t("phishing.stop")} />}><Square className="size-4" /></TooltipTrigger><TooltipContent>{t("phishing.stop")}</TooltipContent></Tooltip>}
