@@ -39,6 +39,13 @@ func TestTagsAndGroupsAreTenantScoped(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("tenant 1 tag create = %d (%s)", w.Code, w.Body.String())
 	}
+	var storedTag db.AgentTag
+	if err := s.db.Where("name = ?", "critical").First(&storedTag).Error; err != nil {
+		t.Fatalf("load created tag: %v", err)
+	}
+	if storedTag.CreatedBy != "op" {
+		t.Fatalf("tag created_by = %q, want the calling operator %q", storedTag.CreatedBy, "op")
+	}
 	groupBody, _ := json.Marshal(map[string]string{"name": "sekrit-group"})
 	c, w = ctxFor(http.MethodPost, "/api/groups", groupBody, 1)
 	c.Params = gin.Params{}

@@ -1515,8 +1515,11 @@ type AgentTag struct {
 	Name string `gorm:"size:100;not null;uniqueIndex:idx_agent_tags_tenant_name,priority:2" json:"name"`
 	// Uniqueness is per tenant: a global unique index made tenant B unable to create a tag
 	// called "critical" because tenant A had one.
-	TenantID  uint       `gorm:"index;uniqueIndex:idx_agent_tags_tenant_name,priority:1" json:"tenant_id"`
-	Color     string     `gorm:"size:7;default:#3498db" json:"color"` // hex color
+	TenantID uint   `gorm:"index;uniqueIndex:idx_agent_tags_tenant_name,priority:1" json:"tenant_id"`
+	Color    string `gorm:"size:7;default:#3498db" json:"color"` // hex color
+	// CreatedBy records which operator created the tag (attribution, not a
+	// scope: tenantScope is the isolation boundary), matching GroupsPage.
+	CreatedBy string     `gorm:"size:100" json:"created_by,omitempty"`
 	CreatedAt time.Time  `json:"created_at"`
 	UpdatedAt time.Time  `json:"updated_at"`
 	Agents    []*Implant `gorm:"many2many:agent_tag_assignments;" json:"agents,omitempty"`

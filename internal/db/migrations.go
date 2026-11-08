@@ -1245,6 +1245,17 @@ var indexMigrations = []*gormigrate.Migration{
 			return nil
 		},
 	},
+	{
+		ID: "2026-11-08-add-agent-tag-created-by",
+		Migrate: func(tx *gorm.DB) error {
+			execMigration(tx, "ALTER TABLE agent_tags ADD COLUMN created_by VARCHAR(100) DEFAULT ''", "add_agent_tags_created_by")
+			return nil
+		},
+		Rollback: func(tx *gorm.DB) error {
+			execMigration(tx, "ALTER TABLE agent_tags DROP COLUMN created_by", "drop_agent_tags_created_by")
+			return nil
+		},
+	},
 }
 
 // Migrations is the combined migration history, kept for tooling and tests.

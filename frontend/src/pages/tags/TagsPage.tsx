@@ -25,6 +25,7 @@ interface Tag {
   color: string;
   agent_count: number;
   created_at: string;
+  created_by?: string;
   updated_at: string;
 }
 
@@ -200,7 +201,7 @@ export default function TagsPage() {
                 </div>
               </div>
               <div className="text-xs text-muted-foreground">
-                <span>{t("tags.created")} {tag.created_at ? formatTime(tag.created_at) : "-"}</span>
+                <span>{t("tags.created")} {tag.created_at ? formatTime(tag.created_at) : "-"}{tag.created_by ? ` · ${t("groups.created_by")} ${tag.created_by}` : ""}</span>
               </div>
             </Card>
           ))}

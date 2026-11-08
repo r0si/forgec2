@@ -77,6 +77,7 @@ func (s *Server) handleAPITagCreate(c *gin.Context) {
 		// Tags are per tenant now: uniqueness is (tenant_id, name), so two tenants can each
 		// have a "critical" tag without colliding.
 		TenantID:  s.currentTenantID(c),
+		CreatedBy: c.GetString("user"),
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
