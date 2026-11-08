@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"fmt"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -462,6 +463,66 @@ func TestSearchRanksRareTermAboveCommonTerm(t *testing.T) {
 		if results[i].Score > results[0].Score {
 			t.Fatalf("scores not descending at %d: %+v", i, results)
 		}
+	}
+}
+
+// TestSearchRanksDistinctiveChunkFirstAtScale pins the ranking contract on a
+// corpus where ranking actually matters: 200 chunks share the ubiquitous
+// query term, and exactly one holds the distinctive term. The IDF-weighted
+// scorer must still surface that one chunk first — a flat match count would
+// tie-all and bury it.
+func TestSearchRanksDistinctiveChunkFirstAtScale(t *testing.T) {
+	s := knowledgeTestServer(t)
+	principal := aiPrincipal{UserID: 1, Username: "alice", TenantID: 1, Role: db.RoleAdmin}
+
+	collection := db.AIKnowledgeCollection{TenantID: 1, OwnerID: 1, Name: "recall"}
+	if err := s.db.Create(&collection).Error; err != nil {
+		t.Fatal(err)
+	}
+	source := db.AIKnowledgeSource{TenantID: 1, CollectionID: collection.ID, Name: "recall-src"}
+	if err := s.db.Create(&source).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	const corpus = 200
+	chunks := make([]db.AIKnowledgeChunk, 0, corpus)
+	for i := 0; i < corpus-1; i++ {
+		chunks = append(chunks, db.AIKnowledgeChunk{
+			TenantID: 1, CollectionID: collection.ID, SourceID: source.ID,
+			Position: i, Content: fmt.Sprintf("ubiquitous routine operations filler %04d", i),
+			SearchTokens: s.blindAIKnowledgeTokens(fmt.Sprintf("ubiquitous routine operations filler %04d", i)),
+		})
+	}
+	chunks = append(chunks, db.AIKnowledgeChunk{
+		TenantID: 1, CollectionID: collection.ID, SourceID: source.ID,
+		Position: corpus - 1, Content: "unique distinctivetarget chunk",
+		SearchTokens: s.blindAIKnowledgeTokens("unique distinctivetarget chunk"),
+	})
+	if err := s.db.CreateInBatches(&chunks, 50).Error; err != nil {
+		t.Fatalf("seed %d chunks: %v", corpus, err)
+	}
+	for _, chunk := range chunks {
+		if err := s.db.Exec("INSERT INTO ai_knowledge_fts(chunk_id, tokens) VALUES(?, ?)", chunk.ID, chunk.SearchTokens).Error; err != nil {
+			t.Fatalf("seed fts: %v", err)
+		}
+	}
+
+	results, err := s.searchAIKnowledge(principal, aiKnowledgeSearchRequest{
+		Query: "ubiquitous distinctivetarget", CollectionIDs: []uint{collection.ID}, Limit: 10,
+	})
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if len(results) == 0 {
+		t.Fatal("expected results")
+	}
+	if !strings.Contains(results[0].Content, "distinctivetarget") {
+		t.Fatalf("distinctive chunk not first in %v", results[:min(3, len(results))])
+	}
+	// The runner-up can only have matched the ubiquitous term: its score must
+	// be strictly below the distinctive chunk's.
+	if len(results) > 1 && results[1].Score >= results[0].Score {
+		t.Fatalf("expected strict separation, got %+v", results[:2])
 	}
 }
 

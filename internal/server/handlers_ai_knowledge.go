@@ -531,12 +531,16 @@ func (s *Server) searchAIKnowledge(principal aiPrincipal, req aiKnowledgeSearchR
 	// failed statement per search.
 	useIndex := s.aiKnowledgeFTSEnabled()
 	if useIndex {
+		// No fixed LIMIT here: like the PostgreSQL per-term fan-out, candidates are
+		// ALL chunks the MATCH hits, and Go ranks them after. The previous
+		// LIMIT 100 could silently drop the distinctive chunk behind 100+
+		// ubiquitous matches (proven by TestSearchRanksDistinctiveChunkFirstAtScale).
 		var indexedIDs []uint
 		matchTerms := make([]string, 0, len(hashed))
 		for _, token := range hashed {
 			matchTerms = append(matchTerms, `"`+token+`"`)
 		}
-		if err := s.db.Raw("SELECT CAST(chunk_id AS INTEGER) FROM ai_knowledge_fts WHERE tokens MATCH ? LIMIT 100", strings.Join(matchTerms, " OR ")).Scan(&indexedIDs).Error; err != nil {
+		if err := s.db.Raw("SELECT CAST(chunk_id AS INTEGER) FROM ai_knowledge_fts WHERE tokens MATCH ?", strings.Join(matchTerms, " OR ")).Scan(&indexedIDs).Error; err != nil {
 			useIndex = false
 		} else if len(indexedIDs) == 0 {
 			return []aiKnowledgeSearchResult{}, nil
