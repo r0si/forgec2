@@ -34,7 +34,7 @@ stamp=$(date +%F-%H%M%S)
 file="$OUT/forgec2-$stamp.sql.gz"
 
 PGPASSWORD="$DB_PASSWORD" pg_dump -h 127.0.0.1 -U forgec2 -d forgec2 \
-  --compress=6 --no-owner --no-privileges | gzip > "$file.tmp"
+  --no-owner --no-privileges | gzip > "$file.tmp"
 mv "$file.tmp" "$file"
 echo "backup written: $file ($(stat -c%s "$file") bytes)"
 

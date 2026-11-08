@@ -131,6 +131,15 @@ install it with:
 sudo install -m 0644 deploy/demo/logrotate.conf /etc/logrotate.d/forgec2-demo
 ```
 
+A backup is only real once it has been restored somewhere. `restore-drill.sh`
+restores the newest dump into a scratch database on the same cluster and
+compares row counts on the tables that matter (needs sudo access to the
+postgres superuser for database creation):
+
+```bash
+sudo bash deploy/demo/restore-drill.sh
+```
+
 Back up with `deploy/demo/backup.sh` (the built-in backup is SQLite-only and
 logs a warning under PostgreSQL). It reads `DB_PASSWORD` from the same `.env`
 as the server, writes a gzipped dump to `/var/backups/forgec2-demo/` and
