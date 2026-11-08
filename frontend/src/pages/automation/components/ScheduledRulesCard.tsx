@@ -286,6 +286,7 @@ export function ScheduledRulesCard({ onChanged }: { onChanged?: () => void }) {
                     <span className="inline-flex items-center gap-1"><Calendar className="size-3.5" />{task.schedule}</span>
                     {task.next_run && <span className="inline-flex items-center gap-1"><Clock className="size-3.5" />{t("scheduler.next")}: {formatTime(task.next_run)}</span>}
                     {task.last_run && <span className="text-muted-foreground">{t("scheduler.last")}: {formatTime(task.last_run)}</span>}
+                    {task.created_by && <span className="text-muted-foreground">{t("groups.created_by")} {task.created_by}</span>}
                   </div>
                 </div>
                 <div className="flex gap-1 shrink-0">
