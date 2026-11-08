@@ -263,9 +263,13 @@ export default function BOFListTab({ files, loading, onUpload, onDelete, onRun, 
                 <span className="text-sm text-muted-foreground">{t("bof.description")}</span>
                 <span className="text-sm text-foreground max-w-[60%] text-right">{showInfo.description || "-"}</span>
               </div>
-              <div className="flex justify-between py-2">
+              <div className="flex justify-between py-2 border-b border-border">
                 <span className="text-sm text-muted-foreground">{t("bof.uploaded")}</span>
                 <span className="text-sm text-foreground">{showInfo.created_at || "-"}</span>
+              </div>
+              <div className="flex justify-between py-2">
+                <span className="text-sm text-muted-foreground">{t("groups.created_by")}</span>
+                <span className="text-sm text-foreground">{showInfo.created_by || showInfo.CreatedBy || "-"}</span>
               </div>
             </div>
           )}
