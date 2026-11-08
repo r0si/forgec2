@@ -3,6 +3,7 @@ export interface SavedScript {
   name?: string;
   code?: string;
   created_at?: string;
+  created_by?: string;
 }
 
 export interface ScriptRun {

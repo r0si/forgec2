@@ -411,14 +411,16 @@ func (e *ScriptEngine) UnloadScript(name string) {
 // the bridge (sendTask/getAgent/listAgents/httpRequest/query/sleep).
 
 type Script struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	Code        string    `json:"code"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
-	RunCount    int       `json:"run_count"`
-	LastRun     time.Time `json:"last_run"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Code        string `json:"code"`
+	// CreatedBy attributes a script to its operator; empty for historic rows.
+	CreatedBy string    `json:"created_by,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	RunCount  int       `json:"run_count"`
+	LastRun   time.Time `json:"last_run"`
 }
 
 type ExecutionResult struct {

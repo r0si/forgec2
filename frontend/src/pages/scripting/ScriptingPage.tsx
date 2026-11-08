@@ -305,10 +305,13 @@ export default function ScriptingPage() {
                   ) : (
                     savedScripts.map((s) => (
                       <div key={s.id} className="flex items-center justify-between px-4 py-2.5 border-b border-border hover:bg-muted transition-colors">
-                        <Button variant="ghost" size="sm" onClick={() => handleLoadScript(s)} className="text-sm text-muted-foreground hover:text-primary truncate text-left flex-1 justify-start">
-                          {s.name || t("scripting.untitled")}
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleDeleteScript(s)} className="text-muted-foreground hover:text-destructive-ink ml-2" aria-label={t("scripting.delete_title")}>
+                        <div className="flex-1 min-w-0">
+                          <Button variant="ghost" size="sm" onClick={() => handleLoadScript(s)} className="text-sm text-muted-foreground hover:text-primary truncate text-left justify-start w-full p-0">
+                            {s.name || t("scripting.untitled")}
+                          </Button>
+                          {s.created_by && <p className="text-xs-sm text-muted-foreground">{t("groups.created_by")} {s.created_by}</p>}
+                        </div>
+                        <Button variant="ghost" size="sm" onClick={() => handleDeleteScript(s)} className="text-muted-foreground hover:text-destructive-ink ml-2 shrink-0" aria-label={t("scripting.delete_title")}>
                           <Trash2 className="size-4" />
                         </Button>
                       </div>

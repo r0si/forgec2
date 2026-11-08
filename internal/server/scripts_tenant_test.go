@@ -51,6 +51,12 @@ func TestScriptsAreTenantScoped(t *testing.T) {
 	if bytes.Contains(w.Body.Bytes(), []byte("sekrit-code")) {
 		t.Fatalf("tenant 2 listed tenant 1's script code: %s", w.Body.String())
 	}
+	// 1b. The owner sees the creator attribution.
+	c, w = ctxFor(http.MethodGet, "/api/scripting/scripts", nil, 1)
+	s.handleAPIGetScripts(c)
+	if !bytes.Contains(w.Body.Bytes(), []byte("tenant1-admin")) {
+		t.Fatalf("owner does not see the script creator attribution: %s", w.Body.String())
+	}
 
 	// 2. Editing by id cannot overwrite it.
 	patch, _ := json.Marshal(map[string]string{

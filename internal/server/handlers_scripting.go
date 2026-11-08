@@ -69,6 +69,7 @@ func (s *Server) listScriptsFromDB(c *gin.Context) ([]scripting.Script, error) {
 			Name:        row.Name,
 			Description: row.Description,
 			Code:        row.Code,
+			CreatedBy:   row.CreatedBy,
 			CreatedAt:   row.CreatedAt,
 			UpdatedAt:   row.UpdatedAt,
 			RunCount:    row.RunCount,
