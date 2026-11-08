@@ -261,6 +261,7 @@ export default function PhishingPageContent() {
                   <TableHead className="text-left px-4 py-3 sm:py-3.5">{t("phishing.col_subject")}</TableHead>
                   <TableHead className="text-left px-4 py-3 sm:py-3.5">{t("phishing.col_from")}</TableHead>
                   <TableHead className="text-left px-4 py-3 sm:py-3.5">{t("phishing.col_type")}</TableHead>
+                  <TableHead className="text-left px-4 py-3 sm:py-3.5">{t("groups.created_by")}</TableHead>
                   <TableHead className="text-right px-4 py-3 sm:py-3.5">{t("phishing.col_actions")}</TableHead>
                 </TableRow>
               </TableHeader>
@@ -273,6 +274,7 @@ export default function PhishingPageContent() {
                       <TableCell className="px-4 py-3 sm:py-3.5 text-muted-foreground max-w-[200px] truncate">{tpl.subject}</TableCell>
                       <TableCell className="px-4 py-3 sm:py-3.5 text-muted-foreground">{tpl.from_name || tpl.from_email}</TableCell>
                       <TableCell className="px-4 py-3 sm:py-3.5"><Badge variant="outline">{tpl.type}</Badge></TableCell>
+                      <TableCell className="px-4 py-3 sm:py-3.5 text-muted-foreground text-xs">{tpl.created_by || "-"}</TableCell>
                       <TableCell className="px-4 py-3 sm:py-3.5 text-right">
                         <Button variant="ghost" size="icon-xs" onClick={() => handleEditTpl(tpl)} className="text-muted-foreground hover:text-primary mr-3" aria-label={t("phishing.a11y_edit_template")}><Pencil className="size-4" /></Button>
                         <Button variant="ghost" size="icon-xs" onClick={() => handleDeleteTpl(tid)} className="text-muted-foreground hover:text-destructive-ink" aria-label={t("phishing.a11y_delete_template")}><Trash2 className="size-4" /></Button>
