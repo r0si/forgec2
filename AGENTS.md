@@ -21,6 +21,29 @@ The `bash` tool runs **PowerShell 5.1**, not bash. Adapt accordingly:
 - Every numbers claim (floors, measurements) is updated in the same commit
   that raises it — a floor never raised stops guarding anything.
 
+### Objective acceptance criteria ("提升C2功能，优化产品体验")
+
+The objective is open-ended and has no natural terminal state. This
+repository measures "improved" against the following concrete, checkable
+criteria instead of vibes:
+
+| # | Criterion | Current threshold |
+|---|---|---|
+| 1 | CI on the tip is `completed/success` (fuzz skipped) | yes |
+| 2 | `npm run check` green (nav-perms 44/44, bundle ≤ 900kB critical / 5.0MB total, webdist byte-identical) | yes |
+| 3 | Gosec at 0 findings (windows target 1 staticcheck headroom, linux 0) | yes (65 → 0) |
+| 4 | Go statement coverage ≥ 58% | 59.1% measured |
+| 5 | Frontend statements ≥ 36.5% | 37.91% measured |
+| 6 | Demo image pin matches GHCR `edge` digest; boot log error patterns at 0; read-only boundary assertions green | yes |
+| 7 | Wiki / Pages / sitemap live with 200s | yes |
+| 8 | Knowledge search: recall@5 regression test green in CI over a 200-chunk corpus (SQLite path) | yes |
+| 9 | Demo backup restore drill: row counts match after a real restore | yes |
+
+A round that leaves any of 1–9 red is not done; a round that holds all of
+them while shipping a feature or gate is on-goal, regardless of how many
+times the goal can be re-chosen. New criteria are added here when a new
+class of regression is worth gating.
+
 ## Project overview
 ForgeC2 is a mature Go (net/http + sqlite) C2 server plus a Vite + React TypeScript frontend.
 - Server binary: `forgec2-server.exe` (built with `go build ./cmd/server`).
