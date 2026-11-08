@@ -526,6 +526,68 @@ func TestSearchRanksDistinctiveChunkFirstAtScale(t *testing.T) {
 	}
 }
 
+// TestSearchRecallAtFiveIsComplete is the recall gate: every chunk holding
+// the distinctive query term must land in the top 5. Runs on the SQLite
+// harness so CI enforces the ranking contract deterministically; the
+// PostgreSQL BenchmarkAISearchKnowledgeLat measures the same contract at
+// corpus scale locally.
+func TestSearchRecallAtFiveIsComplete(t *testing.T) {
+	s := knowledgeTestServer(t)
+	principal := aiPrincipal{UserID: 1, Username: "alice", TenantID: 1, Role: db.RoleAdmin}
+
+	collection := db.AIKnowledgeCollection{TenantID: 1, OwnerID: 1, Name: "recall5"}
+	if err := s.db.Create(&collection).Error; err != nil {
+		t.Fatal(err)
+	}
+	source := db.AIKnowledgeSource{TenantID: 1, CollectionID: collection.ID, Name: "recall5-src"}
+	if err := s.db.Create(&source).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	const corpus = 200
+	const distinctN = 5
+	chunks := make([]db.AIKnowledgeChunk, 0, corpus)
+	for i := 0; i < corpus-distinctN; i++ {
+		body := fmt.Sprintf("ubiquitous filler material %04d", i)
+		chunks = append(chunks, db.AIKnowledgeChunk{
+			TenantID: 1, CollectionID: collection.ID, SourceID: source.ID,
+			Position: i, Content: body,
+			SearchTokens: s.blindAIKnowledgeTokens(body),
+		})
+	}
+	for i := 0; i < distinctN; i++ {
+		body := fmt.Sprintf("distinctivetarget finding %d of sharing quota crisis", i)
+		chunks = append(chunks, db.AIKnowledgeChunk{
+			TenantID: 1, CollectionID: collection.ID, SourceID: source.ID,
+			Position: corpus - distinctN + i, Content: body,
+			SearchTokens: s.blindAIKnowledgeTokens(body),
+		})
+	}
+	if err := s.db.CreateInBatches(&chunks, 50).Error; err != nil {
+		t.Fatalf("seed %d chunks: %v", corpus, err)
+	}
+	for _, chunk := range chunks {
+		if err := s.db.Exec("INSERT INTO ai_knowledge_fts(chunk_id, tokens) VALUES(?, ?)", chunk.ID, chunk.SearchTokens).Error; err != nil {
+			t.Fatalf("seed fts: %v", err)
+		}
+	}
+
+	results, err := s.searchAIKnowledge(principal, aiKnowledgeSearchRequest{
+		Query: "distinctivetarget", CollectionIDs: []uint{collection.ID}, Limit: 5,
+	})
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+	if len(results) != distinctN {
+		t.Fatalf("recall@5: got %d results, want all %d distinctive chunks", len(results), distinctN)
+	}
+	for _, r := range results {
+		if !strings.Contains(r.Content, "distinctivetarget") {
+			t.Fatalf("non-distinctive chunk inside the top 5: %+v", r)
+		}
+	}
+}
+
 func TestTruncateAIRunes(t *testing.T) {
 	if got := truncateAIRunes("short", 10); got != "short" {
 		t.Fatalf("short value changed: %q", got)
