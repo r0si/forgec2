@@ -535,6 +535,11 @@ var allowedInfoKeys = map[string]bool{
 	"peer_count": true, "tags": true, "note": true, "encoding": true,
 	"listener_id": true, "interval": true, "jitter": true, "active_window": true,
 	"env_threat_score": true, "env_honeypot": true, "env_class": true,
+	// tls_profile is the uTLS ClientHello preset the agent was built with. It
+	// was reported by every beacon and missing from this allowlist, so the
+	// column stayed empty in every real deployment while the direct-seed test
+	// passed. Any info key the agent sends MUST be declared here.
+	"tls_profile": true,
 }
 
 const maxInfoValueLen = 512

@@ -23,6 +23,11 @@
 #     (shell is ops-profile-aware: a host the agent classifies as a sandbox
 #     refuses it by design, so the script asserts that refusal instead of the
 #     marker; read/task output is base64 on the wire and plain text once stored)
+#   * asserts the agent's reported TLS fingerprint: "chrome_auto (default)" when
+#     -TLSFingerprint is omitted, or the requested value ("random", "firefox",
+#     ...). This is the only observable proof that the option survived
+#     option -> config blob -> binary -> check-in; CI runs it with "random" and
+#     with a pinned profile.
 #   * with -Modules (comma-separated include list, e.g. "core") it also
 #     exercises the honest exclusion layer end to end: a task owned by an
 #     excluded module must fail with the named "not compiled into this build"
@@ -42,6 +47,13 @@ param(
     # Comma-separated agent module include list (empty = every module, "core" =
     # the minimal build). See docs/AGENT_MODULES.md.
     [string]$Modules,
+    # TLS ClientHello option for the generated agent (JA3/JA4). Empty keeps the
+    # stable Chrome Auto default; "random" rotates a browser profile per
+    # handshake; a profile name ("chrome", "firefox", "safari", "edge", "ios",
+    # "android", "360", "qq") pins one. The run asserts the agent reports the
+    # configured profile at check-in, which is the only observable proof that
+    # the option reached the binary.
+    [string]$TLSFingerprint = '',
     [ValidateSet('auto', 'windows', 'linux')][string]$TargetOs = 'auto',
     [int]$BuildTimeoutSec = 900,
     [int]$TaskTimeoutSec = 120,
@@ -270,6 +282,7 @@ try {
     # interval=2 keeps the round-trip fast; the clamp floor is 1s.
     $genForm = "listener_id=$listenerId&interval=2&jitter=0&filename=$agentName"
     if ($Modules) { $genForm += "&modules=$Modules" }
+    if ($TLSFingerprint) { $genForm += "&tls_fingerprint=$([uri]::EscapeDataString($TLSFingerprint))" }
     $gen = Api-PostForm "$base$genPath" $genForm "$WorkDir/generate.json"
     if (-not $gen.success) { throw "generate request failed: $(Get-Content "$WorkDir/generate.json" -Raw)" }
     $buildId = $gen.data.build_id
@@ -359,6 +372,17 @@ try {
     if (-not $agentId) { throw 'the agent never registered' }
     Write-Host "  agent $agentId status=$agentStatus host=$($agentInfo.hostname) os=$($agentInfo.os)/$($agentInfo.arch)"
     if ($agentStatus -ne 'online') { throw "agent is not online: $agentStatus" }
+
+    # The TLS fingerprint option must survive option -> config blob -> binary ->
+    # check-in. The agent reports the CONFIGURED profile (it cannot measure its
+    # own ClientHello), so this asserts exactly "the build carried what was
+    # asked", including the stable default when the option is omitted.
+    $wantProfile = 'chrome_auto (default)'
+    if ($TLSFingerprint -and $TLSFingerprint.ToLowerInvariant() -ne 'stable') {
+        $wantProfile = $TLSFingerprint.ToLowerInvariant()
+    }
+    Check 'agent reports the built TLS profile' ($agentInfo.tls_profile -eq $wantProfile) `
+        "(got '$($agentInfo.tls_profile)', want '$wantProfile')"
 
     Step '8/9 create the file fixtures and dispatch tasks'
     $markerHex = New-Hex 6
