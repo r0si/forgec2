@@ -4,17 +4,26 @@ import { api } from "@/lib/api";
 import { paths } from "@/lib/api-paths";
 import { isEditableTarget, tabFromDigit } from "@/lib/interact-workspace";
 import { shouldCloseOnNavigate, useInteractStore } from "@/lib/interact-store";
+import { registerFragment } from "@/lib/i18n";
 
 // The dock body lives under src/pages/beacons, so a static import here drags
 // page JS into the entry graph even though the dock is closed on first paint.
 // Measured: the entry chunk carried ~900 kB of route JS that no first-paint
 // screen touches. Lazy keeps the dock out of the initial download and loads it
 // the first time one is actually opened.
-const AgentInteractDock = lazy(() =>
-  import("@/pages/beacons/components/AgentInteractDock").then((m) => ({
-    default: m.AgentInteractDock,
-  })),
-);
+//
+// It also registers the agents dictionary fragment in the same round trip: the
+// dock renders agents.* labels and can be opened from ANY page (dashboard,
+// events, ...), whose entry does not load the beacon pages' fragment. Registering
+// it here — not at module scope — keeps the 53 kB out of first paint.
+const AgentInteractDock = lazy(async () => {
+  const [{ enAgents }, m] = await Promise.all([
+    import("@/lib/i18n/fragments/en.agents"),
+    import("@/pages/beacons/components/AgentInteractDock"),
+  ]);
+  registerFragment(enAgents);
+  return { default: m.AgentInteractDock };
+});
 
 export default function GlobalInteractDock() {
   const navigate = useNavigate();
