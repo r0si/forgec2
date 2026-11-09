@@ -179,6 +179,31 @@ counts fragment keys as defined English keys, and `e2e/layout.spec.ts` asserts
 `/beacons` pulls `i18n-agents` (not just `en`) and that neither page renders a
 raw dotted key.
 
+## Deferred toaster (2026-11)
+
+`sonner` (33,562 B / ~9.5 kB gzip) was a first-paint chunk because the root
+`main.tsx` imported `<Toaster>` and the always-mounted shell components
+(`UpdateBanner`, `UpdateDialog`, `SessionTimeoutWarning`, `WsOutboxToast`, the
+topbar notification/user dropdowns, `SavedViewPicker`, `useErrorToast`) imported
+`toast` statically.
+
+Now the toaster is not part of first paint at all:
+
+| | Before | After |
+| --- | --- | --- |
+| entry critical path | 745 kB | **713 kB** (12 chunks) |
+| `vendor-sonner-*.js` | preloaded (33 kB) | fetched on the first toast, or at idle in the authenticated shell (`DeferredToaster`) |
+| login page | fetched sonner | 0 sonner bytes |
+
+`lib/toast.ts#toastSoon(fn)` loads sonner on demand and caches it; every shell
+call site uses it (the action still completes if the chunk fails). `DeferredToaster`
+mounts `<Toaster>` on the first idle window (2 s timeout, 1.5 s timer where
+`requestIdleCallback` is missing) inside `MainLayout`, so signed-out screens
+never mount it. sonner keeps toasts in its store, so one fired before the
+toaster mounts is still shown once it does. `check-bundle` was tightened
+**800 → 740 kB**: 27 kB of headroom, less than the 33 kB chunk this removed, so
+re-importing sonner into the entry trips the gate.
+
 ## First-paint JS split (2026-11)
 
 Two atomic vendor buckets charged the entry for page-only modules:

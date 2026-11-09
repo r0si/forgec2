@@ -1,4 +1,4 @@
-import { act, render } from "@testing-library/react";
+import { act, render, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { toast } from "sonner";
 import WsOutboxToast from "./WsOutboxToast";
@@ -22,13 +22,13 @@ describe("WsOutboxToast", () => {
     vi.clearAllMocks();
   });
 
-  it("toasts the cumulative drop count with a stable id", () => {
+  it("toasts the cumulative drop count with a stable id", async () => {
     const { unmount } = renderToast();
     try {
       act(() => {
         window.dispatchEvent(new CustomEvent(WS_OUTBOX_DROP_EVENT, { detail: { dropped: 3 } }));
       });
-      expect(vi.mocked(toast.warning)).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect(vi.mocked(toast.warning)).toHaveBeenCalledTimes(1));
       const [msg, opts] = vi.mocked(toast.warning).mock.calls[0];
       expect(String(msg)).toContain("3");
       expect(opts).toMatchObject({ id: "ws-outbox-drop" });

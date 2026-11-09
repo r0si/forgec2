@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { toast } from "sonner";
+import { toastSoon } from "@/lib/toast";
 import { useI18n } from "@/lib/i18n";
 import { useConfirm } from "@/lib/hooks/useConfirm";
 import { useSavedViews } from "@/lib/hooks/useSavedViews";
@@ -39,9 +39,9 @@ export default function SavedViewPicker({ page, getState, applyState }: SavedVie
     try {
       const state = JSON.parse(view.state) as Record<string, unknown>;
       applyState(state);
-      toast.success(t("savedviews.applied", { name: view.name }));
+      toastSoon((toast) => toast.success(t("savedviews.applied", { name: view.name })));
     } catch {
-      toast.error(t("savedviews.corrupt"));
+      toastSoon((toast) => toast.error(t("savedviews.corrupt")));
     }
   };
 
@@ -60,9 +60,9 @@ export default function SavedViewPicker({ page, getState, applyState }: SavedVie
       setSelectedId("");
       setNaming(false);
       setNameInput("");
-      toast.success(t("savedviews.saved"));
+      toastSoon((toast) => toast.success(t("savedviews.saved")));
     } catch {
-      toast.error(t("savedviews.save_failed"));
+      toastSoon((toast) => toast.error(t("savedviews.save_failed")));
     }
   };
 
@@ -74,9 +74,9 @@ export default function SavedViewPicker({ page, getState, applyState }: SavedVie
     try {
       await remove(view.id);
       setSelectedId("");
-      toast.success(t("savedviews.deleted"));
+      toastSoon((toast) => toast.success(t("savedviews.deleted")));
     } catch {
-      toast.error(t("savedviews.delete_failed"));
+      toastSoon((toast) => toast.error(t("savedviews.delete_failed")));
     }
   };
 

@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { toast } from "sonner";
+import { toastSoon } from "@/lib/toast";
 import { useI18n } from "@/lib/i18n";
 import { WS_OUTBOX_DROP_EVENT } from "@/lib/wsContext";
 
@@ -14,7 +14,7 @@ export default function WsOutboxToast() {
   useEffect(() => {
     const onDrop = (e: Event) => {
       const dropped = (e as CustomEvent<{ dropped?: number }>).detail?.dropped ?? 1;
-      toast.warning(t("network.outbox_dropped", { n: dropped }), { id: "ws-outbox-drop" });
+      toastSoon((toast) => toast.warning(t("network.outbox_dropped", { n: dropped }), { id: "ws-outbox-drop" }));
     };
     window.addEventListener(WS_OUTBOX_DROP_EVENT, onDrop);
     return () => window.removeEventListener(WS_OUTBOX_DROP_EVENT, onDrop);

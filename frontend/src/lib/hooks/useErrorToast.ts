@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { toast } from "sonner";
+import { toastSoon } from "@/lib/toast";
 import { normalizeError, resolveErrorText, type NormalizedError } from "@/lib/errors";
 import { useI18n } from "@/lib/i18n";
 
@@ -37,13 +37,13 @@ export function useErrorToast() {
 
   const toastError = useCallback(
     (err: unknown, fallbackKey = "common.error", fallbackParams?: Record<string, number | string>) =>
-      emit((msg) => toast.error(msg), err, fallbackKey, fallbackParams),
+      emit((msg) => toastSoon((toast) => toast.error(msg)), err, fallbackKey, fallbackParams),
     [emit],
   );
 
   const warnError = useCallback(
     (err: unknown, fallbackKey = "common.error", fallbackParams?: Record<string, number | string>) =>
-      emit((msg) => toast.warning(msg), err, fallbackKey, fallbackParams),
+      emit((msg) => toastSoon((toast) => toast.warning(msg)), err, fallbackKey, fallbackParams),
     [emit],
   );
 

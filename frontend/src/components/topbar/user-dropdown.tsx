@@ -4,7 +4,7 @@ import { useI18n } from "@/lib/i18n";
 import { useAppStore } from "@/lib/store";
 import { api } from "@/lib/api";
 import { paths } from "@/lib/api-paths";
-import { toast } from "sonner";
+import { toastSoon } from "@/lib/toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -50,7 +50,7 @@ export function UserDropdown() {
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive"
-          onClick={() => { api.post(paths.auth.logout).catch(() =>         toast.error(t("topbar.toast.logout_failed"))).finally(() => navigate("/login")); }}>
+          onClick={() => { api.post(paths.auth.logout).catch(() =>         toastSoon((toast) => toast.error(t("topbar.toast.logout_failed")))).finally(() => navigate("/login")); }}>
           <LogOut className="size-4" />
           {t("topbar.logout")}
         </DropdownMenuItem>

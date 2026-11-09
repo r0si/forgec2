@@ -4,7 +4,7 @@ import { useWS } from "@/lib/wsContext";
 import { useI18n } from "@/lib/i18n";
 import { usePermissions } from "@/lib/hooks/usePermissions";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import { toastSoon } from "@/lib/toast";
 import { ArrowUpCircle, X } from "lucide-react";
 import { safeHref } from "@/lib/safeUrl";
 import { bannerSurface } from "@/components/ui/banner";
@@ -29,7 +29,7 @@ export default function UpdateBanner({ currentVersion }: { currentVersion?: stri
       const d = localStorage.getItem(DISMISS_KEY);
       if (d) Promise.resolve().then(() => setDismissed(true));
     } catch {
-      toast.error(t("update_banner.toast.storage_failed"));
+      toastSoon((toast) => toast.error(t("update_banner.toast.storage_failed")));
     }
   }, [t]);
 
@@ -41,7 +41,7 @@ export default function UpdateBanner({ currentVersion }: { currentVersion?: stri
         try {
           dismissedVer = localStorage.getItem(DISMISS_KEY);
         } catch {
-          toast.error(t("update_banner.toast.storage_failed"));
+          toastSoon((toast) => toast.error(t("update_banner.toast.storage_failed")));
         }
         if (!latest || dismissedVer === latest) return;
         setInfo({
@@ -66,7 +66,7 @@ export default function UpdateBanner({ currentVersion }: { currentVersion?: stri
     try {
       localStorage.setItem(DISMISS_KEY, info.latest);
     } catch {
-      toast.error(t("update_banner.toast.storage_failed"));
+      toastSoon((toast) => toast.error(t("update_banner.toast.storage_failed")));
     }
   };
 

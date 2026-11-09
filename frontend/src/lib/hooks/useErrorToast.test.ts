@@ -1,4 +1,4 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -31,7 +31,7 @@ describe("useErrorToast", () => {
     expect(returned?.kind).toBe("aborted");
   });
 
-  it("resolves mapped API errors through t", () => {
+  it("resolves mapped API errors through t", async () => {
     const { result } = renderHook(() => useErrorToast());
 
     act(() => {
@@ -39,10 +39,10 @@ describe("useErrorToast", () => {
     });
 
     expect(mocks.t).toHaveBeenCalledWith("common.forbidden", undefined);
-    expect(mocks.toast).toHaveBeenCalledWith("T:common.forbidden");
+    await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith("T:common.forbidden"));
   });
 
-  it("falls back to the raw message for unmapped errors", () => {
+  it("falls back to the raw message for unmapped errors", async () => {
     const { result } = renderHook(() => useErrorToast());
 
     act(() => {
@@ -50,10 +50,10 @@ describe("useErrorToast", () => {
     });
 
     expect(mocks.t).not.toHaveBeenCalled();
-    expect(mocks.toast).toHaveBeenCalledWith("disk offline");
+    await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith("disk offline"));
   });
 
-  it("falls back to the fallback key when the message is empty", () => {
+  it("falls back to the fallback key when the message is empty", async () => {
     const { result } = renderHook(() => useErrorToast());
 
     act(() => {
@@ -61,10 +61,10 @@ describe("useErrorToast", () => {
     });
 
     expect(mocks.t).toHaveBeenCalledWith("common.error");
-    expect(mocks.toast).toHaveBeenCalledWith("T:common.error");
+    await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith("T:common.error"));
   });
 
-  it("interpolates fallback params into the fallback key", () => {
+  it("interpolates fallback params into the fallback key", async () => {
     const { result } = renderHook(() => useErrorToast());
 
     act(() => {
@@ -72,10 +72,10 @@ describe("useErrorToast", () => {
     });
 
     expect(mocks.t).toHaveBeenCalledWith("settings.emergency.failed", { action: "arm" });
-    expect(mocks.toast).toHaveBeenCalledWith("T:settings.emergency.failed");
+    await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith("T:settings.emergency.failed"));
   });
 
-  it("warnError keeps a 409 approval outcome a warning with the backend text", () => {
+  it("warnError keeps a 409 approval outcome a warning with the backend text", async () => {
     const { result } = renderHook(() => useErrorToast());
 
     act(() => {
@@ -85,13 +85,13 @@ describe("useErrorToast", () => {
       );
     });
 
-    expect(mocks.warn).toHaveBeenCalledWith("destructive command needs approval");
+    await waitFor(() => expect(mocks.warn).toHaveBeenCalledWith("destructive command needs approval"));
     expect(mocks.toast).not.toHaveBeenCalled();
     // 409 is outcome-specific: the fallback key must not be consulted.
     expect(mocks.t).not.toHaveBeenCalled();
   });
 
-  it("warnError resolves a message-less conflict through the fallback key", () => {
+  it("warnError resolves a message-less conflict through the fallback key", async () => {
     const { result } = renderHook(() => useErrorToast());
 
     act(() => {
@@ -99,17 +99,17 @@ describe("useErrorToast", () => {
     });
 
     // An empty approval notice must not toast an empty string.
-    expect(mocks.warn).toHaveBeenCalledWith("T:agents.detail_command_send_failed");
+    await waitFor(() => expect(mocks.warn).toHaveBeenCalledWith("T:agents.detail_command_send_failed"));
   });
 
-  it("warnError maps server failures exactly like toastError does", () => {
+  it("warnError maps server failures exactly like toastError does", async () => {
     const { result } = renderHook(() => useErrorToast());
 
     act(() => {
       result.current.warnError({ status: 503, message: "boom" });
     });
 
-    expect(mocks.warn).toHaveBeenCalledWith("T:common.server_error");
+    await waitFor(() => expect(mocks.warn).toHaveBeenCalledWith("T:common.server_error"));
     expect(mocks.toast).not.toHaveBeenCalled();
   });
 

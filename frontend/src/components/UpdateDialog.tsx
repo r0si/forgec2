@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { AlertTriangle, ArrowUpCircle, RotateCw } from "lucide-react";
-import { toast } from "sonner";
+import { toastSoon } from "@/lib/toast";
 
 interface UpdateDialogInfo {
   latest: string;
@@ -83,7 +83,7 @@ export function UpdateDialog() {
       // get the confirmation toast.
     }
     if (updated) {
-      toast.success(t("update_dialog.updated_toast", { version: updated }));
+      toastSoon((toast) => toast.success(t("update_dialog.updated_toast", { version: updated })));
     }
   }, [t]);
 

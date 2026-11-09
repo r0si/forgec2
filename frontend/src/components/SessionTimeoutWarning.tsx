@@ -1,7 +1,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
+import { toastSoon } from "@/lib/toast";
 import { api } from "@/lib/api";
 import { paths } from "@/lib/api-paths";
 import { useI18n } from "@/lib/i18n";
@@ -60,11 +60,13 @@ export default function SessionTimeoutWarning() {
       if (shouldWarn && !toastShownRef.current) {
         toastShownRef.current = true;
         const minutes = Math.ceil(left / 60_000);
-        toast.warning(
-          minutes === 1
-            ? t("session.toast_minute")
-            : t("session.toast_minutes", { minutes }),
-          { duration: 10000 },
+        toastSoon((toast) =>
+          toast.warning(
+            minutes === 1
+              ? t("session.toast_minute")
+              : t("session.toast_minutes", { minutes }),
+            { duration: 10000 },
+          ),
         );
       }
     } finally {
@@ -89,7 +91,7 @@ export default function SessionTimeoutWarning() {
       if (status === 401) {
         window.location.href = "/login";
       } else {
-        toast.error(t("session.extend_failed"));
+        toastSoon((toast) => toast.error(t("session.extend_failed")));
       }
     }
   }, [check, t]);

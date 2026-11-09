@@ -51,7 +51,11 @@ const TOTAL_LIMIT_BYTES = 5.0 * 1024 * 1024;
 // (vendor-icons 67 -> 19 kB) and web-vitals (9 kB) out of first paint. 800 kB
 // leaves ~56 kB of ordinary headroom — less than the smallest route chunk
 // (~70 kB) — so a re-leak of one page chunk trips it.
-const CRITICAL_PATH_LIMIT_BYTES = 800 * 1024;
+// Re-measured again 2026-11-09: 713 kB after the toaster was deferred (sonner
+// 33.5 kB left the entry; it now loads on the first toast / on idle). Set to
+// 740 kB: ~27 kB of ordinary headroom, and putting any of the chunks just
+// removed (sonner 33 kB, agents dictionary 53 kB) back in first paint trips it.
+const CRITICAL_PATH_LIMIT_BYTES = 740 * 1024;
 // Measured 2026-11-09: Inter 210 kB + JetBrains Mono 55 kB after the Latin/UI
 // subset (was 350 + 72 = 422 kB as the full families). 300 kB leaves ~35 kB of
 // headroom; restoring either full font trips it.

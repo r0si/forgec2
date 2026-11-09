@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTypedWS, isWSEvent } from "@/lib/typed-ws";
 import { useI18n } from "@/lib/i18n";
-import { toast } from "sonner";
+import { toastSoon } from "@/lib/toast";
 import { api } from "@/lib/api";
 import { paths } from "@/lib/api-paths";
 import { formatTime, nowTime } from "@/lib/utils";
@@ -190,7 +190,7 @@ export function NotificationDropdown() {
           idsPresent.has(n.id) && !n.read ? { ...n, read: false } : n,
         ),
       );
-      toast.error(t("topbar.notif.mark_read_failed"));
+      toastSoon((toast) => toast.error(t("topbar.notif.mark_read_failed")));
     });
   };
   const typeColors: Record<string, string> = {

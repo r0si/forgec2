@@ -11,6 +11,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import AppLayout from "@/components/AppLayout";
 import RouterErrorView from "@/components/RouterErrorView";
 import { useCurrentUserBootstrap } from "@/components/ClientProvider";
+import DeferredToaster from "@/components/DeferredToaster";
 import { I18nProvider } from "@/lib/i18n";
 import { WebSocketProvider } from "@/lib/wsContext";
 import NotFound from "@/pages/NotFound";
@@ -123,6 +124,7 @@ function MainLayout() {
         <AppLayout>
           <Outlet />
         </AppLayout>
+        <DeferredToaster />
       </WebSocketProvider>
     </I18nProvider>
   );
