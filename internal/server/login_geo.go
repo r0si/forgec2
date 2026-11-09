@@ -19,75 +19,25 @@ import (
 // accurate without hammering any provider.
 const loginGeoTTL = 7 * 24 * time.Hour
 
-// loginGeoPerRequest bounds how many uncached lookups one panel request may
-// trigger. The panel renders up to 50 rows; resolving the whole page would add
-// seconds of latency and could trip a provider's rate limit on the first load.
-const loginGeoPerRequest = 5
+// loginGeoPerRequest bounds how many lookups one panel request may enqueue.
+// The panel renders up to 50 rows plus a 24h rollup; queueing the whole page
+// would keep the background worker busy for minutes and could trip a
+// provider's rate limit on the first load.
+const loginGeoPerRequest = 8
 
-// loginCountry returns the country for an IP from the persisted cache,
-// resolving it on demand (bounded) when the cache misses.
-// Resolution is opt-in behind server.geoip_enabled, exactly like the beacon
-// GeoIP path: a deployment that has not opted in must not make surprise
-// outbound requests just because someone opened the audit page.
-func (s *Server) loginCountry(ctx context.Context, ip string) (country, city string) {
-	ip = strings.TrimSpace(ip)
-	if ip == "" {
-		return "", ""
-	}
-	if isPrivateIP(ip) {
-		// A loopback/LAN address has no country; the panel shows the IP and
-		// this resolves to "local" in the UI rather than "unknown".
-		return "local", ""
-	}
+// loginGeoQueueMax bounds the pending work. A login log covering a large fleet
+// of source IPs must not grow an unbounded channel.
+const loginGeoQueueMax = 512
 
-	if country, city := s.cachedLoginCountry(ctx, ip); country != "" {
-		return country, city
-	}
+// loginGeoSpacing is the minimum gap between two provider calls. ip.taobao.com
+// enforces roughly one request per second (`code:4` when exceeded), and ip-api
+// limits per minute; spacing the worker keeps both happy.
+const loginGeoSpacing = 1100 * time.Millisecond
 
-	s.configMu.RLock()
-	enabled := s.cfg != nil && s.cfg.Server.GeoIPEnabled
-	s.configMu.RUnlock()
-	if !enabled {
-		return "", ""
-	}
-
-	country, city = s.resolveLoginGeo(ctx, ip)
-	if country == "" {
-		return "", ""
-	}
-	row := db.LoginGeo{IP: ip, Country: country, City: city, ResolvedAt: time.Now()}
-	// Best-effort: a cache write failure only costs another lookup later.
-	if err := s.db.WithContext(ctx).Save(&row).Error; err != nil {
-		slog.Debug("Login geo cache write failed", "ip", ip, "err", err)
-	}
-	return country, city
-}
-
-// cachedLoginCountry reads the persisted cache without any outbound call. It
-// exists so a page beyond the per-request lookup budget still shows the
-// countries that were already resolved.
-func (s *Server) cachedLoginCountry(ctx context.Context, ip string) (country, city string) {
-	ip = strings.TrimSpace(ip)
-	if ip == "" {
-		return "", ""
-	}
-	if isPrivateIP(ip) {
-		return "local", ""
-	}
-	var cached db.LoginGeo
-	if err := s.db.WithContext(ctx).Where("ip = ?", ip).First(&cached).Error; err != nil {
-		return "", ""
-	}
-	if time.Since(cached.ResolvedAt) >= loginGeoTTL {
-		return "", ""
-	}
-	return cached.Country, cached.City
-}
-
-// loginGeoFailedProviderTTL is how long a provider that could not be reached
-// is skipped. Without it every panel load retried the unreachable provider
-// first (the demo host cannot reach ip-api.com), paying its connection
-// timeout on each page.
+// loginGeoFailedProviderTTL is how long a provider that could not answer is
+// skipped. Without it every resolution retried the unreachable provider first
+// (the demo host cannot reach ip-api.com), paying its connection timeout each
+// time.
 const loginGeoFailedProviderTTL = 5 * time.Minute
 
 var loginGeoProviderDown = struct {
@@ -108,12 +58,114 @@ func markLoginGeoProviderDown(name string) {
 	loginGeoProviderDown.at[name] = time.Now()
 }
 
+// cachedLoginCountry reads the persisted cache without any outbound call.
+func (s *Server) cachedLoginCountry(ctx context.Context, ip string) (country, city string) {
+	ip = strings.TrimSpace(ip)
+	if ip == "" {
+		return "", ""
+	}
+	if isPrivateIP(ip) {
+		// A loopback/LAN address has no country; the panel names this category
+		// instead of showing a missing value.
+		return "local", ""
+	}
+	var cached db.LoginGeo
+	if err := s.db.WithContext(ctx).Where("ip = ?", ip).First(&cached).Error; err != nil {
+		return "", ""
+	}
+	if time.Since(cached.ResolvedAt) >= loginGeoTTL {
+		return "", ""
+	}
+	return cached.Country, cached.City
+}
+
+// loginCountry answers from the cache and, on a miss, queues the IP for the
+// background worker. It never blocks on a provider: the panel shows the IP
+// immediately and the country appears on the next refresh.
+func (s *Server) loginCountry(ctx context.Context, ip string) (country, city string) {
+	ip = strings.TrimSpace(ip)
+	if ip == "" {
+		return "", ""
+	}
+	if isPrivateIP(ip) {
+		return "local", ""
+	}
+	if country, city := s.cachedLoginCountry(ctx, ip); country != "" {
+		return country, city
+	}
+
+	s.configMu.RLock()
+	enabled := s.cfg != nil && s.cfg.Server.GeoIPEnabled
+	s.configMu.RUnlock()
+	if !enabled {
+		return "", ""
+	}
+	s.enqueueLoginGeo(ip)
+	return "", ""
+}
+
+// enqueueLoginGeo starts the worker once and hands it the IP without blocking.
+func (s *Server) enqueueLoginGeo(ip string) {
+	s.loginGeoOnce.Do(func() {
+		s.loginGeoCh = make(chan string, loginGeoQueueMax)
+		s.wg.Add(1)
+		go func() {
+			defer s.wg.Done()
+			s.loginGeoWorker()
+		}()
+	})
+	select {
+	case s.loginGeoCh <- ip:
+	default:
+		// Queue full: dropping is correct. The next panel load asks again, and
+		// blocking here would put the drop on the request path instead.
+	}
+}
+
+// loginGeoWorker resolves queued IPs one at a time, spaced out so a provider's
+// per-second quota is respected, and stops with the server context.
+func (s *Server) loginGeoWorker() {
+	ctx := s.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	// Deduplicate: several rows and the rollup can enqueue the same IP in one
+	// request.
+	queued := make(map[string]bool)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case ip := <-s.loginGeoCh:
+			if queued[ip] {
+				continue
+			}
+			queued[ip] = true
+			if country, _ := s.cachedLoginCountry(ctx, ip); country != "" {
+				continue
+			}
+			country, city := s.resolveLoginGeo(ctx, ip)
+			if country != "" {
+				row := db.LoginGeo{IP: ip, Country: country, City: city, ResolvedAt: time.Now()}
+				if err := s.db.WithContext(ctx).Save(&row).Error; err != nil {
+					slog.Debug("Login geo cache write failed", "ip", ip, "err", err)
+				}
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(loginGeoSpacing):
+			}
+		}
+	}
+}
+
 // resolveLoginGeo tries the providers in order and returns the first answer.
 //
 // ip-api.com is the international default (and the one the beacon path uses),
 // but it is unreachable from some networks — the demo host reaches neither it
 // nor other Western providers, while ip.taobao.com answers there. Trying both
-// keeps the feature useful in either network instead of silently returning
+// keeps the feature useful in either network instead of silently reporting
 // "unknown" everywhere.
 func (s *Server) resolveLoginGeo(ctx context.Context, ip string) (country, city string) {
 	type provider struct {
@@ -121,28 +173,37 @@ func (s *Server) resolveLoginGeo(ctx context.Context, ip string) (country, city 
 		url  string
 		// parse extracts (country, city) from a 200 body; empty country means
 		// "this provider had no answer", which falls through to the next one.
-		parse func(body []byte) (string, string)
+		// The bool reports a provider-level refusal (rate limit / quota), which
+		// marks the provider unusable for a while instead of just missing data.
+		parse func(body []byte) (string, string, bool)
 	}
 	providers := []provider{
 		{
 			name: "ip-api.com",
-			url:  "http://ip-api.com/json/" + url.PathEscape(ip) + "?fields=country,city,status",
-			parse: func(body []byte) (string, string) {
+			url:  "http://ip-api.com/json/" + url.PathEscape(ip) + "?fields=country,city,status,message",
+			parse: func(body []byte) (string, string, bool) {
 				var r struct {
 					Status  string `json:"status"`
+					Message string `json:"message"`
 					Country string `json:"country"`
 					City    string `json:"city"`
 				}
-				if json.Unmarshal(body, &r) != nil || r.Status != "success" {
-					return "", ""
+				if json.Unmarshal(body, &r) != nil {
+					return "", "", false
 				}
-				return r.Country, r.City
+				if r.Status != "success" {
+					// "private range"/"reserved range" are answers; the rest
+					// (quota, invalid) means the provider is not serving us.
+					busy := strings.Contains(r.Message, "limit") || strings.Contains(r.Message, "quota")
+					return "", "", busy
+				}
+				return r.Country, r.City, false
 			},
 		},
 		{
 			name: "ip.taobao.com",
 			url:  "https://ip.taobao.com/outGetIpInfo?accessKey=alibaba-inc&ip=" + url.PathEscape(ip),
-			parse: func(body []byte) (string, string) {
+			parse: func(body []byte) (string, string, bool) {
 				var r struct {
 					Code int `json:"code"`
 					Data struct {
@@ -150,14 +211,18 @@ func (s *Server) resolveLoginGeo(ctx context.Context, ip string) (country, city 
 						City    string `json:"city"`
 					} `json:"data"`
 				}
-				if json.Unmarshal(body, &r) != nil || r.Code != 0 {
-					return "", ""
+				if json.Unmarshal(body, &r) != nil {
+					return "", "", false
+				}
+				if r.Code != 0 {
+					// code 4 is "over max qps": back off this provider.
+					return "", "", r.Code == 4
 				}
 				// The provider answers "XX" for unknown, which is not a country.
 				if r.Data.Country == "" || r.Data.Country == "XX" {
-					return "", ""
+					return "", "", false
 				}
-				return r.Data.Country, r.Data.City
+				return r.Data.Country, r.Data.City, false
 			},
 		},
 	}
@@ -182,11 +247,24 @@ func (s *Server) resolveLoginGeo(ctx context.Context, ip string) (country, city 
 		body, readErr := io.ReadAll(io.LimitReader(resp.Body, 8*1024))
 		status := resp.StatusCode
 		_ = resp.Body.Close()
-		if readErr != nil || status != http.StatusOK {
-			slog.Debug("Login geo provider answered without a location", "provider", p.name, "ip", ip, "status", status)
+		if readErr != nil {
 			continue
 		}
-		if country, city := p.parse(body); country != "" {
+		if status == http.StatusTooManyRequests || status >= http.StatusInternalServerError {
+			slog.Debug("Login geo provider throttled", "provider", p.name, "ip", ip, "status", status)
+			markLoginGeoProviderDown(p.name)
+			continue
+		}
+		if status != http.StatusOK {
+			continue
+		}
+		country, city, busy := p.parse(body)
+		if busy {
+			slog.Debug("Login geo provider refused the lookup", "provider", p.name, "ip", ip)
+			markLoginGeoProviderDown(p.name)
+			continue
+		}
+		if country != "" {
 			return country, city
 		}
 	}

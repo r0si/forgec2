@@ -39,6 +39,7 @@ describe("LoginLogPanel", () => {
       { country: "美国", failed: 2, ok: 0 },
       { country: "中国", failed: 0, ok: 5 },
       { country: "local", failed: 0, ok: 2 },
+      { country: "", failed: 0, ok: 1 },
     ],
   };
 
@@ -55,6 +56,8 @@ describe("LoginLogPanel", () => {
     // The failed country is listed with its failed/ok split.
     expect(screen.getByText("美国 · 2/0")).toBeTruthy();
     expect(screen.getByText("本地 / 内网 · 0/2")).toBeTruthy();
+    // An unresolved IP is named, not blank: it fills in on the next refresh.
+    expect(screen.getByText("audit.login_country_unknown · 0/1")).toBeTruthy();
   });
 
   it("renders the recorded time, user, IP and country for each sign-in", async () => {

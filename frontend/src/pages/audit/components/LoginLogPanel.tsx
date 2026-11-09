@@ -127,11 +127,11 @@ export function LoginLogPanel() {
             <div className="mt-3 flex flex-wrap gap-1.5">
               {summary.by_country.slice(0, 8).map((row) => (
                 <Badge
-                  key={row.country}
+                  key={row.country || "__unknown__"}
                   variant={row.failed > 0 ? "destructive" : "secondary"}
-                  title={`${row.country}: ${row.failed} failed / ${row.ok} ok`}
+                  title={`${countryLabel(t, row.country)}: ${row.failed} failed / ${row.ok} ok`}
                 >
-                  {countryLabel(t, row.country)} · {row.failed}/{row.ok}
+                  {row.country ? countryLabel(t, row.country) : t("audit.login_country_unknown")} · {row.failed}/{row.ok}
                 </Badge>
               ))}
             </div>

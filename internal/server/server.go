@@ -255,6 +255,15 @@ type Server struct {
 	agentPendingTasks   map[string]int
 	agentPendingTasksMu sync.Mutex
 
+	// Login-log country resolution runs off the request path: the panel
+	// enqueues IPs it could not find in the cache and returns immediately,
+	// and a single rate-limited worker fills `login_geos` in the background.
+	// A provider call inside the request would make opening the audit page
+	// wait on ip-api/taobao (seconds per uncached IP, and taobao enforces
+	// ~1 QPS).
+	loginGeoOnce sync.Once
+	loginGeoCh   chan string
+
 	// Beacon deduplication: track recently processed beacon fingerprints
 	beaconDedupMu    sync.Mutex
 	beaconDedupCache map[string]time.Time

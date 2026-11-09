@@ -143,7 +143,7 @@ func (s *Server) loginEventSummary(c *gin.Context) gin.H {
 	for _, row := range counts {
 		failedTotal += row.Failed
 		okTotal += row.OK
-		country := "unknown"
+		country := ""
 		if row.IP != "" {
 			var countryResolved string
 			if budget > 0 {
@@ -152,9 +152,7 @@ func (s *Server) loginEventSummary(c *gin.Context) gin.H {
 			} else {
 				countryResolved, _ = s.cachedLoginCountry(ctx, row.IP)
 			}
-			if countryResolved != "" {
-				country = countryResolved
-			}
+			country = countryResolved
 		}
 		stat := byCountry[country]
 		if stat == nil {
@@ -172,6 +170,11 @@ func (s *Server) loginEventSummary(c *gin.Context) gin.H {
 	sort.Slice(ordered, func(i, j int) bool {
 		if ordered[i].Failed != ordered[j].Failed {
 			return ordered[i].Failed > ordered[j].Failed
+		}
+		// Unresolved IPs sort last: an empty country is "not known yet", and
+		// putting it first would make the list lead with the least useful row.
+		if (ordered[i].Country == "") != (ordered[j].Country == "") {
+			return ordered[j].Country == ""
 		}
 		return ordered[i].Country < ordered[j].Country
 	})

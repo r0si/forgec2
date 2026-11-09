@@ -1335,6 +1335,7 @@ export const en: Record<string, string> = {
     "audit.tab_logins": "Login log",
     "audit.login_country": "Country",
     "audit.login_country_local": "Local / LAN",
+    "audit.login_country_unknown": "Unknown (resolving)",
     "audit.login_result": "Result",
     "audit.login_ok": "Success",
     "audit.login_failed": "Failed",
