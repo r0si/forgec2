@@ -158,6 +158,7 @@ const LAZY_ONLY_PREFIXES = [
   "i18n-agents",
   "i18n-settings",
   "i18n-generate",
+  "i18n-ai",
 ];
 const leakedLazy = [...critical.keys()].filter((n) => LAZY_ONLY_PREFIXES.some((p) => n.startsWith(p)));
 

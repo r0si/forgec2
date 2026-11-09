@@ -151,31 +151,33 @@ its raw dotted name.
 
 ## Page-only dictionary fragments (2026-11)
 
-`agents.*` (58 kB of source), `settings.*` (27 kB) and `generate.*` (309 keys,
-19 kB) are only rendered by their own pages, but they sat in the startup
-dictionary that every authenticated page fetches. They are now plain data
-modules (`lib/i18n/fragments/en.{agents,settings,generate}.ts`); the route entry
-registers the module it needs with `registerFragment`, and `t()` consults that
-registry between the active dictionary and the shell slice.
+`agents.*` (58 kB of source), `settings.*` (27 kB), `generate.*` (309 keys,
+19 kB) and `ai.*` (221 keys, 13 kB) are only rendered by their own pages, but
+they sat in the startup dictionary that every authenticated page fetches. They
+are now plain data modules (`lib/i18n/fragments/en.{agents,settings,generate,ai}.ts`);
+the route entry registers the module it needs with `registerFragment`, and `t()`
+consults that registry between the active dictionary and the shell slice.
 
 | Chunk | Raw | Gzip | Loaded when |
 | --- | --- | --- | --- |
-| `en-*.js` (startup dictionary) | 147,226 | 40,352 | every authenticated page |
+| `en-*.js` (startup dictionary) | 135,373 | 36,767 | every authenticated page |
 | `i18n-agents-*.js` | 53,479 | 14,345 | beacon/loot/roles/tags/toolkit/asset pages |
 | `i18n-settings-*.js` | 25,733 | 7,027 | settings/roles/asset pages |
 | `i18n-generate-*.js` | 17,868 | 5,618 | payload factory, listeners, beacon pages, settings |
+| `i18n-ai-*.js` | 11,876 | 4,097 | AI page, beacon detail (AI suggest), macros, tasks |
 | previous `en-*.js` | 244,088 | 66,010 | every authenticated page |
 
-Savings against the single dictionary: the **startup chunk is 97 kB smaller
-(26 kB gzip less) before first paint** on every authenticated page (login
+Savings against the single dictionary: the **startup chunk is 109 kB smaller
+(29 kB gzip less) before first paint** on every authenticated page (login
 downloads no dictionary at all). The fragments then load with the pages that
-render them: the payload factory, listeners, beacon list/detail, settings. The
-idle prefetch of `/listeners` also warms `i18n-generate` once the operator is
-idle, so the saving is on the initial load rather than a permanent per-page
-delta. The fragments stay out of `index.html`'s preload (asserted by
-`check-bundle` + e2e); the registry lives in `lib/i18n/index.tsx` because a
-separate registry module was merged into the lazy agents chunk by Rolldown,
-which put the 53 kB back into first paint.
+render them: the payload factory, listeners, beacon list/detail, settings, the
+AI page, macros and tasks. The idle prefetch of `/listeners` also warms
+`i18n-generate` once the operator is idle, so that saving is on the initial
+load rather than a permanent per-page delta; `i18n-ai` is not warm-started by
+the three prefetched routes. The fragments stay out of `index.html`'s preload
+(asserted by `check-bundle` + e2e); the registry lives in `lib/i18n/index.tsx`
+because a separate registry module was merged into the lazy agents chunk by
+Rolldown, which put the 53 kB back into first paint.
 
 The `agents.*` / `settings.*` keys the shell itself needs were renamed to
 `nav.beacon_*` / `topbar.online_label` and moved into the bootstrap slice, so no

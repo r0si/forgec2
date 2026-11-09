@@ -1,4 +1,8 @@
 
+import { registerFragment } from "@/lib/i18n";
+import { enAI } from "@/lib/i18n/fragments/en.ai";
+registerFragment(enAI);
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useI18n } from "@/lib/i18n";

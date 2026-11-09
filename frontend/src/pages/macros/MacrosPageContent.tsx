@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { registerFragment } from "@/lib/i18n";
+import { enAI } from "@/lib/i18n/fragments/en.ai";
+registerFragment(enAI);
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { paths } from "@/lib/api-paths";

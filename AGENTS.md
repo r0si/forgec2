@@ -366,7 +366,7 @@ Both sides carry a coverage floor, and **a floor that is never raised stops guar
 | side | floor | measured (2026-11-07) | where |
 |---|---|---|---|
 | Go | **58%** | 59.1% (was 51.5 at a 52.8 measurement — a 7-point regression would have passed) | `.github/workflows/ci.yml` "Coverage floor" |
-| frontend | **36.5%** | 38.62% statements / 24 554 | `frontend/scripts/check-coverage.mjs` (override with `COVERAGE_FLOOR`) |
+| frontend | **36.5%** | 38.62% statements / 24 559 | `frontend/scripts/check-coverage.mjs` (override with `COVERAGE_FLOOR`) |
 | first-paint bundle | **740 kB** | 713 kB critical path (4.57 MB total under a 5.0 MB cap) | `frontend/scripts/check-bundle.mjs` |
 
 Raise a floor in the same change that adds tests; lower it only as part of that change, never to make

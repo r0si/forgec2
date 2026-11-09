@@ -1,3 +1,7 @@
+import { registerFragment } from "@/lib/i18n";
+import { enAI } from "@/lib/i18n/fragments/en.ai";
+registerFragment(enAI);
+
 import { PageContainer } from "@/components/ui/page-container";
 import { AgentLoadError } from "@/components/AgentLoadError";
 import { PageToolbar } from "@/components/ui/page-toolbar";
