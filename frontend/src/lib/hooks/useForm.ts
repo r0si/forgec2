@@ -1,11 +1,27 @@
 
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
-import type { ZodSchema, ZodError } from "zod";
 import { useErrorToast } from "@/lib/hooks/useErrorToast";
+
+/**
+ * The slice of a schema `useForm` needs, structurally. Zod schemas satisfy it,
+ * but so do hand-written validators — the login page used zod for two
+ * `min(1)` checks and that pulled the 82 kB zod chunk into the public front
+ * door, where it was the largest avoidable script.
+ */
+export interface FormIssue {
+  path: PropertyKey[];
+  message: string;
+}
+
+export interface FormSchema<T> {
+  safeParse: (
+    values: T,
+  ) => { success: true } | { success: false; error: { issues: FormIssue[] } };
+}
 
 interface UseFormOptions<T extends Record<string, unknown>> {
   initialValues: T;
-  schema: ZodSchema<T>;
+  schema: FormSchema<T>;
   onSubmit: (values: T) => Promise<void>;
 }
 
@@ -47,7 +63,7 @@ export function useForm<T extends Record<string, unknown>>({
       // Field names must not collide with inherited properties such as
       // constructor/toString or trigger the legacy __proto__ setter.
       const fieldErrors: Partial<Record<keyof T, string>> = Object.create(null);
-      for (const issue of (result as { error: ZodError }).error.issues) {
+      for (const issue of result.error.issues) {
         const path = issue.path[0] as keyof T;
         if (!fieldErrors[path]) fieldErrors[path] = issue.message;
       }
@@ -82,7 +98,7 @@ export function useForm<T extends Record<string, unknown>>({
       setTouched((prev) => ({ ...prev, [field]: true }));
       const result = schema.safeParse(values);
       if (!result.success) {
-        const issue = (result as { error: ZodError }).error.issues.find(
+        const issue = result.error.issues.find(
           (i) => i.path[0] === field,
         );
         setErrors((prev) => ({ ...prev, [field]: issue?.message }));

@@ -124,8 +124,12 @@ test.describe("responsive shell", () => {
   test("the login page never downloads the full English dictionary", async ({ page }) => {
     await prepare(page);
     const enChunks: string[] = [];
+    const zodChunks: string[] = [];
     page.on("request", (request) => {
-      if (/\/assets\/en-[\w.-]+\.js$/.test(new URL(request.url()).pathname)) enChunks.push(request.url());
+      const pathname = new URL(request.url()).pathname;
+      if (/\/assets\/en-[\w.-]+\.js$/.test(pathname)) enChunks.push(request.url());
+      // The login form's two `required` checks must not pull zod's 84 kB.
+      if (/\/assets\/vendor-zod-[\w.-]+\.js$/.test(pathname)) zodChunks.push(request.url());
     });
     await page.goto("/login.html");
     await expect(page.getByRole("form")).toBeVisible();
@@ -133,6 +137,7 @@ test.describe("responsive shell", () => {
     // asserting the absence of the request.
     await page.waitForTimeout(600);
     expect(enChunks, "login page fetched the full en dictionary").toHaveLength(0);
+    expect(zodChunks, "login page fetched vendor-zod").toHaveLength(0);
 
     // Authenticated routes still load it: the dictionary is deferred until
     // after sign-in, not dropped.

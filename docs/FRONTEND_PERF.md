@@ -189,6 +189,24 @@ counts fragment keys as defined English keys, and `e2e/layout.spec.ts` asserts
 `/payload-generator` pulls `i18n-generate`, and none of those pages renders a
 raw dotted key.
 
+## Login page payload (2026-11)
+
+The signed-out entry is the public demo's front door, so its payload is kept
+minimal. It loads the shell and the form, and none of the following:
+
+| Removed | Why | Saving on `/login` |
+| --- | --- | --- |
+| `en-*.js` (full dictionary) | login/404/forbidden use the 194-key bootstrap slice | 244 kB at the start of the batch; 135 kB after the page splits |
+| `i18n-*` page fragments | signed-out screens register none | 5–53 kB per fragment |
+| `vendor-sonner-*.js` | `<Toaster>` mounts only in the authenticated shell, on idle | 33,562 B |
+| `vendor-zod-*.js` | the two `required` checks are a hand-written `safeParse` schema | 84,447 B (23,840 gzip) |
+| `/ws`, `/api/me` | `WebSocketProvider` and `useCurrentUserBootstrap` live in `MainLayout` | 4 failed handshakes + 5 health probes in 8 s, before |
+
+Measured after the changes: the `LoginPage` chunk is 9,733 B and the page's
+remaining JS is the entry/vendor shell plus the base-ui form primitives.
+`e2e/layout.spec.ts` asserts `/login` makes no `en-*.js`, `vendor-zod-*.js` or
+WebSocket request, and does not probe `/api/me`.
+
 ## Deferred toaster (2026-11)
 
 `sonner` (33,562 B / ~9.5 kB gzip) was a first-paint chunk because the root

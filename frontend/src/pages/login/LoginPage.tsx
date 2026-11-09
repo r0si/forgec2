@@ -10,10 +10,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Spinner } from "@/components/ui/spinner";
 import { AlertCircle, Lock, Shield, User } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
-import { useForm } from "@/lib/hooks/useForm";
+import { useForm, type FormIssue } from "@/lib/hooks/useForm";
 import { isLoginSuccessResponse, parseLoginErrorBody, safeNextPath } from "@/lib/login";
 import { paths } from "@/lib/api-paths";
-import { z } from "zod";
 import TelemetryCollector from "@/components/TelemetryCollector";
 
 type LoginFormValues = {
@@ -29,13 +28,25 @@ function LoginForm() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
+  // A hand-written schema instead of zod: the form has two `required` checks,
+  // and importing zod pulled the 82 kB vendor-zod chunk into the public login
+  // page (the largest avoidable script on the demo's front door). `useForm`
+  // accepts any object with this safeParse shape.
   const loginSchema = useMemo(
-    () =>
-      z.object({
-        username: z.string().min(1, t("login.username_required")),
-        password: z.string().min(1, t("login.password_required")),
-        rememberMe: z.boolean(),
-      }),
+    () => ({
+      safeParse: (vals: LoginFormValues) => {
+        const issues: FormIssue[] = [];
+        if (!vals.username.trim()) {
+          issues.push({ path: ["username"], message: t("login.username_required") });
+        }
+        if (!vals.password) {
+          issues.push({ path: ["password"], message: t("login.password_required") });
+        }
+        return issues.length
+          ? ({ success: false, error: { issues } } as const)
+          : ({ success: true } as const);
+      },
+    }),
     [t],
   );
 
