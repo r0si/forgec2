@@ -100,3 +100,28 @@ func TestLoadConfigBlobAppliesOverDefaults(t *testing.T) {
 		t.Errorf("empty blob should not clear already-applied values, got %q", C2URL)
 	}
 }
+
+// TestConfigBlobAppliesTLSFingerprint proves the build-time ClientHello option
+// travels through the blob into the variables initJA3Rotation() reads.
+func TestConfigBlobAppliesTLSFingerprint(t *testing.T) {
+	raw, err := json.Marshal(agentConfigBlob{Chameleon: "true", ChameleonProfile: "firefox"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	origBlob, origFlag, origProfile := ConfigBlob, ChameleonStr, ChameleonProfileStr
+	defer func() {
+		ConfigBlob, ChameleonStr, ChameleonProfileStr = origBlob, origFlag, origProfile
+	}()
+
+	ChameleonStr = "false"
+	ChameleonProfileStr = "random"
+	ConfigBlob = obfuscateForTest(t, raw)
+	loadConfigBlob()
+
+	if ChameleonStr != "true" {
+		t.Fatalf("ChameleonStr = %q, want true", ChameleonStr)
+	}
+	if ChameleonProfileStr != "firefox" {
+		t.Fatalf("ChameleonProfileStr = %q, want firefox", ChameleonProfileStr)
+	}
+}

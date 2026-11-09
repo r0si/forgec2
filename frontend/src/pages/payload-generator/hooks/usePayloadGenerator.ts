@@ -104,6 +104,7 @@ export function usePayloadGenerator() {
 
   const [shared, setShared] = useState<SharedState>({
     listener_id: "", c2_url: "", protocol: "http", beacon_transport: "http",
+    tls_fingerprint: "stable",
     interval: "15", jitter: "30",
     // "default" = follow the server fleet-wide default; empty cap = follow server default too.
     beacon_randomization: "default", max_random_interval_ms: "",
@@ -376,6 +377,9 @@ export function usePayloadGenerator() {
     formData.set("c2_url", c2url);
     formData.set("protocol", protocol);
     formData.set("beacon_transport", transport);
+    // JA3/JA4 ClientHello option: both hashes derive from the same hello, so
+    // one selection covers both. "stable" is the fixed Chrome Auto default.
+    formData.set("tls_fingerprint", shared.tls_fingerprint || "stable");
     if (shared.dns_doh_url) formData.set("dns_doh_url", shared.dns_doh_url);
     if (shared.dns_dot_addr) formData.set("dns_dot_addr", shared.dns_dot_addr);
     if (shared.ssh_user) formData.set("ssh_user", shared.ssh_user);
@@ -445,7 +449,7 @@ export function usePayloadGenerator() {
       if (msg.includes("abort")) return { error: t("generate.toast.request_timed_out") };
       return { error: msg };
     }
-  }, [shared.listener_id, shared.dns_doh_url, shared.dns_dot_addr, shared.ssh_user, shared.ssh_password, shared.ssh_key, shared.ssh_host_key, buildC2URL, getProtocol, getBeaconTransport, buildFormData, t, waitForBuildResult]);
+  }, [shared.listener_id, shared.dns_doh_url, shared.dns_dot_addr, shared.ssh_user, shared.ssh_password, shared.ssh_key, shared.ssh_host_key, shared.tls_fingerprint, buildC2URL, getProtocol, getBeaconTransport, buildFormData, t, waitForBuildResult]);
 
   // Form updaters
   const updateForm = useCallback(<K extends PayloadKey>(key: K, updater: (prev: PayloadForms[K]) => PayloadForms[K]) => {

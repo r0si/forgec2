@@ -128,6 +128,7 @@ func GenerateCacheKey(cfg *payload.ImplantConfig, platform, format, goVersion, g
 		fmt.Fprintf(h, "interval=%d\n", cfg.Interval)
 		fmt.Fprintf(h, "jitter=%d\n", cfg.Jitter)
 		fmt.Fprintf(h, "user_agent=%s\n", cfg.UserAgent)
+		fmt.Fprintf(h, "tls_fingerprint=%s\n", cfg.TLSFingerprint)
 		fmt.Fprintf(h, "persist=%v\n", cfg.Persist)
 		fmt.Fprintf(h, "skip_tls_verify=%v\n", cfg.SkipTLSVerify)
 		fmt.Fprintf(h, "filename=%s\n", cfg.Filename)

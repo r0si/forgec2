@@ -7,6 +7,23 @@ import (
 	"github.com/forgec2/forgec2/internal/payload"
 )
 
+// TestGenerateCacheKeyDistinguishesTLSFingerprint keeps a build that asks for
+// ClientHello rotation from being served the cached stable-fingerprint binary.
+// The cache returns the artifact bytes, so a missing field is a silent
+// "option did nothing".
+func TestGenerateCacheKeyDistinguishesTLSFingerprint(t *testing.T) {
+	stable := &payload.ImplantConfig{Architecture: "amd64", C2URL: "https://c2.example", TLSFingerprint: "stable"}
+	random := &payload.ImplantConfig{Architecture: "amd64", C2URL: "https://c2.example", TLSFingerprint: "random"}
+	firefox := &payload.ImplantConfig{Architecture: "amd64", C2URL: "https://c2.example", TLSFingerprint: "firefox"}
+
+	k1 := GenerateCacheKey(stable, "windows", "exe", "go1.26.0", "")
+	k2 := GenerateCacheKey(random, "windows", "exe", "go1.26.0", "")
+	k3 := GenerateCacheKey(firefox, "windows", "exe", "go1.26.0", "")
+	if k1 == k2 || k2 == k3 || k1 == k3 {
+		t.Fatalf("TLS fingerprint modes share a cache key: stable=%s random=%s firefox=%s", k1, k2, k3)
+	}
+}
+
 // TestGenerateCacheKeyDistinguishesArchitecture verifies that two builds with
 // the same C2 URL but different target architectures produce different cache
 // keys. A false cache hit here would hand an operator an ARM64 binary when they

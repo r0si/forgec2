@@ -35,6 +35,12 @@ export interface SharedState {
   c2_url: string;
   protocol: string;
   beacon_transport: string;
+  /**
+   * TLS ClientHello option for the implant. "stable" keeps the fixed Chrome
+   * Auto hello; "random" rotates a browser profile per handshake (JA3 and JA4
+   * both change); a profile name pins one.
+   */
+  tls_fingerprint: string;
   interval: string;
   jitter: string;
   // Beacon randomization mode: how the heartbeat interval is randomized

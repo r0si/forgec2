@@ -294,8 +294,12 @@ type ImplantConfig struct {
 	Parameter               string
 	// Placements: JSON array of {target, chain} cover copies.
 	Placements string
-	// UA rotation pool.
+	// URL rotation pool.
 	UserAgents []string
+	// TLSFingerprint controls the implant's TLS ClientHello: "" / "stable"
+	// keeps the fixed Chrome Auto hello, "random" rotates a browser profile per
+	// handshake (JA3 and JA4 both change), and a profile name pins one.
+	TLSFingerprint string
 	// Timing jitter extensions.
 	JitterURI      bool
 	ParameterNames []string

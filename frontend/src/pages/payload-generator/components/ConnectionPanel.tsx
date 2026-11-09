@@ -209,6 +209,28 @@ export default function ConnectionPanel({
           >
             {showExperimental ? t("generate.hide_experimental") : t("generate.show_experimental")}
           </Button>
+          {/* TLS ClientHello (JA3/JA4). Both hashes are derived from the same
+              hello, so one option covers both: rotate per handshake, pin a
+              browser, or keep the stable Chrome Auto default. */}
+          <div>
+            <span className="mb-1.5 block text-xs font-semibold text-muted-foreground">{t("generate.tls_fingerprint")}</span>
+            <Select
+              value={shared.tls_fingerprint || "stable"}
+              onValueChange={(val) => val != null && setShared(s => ({ ...s, tls_fingerprint: val }))}
+            >
+              <SelectTrigger className="w-full" aria-label={t("generate.tls_fingerprint")}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="stable">{t("generate.tls_fp_stable")}</SelectItem>
+                <SelectItem value="random">{t("generate.tls_fp_random")}</SelectItem>
+                {["chrome", "firefox", "safari", "edge", "ios", "android", "360", "qq"].map((p) => (
+                  <SelectItem key={p} value={p}>{p}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="mt-1.5 text-micro-sm text-muted-foreground">{t("generate.tls_fp_help")}</p>
+          </div>
           {CONDITIONAL_TRANSPORTS.includes(transport) && (
             <div className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning-ink">
               <div className="font-semibold mb-0.5">{t("generate.transport_security_title")}</div>
