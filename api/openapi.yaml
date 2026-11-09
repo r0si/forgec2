@@ -2211,18 +2211,20 @@ paths:
                             type: object
                             description: >-
                               24-hour rollup of auth activity grouped by the
-                              country resolved for each source IP.
+                              region (country and, when known, city) resolved
+                              for each source IP.
                             properties:
                               window_hours: {type: integer}
                               failed: {type: integer}
                               ok: {type: integer}
                               distinct_ips: {type: integer}
-                              by_country:
+                              by_region:
                                 type: array
                                 items:
                                   type: object
                                   properties:
                                     country: {type: string}
+                                    city: {type: string}
                                     failed: {type: integer}
                                     ok: {type: integer}
 

@@ -102,15 +102,20 @@ func (s *Server) handleGetLoginEvents(c *gin.Context) {
 	})
 }
 
-// loginCountryStat is one country bucket of the 24h login rollup. An empty
-// Country is "not resolved yet", not an error: the panel labels it.
-type loginCountryStat struct {
+// loginRegionStat is one region bucket (country + city) of the 24h login
+// rollup. An empty Country is "not resolved yet", not an error: the panel
+// labels it, and City is empty for loopback and for providers that only know
+// the country.
+type loginRegionStat struct {
 	Country string `json:"country"`
+	City    string `json:"city,omitempty"`
 	Failed  int64  `json:"failed"`
 	OK      int64  `json:"ok"`
 }
 
-// loginEventSummary aggregates the last 24 hours of auth activity by country.
+// loginEventSummary aggregates the last 24 hours of auth activity by region
+// (country and city), not just country: two sign-ins from the same country but
+// different cities are different facts, and the panel shows the city anyway.
 //
 // Operators open the login log to answer one question first: "is someone
 // hammering us, and from where?" A page of newest-first rows answers it only
@@ -139,35 +144,35 @@ func (s *Server) loginEventSummary(c *gin.Context) gin.H {
 		return gin.H{}
 	}
 
-	byCountry := map[string]*loginCountryStat{}
+	type regionKey struct{ country, city string }
+	byRegion := map[regionKey]*loginRegionStat{}
 	var failedTotal, okTotal int64
 	ctx := c.Request.Context()
 	budget := loginGeoPerRequest
 	for _, row := range counts {
 		failedTotal += row.Failed
 		okTotal += row.OK
-		country := ""
+		var country, city string
 		if row.IP != "" {
-			var countryResolved string
 			if budget > 0 {
-				countryResolved, _ = s.loginCountry(ctx, row.IP)
+				country, city = s.loginCountry(ctx, row.IP)
 				budget--
 			} else {
-				countryResolved, _ = s.cachedLoginCountry(ctx, row.IP)
+				country, city = s.cachedLoginCountry(ctx, row.IP)
 			}
-			country = countryResolved
 		}
-		stat := byCountry[country]
+		key := regionKey{country: country, city: city}
+		stat := byRegion[key]
 		if stat == nil {
-			stat = &loginCountryStat{Country: country}
-			byCountry[country] = stat
+			stat = &loginRegionStat{Country: country, City: city}
+			byRegion[key] = stat
 		}
 		stat.Failed += row.Failed
 		stat.OK += row.OK
 	}
 
-	ordered := make([]loginCountryStat, 0, len(byCountry))
-	for _, stat := range byCountry {
+	ordered := make([]loginRegionStat, 0, len(byRegion))
+	for _, stat := range byRegion {
 		ordered = append(ordered, *stat)
 	}
 	sort.Slice(ordered, func(i, j int) bool {
@@ -179,14 +184,17 @@ func (s *Server) loginEventSummary(c *gin.Context) gin.H {
 		if (ordered[i].Country == "") != (ordered[j].Country == "") {
 			return ordered[j].Country == ""
 		}
-		return ordered[i].Country < ordered[j].Country
+		if ordered[i].Country != ordered[j].Country {
+			return ordered[i].Country < ordered[j].Country
+		}
+		return ordered[i].City < ordered[j].City
 	})
 
 	return gin.H{
 		"window_hours": 24,
 		"failed":       failedTotal,
 		"ok":           okTotal,
-		"by_country":   ordered,
+		"by_region":    ordered,
 		"distinct_ips": len(counts),
 	}
 }

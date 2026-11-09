@@ -152,21 +152,26 @@ func TestLoginEventsReportIPTimeAndCountry(t *testing.T) {
 	if sum.OK != 3 {
 		t.Fatalf("ok = %d, want 3", sum.OK)
 	}
-	// The failed attempt came from the 美国 IP, so that country leads the list.
-	if len(sum.ByCountry) == 0 || sum.ByCountry[0].Country != "美国" || sum.ByCountry[0].Failed != 1 {
-		t.Fatalf("by_country = %+v, want 美国 first with 1 failure", sum.ByCountry)
+	// The failed attempt came from the 美国 IP, so that region leads the list.
+	if len(sum.ByRegion) == 0 || sum.ByRegion[0].Country != "美国" || sum.ByRegion[0].Failed != 1 {
+		t.Fatalf("by_region = %+v, want 美国 first with 1 failure", sum.ByRegion)
 	}
 	var sawLocal, sawDE bool
-	for _, c := range sum.ByCountry {
-		switch c.Country {
+	for _, r := range sum.ByRegion {
+		switch r.Country {
 		case "local":
 			sawLocal = true
 		case "德国":
 			sawDE = true
+			// The rollup is per city, not per country: the cached city must
+			// travel with the bucket so the panel can show "德国 · 法兰克福".
+			if r.City != "法兰克福" {
+				t.Fatalf("德国 region city = %q, want 法兰克福", r.City)
+			}
 		}
 	}
 	if !sawLocal || !sawDE {
-		t.Fatalf("by_country misses local/德国: %+v", sum.ByCountry)
+		t.Fatalf("by_region misses local/德国: %+v", sum.ByRegion)
 	}
 }
 
@@ -179,11 +184,12 @@ type loginEventsResponse struct {
 			Failed      int64 `json:"failed"`
 			OK          int64 `json:"ok"`
 			DistinctIPs int   `json:"distinct_ips"`
-			ByCountry   []struct {
+			ByRegion    []struct {
 				Country string `json:"country"`
+				City    string `json:"city"`
 				Failed  int64  `json:"failed"`
 				OK      int64  `json:"ok"`
-			} `json:"by_country"`
+			} `json:"by_region"`
 		} `json:"summary"`
 	} `json:"data"`
 }

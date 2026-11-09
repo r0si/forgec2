@@ -14195,14 +14195,15 @@ export interface operations {
                                 created_at?: string;
                             }[];
                             total?: number;
-                            /** @description 24-hour rollup of auth activity grouped by the country resolved for each source IP. */
+                            /** @description 24-hour rollup of auth activity grouped by the region (country and, when known, city) resolved for each source IP. */
                             summary?: {
                                 window_hours?: number;
                                 failed?: number;
                                 ok?: number;
                                 distinct_ips?: number;
-                                by_country?: {
+                                by_region?: {
                                     country?: string;
+                                    city?: string;
                                     failed?: number;
                                     ok?: number;
                                 }[];

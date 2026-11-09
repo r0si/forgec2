@@ -19,25 +19,32 @@ export interface LoginSummary {
   failed: number;
   ok: number;
   distinct_ips: number;
-  by_country: { country: string; failed: number; ok: number }[];
+  by_region: { country: string; city?: string; failed: number; ok: number }[];
 }
 
 const PER_PAGE = 50;
 
-/** "local" is the answer for loopback/LAN addresses; the UI names it. */
-function countryLabel(t: (key: string) => string, country: string): string {
-  if (!country) return "—";
-  if (country === "local") return t("audit.login_country_local");
-  return country;
+/**
+ * A region is the country plus, when a provider knows it, the city. The login
+ * log is about "from where", and two sign-ins from the same country but
+ * different cities are different facts, so the city is part of the label and
+ * not a tooltip.
+ */
+function regionLabel(t: (key: string) => string, country: string, city?: string): string {
+  if (!country) return t("audit.login_region_unknown");
+  if (country === "local") return t("audit.login_region_local");
+  const place = (city || "").trim();
+  if (!place || place === country) return country;
+  return `${country} · ${place}`;
 }
 
 /**
- * Login log panel: who signed in, from which IP and country, and when.
+ * Login log panel: who signed in, from which IP and region, and when.
  *
  * The row data comes from GET /audit/logins, which reads the hash-chained
  * audit rows (action login / login_failed / logout) and joins a cached
- * IP→country table. The panel never mutates the audit rows: writing a
- * country after the fact would break the chain those rows exist to protect.
+ * IP→region table. The panel never mutates the audit rows: writing a region
+ * after the fact would break the chain those rows exist to protect.
  */
 export function LoginLogPanel() {
   const { t } = useI18n();
@@ -120,17 +127,20 @@ export function LoginLogPanel() {
               {t("audit.login_summary_ips")} <span className="font-mono text-foreground">{summary.distinct_ips}</span>
             </span>
           </div>
-          {summary.by_country.length > 0 && (
+          {summary.by_region.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-1.5">
-              {summary.by_country.slice(0, 8).map((row) => (
-                <Badge
-                  key={row.country || "__unknown__"}
-                  variant={row.failed > 0 ? "destructive" : "secondary"}
-                  title={`${countryLabel(t, row.country)}: ${row.failed} failed / ${row.ok} ok`}
-                >
-                  {row.country ? countryLabel(t, row.country) : t("audit.login_country_unknown")} · {row.failed}/{row.ok}
-                </Badge>
-              ))}
+              {summary.by_region.slice(0, 8).map((row) => {
+                const label = regionLabel(t, row.country, row.city);
+                return (
+                  <Badge
+                    key={`${row.country}|${row.city || ""}`}
+                    variant={row.failed > 0 ? "destructive" : "secondary"}
+                    title={`${label}: ${row.failed} failed / ${row.ok} ok`}
+                  >
+                    {label} · {row.failed}/{row.ok}
+                  </Badge>
+                );
+              })}
             </div>
           )}
         </Card>
@@ -206,13 +216,9 @@ export function LoginLogPanel() {
               cell: (e) => <span className="text-xs font-mono">{e.ip || "-"}</span>,
             },
             {
-              id: "country",
-              header: t("audit.login_country"),
-              cell: (e) => (
-                <span className="text-xs" title={e.city || undefined}>
-                  {countryLabel(t, e.country)}
-                </span>
-              ),
+              id: "region",
+              header: t("audit.login_region"),
+              cell: (e) => <span className="text-xs">{regionLabel(t, e.country, e.city)}</span>,
             },
             {
               id: "result",

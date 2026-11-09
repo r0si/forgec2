@@ -289,17 +289,17 @@ func TestLoginGeoDisabledMakesNoCall(t *testing.T) {
 }
 
 // TestLoginGeoSummaryPayloadHasStableShape guards the JSON the panel reads: the
-// chips need country/failed/ok even when a country is still unresolved (empty
-// string), because the UI labels that bucket instead of hiding it.
+// chips need country/city/failed/ok even when a region is still unresolved
+// (empty country), because the UI labels that bucket instead of hiding it.
 func TestLoginGeoSummaryPayloadHasStableShape(t *testing.T) {
-	encoded, err := json.Marshal([]loginCountryStat{
-		{Country: "中国", Failed: 1, OK: 2},
+	encoded, err := json.Marshal([]loginRegionStat{
+		{Country: "中国", City: "北京", Failed: 1, OK: 2},
 		{Country: "", Failed: 0, OK: 3},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `[{"country":"中国","failed":1,"ok":2},{"country":"","failed":0,"ok":3}]`
+	want := `[{"country":"中国","city":"北京","failed":1,"ok":2},{"country":"","failed":0,"ok":3}]`
 	if string(encoded) != want {
 		t.Fatalf("payload = %s, want %s", encoded, want)
 	}
