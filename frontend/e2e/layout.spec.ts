@@ -161,6 +161,29 @@ test.describe("responsive shell", () => {
     await expect(page.locator("main")).not.toContainText(/\bsettings\.[a-z_]/);
   });
 
+  test("the login page does not open the operator socket", async ({ page }) => {
+    await prepare(page);
+    const sockets: string[] = [];
+    const meProbes: string[] = [];
+    page.on("websocket", (socket) => sockets.push(socket.url()));
+    page.on("request", (request) => {
+      if (new URL(request.url()).pathname === "/api/me") meProbes.push(request.url());
+    });
+
+    await page.goto("/login.html");
+    await expect(page.getByRole("form")).toBeVisible();
+    // The provider used to connect on mount; give a retry time to fire.
+    await page.waitForTimeout(1500);
+    expect(sockets, "the signed-out login page opened a WebSocket").toHaveLength(0);
+    expect(meProbes, "the signed-out login page probed /api/me").toHaveLength(0);
+
+    // The authenticated shell still owns the socket and the identity probe.
+    await page.goto("/dashboard.html");
+    await expect(page.locator("main").first()).toBeAttached({ timeout: 15_000 });
+    await expect.poll(() => sockets.length, { timeout: 10_000 }).toBeGreaterThan(0);
+    await expect.poll(() => meProbes.length, { timeout: 10_000 }).toBeGreaterThan(0);
+  });
+
   for (const route of ROUTES) {
     test(`${route} uses a bounded page shell`, async ({ page }) => {
       await prepare(page);

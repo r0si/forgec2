@@ -10,7 +10,9 @@ import { PageSpinner } from "@/components/ui/spinner";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import AppLayout from "@/components/AppLayout";
 import RouterErrorView from "@/components/RouterErrorView";
+import { useCurrentUserBootstrap } from "@/components/ClientProvider";
 import { I18nProvider } from "@/lib/i18n";
+import { WebSocketProvider } from "@/lib/wsContext";
 import NotFound from "@/pages/NotFound";
 import Forbidden from "@/pages/forbidden/ForbiddenPage";
 import { NAV_ITEMS } from "@/lib/navigation";
@@ -111,11 +113,17 @@ function LegacyPrefixRedirect({ to }: { to: string }) {
 }
 
 function MainLayout() {
+  useCurrentUserBootstrap();
   return (
     <I18nProvider>
-      <AppLayout>
-        <Outlet />
-      </AppLayout>
+      {/* The socket belongs to the authenticated shell: mounting it at the root
+          made the public login page open /ws (404 behind the demo gateway) and
+          keep retrying + health-polling while the visitor typed credentials. */}
+      <WebSocketProvider>
+        <AppLayout>
+          <Outlet />
+        </AppLayout>
+      </WebSocketProvider>
     </I18nProvider>
   );
 }

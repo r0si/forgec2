@@ -2,7 +2,6 @@
 import { useEffect, useRef, useState } from "react";
 import { I18nProvider } from "@/lib/i18n";
 import { ThemeProvider } from "@/lib/theme";
-import { WebSocketProvider } from "@/lib/wsContext";
 import ErrorBoundary from "./ErrorBoundary";
 import { api } from "@/lib/api";
 import { paths } from "@/lib/api-paths";
@@ -102,7 +101,10 @@ function readCurrentUser(payload: unknown): CurrentUser {
 /** Load authorization independently of the sidebar so focus/mobile layouts
  * receive the same permission state. `unwrap:false` also tolerates legacy and
  * current `/api/me` response shapes during rolling upgrades. */
-function useCurrentUserBootstrap() {
+// MainLayout calls this for the authenticated shell. Signed-out screens
+// (login, forbidden, 404) must not probe /api/me: they have no session, and
+// the call only added a 401/404 to every visit's console.
+export function useCurrentUserBootstrap() {
   const setCurrentUsername = useAppStore((state) => state.setCurrentUsername);
   const setCurrentUserRole = useAppStore((state) => state.setCurrentUserRole);
   const setCurrentPermissions = useAppStore((state) => state.setCurrentPermissions);
@@ -125,7 +127,6 @@ export default function ClientProvider({ children }: { children: React.ReactNode
   // with broken chunks), so no t() or design-system components here.
   const [chunkDead, setChunkDead] = useState(() => chunkReloadsExhausted());
   useChunkErrorReload(() => setChunkDead(true));
-  useCurrentUserBootstrap();
   if (chunkDead) {
     const retry = () => {
       try {
@@ -151,10 +152,12 @@ export default function ClientProvider({ children }: { children: React.ReactNode
       <ThemeProvider>
         {/* Bootstrap-only: the login, 404, forbidden and router error screens
             render outside the authenticated layout and must not pull the full
-            ~244 kB dictionary. MainLayout mounts a full provider inside. */}
-        <I18nProvider full={false}>
-          <WebSocketProvider>{children}</WebSocketProvider>
-        </I18nProvider>
+            dictionary. MainLayout mounts a full provider inside.
+            WebSocketProvider also lives in MainLayout: the public login page
+            used to open /ws (404 behind the demo gateway), then retry/health-
+            poll for as long as it stayed open. No signed-out screen uses the
+            socket. */}
+        <I18nProvider full={false}>{children}</I18nProvider>
       </ThemeProvider>
     </ErrorBoundary>
   );
