@@ -488,6 +488,23 @@ type AuditLog struct {
 	CreatedAt time.Time `gorm:"index;index:idx_audit_action_time,priority:2;index:idx_audit_tenant_time,priority:2" json:"created_at"`
 }
 
+// LoginGeo caches the country/city resolved for an IP seen in the auth log.
+//
+// It exists because the audit row cannot carry a country: the audit log is a
+// hash chain, and writing the country after the insert would break the chain
+// it is supposed to protect. Resolving at login time would also make the login
+// path depend on an external HTTP call. A separate cache table keeps the audit
+// row immutable, lets the login panel answer quickly, and survives a restart
+// (the in-memory beacon GeoIP cache does not).
+type LoginGeo struct {
+	IP         string    `gorm:"primaryKey;size:64" json:"ip"`
+	Country    string    `gorm:"size:64" json:"country"`
+	City       string    `gorm:"size:128" json:"city,omitempty"`
+	ResolvedAt time.Time `json:"resolved_at"`
+}
+
+func (LoginGeo) TableName() string { return "login_geos" }
+
 // Listener represents a C2 listener profile for agents to connect to.
 // Supports multiple listeners (different hosts/ports/protocols) like in Cobalt Strike.
 //

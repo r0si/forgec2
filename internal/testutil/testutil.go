@@ -53,7 +53,7 @@ func SetupTestDB(t testing.TB) *gorm.DB {
 		&db.PasswordHistory{}, &db.APIKey{}, &db.Script{},
 		&db.RegSecret{}, &db.KillSwitch{}, &db.Tenant{}, &db.AgentStatusEvent{},
 		&db.SIEMRule{}, &db.CommandMacro{}, &db.MacroRun{},
-		&db.Engagement{}, &db.PlaybookRun{},
+		&db.Engagement{}, &db.PlaybookRun{}, &db.LoginGeo{},
 	)
 	if err != nil {
 		t.Fatalf("migrate: %v", err)

@@ -203,6 +203,7 @@ export const paths = {
    */
   audit: {
     logs: (query: string) => `/audit/logs?${query}`,
+    logins: (query: string) => `/audit/logins?${query}`,
   },
   /**
    * Build logs dual-use at /builds (renderPageOrJSON) — not /api/builds.

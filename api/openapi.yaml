@@ -2148,6 +2148,66 @@ paths:
               schema:
                 type: string
 
+  /audit/logins:
+    get:
+      tags: [Audit]
+      summary: Login event log
+      description: >-
+        Sign-in, failed sign-in and sign-out events with the client IP, the
+        timestamp and the country resolved for that IP (cached; requires
+        server.geoip_enabled for first-time resolution).
+      operationId: getAuditLoginEvents
+      security:
+        - SessionCookie: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: user
+          in: query
+          schema:
+            type: string
+        - name: result
+          in: query
+          schema:
+            type: string
+            enum: [ok, failed]
+      responses:
+        '200':
+          description: Login events
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          events:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id: {type: integer}
+                                user: {type: string}
+                                action: {type: string}
+                                ip: {type: string}
+                                country: {type: string}
+                                city: {type: string}
+                                success: {type: boolean}
+                                details: {type: string}
+                                created_at: {type: string, format: date-time}
+                          total: {type: integer}
+
   /audit/logs:
     get:
       tags: [Audit]

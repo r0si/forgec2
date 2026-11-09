@@ -1190,6 +1190,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/audit/logins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Login event log
+         * @description Sign-in, failed sign-in and sign-out events with the client IP, the timestamp and the country resolved for that IP (cached; requires server.geoip_enabled for first-time resolution).
+         */
+        get: operations["getAuditLoginEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/audit/logs": {
         parameters: {
             query?: never;
@@ -14136,6 +14156,47 @@ export interface operations {
                 };
                 content: {
                     "text/html": string;
+                };
+            };
+        };
+    };
+    getAuditLoginEvents: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                user?: string;
+                result?: "ok" | "failed";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Login events */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data?: {
+                            events?: {
+                                id?: number;
+                                user?: string;
+                                action?: string;
+                                ip?: string;
+                                country?: string;
+                                city?: string;
+                                success?: boolean;
+                                details?: string;
+                                /** Format: date-time */
+                                created_at?: string;
+                            }[];
+                            total?: number;
+                        };
+                    };
                 };
             };
         };

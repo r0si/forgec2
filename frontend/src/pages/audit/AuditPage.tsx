@@ -20,6 +20,8 @@ import { IconBadge } from "@/components/ui/icon-badge";
 import type { AuditLog } from "@/types/audit";
 import { useInteractStore } from "@/lib/interact-store";
 import { auditLogsToCSV, auditSessionId, normalizeAuditLogs } from "./components/audit-log";
+import { LoginLogPanel } from "./components/LoginLogPanel";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const ACTION_BADGES: Record<string, string> = {
   login: "success",
@@ -160,6 +162,13 @@ export default function AuditPage() {
         </Button>
       </>}>
 
+      <Tabs defaultValue="events">
+        <TabsList>
+          <TabsTrigger value="events">{t("audit.tab_events")}</TabsTrigger>
+          <TabsTrigger value="logins">{t("audit.tab_logins")}</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="events" className="space-y-4">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-5">
         <Card className="p-(--card-spacing)">
           <div className="flex items-center justify-between">
@@ -354,6 +363,12 @@ export default function AuditPage() {
           </div>)}
         </DialogContent>
       </Dialog>
+        </TabsContent>
+
+        <TabsContent value="logins">
+          <LoginLogPanel />
+        </TabsContent>
+      </Tabs>
     </PageContainer>
   );
 }

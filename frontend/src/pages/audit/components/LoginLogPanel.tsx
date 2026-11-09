@@ -1,0 +1,195 @@
+import { useCallback, useEffect, useState } from "react";
+import { api } from "@/lib/api";
+import { paths } from "@/lib/api-paths";
+import { useI18n } from "@/lib/i18n";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { DataTable } from "@/components/ui/data-table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card } from "@/components/ui/card";
+import { PageToolbar } from "@/components/ui/page-toolbar";
+import { Filter, RotateCw } from "lucide-react";
+
+export interface LoginEvent {
+  id: number;
+  user: string;
+  action: string;
+  ip: string;
+  country: string;
+  city?: string;
+  success: boolean;
+  details: string;
+  created_at: string;
+}
+
+const PER_PAGE = 50;
+
+/** "local" is the answer for loopback/LAN addresses; the UI names it. */
+function countryLabel(t: (key: string) => string, country: string): string {
+  if (!country) return "—";
+  if (country === "local") return t("audit.login_country_local");
+  return country;
+}
+
+/**
+ * Login log panel: who signed in, from which IP and country, and when.
+ *
+ * The row data comes from GET /audit/logins, which reads the hash-chained
+ * audit rows (action login / login_failed / logout) and joins a cached
+ * IP→country table. The panel never mutates the audit rows: writing a
+ * country after the fact would break the chain those rows exist to protect.
+ */
+export function LoginLogPanel() {
+  const { t } = useI18n();
+  const [events, setEvents] = useState<LoginEvent[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [userFilter, setUserFilter] = useState("");
+  const [resultFilter, setResultFilter] = useState("");
+  const [applied, setApplied] = useState({ user: "", result: "" });
+
+  const load = useCallback(async (signal?: AbortSignal) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams({ page: String(page), pageSize: String(PER_PAGE) });
+      if (applied.user) params.set("user", applied.user);
+      if (applied.result) params.set("result", applied.result);
+      const payload = (await api.get(paths.audit.logins(params.toString()), { signal })) as {
+        events?: LoginEvent[];
+        total?: number;
+      };
+      setEvents(payload?.events ?? []);
+      setTotal(Number(payload?.total) || 0);
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return;
+      setEvents([]);
+      setTotal(0);
+      // Store the key, not the translated string: `t` is intentionally not a
+      // dependency of this callback, so a provider that re-creates `t` cannot
+      // turn this effect into a refetch loop.
+      setError("audit.login_load_failed");
+    } finally {
+      setLoading(false);
+    }
+  }, [applied, page]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void load(controller.signal);
+    return () => controller.abort();
+  }, [load]);
+
+  const apply = () => {
+    setPage(1);
+    setApplied({ user: userFilter.trim(), result: resultFilter });
+  };
+  const reset = () => {
+    setUserFilter("");
+    setResultFilter("");
+    setPage(1);
+    setApplied({ user: "", result: "" });
+  };
+
+  return (
+    <div className="space-y-4">
+      <PageToolbar sticky>
+        <Select value={resultFilter || "all"} onValueChange={(v) => setResultFilter(v === "all" || !v ? "" : v)}>
+          <SelectTrigger className="w-[180px]" aria-label={t("audit.login_result")}>
+            <SelectValue>
+              {(value) =>
+                value === "all"
+                  ? t("audit.login_all_results")
+                  : value === "failed"
+                    ? t("audit.login_failed")
+                    : t("audit.login_ok")}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t("audit.login_all_results")}</SelectItem>
+            <SelectItem value="ok">{t("audit.login_ok")}</SelectItem>
+            <SelectItem value="failed">{t("audit.login_failed")}</SelectItem>
+          </SelectContent>
+        </Select>
+        <input
+          value={userFilter}
+          onChange={(e) => setUserFilter(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") apply();
+          }}
+          placeholder={t("audit.login_user_filter")}
+          aria-label={t("audit.login_user_filter")}
+          className="h-9 w-[180px] rounded-lg border border-border bg-card px-3 text-sm"
+        />
+        <Button onClick={apply} disabled={loading}>
+          <Filter className="size-4" />
+          <span>{t("audit.apply")}</span>
+        </Button>
+        <Button variant="outline" onClick={reset}>
+          {t("audit.reset")}
+        </Button>
+        <Button variant="ghost" onClick={() => void load()} disabled={loading} aria-label={t("common.refresh")}>
+          <RotateCw className="size-4" />
+        </Button>
+      </PageToolbar>
+
+      <Card className="overflow-hidden">
+        <DataTable<LoginEvent>
+          data={events}
+          label={t("audit.tab_logins")}
+          loading={loading}
+          error={error ? t(error) : null}
+          onRetry={() => void load()}
+          emptyTitle={t("audit.login_empty")}
+          columns={[
+            {
+              id: "created_at",
+              header: t("audit.time"),
+              sortValue: (e) => e.created_at || "",
+              cell: (e) => <span className="text-xs font-mono whitespace-nowrap">{e.created_at}</span>,
+            },
+            {
+              id: "user",
+              header: t("audit.user"),
+              sortValue: (e) => e.user || "",
+              cell: (e) => <span className="text-sm font-medium">{e.user || "-"}</span>,
+            },
+            {
+              id: "ip",
+              header: "IP",
+              cell: (e) => <span className="text-xs font-mono">{e.ip || "-"}</span>,
+            },
+            {
+              id: "country",
+              header: t("audit.login_country"),
+              cell: (e) => (
+                <span className="text-xs" title={e.city || undefined}>
+                  {countryLabel(t, e.country)}
+                </span>
+              ),
+            },
+            {
+              id: "result",
+              header: t("audit.login_result"),
+              cell: (e) => (
+                <Badge variant={e.success ? "success" : "destructive"}>
+                  {e.success ? t("audit.login_ok") : t("audit.login_failed")}
+                </Badge>
+              ),
+            },
+            {
+              id: "details",
+              header: t("audit.details"),
+              cell: (e) => <span className="text-xs max-w-[260px] truncate">{e.details || "-"}</span>,
+              cellClassName: "max-w-[260px]",
+            },
+          ]}
+          rowKey={(e, i) => String(e.id || i)}
+          pagination={{ page, pageSize: PER_PAGE, total, onPageChange: setPage }}
+        />
+      </Card>
+    </div>
+  );
+}
