@@ -22,6 +22,14 @@ export interface LoginEvent {
   created_at: string;
 }
 
+export interface LoginSummary {
+  window_hours: number;
+  failed: number;
+  ok: number;
+  distinct_ips: number;
+  by_country: { country: string; failed: number; ok: number }[];
+}
+
 const PER_PAGE = 50;
 
 /** "local" is the answer for loopback/LAN addresses; the UI names it. */
@@ -42,6 +50,7 @@ function countryLabel(t: (key: string) => string, country: string): string {
 export function LoginLogPanel() {
   const { t } = useI18n();
   const [events, setEvents] = useState<LoginEvent[]>([]);
+  const [summary, setSummary] = useState<LoginSummary | null>(null);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -60,9 +69,11 @@ export function LoginLogPanel() {
       const payload = (await api.get(paths.audit.logins(params.toString()), { signal })) as {
         events?: LoginEvent[];
         total?: number;
+        summary?: LoginSummary;
       };
       setEvents(payload?.events ?? []);
       setTotal(Number(payload?.total) || 0);
+      setSummary(payload?.summary ?? null);
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
       setEvents([]);
@@ -95,6 +106,38 @@ export function LoginLogPanel() {
 
   return (
     <div className="space-y-4">
+      {summary && (
+        <Card className="p-(--card-spacing)">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+            <span className="text-sm font-medium">{t("audit.login_summary_title")}</span>
+            <span className="text-sm text-muted-foreground">
+              {t("audit.login_summary_ok")} <span className="font-mono text-foreground">{summary.ok}</span>
+            </span>
+            <span className="text-sm text-muted-foreground">
+              {t("audit.login_summary_failed")}{" "}
+              <span className={`font-mono ${summary.failed > 0 ? "text-destructive-ink" : "text-foreground"}`}>
+                {summary.failed}
+              </span>
+            </span>
+            <span className="text-sm text-muted-foreground">
+              {t("audit.login_summary_ips")} <span className="font-mono text-foreground">{summary.distinct_ips}</span>
+            </span>
+          </div>
+          {summary.by_country.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {summary.by_country.slice(0, 8).map((row) => (
+                <Badge
+                  key={row.country}
+                  variant={row.failed > 0 ? "destructive" : "secondary"}
+                  title={`${row.country}: ${row.failed} failed / ${row.ok} ok`}
+                >
+                  {countryLabel(t, row.country)} · {row.failed}/{row.ok}
+                </Badge>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
       <PageToolbar sticky>
         <Select value={resultFilter || "all"} onValueChange={(v) => setResultFilter(v === "all" || !v ? "" : v)}>
           <SelectTrigger className="w-[180px]" aria-label={t("audit.login_result")}>

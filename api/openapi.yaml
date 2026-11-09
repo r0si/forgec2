@@ -2207,6 +2207,24 @@ paths:
                                 details: {type: string}
                                 created_at: {type: string, format: date-time}
                           total: {type: integer}
+                          summary:
+                            type: object
+                            description: >-
+                              24-hour rollup of auth activity grouped by the
+                              country resolved for each source IP.
+                            properties:
+                              window_hours: {type: integer}
+                              failed: {type: integer}
+                              ok: {type: integer}
+                              distinct_ips: {type: integer}
+                              by_country:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    country: {type: string}
+                                    failed: {type: integer}
+                                    ok: {type: integer}
 
   /audit/logs:
     get:

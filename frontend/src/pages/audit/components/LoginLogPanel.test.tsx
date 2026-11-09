@@ -7,7 +7,10 @@ import { paths } from "@/lib/api-paths";
 vi.mock("@/lib/api", () => ({ api: { get: vi.fn() } }));
 
 vi.mock("@/lib/i18n", () => ({
-  useI18n: () => ({ t: (key: string) => key }),
+  useI18n: () => ({
+    t: (key: string) =>
+      key === "audit.login_country_local" ? "本地 / 内网" : key,
+  }),
 }));
 
 const ROWS = [
@@ -27,9 +30,31 @@ const ROWS = [
 ];
 
 describe("LoginLogPanel", () => {
+  const SUMMARY = {
+    window_hours: 24,
+    failed: 2,
+    ok: 7,
+    distinct_ips: 3,
+    by_country: [
+      { country: "美国", failed: 2, ok: 0 },
+      { country: "中国", failed: 0, ok: 5 },
+      { country: "local", failed: 0, ok: 2 },
+    ],
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(api.get).mockResolvedValue({ events: ROWS, total: 3 });
+    vi.mocked(api.get).mockResolvedValue({ events: ROWS, total: 3, summary: SUMMARY });
+  });
+
+  it("summarises the last 24 hours by country", async () => {
+    render(<LoginLogPanel />);
+    await screen.findByText("audit.login_summary_title");
+    expect(screen.getByText("2")).toBeTruthy();
+    expect(screen.getByText("7")).toBeTruthy();
+    // The failed country is listed with its failed/ok split.
+    expect(screen.getByText("美国 · 2/0")).toBeTruthy();
+    expect(screen.getByText("本地 / 内网 · 0/2")).toBeTruthy();
   });
 
   it("renders the recorded time, user, IP and country for each sign-in", async () => {
@@ -39,7 +64,7 @@ describe("LoginLogPanel", () => {
     expect(screen.getByText("德国")).toBeTruthy();
     expect(screen.getByText("2026-11-09T08:30:00Z")).toBeTruthy();
     // Loopback reads as a named category, not as a missing country.
-    expect(screen.getByText("audit.login_country_local")).toBeTruthy();
+    expect(screen.getAllByText("本地 / 内网").length).toBeGreaterThan(0);
   });
 
   it("marks failed attempts and keeps them visually distinct", async () => {

@@ -1,7 +1,9 @@
 package server
 
 import (
+	"log/slog"
 	"net/http"
+	"sort"
 	"time"
 
 	"github.com/forgec2/forgec2/internal/db"
@@ -96,5 +98,89 @@ func (s *Server) handleGetLoginEvents(c *gin.Context) {
 		"total":     total,
 		"page":      p.Page,
 		"page_size": p.PageSize,
+		"summary":   s.loginEventSummary(c),
 	})
+}
+
+// loginEventSummary aggregates the last 24 hours of auth activity by country.
+//
+// Operators open the login log to answer one question first: "is someone
+// hammering us, and from where?" A page of newest-first rows answers it only
+// by reading every row, so the panel gets a 24h rollup alongside the table.
+func (s *Server) loginEventSummary(c *gin.Context) gin.H {
+	since := time.Now().Add(-24 * time.Hour)
+
+	type ipCount struct {
+		IP     string
+		Failed int64
+		OK     int64
+	}
+	var counts []ipCount
+	// One grouped query over the window, capped: a login log covering a
+	// thousand distinct IPs must not turn the panel into a full scan.
+	if err := s.auditTenantScope(s.db.Model(&db.AuditLog{}), c).
+		Select("ip, SUM(CASE WHEN success THEN 0 ELSE 1 END) AS failed, SUM(CASE WHEN success THEN 1 ELSE 0 END) AS ok").
+		Where("action IN ?", loginActions).
+		Where("created_at >= ?", since).
+		Group("ip").
+		Order("failed DESC").
+		Limit(20).
+		Scan(&counts).Error; err != nil {
+		// The rollup is advisory: a failed aggregate must not hide the rows.
+		slog.Warn("Login event summary failed", "err", err)
+		return gin.H{}
+	}
+
+	type countryStat struct {
+		Country string `json:"country"`
+		Failed  int64  `json:"failed"`
+		OK      int64  `json:"ok"`
+	}
+	byCountry := map[string]*countryStat{}
+	var failedTotal, okTotal int64
+	ctx := c.Request.Context()
+	budget := loginGeoPerRequest
+	for _, row := range counts {
+		failedTotal += row.Failed
+		okTotal += row.OK
+		country := "unknown"
+		if row.IP != "" {
+			var countryResolved string
+			if budget > 0 {
+				countryResolved, _ = s.loginCountry(ctx, row.IP)
+				budget--
+			} else {
+				countryResolved, _ = s.cachedLoginCountry(ctx, row.IP)
+			}
+			if countryResolved != "" {
+				country = countryResolved
+			}
+		}
+		stat := byCountry[country]
+		if stat == nil {
+			stat = &countryStat{Country: country}
+			byCountry[country] = stat
+		}
+		stat.Failed += row.Failed
+		stat.OK += row.OK
+	}
+
+	ordered := make([]countryStat, 0, len(byCountry))
+	for _, stat := range byCountry {
+		ordered = append(ordered, *stat)
+	}
+	sort.Slice(ordered, func(i, j int) bool {
+		if ordered[i].Failed != ordered[j].Failed {
+			return ordered[i].Failed > ordered[j].Failed
+		}
+		return ordered[i].Country < ordered[j].Country
+	})
+
+	return gin.H{
+		"window_hours": 24,
+		"failed":       failedTotal,
+		"ok":           okTotal,
+		"by_country":   ordered,
+		"distinct_ips": len(counts),
+	}
 }

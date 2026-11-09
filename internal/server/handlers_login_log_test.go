@@ -125,11 +125,65 @@ func TestLoginEventsReportIPTimeAndCountry(t *testing.T) {
 	if paged.Data.Total != 4 || len(paged.Data.Events) != 2 {
 		t.Fatalf("page 2 = %d events of total %d, want 2 of 4", len(paged.Data.Events), paged.Data.Total)
 	}
+
+	// The 24h rollup answers "is someone hammering us, and from where?" without
+	// reading every row: totals, distinct IPs, and failures grouped by country.
+	// Rows older than the window must not count.
+	old := db.AuditLog{
+		User: "legacy", Action: "login_failed", Resource: "auth", IP: "203.0.113.9",
+		Success: false, CreatedAt: time.Now().Add(-30 * time.Hour),
+	}
+	if err := s.db.Create(&old).Error; err != nil {
+		t.Fatal(err)
+	}
+	w, withSummary := call("?page=1&pageSize=50")
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d %s", w.Code, w.Body.String())
+	}
+	sum := withSummary.Data.Summary
+	if sum.WindowHours != 24 {
+		t.Fatalf("window_hours = %d, want 24", sum.WindowHours)
+	}
+	// Seeds: 2 successes (alice login, admin loopback) + alice logout,
+	// 1 failure (mallory). The 30h-old failure is outside the window.
+	if sum.Failed != 1 {
+		t.Fatalf("failed = %d, want 1 (the 30h-old attempt must not count): %+v", sum.Failed, sum)
+	}
+	if sum.OK != 3 {
+		t.Fatalf("ok = %d, want 3", sum.OK)
+	}
+	// The failed attempt came from the 美国 IP, so that country leads the list.
+	if len(sum.ByCountry) == 0 || sum.ByCountry[0].Country != "美国" || sum.ByCountry[0].Failed != 1 {
+		t.Fatalf("by_country = %+v, want 美国 first with 1 failure", sum.ByCountry)
+	}
+	var sawLocal, sawDE bool
+	for _, c := range sum.ByCountry {
+		switch c.Country {
+		case "local":
+			sawLocal = true
+		case "德国":
+			sawDE = true
+		}
+	}
+	if !sawLocal || !sawDE {
+		t.Fatalf("by_country misses local/德国: %+v", sum.ByCountry)
+	}
 }
 
 type loginEventsResponse struct {
 	Data struct {
-		Events []loginEvent `json:"events"`
-		Total  int64        `json:"total"`
+		Events  []loginEvent `json:"events"`
+		Total   int64        `json:"total"`
+		Summary struct {
+			WindowHours int   `json:"window_hours"`
+			Failed      int64 `json:"failed"`
+			OK          int64 `json:"ok"`
+			DistinctIPs int   `json:"distinct_ips"`
+			ByCountry   []struct {
+				Country string `json:"country"`
+				Failed  int64  `json:"failed"`
+				OK      int64  `json:"ok"`
+			} `json:"by_country"`
+		} `json:"summary"`
 	} `json:"data"`
 }
