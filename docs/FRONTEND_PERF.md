@@ -151,32 +151,36 @@ its raw dotted name.
 
 ## Page-only dictionary fragments (2026-11)
 
-`agents.*` (58 kB of source) and `settings.*` (27 kB) are only rendered by
-beacon and settings/roles pages, but they sat in the startup dictionary that
-every authenticated page fetches. They are now plain data modules
-(`lib/i18n/fragments/en.agents.ts`, `en.settings.ts`); the route entry registers
-the module it needs with `registerFragment`, and `t()` consults that registry
-between the active dictionary and the shell slice.
+`agents.*` (58 kB of source), `settings.*` (27 kB) and `generate.*` (309 keys,
+19 kB) are only rendered by their own pages, but they sat in the startup
+dictionary that every authenticated page fetches. They are now plain data
+modules (`lib/i18n/fragments/en.{agents,settings,generate}.ts`); the route entry
+registers the module it needs with `registerFragment`, and `t()` consults that
+registry between the active dictionary and the shell slice.
 
 | Chunk | Raw | Gzip | Loaded when |
 | --- | --- | --- | --- |
-| `en-*.js` (startup dictionary) | 165,071 | 45,566 | every authenticated page |
-| `i18n-agents-*.js` | 53,399 | 14,278 | beacon/loot/roles/tags/toolkit/asset pages |
+| `en-*.js` (startup dictionary) | 147,226 | 40,352 | every authenticated page |
+| `i18n-agents-*.js` | 53,479 | 14,345 | beacon/loot/roles/tags/toolkit/asset pages |
 | `i18n-settings-*.js` | 25,733 | 7,027 | settings/roles/asset pages |
+| `i18n-generate-*.js` | 17,868 | 5,618 | payload factory, listeners, beacon pages, settings |
 | previous `en-*.js` | 244,088 | 66,010 | every authenticated page |
 
-Savings against the single dictionary: **−79 kB raw / −20 kB gzip** on pages
-that need neither namespace (dashboard, events, listeners, …), −25 kB raw on
-beacon pages and −53 kB raw on settings pages. The fragments stay out of
-`index.html`'s preload (asserted by `check-bundle` + e2e); the registry lives in
-`lib/i18n/index.tsx` because a separate registry module was merged into the
-lazy agents chunk by Rolldown, which put the 53 kB back into first paint.
+Savings against the single dictionary: **−97 kB raw / −26 kB gzip** on pages
+that need none of the three namespaces (dashboard, events, AI, audit, …), −25 kB
+raw on beacon-list/detail pages (agents + generate), −53 kB raw on settings
+pages (settings + generate) and −79 kB raw on the payload factory (generate).
+The fragments stay out of `index.html`'s preload (asserted by `check-bundle` +
+e2e); the registry lives in `lib/i18n/index.tsx` because a separate registry
+module was merged into the lazy agents chunk by Rolldown, which put the 53 kB
+back into first paint.
 
 The `agents.*` / `settings.*` keys the shell itself needs were renamed to
 `nav.beacon_*` / `topbar.online_label` and moved into the bootstrap slice, so no
 header/sidebar/breadcrumb string depends on a page fragment. `check:i18n`
 counts fragment keys as defined English keys, and `e2e/layout.spec.ts` asserts
-`/beacons` pulls `i18n-agents` (not just `en`) and that neither page renders a
+`/beacons` pulls `i18n-agents`, `/settings` pulls `i18n-settings`,
+`/payload-generator` pulls `i18n-generate`, and none of those pages renders a
 raw dotted key.
 
 ## Deferred toaster (2026-11)

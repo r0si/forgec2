@@ -157,6 +157,7 @@ const LAZY_ONLY_PREFIXES = [
   "vendor-baseui-forms",
   "i18n-agents",
   "i18n-settings",
+  "i18n-generate",
 ];
 const leakedLazy = [...critical.keys()].filter((n) => LAZY_ONLY_PREFIXES.some((p) => n.startsWith(p)));
 

@@ -183,6 +183,7 @@ export default defineConfig(({ command }) => {
             if (id.includes("lib/i18n/fragments/")) {
               if (id.includes("en.agents")) return "i18n-agents";
               if (id.includes("en.settings")) return "i18n-settings";
+              if (id.includes("en.generate")) return "i18n-generate";
             }
             return;
           }

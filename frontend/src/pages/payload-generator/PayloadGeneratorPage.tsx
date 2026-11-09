@@ -1,3 +1,7 @@
+import { registerFragment } from "@/lib/i18n";
+import { enGenerate } from "@/lib/i18n/fragments/en.generate";
+registerFragment(enGenerate);
+
 import { lazy, Suspense, useEffect, useState } from "react";
 
 import { useI18n } from "@/lib/i18n";

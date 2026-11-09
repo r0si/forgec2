@@ -1,6 +1,8 @@
 import { registerFragment } from "@/lib/i18n";
 import { enAgents } from "@/lib/i18n/fragments/en.agents";
+import { enGenerate } from "@/lib/i18n/fragments/en.generate";
 registerFragment(enAgents);
+registerFragment(enGenerate);
 
 import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";

@@ -1,6 +1,8 @@
 import { registerFragment } from "@/lib/i18n";
 import { enAgents } from "@/lib/i18n/fragments/en.agents";
+import { enGenerate } from "@/lib/i18n/fragments/en.generate";
 registerFragment(enAgents);
+registerFragment(enGenerate);
 import { useParams } from "react-router-dom";
 import { Banner } from "@/components/ui/banner";
 import { PageContainer } from "@/components/ui/page-container";

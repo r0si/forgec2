@@ -1,4 +1,8 @@
 
+import { registerFragment } from "@/lib/i18n";
+import { enGenerate } from "@/lib/i18n/fragments/en.generate";
+registerFragment(enGenerate);
+
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { z } from "zod";
