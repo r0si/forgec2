@@ -18,7 +18,7 @@ database, one HTTP listener, and **no** beacon transport.
 
 | layer | detail |
 |---|---|
-| backend | container `forgec2-demo` from the published image (this deployment pins `sha256:3526d970…`, i.e. the `edge` build of `fb9b4ee31`), `network_mode: host`, `read_only`, `working_dir: /data`, binds `127.0.0.1:18000` only |
+| backend | container `forgec2-demo` from the published image (this deployment pins `sha256:8414f2dc…`, i.e. the `edge` build of `c3dfe334a`), `network_mode: host`, `read_only`, `working_dir: /data`, binds `127.0.0.1:18000` only |
 | database | PostgreSQL 18 on the host (`127.0.0.1:5432`, role `forgec2`, db `forgec2`) |
 | edge | standalone nginx (`deploy/demo/nginx.conf`) listening on `0.0.0.0:8000`, proxying everything to the backend |
 | state | `/opt/forgec2-demo/container-data` (uid/gid 65532), config mounted read-only from `/opt/forgec2-demo/compose/config.yaml` |
@@ -72,7 +72,7 @@ Requirements specific to this host and documented rather than hidden:
 
 - **GHCR is not reachable directly.** The image is pulled through a read-only
   mirror serving the identical manifest (`ghcr.nju.edu.cn/r0si/forgec2`, pulled
-  by digest `sha256:3526d970…`). Set `FORGEC2_IMAGE` to the mirror, tag or
+  by digest `sha256:8414f2dc…`). Set `FORGEC2_IMAGE` to the mirror, tag or
   digest, in `.env`.
 - **Docker Hub is not reachable**, so PostgreSQL is the host package rather
   than the compose `postgres` profile. Swapping to the profile only means
