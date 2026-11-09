@@ -176,11 +176,11 @@ export default memo(function AgentHeader({
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:w-[34rem]">
-              <Button variant="outline" size="sm" render={<Link to={`/beacons/${agentId}/shell`} />}><Terminal className="size-4" /> {t("agents.shell_title")} <kbd className="text-micro-sm opacity-50 ml-1">S</kbd></Button>
+              <Button variant="outline" size="sm" render={<Link to={`/beacons/${agentId}/shell`} />}><Terminal className="size-4" /> {t("nav.beacon_shell_title")} <kbd className="text-micro-sm opacity-50 ml-1">S</kbd></Button>
               <Button variant="outline" size="sm" render={<Link to={`/ai?agent=${encodeURIComponent(agentId)}`} />}><Bot className="size-4" /> {t("ai.open_for_agent")}</Button>
               <Button variant="outline" size="sm" render={<Link to={rebuildPayloadHref(agent)} />}><RefreshCw className="size-4" /> {t("agents.rebuild_payload")}</Button>
               <Button variant="outline" size="sm" render={<Link to={`/beacons/${agentId}/files`} />}><FolderOpen className="size-4" /> {t("agents.files_title")} <kbd className="text-micro-sm opacity-50 ml-1">F</kbd></Button>
-              <Button variant="outline" size="sm" render={<Link to={`/beacons/${agentId}/screen`} />}><Monitor className="size-4" /> {t("agents.screen_title")} <span className="text-micro opacity-70"><QualityMark quality="hardened" /></span> <kbd className="text-micro-sm opacity-50 ml-1">D</kbd></Button>
+              <Button variant="outline" size="sm" render={<Link to={`/beacons/${agentId}/screen`} />}><Monitor className="size-4" /> {t("nav.beacon_screen")} <span className="text-micro opacity-70"><QualityMark quality="hardened" /></span> <kbd className="text-micro-sm opacity-50 ml-1">D</kbd></Button>
               <Button variant="outline" size="sm" onClick={onPopOut} aria-label={t("agents.popout_console")}>
                 <PictureInPicture2 className="size-4" /> {t("agents.popout_console")}
               </Button>
@@ -188,15 +188,15 @@ export default memo(function AgentHeader({
                 <DropdownMenuTrigger render={<Button variant="secondary" size="sm" className="gap-1.5"><MoreHorizontal className="size-4" /> {t("agents.header_more")}</Button>} />
                 <DropdownMenuContent className="w-48">
                   <DropdownMenuItem render={<Link to={`/beacons/${agentId}/token`} />}>
-                    <Key className="size-4" /> {t("agents.token_title")}
+                    <Key className="size-4" /> {t("nav.beacon_token")}
                     <span className="ml-auto text-micro text-muted-foreground"><QualityMark quality="hardened" /></span>
                   </DropdownMenuItem>
                   <DropdownMenuItem render={<Link to={`/beacons/${agentId}/persistence`} />}>
-                    <LinkIcon className="size-4" /> {t("agents.persistence_title")}
+                    <LinkIcon className="size-4" /> {t("nav.beacon_persistence")}
                     <span className="ml-auto text-micro text-muted-foreground"><QualityMark quality="hardened" /></span>
                   </DropdownMenuItem>
                   <DropdownMenuItem render={<Link to={`/beacons/${agentId}/remote-desktop`} />}>
-                    <Monitor className="size-4" /> {t("agents.rdp_title")}
+                    <Monitor className="size-4" /> {t("nav.beacon_rdp")}
                     {isExperimentalDesktop("remote-desktop") ? (
                       <span className="ml-auto text-micro text-warning-ink"><QualityMark quality="experimental" /></span>
                     ) : null}

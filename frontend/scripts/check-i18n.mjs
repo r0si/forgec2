@@ -63,13 +63,29 @@ function keysFromFile(content) {
   return keys;
 }
 
+function localeKeys(baseFile) {
+  const keys = keysFromFile(fs.readFileSync(baseFile, "utf8"));
+  // Split fragments (`fragments/en.agents.ts`, …) are part of the English
+  // dictionary: they load with their page chunks, not the startup chunk, but
+  // their keys must count as defined and as used.
+  const base = path.basename(baseFile, ".ts");
+  for (const dir of [I18N_DIR, path.join(I18N_DIR, "fragments")]) {
+    if (!fs.existsSync(dir)) continue;
+    for (const entry of fs.readdirSync(dir)) {
+      if (!entry.startsWith(base + ".") || !entry.endsWith(".ts") || entry.includes(".sync.")) continue;
+      for (const key of keysFromFile(fs.readFileSync(path.join(dir, entry), "utf8"))) keys.add(key);
+    }
+  }
+  return keys;
+}
+
 function main() {
   if (!fs.existsSync(EN_FILE) || !fs.existsSync(ZH_FILE)) {
     console.error("i18n locale files not found at", I18N_DIR);
     process.exit(1);
   }
-  const enKeys = keysFromFile(fs.readFileSync(EN_FILE, "utf8"));
-  const zhKeys = keysFromFile(fs.readFileSync(ZH_FILE, "utf8"));
+  const enKeys = localeKeys(EN_FILE);
+  const zhKeys = localeKeys(ZH_FILE);
 
   const used = new Set();
   // Keys that appear literally somewhere outside the dictionaries. The t()

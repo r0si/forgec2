@@ -143,7 +143,17 @@ const criticalBytes = [...critical.values()].reduce((a, b) => a + b, 0);
 // page-only base-ui subpath became entry-reachable). The budget above can be
 // too coarse to catch that: the icon-pages bucket is ~60 kB, well under the
 // headroom, while every visitor now pays it before painting.
-const LAZY_ONLY_PREFIXES = ["vendor-icons-pages", "vendor-misc-pages", "vendor-baseui-forms"];
+//
+// i18n-* is the same shape and shipped once: the fragment modules imported the
+// i18n provider/registry, Rolldown merged the provider into i18n-agents, and
+// the entry preloaded the 72 kB chunk — the split was live but saved nothing.
+const LAZY_ONLY_PREFIXES = [
+  "vendor-icons-pages",
+  "vendor-misc-pages",
+  "vendor-baseui-forms",
+  "i18n-agents",
+  "i18n-settings",
+];
 const leakedLazy = [...critical.keys()].filter((n) => LAZY_ONLY_PREFIXES.some((p) => n.startsWith(p)));
 
 const mb = (b) => `${(b / 1024 / 1024).toFixed(2)}MB`;

@@ -288,7 +288,7 @@ export const AgentRow = memo(function AgentRow({
             variant="ghost"
             size="icon-xs"
             className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
-            aria-label={t("agents.shell_title")}
+            aria-label={t("nav.beacon_shell_title")}
             onClick={(e) => { e.stopPropagation(); onQuickNav?.(beacon, "shell"); }}
           >
             <Terminal className="size-4" />
@@ -306,7 +306,7 @@ export const AgentRow = memo(function AgentRow({
             variant="ghost"
             size="icon-xs"
             className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
-            aria-label={t("agents.screen_title")}
+            aria-label={t("nav.beacon_screen")}
             onClick={(e) => { e.stopPropagation(); onQuickNav?.(beacon, "screen"); }}
           >
             <Monitor className="size-4" />

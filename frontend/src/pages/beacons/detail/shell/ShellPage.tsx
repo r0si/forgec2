@@ -1,3 +1,6 @@
+import { registerFragment } from "@/lib/i18n";
+import { enAgents } from "@/lib/i18n/fragments/en.agents";
+registerFragment(enAgents);
 
 import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -110,7 +113,7 @@ export default function AgentShellPage() {
       if (controller.signal.aborted) return;
       setAgents(list);
       setListError(error);
-      if (error) toast.error(t("agents.list_unreadable", { message: error }));
+      if (error) toast.error(t("error.agents_list_unreadable", { message: error }));
       setMetaByAgent((prev) => {
         const merged = { ...prev };
         for (const a of list) {
@@ -343,7 +346,7 @@ export default function AgentShellPage() {
         </div>
       )}
       {listError && (
-        <p className="shrink-0 px-4 py-1.5 text-xs text-red-300" role="alert">{t("agents.list_unreadable", { message: listError })}</p>
+        <p className="shrink-0 px-4 py-1.5 text-xs text-red-300" role="alert">{t("error.agents_list_unreadable", { message: listError })}</p>
       )}
       <div className="relative flex min-h-0 flex-1 flex-col">
         {tabs.map((tab) => {

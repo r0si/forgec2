@@ -10,14 +10,14 @@ function normalizeKey(seg: string): string {
 }
 
 const SUB_ROUTE_LABELS: Record<string, string> = {
-  config: "agents.config_title",
-  shell: "agents.shell",
+  config: "nav.beacon_config",
+  shell: "nav.beacon_shell",
   files: "nav.files",
-  screen: "agents.screen_title",
-  "remote-desktop": "agents.rdp_title",
-  token: "agents.token_title",
+  screen: "nav.beacon_screen",
+  "remote-desktop": "nav.beacon_rdp",
+  token: "nav.beacon_token",
   traffic: "nav.traffic",
-  persistence: "agents.persistence_title",
+  persistence: "nav.beacon_persistence",
 };
 
 function Breadcrumb() {

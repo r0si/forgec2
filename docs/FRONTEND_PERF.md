@@ -132,12 +132,11 @@ chunks out of `index.html`. A revisit of the shell revalidates to `304` with a
 
 ## Dictionary deferral (2026-11)
 
-The full English dictionary ships as its own lazy chunk (`en-*.js`, 244 kB raw /
-~66 kB gzip). The provider used to fetch it on mount on **every** route,
-including `/login`, so the public demo's front door paid it before the visitor
-signed in. Now:
+The English dictionary ships as its own lazy chunk (`en-*.js`). The provider
+used to fetch it on mount on **every** route, including `/login`, so the public
+demo's front door paid it before the visitor signed in. Now:
 
-- `ClientProvider` mounts a **bootstrap-only** provider (183 keys: nav, topbar,
+- `ClientProvider` mounts a **bootstrap-only** provider (194 keys: nav, topbar,
   sections, a11y, common, login, error, notfound, forbidden).
 - `MainLayout` mounts a **full** provider for authenticated routes; `AppLayout`
   already holds the routed page until `ready`, so no raw key can flash.
@@ -149,6 +148,36 @@ one extra provider instance per navigation between the public and app shells.
 The bootstrap slice is generated (`scripts/gen-i18n-bootstrap.mjs`) and gated by
 `check:i18n-bootstrap`, so a new login/shell key cannot silently fall back to
 its raw dotted name.
+
+## Page-only dictionary fragments (2026-11)
+
+`agents.*` (58 kB of source) and `settings.*` (27 kB) are only rendered by
+beacon and settings/roles pages, but they sat in the startup dictionary that
+every authenticated page fetches. They are now plain data modules
+(`lib/i18n/fragments/en.agents.ts`, `en.settings.ts`); the route entry registers
+the module it needs with `registerFragment`, and `t()` consults that registry
+between the active dictionary and the shell slice.
+
+| Chunk | Raw | Gzip | Loaded when |
+| --- | --- | --- | --- |
+| `en-*.js` (startup dictionary) | 165,071 | 45,566 | every authenticated page |
+| `i18n-agents-*.js` | 53,399 | 14,278 | beacon/loot/roles/tags/toolkit/asset pages |
+| `i18n-settings-*.js` | 25,733 | 7,027 | settings/roles/asset pages |
+| previous `en-*.js` | 244,088 | 66,010 | every authenticated page |
+
+Savings against the single dictionary: **−79 kB raw / −20 kB gzip** on pages
+that need neither namespace (dashboard, events, listeners, …), −25 kB raw on
+beacon pages and −53 kB raw on settings pages. The fragments stay out of
+`index.html`'s preload (asserted by `check-bundle` + e2e); the registry lives in
+`lib/i18n/index.tsx` because a separate registry module was merged into the
+lazy agents chunk by Rolldown, which put the 53 kB back into first paint.
+
+The `agents.*` / `settings.*` keys the shell itself needs were renamed to
+`nav.beacon_*` / `topbar.online_label` and moved into the bootstrap slice, so no
+header/sidebar/breadcrumb string depends on a page fragment. `check:i18n`
+counts fragment keys as defined English keys, and `e2e/layout.spec.ts` asserts
+`/beacons` pulls `i18n-agents` (not just `en`) and that neither page renders a
+raw dotted key.
 
 ## First-paint JS split (2026-11)
 

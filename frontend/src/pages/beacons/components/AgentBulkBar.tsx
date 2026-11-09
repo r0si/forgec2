@@ -53,7 +53,7 @@ export function AgentBulkBar({
       {!bulkMode && selected.size > 0 && (
         <div className="mb-3 px-4 py-3 bg-sidebar border border-border rounded-lg flex flex-wrap items-center gap-2 shadow-sm">
           <span className="text-sm text-foreground font-medium mr-2">{t("agents.n_selected").replace("{n}", String(selected.size))}</span>
-          <Button size="sm" onClick={onBulkShell} ><Terminal className="size-4" />{t("agents.shell")}</Button>
+          <Button size="sm" onClick={onBulkShell} ><Terminal className="size-4" />{t("nav.beacon_shell")}</Button>
           <Button size="sm" variant="secondary" onClick={onBulkScreenshot}><Camera className="size-4" />{t("agents.screenshot")}</Button>
           <Button size="sm" variant="secondary" onClick={onBulkBeaconNow}><Radio className="size-4" />{t("agents.beacon_now")}</Button>
           <Button size="sm" variant="secondary" onClick={onBulkSleep}><Clock className="size-4" />{t("agents.sleep")}</Button>

@@ -170,14 +170,14 @@ export const NAV_SEGMENT_LABELS: Record<string, string> = Object.fromEntries(
 
 /** Sub-route segment -> labelKey for per-page document.title. */
 const SUB_ROUTE_TITLE_KEYS: Record<string, string> = {
-  config: "agents.config_title",
-  shell: "agents.shell",
+  config: "nav.beacon_config",
+  shell: "nav.beacon_shell",
   files: "nav.files",
-  screen: "agents.screen_title",
-  "remote-desktop": "agents.rdp_title",
-  token: "agents.token_title",
+  screen: "nav.beacon_screen",
+  "remote-desktop": "nav.beacon_rdp",
+  token: "nav.beacon_token",
   traffic: "nav.traffic",
-  persistence: "agents.persistence_title",
+  persistence: "nav.beacon_persistence",
 };
 
 /** Resolve the i18n label key for a pathname (deepest named segment first).

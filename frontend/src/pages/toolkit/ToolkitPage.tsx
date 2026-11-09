@@ -1,3 +1,6 @@
+import { registerFragment } from "@/lib/i18n";
+import { enAgents } from "@/lib/i18n/fragments/en.agents";
+registerFragment(enAgents);
 
 import { useEffect, useState } from "react";
 import { StatusBadge } from "@/components/ui/status-indicator";

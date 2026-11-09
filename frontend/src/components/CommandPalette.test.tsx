@@ -18,7 +18,7 @@ vi.mock("@/lib/i18n", () => ({
       if (key === "palette.title") return "Command palette";
       if (key === "palette.no_results") return "No results";
       if (key === "palette.agents") return "Agents";
-      if (key === "agents.shell_title") return "Shell";
+      if (key === "nav.beacon_shell_title") return "Shell";
       return key;
     },
   }),

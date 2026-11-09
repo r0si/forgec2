@@ -1,3 +1,8 @@
+import { registerFragment } from "@/lib/i18n";
+import { enAgents } from "@/lib/i18n/fragments/en.agents";
+import { enSettings } from "@/lib/i18n/fragments/en.settings";
+registerFragment(enAgents);
+registerFragment(enSettings);
 
 import { useState } from "react";
 import { api } from "@/lib/api";

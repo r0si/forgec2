@@ -1,3 +1,6 @@
+import { registerFragment } from "@/lib/i18n";
+import { enAgents } from "@/lib/i18n/fragments/en.agents";
+registerFragment(enAgents);
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams } from "react-router-dom";
@@ -367,7 +370,7 @@ export default function AgentTokenPage() {
     );
   };  return (
     <PageContainer
-      title={t("agents.token_title")}
+      title={t("nav.beacon_token")}
       subtitle={t("agents.token_subtitle", { hostname: agentId.substring(0, 12) })}
       icon={<BadgeInfo className="size-4" />}
       actions={
@@ -467,7 +470,7 @@ export default function AgentTokenPage() {
       <Card className="overflow-hidden">
         <div className="px-5 py-3 border-b border-border flex items-center justify-between">
           <h2 className="text-sm font-semibold text-foreground">
-            <List className="size-4" />{t("agents.token_title")} ({tokenError ? "?" : tokens.length})
+            <List className="size-4" />{t("nav.beacon_token")} ({tokenError ? "?" : tokens.length})
           </h2>          <div className="flex items-center gap-2">
             <div className="text-xs text-muted-foreground">
               <span className="inline-flex items-center gap-1.5">

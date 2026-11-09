@@ -153,7 +153,7 @@ export default memo(function RdpStage({
             <SafeImg
               ref={imgRef}
               src={safeImageSrc(screenData)}
-              alt={t("agents.rdp_title")}
+              alt={t("nav.beacon_rdp")}
               className="max-w-full max-h-full object-contain"
               draggable={false}
               loading="lazy"

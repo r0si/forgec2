@@ -4,6 +4,40 @@ import { en as enSync } from "@i18n-sync";
 
 export type Locale = "en" | "zh";
 
+// ── Lazy English dictionary fragments ────────────────────────────────────────
+// The English dictionary is one dynamic chunk (~165 kB) fetched at startup. Two
+// large namespaces are only needed by page chunks (`agents.*` by the beacon
+// pages, `settings.*` by settings/roles), so they live in plain data modules
+// that the route entry registers here. `t()` consults this table after the
+// active dictionary, so a page translates from the moment it renders and the
+// startup chunk stays smaller.
+//
+// The registry lives in THIS module on purpose: the provider already imports it,
+// so the state is a single copy in the entry chunk. A separate registry module
+// was shared only by the provider and the two fragment chunks, and Rolldown
+// merged it into `i18n-agents` — which put the whole 53 kB agents dictionary
+// back into first paint. Page chunks import this module anyway (for useI18n),
+// so registration adds no bytes to them.
+//
+// zh is not split: it loads only for zh users and stays whole, so a zh user
+// never depends on fragment registration order. An English fragment is still
+// the fallback for a key missing from zh.
+type Dict = Record<string, string>;
+
+const fragments: Dict = {};
+
+/** Merge a fragment into the lookup table. Idempotent per key. */
+export function registerFragment(dict: Dict): void {
+  for (const key in dict) {
+    fragments[key] = dict[key];
+  }
+}
+
+/** Value for a key registered by a loaded fragment, if any. */
+export function fragmentValue(key: string): string | undefined {
+  return fragments[key];
+}
+
 interface I18nContextType {
   locale: Locale;
   setLocale: (locale: Locale) => void;
@@ -22,11 +56,9 @@ const defaultI18n: I18nContextType = {
 };
 const I18nContext = createContext<I18nContextType>(defaultI18n);
 
-type Dict = Record<string, string>;
-
-// The full English dictionary is ~239 kB and used to sit on the first-paint
-// path. Only the shell is synchronous now (bootstrap.ts); the rest arrives as
-// its own chunk and is merged in. Dev and test resolve @i18n-sync to the real
+// The full English dictionary used to sit on the first-paint path at ~244 kB.
+// Only the shell is synchronous now (bootstrap.ts); the rest arrives as its own
+// chunk and is merged in. Dev and test resolve @i18n-sync to the real
 // dictionary so assertions see translated text immediately; a production build
 // resolves it to an empty module.
 const bootstrapDict: Dict = enBootstrap;
@@ -175,7 +207,10 @@ export function I18nProvider({ children, full = true }: { children: ReactNode; f
   // with the complete strings instead of the bootstrap slice.
   const t = useCallback((key: string, params?: Record<string, string | number>): string => {
     const dict = dictFor(localeRef.current);
-    let val = dict[key] || bootstrapDict[key] || key;
+    // Registered page fragments sit between the active dictionary and the
+    // synchronous shell slice: a page that imported its fragment translates
+    // immediately, and it is also the fallback when zh lacks a key.
+    let val = dict[key] || fragmentValue(key) || bootstrapDict[key] || key;
     if (params) {
       Object.entries(params).forEach(([k, v]) => {
         val = val.replace(new RegExp(`\\{${k}\\}`, "g"), String(v));

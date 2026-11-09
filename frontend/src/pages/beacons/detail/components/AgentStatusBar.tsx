@@ -54,7 +54,7 @@ export default memo(function AgentStatusBar({ agent, agentId, status }: AgentSta
             <div className="ml-auto flex items-center gap-1.5 shrink-0">
               <Tooltip>
                 <TooltipTrigger>
-                  <Button variant="outline" size="sm" render={<Link to={`/beacons/${agentId}/shell`} />} className="h-7 gap-1.5 text-xs"><Terminal className="size-3.5" /> {t("agents.shell_title")}</Button>
+                  <Button variant="outline" size="sm" render={<Link to={`/beacons/${agentId}/shell`} />} className="h-7 gap-1.5 text-xs"><Terminal className="size-3.5" /> {t("nav.beacon_shell_title")}</Button>
                 </TooltipTrigger>
                 <TooltipContent>{t("agents.shortcut_hint", { key: "S" })}</TooltipContent>
               </Tooltip>
@@ -66,7 +66,7 @@ export default memo(function AgentStatusBar({ agent, agentId, status }: AgentSta
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger>
-                  <Button variant="outline" size="sm" render={<Link to={`/beacons/${agentId}/screen`} />} className="h-7 gap-1.5 text-xs"><Monitor className="size-3.5" /> {t("agents.screen_title")}</Button>
+                  <Button variant="outline" size="sm" render={<Link to={`/beacons/${agentId}/screen`} />} className="h-7 gap-1.5 text-xs"><Monitor className="size-3.5" /> {t("nav.beacon_screen")}</Button>
                 </TooltipTrigger>
                 <TooltipContent>{t("agents.shortcut_hint", { key: "D" })}</TooltipContent>
               </Tooltip>

@@ -125,8 +125,8 @@ export function AgentContextMenu({ point, onClose, onAction }: AgentContextMenuP
       <MenuRow icon={<Network />} label={t("agents.dock_cmd_socks")} onClick={() => run("socks")} />
       <MenuRow icon={<Copy />} label={t("agents.copy_id")} onClick={() => run("copy_id")} />
       <MenuRow icon={<RefreshCw />} label={t("agents.rebuild_payload")} onClick={() => run("rebuild")} />
-      <MenuRow icon={<IdCard />} label={`${t("agents.token_title")} · ${t("generate.quality_hardened")}`} onClick={() => run("tokens")} />
-      <MenuRow icon={<Monitor />} label={`${t("agents.screen_title")} · ${t("generate.quality_hardened")}`} onClick={() => run("screen")} />
+      <MenuRow icon={<IdCard />} label={`${t("nav.beacon_token")} · ${t("generate.quality_hardened")}`} onClick={() => run("tokens")} />
+      <MenuRow icon={<Monitor />} label={`${t("nav.beacon_screen")} · ${t("generate.quality_hardened")}`} onClick={() => run("screen")} />
       <Separator className="my-1" />
       <div className="px-2 py-1 text-micro-sm uppercase tracking-wider text-muted-foreground">
         {t("agents.context_danger")}

@@ -12,7 +12,7 @@ vi.mock("./zh", () => ({
   },
 }));
 
-import { I18nProvider, useI18n, getLocale } from "./index";
+import { I18nProvider, useI18n, getLocale, registerFragment } from "./index";
 
 type Locale = "en" | "zh";
 type Snap = {
@@ -119,6 +119,37 @@ describe("I18nProvider", () => {
       captured.setLocale!("en");
     });
     expect(captured.t).toBe(t1);
+  });
+
+  it("resolves keys registered by a lazily loaded page fragment", async () => {
+    // A page chunk registers its fragment at module scope (before render), so
+    // t() must consult the fragment table. The value is also the English
+    // fallback while zh is active: page fragments are English-only.
+    const fragmentKey = "agents.probe_fragment";
+    registerFragment({ [fragmentKey]: "Fragment text" });
+
+    function FragmentProbe() {
+      const { t, setLocale } = useI18n();
+      useEffect(() => {
+        captured.setLocale = setLocale;
+      });
+      return <output data-testid="fragment-probe">{t(fragmentKey)}</output>;
+    }
+
+    render(<I18nProvider><FragmentProbe /></I18nProvider>);
+    expect(screen.getByTestId("fragment-probe").textContent).toBe("Fragment text");
+
+    await act(async () => {
+      captured.setLocale!("zh");
+    });
+    await waitFor(() => expect(getLocale()).toBe("zh"));
+    expect(screen.getByTestId("fragment-probe").textContent).toBe("Fragment text");
+
+    // Leave the module-level locale on en for the following tests.
+    act(() => {
+      captured.setLocale!("en");
+    });
+    expect(getLocale()).toBe("en");
   });
 
   it("keeps the final English selection when a Chinese load is pending", async () => {

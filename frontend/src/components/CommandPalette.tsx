@@ -69,7 +69,7 @@ export default function CommandPalette() {
     const q = normalize(query.trim());
     if (!q) return [];
     const out: PaletteItem[] = [];
-    const shellLabel = t("agents.shell_title");
+    const shellLabel = t("nav.beacon_shell_title");
     for (const agent of agents) {
       const id = agent.id;
       if (!id) continue;

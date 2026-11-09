@@ -74,12 +74,12 @@ export default function TopBar({ onMenuToggle }: { onMenuToggle?: () => void }) 
                 <span className="min-w-16 truncate text-micro-sm text-muted-foreground">{connected ? t("common.live") : reconnectFailed ? t("common.offline") : t("topbar.reconnecting")}</span>
                 {stats && (stats.online_agents ?? 0) > 0 && (
                   <span className="hidden xl:inline-flex items-center gap-1 text-micro-sm font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">
-                    {stats.online_agents} {t("agents.online_label")}
+                    {stats.online_agents} {t("topbar.online_label")}
                   </span>
                 )}
               </span>
             </TooltipTrigger>
-            <TooltipContent>{connected ? t("topbar.ws_connected") : reconnectFailed ? t("topbar.ws_lost") : t("topbar.reconnecting")}{stats ? ` · ${stats.online_agents ?? 0} ${t("agents.online_label")}` : ""}</TooltipContent>
+            <TooltipContent>{connected ? t("topbar.ws_connected") : reconnectFailed ? t("topbar.ws_lost") : t("topbar.reconnecting")}{stats ? ` · ${stats.online_agents ?? 0} ${t("nav.online_label")}` : ""}</TooltipContent>
           </Tooltip>
         </div>
 

@@ -108,7 +108,7 @@ describe("ModulesSection load failures", () => {
     agentsMock.mockRejectedValue({ status: 503, message: "agents down" });
     render(<ModulesSection />);
 
-    await waitFor(() => expect(bodyText()).toContain("agents.list_unreadable·common.server_error"));
+    await waitFor(() => expect(bodyText()).toContain("error.agents_list_unreadable·common.server_error"));
   });
 
   it("falls back to the modules copy on both surfaces when nothing carries a message", async () => {

@@ -29,7 +29,7 @@ export default memo(function ScreenToolbar({
 }: ScreenToolbarProps) {
   return (
     <WorkspaceToolbar
-      title={t("agents.screen_title")}
+      title={t("nav.beacon_screen")}
       icon={Monitor}
       badges={
         <>

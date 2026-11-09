@@ -1,3 +1,6 @@
+import { registerFragment } from "@/lib/i18n";
+import { enAgents } from "@/lib/i18n/fragments/en.agents";
+registerFragment(enAgents);
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { PageContainer } from "@/components/ui/page-container";

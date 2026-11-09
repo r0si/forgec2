@@ -139,6 +139,28 @@ test.describe("responsive shell", () => {
     await expect.poll(() => enChunks.length, { timeout: 10_000 }).toBeGreaterThan(0);
   });
 
+  test("page-only dictionary fragments load with their own pages", async ({ page }) => {
+    await prepare(page);
+    const dictChunks: string[] = [];
+    page.on("request", (request) => {
+      const pathname = new URL(request.url()).pathname;
+      if (/\/assets\/i18n-[\w.-]+\.js$/.test(pathname)) dictChunks.push(pathname);
+    });
+
+    // Beacon pages register the agents.fragment; the settings page registers
+    // settings. Neither is in the startup chunk (en-*.js is).
+    await page.goto("/beacons.html");
+    await expect(page.locator("main").first()).toBeAttached({ timeout: 15_000 });
+    await expect.poll(() => dictChunks.some((c) => c.includes("i18n-agents"))).toBe(true);
+    await expect(page.locator("main")).not.toContainText(/\bagents\.[a-z_]/);
+
+    dictChunks.length = 0;
+    await page.goto("/settings.html");
+    await expect(page.locator("main").first()).toBeAttached({ timeout: 15_000 });
+    await expect.poll(() => dictChunks.some((c) => c.includes("i18n-settings"))).toBe(true);
+    await expect(page.locator("main")).not.toContainText(/\bsettings\.[a-z_]/);
+  });
+
   for (const route of ROUTES) {
     test(`${route} uses a bounded page shell`, async ({ page }) => {
       await prepare(page);

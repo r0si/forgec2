@@ -40,7 +40,7 @@ export default memo(function RdpToolbar({
 }: RdpToolbarProps) {
   return (
     <WorkspaceToolbar
-      title={t("agents.rdp_title")}
+      title={t("nav.beacon_rdp")}
       icon={Users}
       badges={
         <>

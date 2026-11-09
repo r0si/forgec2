@@ -20,7 +20,7 @@ export function useAgentList(options: { enabled?: boolean } = {}) {
   return {
     agents: data ?? [],
     loading,
-    error: error ? t("agents.load_agents_failed") : null,
+    error: error ? t("error.agents_load_failed") : null,
     refresh,
   };
 }

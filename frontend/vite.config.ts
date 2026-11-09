@@ -172,7 +172,20 @@ export default defineConfig(({ command }) => {
           // now paid per route visit instead of by every operator on every
           // first paint. The vendor buckets below stay - they are what stops
           // react being duplicated across chunks.
-          if (!id.includes("node_modules")) return;
+          if (!id.includes("node_modules")) {
+            // Page-only English dictionaries (measured 2026-11: agents 53 kB,
+            // settings 26 kB). They are plain data modules registered by the
+            // route entry that renders them; keeping each in its own chunk is
+            // what stops `en-*.js` (165 kB) from carrying both. Do NOT let the
+            // fragment modules import the provider/registry: Rolldown then
+            // merges i18n/index.tsx into these chunks (72 kB) and preloads the
+            // whole thing again, which is exactly what this split removes.
+            if (id.includes("lib/i18n/fragments/")) {
+              if (id.includes("en.agents")) return "i18n-agents";
+              if (id.includes("en.settings")) return "i18n-settings";
+            }
+            return;
+          }
           // Order matters: react-router is a react lib too.
           if (id.includes("react-router")) return "vendor-router";
           if (id.includes("@xterm")) return "vendor-xterm";
