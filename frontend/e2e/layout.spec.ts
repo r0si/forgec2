@@ -173,6 +173,13 @@ test.describe("responsive shell", () => {
     await expect(page.locator("main").first()).toBeAttached({ timeout: 15_000 });
     await expect.poll(() => dictChunks.some((c) => c.includes("i18n-ai"))).toBe(true);
     await expect(page.locator("main")).not.toContainText(/\bai\.[a-z_]/);
+
+    // The credentials page pulls its own 6 kB namespace.
+    dictChunks.length = 0;
+    await page.goto("/credentials.html");
+    await expect(page.locator("main").first()).toBeAttached({ timeout: 15_000 });
+    await expect.poll(() => dictChunks.some((c) => c.includes("i18n-cred"))).toBe(true);
+    await expect(page.locator("main")).not.toContainText(/\bcred\.[a-z_]/);
   });
 
   test("the login page does not open the operator socket", async ({ page }) => {

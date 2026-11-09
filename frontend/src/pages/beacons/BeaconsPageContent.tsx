@@ -1,7 +1,9 @@
 import { registerFragment } from "@/lib/i18n";
 import { enAgents } from "@/lib/i18n/fragments/en.agents";
+import { enCred } from "@/lib/i18n/fragments/en.cred";
 import { enGenerate } from "@/lib/i18n/fragments/en.generate";
 registerFragment(enAgents);
+registerFragment(enCred);
 registerFragment(enGenerate);
 
 import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from "react";

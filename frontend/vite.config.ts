@@ -185,6 +185,7 @@ export default defineConfig(({ command }) => {
               if (id.includes("en.settings")) return "i18n-settings";
               if (id.includes("en.generate")) return "i18n-generate";
               if (id.includes("en.ai")) return "i18n-ai";
+              if (id.includes("en.cred")) return "i18n-cred";
             }
             return;
           }

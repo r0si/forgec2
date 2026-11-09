@@ -1,4 +1,8 @@
 
+import { registerFragment } from "@/lib/i18n";
+import { enCred } from "@/lib/i18n/fragments/en.cred";
+registerFragment(enCred);
+
 import { toast } from "sonner";
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { z } from "zod";
