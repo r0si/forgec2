@@ -11,6 +11,7 @@ import { formatBytes } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { KnowledgeSearchPanel } from "./KnowledgeSearchPanel";
 
 interface AIProfile {
   id: number;
@@ -232,6 +233,8 @@ export function AIContextPanel({
             </label>
           ))}
         </section>
+
+        <KnowledgeSearchPanel selectedCollectionIds={selectedCollectionIds} />
 
         <section className="rounded-xl border border-border bg-card p-3">
           <label className="flex cursor-pointer items-start gap-3">

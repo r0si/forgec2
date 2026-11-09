@@ -329,6 +329,7 @@ export const paths = {
 		intentApprove: (id: string) => `/api/ai/intents/${id}/approve`,
 		intentReject: (id: string) => `/api/ai/intents/${id}/reject`,
 		knowledgeCollections: "/api/ai/knowledge/collections",
+		knowledgeSearch: "/api/ai/knowledge/search",
 		attachments: (sessionId: string | number) => `/api/ai/sessions/${sessionId}/attachments`,
 		attachment: (id: string) => `/api/ai/attachments/${id}`,
     status: "/api/ai/status",
