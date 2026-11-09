@@ -41,7 +41,12 @@ export DEMO_USER ROLE_NAME
 # settings.read, and /lateral fetches /credentials?format=json. Without them
 # those pages render but every data call answers 403. No *.write permission is
 # present, so RequirePermission still refuses every mutation at the handler.
-ROLE_PERMS='["agents.read","listeners.read","tasks.read","files.read","groups.read","campaigns.read","opsec.read","intel.read","automation.read","notifications.read","ai.use","settings.read","credentials.read"]'
+#
+# audit.read is deliberate: the demo now exposes the Audit page, including the
+# login log (sign-in time, user, IP, country) and the chain verify/export
+# endpoints. That means visitors can see each other's sign-in IPs — accepted
+# for this public demo, and the reason the permission was previously withheld.
+ROLE_PERMS='["agents.read","listeners.read","tasks.read","files.read","groups.read","campaigns.read","opsec.read","intel.read","automation.read","notifications.read","ai.use","settings.read","credentials.read","audit.read"]'
 
 API="http://127.0.0.1:18000"
 EDGE="http://127.0.0.1:$PUBLIC_LISTEN"

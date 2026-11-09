@@ -23,9 +23,10 @@
 # console reaches the WebSocket and the dual-use read routes) — with no write
 # permission there is no command surface.
 #
-# Deliberately NOT granted: settings.read (server config), audit.read (other
-# visitors' login records), users.read / roles.read (account inventory),
+# Deliberately NOT granted: users.read / roles.read (account inventory),
 # credentials.read (collected secrets), agents.write (the screen-view gate).
+# audit.read IS granted: the public demo shows the audit page and its login
+# log, so visitor sign-in IPs are visible there by design.
 set -eu
 
 DB="${1:-/opt/forgec2-demo/data/db/forgec2.db}"
@@ -34,7 +35,7 @@ USER_NAME="${3:-demo}"
 
 test -f "$DB" || { echo "db not found: $DB" >&2; exit 1; }
 
-ROLE_JSON='["agents.read","listeners.read","tasks.read","files.read","groups.read","campaigns.read","opsec.read","intel.read","automation.read","notifications.read","ai.use"]'
+ROLE_JSON='["agents.read","listeners.read","tasks.read","files.read","groups.read","campaigns.read","opsec.read","intel.read","automation.read","notifications.read","ai.use","audit.read"]'
 
 sqlite3 "$DB" <<SQL
 INSERT INTO custom_roles (name, description, permissions, created_at, updated_at)

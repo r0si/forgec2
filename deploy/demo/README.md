@@ -34,8 +34,11 @@ The host's own nginx is untouched: the demo gateway is a separate instance
    Everything else answers `403` before the handler runs.
 2. **Handler** — the `demo-observer` custom role holds only read permissions
    (`agents,listeners,tasks,files,groups,campaigns,opsec,intel,automation,
-   notifications,settings,credentials.read` plus `ai.use`). Every mutating
+   notifications,settings,credentials,audit.read` plus `ai.use`). Every mutating
    route calls `RequirePermission(<resource>.write)` and refuses.
+   `audit.read` is granted on purpose: the Audit page and its Login log are part
+   of the tour, which means visitors can see sign-in records (time, user, IP,
+   country) — including other visitors' and the operator's.
 
 Not reachable by design: `/ws` and `/extc2/ws` (404 — no operator socket to
 anonymous visitors, the console will report the live channel as unavailable),
