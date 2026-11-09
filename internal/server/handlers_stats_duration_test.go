@@ -304,7 +304,18 @@ func TestTaskDurationBuckets(t *testing.T) {
 	s := mustTenantServer(t)
 
 	// Two tasks in one hour (one failed) and one in the previous hour.
+	//
+	// The base must keep all three seeds inside ONE calendar day: the day
+	// bucket assertion below fails legitimately at local midnight, when
+	// "previous hour" is yesterday (observed as [{Count:1} {Count:2}] on a
+	// CI run that started at 02:07 UTC with the truncation landing on 00:00
+	// and the third seed at 23:30 the day before). Anchor to yesterday noon
+	// in that window; every seed still falls inside since=7d.
 	hourStart := time.Now().Truncate(time.Hour).Add(-2 * time.Hour)
+	if hourStart.Hour() == 0 {
+		now := time.Now()
+		hourStart = time.Date(now.Year(), now.Month(), now.Day(), 12, 0, 0, 0, now.Location()).AddDate(0, 0, -1)
+	}
 	seed := func(created time.Time, ms int, status string) {
 		task := db.Task{
 			AgentID: "a-1", TenantID: 1, Type: "shell", Command: "x", Status: status,
