@@ -142,6 +142,7 @@ func (s *Server) loginGeoWorker() {
 			}
 			queued[ip] = true
 			if country, _ := s.cachedLoginCountry(ctx, ip); country != "" {
+				delete(queued, ip)
 				continue
 			}
 			country, city := s.resolveLoginGeo(ctx, ip)
@@ -151,6 +152,9 @@ func (s *Server) loginGeoWorker() {
 					slog.Debug("Login geo cache write failed", "ip", ip, "err", err)
 				}
 			}
+			// The marker only dedupes a burst; a failed lookup must be
+			// retryable on a later panel load, so it is released here.
+			delete(queued, ip)
 			select {
 			case <-ctx.Done():
 				return
@@ -158,6 +162,49 @@ func (s *Server) loginGeoWorker() {
 			}
 		}
 	}
+}
+
+// parseIPAPI reads ip-api.com's answer. The bool marks a provider-level refusal
+// (rate limit / quota), which backs the provider off instead of just missing.
+func parseIPAPI(body []byte) (string, string, bool) {
+	var r struct {
+		Status  string `json:"status"`
+		Message string `json:"message"`
+		Country string `json:"country"`
+		City    string `json:"city"`
+	}
+	if json.Unmarshal(body, &r) != nil {
+		return "", "", false
+	}
+	if r.Status != "success" {
+		// "private range"/"reserved range" are answers; the rest (quota,
+		// invalid) means the provider is not serving us.
+		busy := strings.Contains(r.Message, "limit") || strings.Contains(r.Message, "quota")
+		return "", "", busy
+	}
+	return r.Country, r.City, false
+}
+
+// parseTaobao reads ip.taobao.com's answer; code 4 is "over max qps".
+func parseTaobao(body []byte) (string, string, bool) {
+	var r struct {
+		Code int `json:"code"`
+		Data struct {
+			Country string `json:"country"`
+			City    string `json:"city"`
+		} `json:"data"`
+	}
+	if json.Unmarshal(body, &r) != nil {
+		return "", "", false
+	}
+	if r.Code != 0 {
+		return "", "", r.Code == 4
+	}
+	// The provider answers "XX" for unknown, which is not a country.
+	if r.Data.Country == "" || r.Data.Country == "XX" {
+		return "", "", false
+	}
+	return r.Data.Country, r.Data.City, false
 }
 
 // resolveLoginGeo tries the providers in order and returns the first answer.
@@ -173,57 +220,18 @@ func (s *Server) resolveLoginGeo(ctx context.Context, ip string) (country, city 
 		url  string
 		// parse extracts (country, city) from a 200 body; empty country means
 		// "this provider had no answer", which falls through to the next one.
-		// The bool reports a provider-level refusal (rate limit / quota), which
-		// marks the provider unusable for a while instead of just missing data.
 		parse func(body []byte) (string, string, bool)
 	}
 	providers := []provider{
 		{
-			name: "ip-api.com",
-			url:  "http://ip-api.com/json/" + url.PathEscape(ip) + "?fields=country,city,status,message",
-			parse: func(body []byte) (string, string, bool) {
-				var r struct {
-					Status  string `json:"status"`
-					Message string `json:"message"`
-					Country string `json:"country"`
-					City    string `json:"city"`
-				}
-				if json.Unmarshal(body, &r) != nil {
-					return "", "", false
-				}
-				if r.Status != "success" {
-					// "private range"/"reserved range" are answers; the rest
-					// (quota, invalid) means the provider is not serving us.
-					busy := strings.Contains(r.Message, "limit") || strings.Contains(r.Message, "quota")
-					return "", "", busy
-				}
-				return r.Country, r.City, false
-			},
+			name:  "ip-api.com",
+			url:   "http://ip-api.com/json/" + url.PathEscape(ip) + "?fields=country,city,status,message",
+			parse: parseIPAPI,
 		},
 		{
-			name: "ip.taobao.com",
-			url:  "https://ip.taobao.com/outGetIpInfo?accessKey=alibaba-inc&ip=" + url.PathEscape(ip),
-			parse: func(body []byte) (string, string, bool) {
-				var r struct {
-					Code int `json:"code"`
-					Data struct {
-						Country string `json:"country"`
-						City    string `json:"city"`
-					} `json:"data"`
-				}
-				if json.Unmarshal(body, &r) != nil {
-					return "", "", false
-				}
-				if r.Code != 0 {
-					// code 4 is "over max qps": back off this provider.
-					return "", "", r.Code == 4
-				}
-				// The provider answers "XX" for unknown, which is not a country.
-				if r.Data.Country == "" || r.Data.Country == "XX" {
-					return "", "", false
-				}
-				return r.Data.Country, r.Data.City, false
-			},
+			name:  "ip.taobao.com",
+			url:   "https://ip.taobao.com/outGetIpInfo?accessKey=alibaba-inc&ip=" + url.PathEscape(ip),
+			parse: parseTaobao,
 		},
 	}
 
@@ -231,12 +239,18 @@ func (s *Server) resolveLoginGeo(ctx context.Context, ip string) (country, city 
 		if !loginGeoProviderUsable(p.name) {
 			continue
 		}
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, p.url, nil)
+		// Per-provider deadline, independent of the shared 30s client timeout:
+		// a blackholed provider (ip-api.com from this network) would otherwise
+		// stall the worker for half a minute per IP.
+		reqCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, p.url, nil)
 		if err != nil {
+			cancel()
 			continue
 		}
 		resp, err := s.httpClient.Do(req)
 		if err != nil {
+			cancel()
 			slog.Debug("Login geo provider unreachable", "provider", p.name, "ip", ip, "err", err)
 			markLoginGeoProviderDown(p.name)
 			continue
@@ -247,6 +261,7 @@ func (s *Server) resolveLoginGeo(ctx context.Context, ip string) (country, city 
 		body, readErr := io.ReadAll(io.LimitReader(resp.Body, 8*1024))
 		status := resp.StatusCode
 		_ = resp.Body.Close()
+		cancel()
 		if readErr != nil {
 			continue
 		}
