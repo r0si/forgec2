@@ -583,7 +583,7 @@ func (s *Server) Run() error {
 	}
 
 	if s.cfg.Server.GeoIPEnabled {
-		slog.Warn("GeoIP lookups are ENABLED: the public IP of every beaconing host will be sent to the third-party service ip-api.com. Disable server.geoip_enabled unless this exfiltration is acceptable for the engagement.")
+		slog.Warn("GeoIP lookups are ENABLED: the public IP of every beaconing host, and every sign-in IP that reaches the login log, will be sent to third-party services (ip-api.com, ip.zxinc.org, ip.taobao.com, in that order). Disable server.geoip_enabled unless this exfiltration is acceptable for the engagement.")
 	}
 
 	s.httpServer = s.newHTTPServer(addr)

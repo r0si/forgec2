@@ -198,12 +198,16 @@ const (
 	AITaskPollMinInterval     = 250 * time.Millisecond
 	WebhookHTTPTimeout        = 10 * time.Second
 	AutomationDownloadTimeout = 60 * time.Second
-	GeoIPLookupTimeout        = 5 * time.Second
-	ReachabilityDialTimeout   = 5 * time.Second
-	DomainHealthCheckTimeout  = 8 * time.Second
-	WebhookDeliveryTimeout    = 15 * time.Second
-	UpdateCheckInitialDelay   = 10 * time.Second
-	UpdateCheckInterval       = 1 * time.Hour
+	// GeoIPLookupTimeout bounds one asynchronous agent-IP lookup. It must cover
+	// the whole provider chain (3 providers x 4s), or the first provider being
+	// blackholed — ip-api.com from some networks — would consume the budget
+	// before the fallback that works there is tried.
+	GeoIPLookupTimeout       = 12 * time.Second
+	ReachabilityDialTimeout  = 5 * time.Second
+	DomainHealthCheckTimeout = 8 * time.Second
+	WebhookDeliveryTimeout   = 15 * time.Second
+	UpdateCheckInitialDelay  = 10 * time.Second
+	UpdateCheckInterval      = 1 * time.Hour
 	// UpdateCheckJitter spreads the background checks so a fleet of servers
 	// that booted together does not hit api.github.com in lockstep.
 	UpdateCheckJitter       = 5 * time.Minute

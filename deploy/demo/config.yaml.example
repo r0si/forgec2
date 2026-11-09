@@ -27,7 +27,8 @@ server:
     - 127.0.0.1
   update_check_enabled: false
   # The login log resolves the country of a sign-in IP on first sight and
-  # caches it in `login_geos`; nothing else phones out. Providers are tried in
+  # caches it in `login_geos`; nothing else phones out. Agent check-ins use the
+  # same provider chain and cache per IP in memory. Providers are tried in
   # order: ip-api.com (unreachable from this host), ip.zxinc.org (UTF-8, no
   # shared quota), then ip.taobao.com.
   geoip_enabled: true

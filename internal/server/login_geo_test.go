@@ -52,13 +52,13 @@ func (c *cannedProviderTransport) calls() []string {
 func clearProviderBackoff(t *testing.T) {
 	t.Helper()
 	t.Cleanup(func() {
-		loginGeoProviderDown.mu.Lock()
-		loginGeoProviderDown.at = make(map[string]time.Time)
-		loginGeoProviderDown.mu.Unlock()
+		geoProviderDown.mu.Lock()
+		geoProviderDown.at = make(map[string]time.Time)
+		geoProviderDown.mu.Unlock()
 	})
-	loginGeoProviderDown.mu.Lock()
-	loginGeoProviderDown.at = make(map[string]time.Time)
-	loginGeoProviderDown.mu.Unlock()
+	geoProviderDown.mu.Lock()
+	geoProviderDown.at = make(map[string]time.Time)
+	geoProviderDown.mu.Unlock()
 }
 
 // TestLoginGeoProvidersClassifyRateLimits pins the difference between "this IP
@@ -72,7 +72,7 @@ func clearProviderBackoff(t *testing.T) {
 func TestLoginGeoProvidersClassifyRateLimits(t *testing.T) {
 	cases := []struct {
 		name        string
-		parse       func([]byte) (string, string, string)
+		locate      func([]byte) (geoLocation, string)
 		body        string
 		wantCountry string
 		wantCity    string
@@ -80,65 +80,65 @@ func TestLoginGeoProvidersClassifyRateLimits(t *testing.T) {
 	}{
 		{
 			name:        "ip-api success",
-			parse:       parseIPAPI,
+			locate:      locateIPAPI,
 			body:        `{"status":"success","country":"Germany","city":"Berlin"}`,
 			wantCountry: "Germany",
 			wantCity:    "Berlin",
 		},
 		{
 			name:        "ip-api quota refusal",
-			parse:       parseIPAPI,
+			locate:      locateIPAPI,
 			body:        `{"status":"fail","message":"quota exceeded"}`,
 			wantRefusal: true,
 		},
 		{
-			name:  "ip-api private range is a miss, not a refusal",
-			parse: parseIPAPI,
-			body:  `{"status":"fail","message":"private range"}`,
+			name:   "ip-api private range is a miss, not a refusal",
+			locate: locateIPAPI,
+			body:   `{"status":"fail","message":"private range"}`,
 		},
 		{
 			name:        "zxinc splits country/province/city",
-			parse:       parseZXInc,
+			locate:      locateZXInc,
 			body:        `{"code":0,"data":{"country":"中国–北京–北京"}}`,
 			wantCountry: "中国",
 			wantCity:    "北京",
 		},
 		{
 			name:        "zxinc foreign answer",
-			parse:       parseZXInc,
+			locate:      locateZXInc,
 			body:        `{"code":0,"data":{"country":"美国–加利福尼亚州–圣克拉拉–山景城"}}`,
 			wantCountry: "美国",
 			wantCity:    "山景城",
 		},
 		{
-			name:  "zxinc empty answer is a miss",
-			parse: parseZXInc,
-			body:  `{"code":0,"data":{"country":""}}`,
+			name:   "zxinc empty answer is a miss",
+			locate: locateZXInc,
+			body:   `{"code":0,"data":{"country":""}}`,
 		},
 		{
 			name:        "taobao success",
-			parse:       parseTaobao,
+			locate:      locateTaobao,
 			body:        `{"code":0,"data":{"country":"中国","city":"北京"}}`,
 			wantCountry: "中国",
 			wantCity:    "北京",
 		},
 		{
 			name:        "taobao qps refusal",
-			parse:       parseTaobao,
+			locate:      locateTaobao,
 			body:        `{"msg":"the request over max qps for user","code":4}`,
 			wantRefusal: true,
 		},
 		{
-			name:  "taobao unknown country is a miss",
-			parse: parseTaobao,
-			body:  `{"code":0,"data":{"country":"XX","city":""}}`,
+			name:   "taobao unknown country is a miss",
+			locate: locateTaobao,
+			body:   `{"code":0,"data":{"country":"XX","city":""}}`,
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			country, city, refusal := tc.parse([]byte(tc.body))
-			if country != tc.wantCountry || city != tc.wantCity {
-				t.Fatalf("location = %q/%q, want %q/%q", country, city, tc.wantCountry, tc.wantCity)
+			loc, refusal := tc.locate([]byte(tc.body))
+			if loc.Country != tc.wantCountry || loc.City != tc.wantCity {
+				t.Fatalf("location = %q/%q, want %q/%q", loc.Country, loc.City, tc.wantCountry, tc.wantCity)
 			}
 			if (refusal != "") != tc.wantRefusal {
 				t.Fatalf("refusal = %q, want refusal=%v", refusal, tc.wantRefusal)
@@ -185,19 +185,19 @@ func TestLoginGeoProviderChainOrder(t *testing.T) {
 // then retried after the window, instead of being disabled for the process
 // lifetime (which showed up as countries never resolving).
 func TestLoginGeoProviderBackoffExpires(t *testing.T) {
-	markLoginGeoProviderDown("test-provider", "test")
-	if loginGeoProviderUsable("test-provider") {
+	markGeoProviderDown("test-provider", "test")
+	if geoProviderUsable("test-provider") {
 		t.Fatal("a provider marked down must be skipped")
 	}
-	loginGeoProviderDown.mu.Lock()
-	loginGeoProviderDown.at["test-provider"] = time.Now().Add(-loginGeoFailedProviderTTL - time.Second)
-	loginGeoProviderDown.mu.Unlock()
-	if !loginGeoProviderUsable("test-provider") {
+	geoProviderDown.mu.Lock()
+	geoProviderDown.at["test-provider"] = time.Now().Add(-geoProviderBackoffTTL - time.Second)
+	geoProviderDown.mu.Unlock()
+	if !geoProviderUsable("test-provider") {
 		t.Fatal("a provider past the backoff window must be tried again")
 	}
-	loginGeoProviderDown.mu.Lock()
-	delete(loginGeoProviderDown.at, "test-provider")
-	loginGeoProviderDown.mu.Unlock()
+	geoProviderDown.mu.Lock()
+	delete(geoProviderDown.at, "test-provider")
+	geoProviderDown.mu.Unlock()
 }
 
 // TestLoginGeoWorkerResolvesQueuedIP pins the whole background pipeline: the

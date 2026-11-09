@@ -96,7 +96,7 @@ type Config struct {
 		SSHUser              string        `yaml:"ssh_user"`                // SSH user for agent auth
 		SSHPassword          string        `yaml:"ssh_password"`            // SSH password (empty = any password or key-only)
 		SSHKeyAuth           bool          `yaml:"ssh_key_auth"`            // allow public key authentication
-		GeoIPEnabled         bool          `yaml:"geoip_enabled"`           // enable GeoIP lookup via ip-api.com (opt-in)
+		GeoIPEnabled         bool          `yaml:"geoip_enabled"`           // enable GeoIP lookup via ip-api.com → ip.zxinc.org → ip.taobao.com (opt-in)
 		AllowedOrigins       []string      `yaml:"allowed_origins"`         // allowed WebSocket/CORS origins (default: localhost,127.0.0.1,::1)
 		TrustedProxies       []string      `yaml:"trusted_proxies"`         // trusted reverse proxy IPs/CIDRs for X-Forwarded-For (empty = trust none, use direct client IP)
 		OperatorAllowedCIDRs []string      `yaml:"operator_allowed_cidrs"`  // operator-plane IP allowlist for login + authenticated API/UI (empty = disabled; beacons/payloads/phishing/health unaffected)

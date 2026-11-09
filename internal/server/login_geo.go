@@ -2,12 +2,7 @@ package server
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
-	"io"
 	"log/slog"
-	"net/http"
-	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -35,42 +30,6 @@ const loginGeoQueueMax = 512
 // (`code:4` when exceeded, observed even at 1.1s spacing), and ip-api limits
 // per minute; spacing the worker at 2s keeps all of them happy.
 const loginGeoSpacing = 2 * time.Second
-
-// loginGeoFailedProviderTTL is how long a provider that could not answer is
-// skipped. Without it every resolution retried the unreachable provider first
-// (the demo host cannot reach ip-api.com), paying its connection timeout each
-// time. Two minutes keeps a recoverable outage from blacking out countries for
-// the rest of the hour.
-const loginGeoFailedProviderTTL = 2 * time.Minute
-
-var loginGeoProviderDown = struct {
-	mu sync.Mutex
-	at map[string]time.Time
-}{at: make(map[string]time.Time)}
-
-func loginGeoProviderUsable(name string) bool {
-	loginGeoProviderDown.mu.Lock()
-	defer loginGeoProviderDown.mu.Unlock()
-	at, ok := loginGeoProviderDown.at[name]
-	return !ok || time.Since(at) >= loginGeoFailedProviderTTL
-}
-
-func markLoginGeoProviderDown(name, reason string) {
-	loginGeoProviderDown.mu.Lock()
-	already := false
-	if at, ok := loginGeoProviderDown.at[name]; ok && time.Since(at) < loginGeoFailedProviderTTL {
-		already = true
-	}
-	loginGeoProviderDown.at[name] = time.Now()
-	loginGeoProviderDown.mu.Unlock()
-	if !already {
-		// Warn once per window, not per lookup: a provider that is blocked or
-		// throttled is worth seeing at default log level, because the symptom
-		// otherwise is "countries are always unknown" with no explanation.
-		slog.Warn("Login geo provider unavailable; countries will stay unknown until it recovers",
-			"provider", name, "reason", reason, "retry_after", loginGeoFailedProviderTTL)
-	}
-}
 
 // cachedLoginCountry reads the persisted cache without any outbound call.
 func (s *Server) cachedLoginCountry(ctx context.Context, ip string) (country, city string) {
@@ -136,8 +95,8 @@ func (s *Server) enqueueLoginGeo(ip string) {
 	})
 	select {
 	case s.loginGeoCh <- ip:
-		// One line per process tells an operator the pipeline is alive and how
-		// many IPs are waiting; per-IP logging would flood a page load.
+		// One line per process tells an operator the pipeline is alive; per-IP
+		// logging would flood a page load.
 		loginGeoQueuedLog.Do(func() {
 			slog.Info("Login geo: uncached sign-in IP queued for background resolution",
 				"ip", ip, "spacing", loginGeoSpacing)
@@ -206,171 +165,12 @@ func (s *Server) loginGeoWorker() {
 	}
 }
 
-// parseIPAPI reads ip-api.com's answer. A non-empty refusal means the provider
-// is not serving us (rate limit / quota), which backs it off instead of just
-// missing one lookup.
-func parseIPAPI(body []byte) (country, city, refusal string) {
-	var r struct {
-		Status  string `json:"status"`
-		Message string `json:"message"`
-		Country string `json:"country"`
-		City    string `json:"city"`
-	}
-	if json.Unmarshal(body, &r) != nil {
-		return "", "", ""
-	}
-	if r.Status != "success" {
-		// "private range"/"reserved range" are answers; the rest (quota,
-		// invalid) means the provider is not serving us.
-		if strings.Contains(r.Message, "limit") || strings.Contains(r.Message, "quota") {
-			return "", "", r.Message
-		}
-		return "", "", ""
-	}
-	return r.Country, r.City, ""
-}
-
-// parseTaobao reads ip.taobao.com's answer; code 4 is "over max qps".
-func parseTaobao(body []byte) (country, city, refusal string) {
-	var r struct {
-		Code int    `json:"code"`
-		Msg  string `json:"msg"`
-		Data struct {
-			Country string `json:"country"`
-			City    string `json:"city"`
-		} `json:"data"`
-	}
-	if json.Unmarshal(body, &r) != nil {
-		return "", "", ""
-	}
-	if r.Code != 0 {
-		if r.Code == 4 {
-			return "", "", fmt.Sprintf("code 4: %s", truncateString(r.Msg, 80))
-		}
-		return "", "", ""
-	}
-	// The provider answers "XX" for unknown, which is not a country.
-	if r.Data.Country == "" || r.Data.Country == "XX" {
-		return "", "", ""
-	}
-	return r.Data.Country, r.Data.City, ""
-}
-
-// parseZXInc reads ip.zxinc.org's answer. It is UTF-8 JSON with a `country`
-// field shaped `国家–省–市` (en dash, U+2013) and no rate limit, which makes it
-// the dependable fallback on networks that cannot reach ip-api.com.
-func parseZXInc(body []byte) (country, city, refusal string) {
-	var r struct {
-		Code int `json:"code"`
-		Data struct {
-			Country string `json:"country"`
-		} `json:"data"`
-	}
-	if json.Unmarshal(body, &r) != nil {
-		return "", "", ""
-	}
-	if r.Code != 0 {
-		// Non-zero means "no data for this IP", not a quota answer: keep
-		// falling through instead of backing the provider off.
-		return "", "", ""
-	}
-	parts := strings.FieldsFunc(r.Data.Country, func(rc rune) bool { return rc == '–' || rc == '—' })
-	if len(parts) == 0 {
-		return "", "", ""
-	}
-	country = strings.TrimSpace(parts[0])
-	if country == "" {
-		return "", "", ""
-	}
-	if len(parts) > 1 {
-		city = strings.TrimSpace(parts[len(parts)-1])
-	}
-	return country, city, ""
-}
-
-// resolveLoginGeo tries the providers in order and returns the first answer.
-//
-// ip-api.com is the international default (and the one the beacon path uses),
-// but it is unreachable from some networks — the demo host reaches neither it
-// nor other Western providers. ip.zxinc.org answers there, in UTF-8, without a
-// shared quota; ip.taobao.com is kept as a last resort because its public
-// `alibaba-inc` key enforces about 1 QPS globally. Trying all three keeps the
-// feature useful in either network instead of silently reporting "unknown".
+// resolveLoginGeo is the login log's view of the shared provider chain: it
+// only needs country and city, and leaves coordinates to the agent path.
 func (s *Server) resolveLoginGeo(ctx context.Context, ip string) (country, city string) {
-	type provider struct {
-		name string
-		url  string
-		// parse extracts (country, city) from a 200 body; empty country means
-		// "this provider had no answer", which falls through to the next one.
-		// A non-empty refusal means the provider is rejecting us (rate limit),
-		// which marks it unusable for a while instead of just missing data.
-		parse func(body []byte) (string, string, string)
+	loc, ok := s.resolveGeoLocation(ctx, ip)
+	if !ok {
+		return "", ""
 	}
-	providers := []provider{
-		{
-			name:  "ip-api.com",
-			url:   "http://ip-api.com/json/" + url.PathEscape(ip) + "?fields=country,city,status,message",
-			parse: parseIPAPI,
-		},
-		{
-			name:  "ip.zxinc.org",
-			url:   "https://ip.zxinc.org/api.php?type=json&ip=" + url.PathEscape(ip),
-			parse: parseZXInc,
-		},
-		{
-			name:  "ip.taobao.com",
-			url:   "https://ip.taobao.com/outGetIpInfo?accessKey=alibaba-inc&ip=" + url.PathEscape(ip),
-			parse: parseTaobao,
-		},
-	}
-
-	for _, p := range providers {
-		if !loginGeoProviderUsable(p.name) {
-			continue
-		}
-		// Per-provider deadline, independent of the shared 30s client timeout:
-		// a blackholed provider (ip-api.com from this network) would otherwise
-		// stall the worker for half a minute per IP.
-		reqCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-		req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, p.url, nil)
-		if err != nil {
-			cancel()
-			continue
-		}
-		resp, err := s.httpClient.Do(req)
-		if err != nil {
-			cancel()
-			slog.Debug("Login geo provider unreachable", "provider", p.name, "ip", ip, "err", err)
-			markLoginGeoProviderDown(p.name, err.Error())
-			continue
-		}
-		// The status is read before the body: a 429 here is the provider's
-		// rate limit, and decoding its error page as a location is exactly the
-		// silent-empty-field defect the beacon path already fixed.
-		body, readErr := io.ReadAll(io.LimitReader(resp.Body, 8*1024))
-		status := resp.StatusCode
-		_ = resp.Body.Close()
-		cancel()
-		if readErr != nil {
-			continue
-		}
-		if status == http.StatusTooManyRequests || status >= http.StatusInternalServerError {
-			slog.Debug("Login geo provider throttled", "provider", p.name, "ip", ip, "status", status)
-			markLoginGeoProviderDown(p.name, fmt.Sprintf("HTTP %d", status))
-			continue
-		}
-		if status != http.StatusOK {
-			continue
-		}
-		country, city, refusal := p.parse(body)
-		if refusal != "" {
-			slog.Debug("Login geo provider refused the lookup", "provider", p.name, "ip", ip, "reason", refusal)
-			markLoginGeoProviderDown(p.name, refusal)
-			continue
-		}
-		if country != "" {
-			return country, city
-		}
-	}
-	return "", ""
+	return loc.Country, loc.City
 }
