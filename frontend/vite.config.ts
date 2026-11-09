@@ -62,6 +62,44 @@ const BASEUI_PAGE_ONLY_KEYS = new Set([
   "warn.mjs",
 ]);
 
+// Icons no first-paint screen renders. Measured 2026-11-09 by building with one
+// chunk per icon module and walking the entry's static closure: 56 icons
+// (10 kB) are entry-reachable, the 170 below are not, and the single bucket
+// they used to share charged all 67 kB to first paint. Icons not listed here
+// stay in vendor-icons (the entry bucket): when a new one is added it costs
+// ~200 B, and if it is page-only, add it here to move it out.
+const ICON_PAGE_ONLY = new Set([
+  "anchor", "app-window", "apple", "arrow-down", "arrow-left", "arrow-right",
+  "arrow-up", "arrow-up-down", "award", "badge-info", "ban", "binary",
+  "book-open", "bookmark", "bookmark-plus", "box", "brain", "calendar",
+  "calendar-check", "calendar-clock", "camera", "chart-column", "chart-no-axes-column", "chart-pie",
+  "check-check", "chevron-left", "chevron-right", "chevrons-up-down", "circle", "circle-alert",
+  "circle-check", "circle-check-big", "circle-dot", "circle-plus", "circle-question-mark", "circle-x",
+  "clipboard", "clipboard-paste", "clock-3", "cloud-upload", "code-xml", "cog",
+  "columns-2", "compass", "copy", "cpu", "credit-card", "crown",
+  "database", "disc", "download", "earth", "eighth-notes", "ellipsis",
+  "eraser", "expand", "external-link", "eye", "eye-off", "file",
+  "file-braces", "file-braces-corner", "file-code-corner", "file-down", "file-exclamation-point", "file-spreadsheet",
+  "file-text", "file-up", "flame", "flask-conical", "folder", "folder-open",
+  "folder-plus", "folder-tree", "folder-up", "funnel", "gauge", "git-compare",
+  "globe", "grid-3x3", "grip", "hammer", "hand", "hard-drive",
+  "heart-pulse", "house", "image", "images", "import", "inbox",
+  "info", "key-round", "languages", "laptop", "lightbulb", "link-2",
+  "list", "list-checks", "list-filter", "list-todo", "list-x", "loader-circle",
+  "lock", "lock-open", "mail", "map-pin", "megaphone", "message-circle",
+  "message-square-text", "mic", "mouse", "mouse-pointer-click", "package", "package-open",
+  "palette", "paperclip", "pause", "paw-print", "pen-line", "pencil",
+  "picture-in-picture-2", "pin", "pin-off", "play", "plus", "power",
+  "printer", "radar", "refresh-cw", "rocket", "rotate-ccw", "rotate-ccw-clock",
+  "rows-2", "rows-3", "save", "scan-search", "search-x", "send",
+  "share-2", "shield-check", "shield-off", "shield-user", "shield-x", "skull",
+  "sliders-horizontal", "snowflake", "sparkles", "square", "square-terminal", "star",
+  "sticky-note", "syringe", "table-2", "tag", "target", "ticket",
+  "timer", "tower-control", "trash", "trending-up", "upload", "usb",
+  "user", "user-check", "user-cog", "video", "wallet", "waypoints",
+  "wifi", "workflow",
+]);
+
 export default defineConfig(({ command }) => {
   // One-release compat: the old NEXT_PUBLIC_* names are ignored; warn loudly
   // instead of failing silently with an empty API base.
@@ -167,7 +205,19 @@ export default defineConfig(({ command }) => {
             const key = id.match(/@base-ui\/(?:react|utils)\/([^/]+)/)?.[1] ?? "";
             return BASEUI_PAGE_ONLY_KEYS.has(key) ? "vendor-baseui-forms" : "vendor-baseui";
           }
-          if (id.includes("lucide-react")) return "vendor-icons";
+          if (id.includes("lucide-react")) {
+            // Icons are one module each. A single bucket charged the entry for
+            // every icon any page imports (67 kB) because the shell's icons
+            // shared it. The page-only names below are measured: build with one
+            // chunk per icon, walk the entry's static closure, and the pages'
+            // icons are the complement of the 56 entry icons (10 kB). An icon
+            // that is not listed here stays in vendor-icons — a new shell icon
+            // costs ~200 B instead of silently pulling the whole page-only set
+            // into first paint; listing a new page-only icon reclaims it.
+            const icon = id.match(/lucide-react\/dist\/esm\/icons\/([^/]+)\.mjs$/)?.[1];
+            if (icon && ICON_PAGE_ONLY.has(icon)) return "vendor-icons-pages";
+            return "vendor-icons";
+          }
           if (id.includes("dompurify")) return "vendor-dompurify";
           if (id.includes("html-to-image")) return "vendor-html2image";
           if (id.includes("zod")) return "vendor-zod";
@@ -178,6 +228,10 @@ export default defineConfig(({ command }) => {
           // ("Cannot set properties of undefined (setting 'Activity')").
           if (id.includes("use-sync-external-store") || id.includes("react-is")) return "vendor-react";
           if (id.includes("react") || id.includes("scheduler")) return "vendor-react";
+          // web-vitals is reached only from the performance page. Without its
+          // own bucket it lands in vendor-misc, which the entry imports, so
+          // every visitor downloaded it before first paint (measured 9 kB).
+          if (id.includes("web-vitals")) return "vendor-misc-pages";
           return "vendor-misc";
         },
       },

@@ -47,7 +47,11 @@ const TOTAL_LIMIT_BYTES = 5.0 * 1024 * 1024;
 // 292 kB - enough for a 200 kB route chunk to start leaking again and still pass, which is exactly
 // the regression this budget exists to catch. Set to 900 kB: ~100 kB of ordinary entry/vendor
 // headroom, and a re-leak of a few hundred kB trips it.
-const CRITICAL_PATH_LIMIT_BYTES = 900 * 1024;
+// Re-measured 2026-11-09: 744 kB after splitting the page-only icons
+// (vendor-icons 67 -> 19 kB) and web-vitals (9 kB) out of first paint. 800 kB
+// leaves ~56 kB of ordinary headroom — less than the smallest route chunk
+// (~70 kB) — so a re-leak of one page chunk trips it.
+const CRITICAL_PATH_LIMIT_BYTES = 800 * 1024;
 // Measured 2026-11-09: Inter 210 kB + JetBrains Mono 55 kB after the Latin/UI
 // subset (was 350 + 72 = 422 kB as the full families). 300 kB leaves ~35 kB of
 // headroom; restoring either full font trips it.
@@ -133,6 +137,15 @@ while (queue.length) {
 }
 const criticalBytes = [...critical.values()].reduce((a, b) => a + b, 0);
 
+// These buckets exist so their contents stay out of first paint. A static
+// import from the entry pulls the whole chunk, so a hit here means the bucket
+// is mis-classified (e.g. a new shell icon was added to ICON_PAGE_ONLY, or a
+// page-only base-ui subpath became entry-reachable). The budget above can be
+// too coarse to catch that: the icon-pages bucket is ~60 kB, well under the
+// headroom, while every visitor now pays it before painting.
+const LAZY_ONLY_PREFIXES = ["vendor-icons-pages", "vendor-misc-pages", "vendor-baseui-forms"];
+const leakedLazy = [...critical.keys()].filter((n) => LAZY_ONLY_PREFIXES.some((p) => n.startsWith(p)));
+
 const mb = (b) => `${(b / 1024 / 1024).toFixed(2)}MB`;
 const kb = (b) => `${Math.round(b / 1024)}kB`;
 
@@ -161,6 +174,12 @@ if (criticalBytes > CRITICAL_PATH_LIMIT_BYTES) {
 if (fontBytes > FONT_LIMIT_BYTES) {
   console.error(`FAIL: fonts are ${kb(fontBytes)} (${fontFiles} files) — exceeds ${kb(FONT_LIMIT_BYTES)}.`);
   console.error("Re-run scripts/subset-fonts.py instead of committing the full Inter/JetBrains families.");
+  failed = true;
+}
+if (leakedLazy.length) {
+  console.error(`FAIL: page-only chunk(s) reached first paint: ${leakedLazy.join(", ")}.`);
+  console.error("A static import from the entry pulls a whole bucket. Move the new module to the entry bucket");
+  console.error("(vendor-icons / vendor-misc / vendor-baseui) or remove the page-only classification.");
   failed = true;
 }
 if (failed) process.exit(1);

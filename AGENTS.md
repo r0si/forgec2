@@ -14,7 +14,7 @@ The `bash` tool runs **PowerShell 5.1**, not bash. Adapt accordingly:
 
 "Done" for an optimization round = every applicable box checked, not "looks clean":
 
-- `npm run check` green (nav-perms 44/44, webdist byte-identical, bundle 800/900 kB, coverage ≥ 36.5%).
+- `npm run check` green (nav-perms 44/44, webdist byte-identical, bundle 744/800 kB, coverage ≥ 36.5%).
 - CI on the tip is `completed/success` (fuzz alone skipped).
 - When a container image ships, the demo host pins the new digest by UI or
   compose value and the boundary checks (read-only edges, 404 controls) pass.
@@ -30,7 +30,7 @@ criteria instead of vibes:
 | # | Criterion | Current threshold |
 |---|---|---|
 | 1 | CI on the tip is `completed/success` (fuzz skipped) | yes |
-| 2 | `npm run check` green (nav-perms 44/44, bundle ≤ 900kB critical / 5.0MB total, webdist byte-identical) | yes |
+| 2 | `npm run check` green (nav-perms 44/44, bundle ≤ 800kB critical / 5.0MB total, webdist byte-identical) | yes |
 | 3 | Gosec at 0 findings (windows target 1 staticcheck headroom, linux 0) | yes (65 → 0) |
 | 4 | Go statement coverage ≥ 58% | 59.1% measured |
 | 5 | Frontend statements ≥ 36.5% | 37.91% measured |
@@ -367,7 +367,7 @@ Both sides carry a coverage floor, and **a floor that is never raised stops guar
 |---|---|---|---|
 | Go | **58%** | 59.1% (was 51.5 at a 52.8 measurement — a 7-point regression would have passed) | `.github/workflows/ci.yml` "Coverage floor" |
 | frontend | **36.5%** | 37.71% statements / 24 365 | `frontend/scripts/check-coverage.mjs` (override with `COVERAGE_FLOOR`) |
-| first-paint bundle | **900 kB** | 800 kB critical path (4.56 MB total under a 5.0 MB cap) | `frontend/scripts/check-bundle.mjs` |
+| first-paint bundle | **800 kB** | 744 kB critical path (4.57 MB total under a 5.0 MB cap) | `frontend/scripts/check-bundle.mjs` |
 
 Raise a floor in the same change that adds tests; lower it only as part of that change, never to make
 a regression pass. ~1 point of headroom is deliberate: it absorbs ordinary page work while a large
@@ -376,8 +376,10 @@ below the measured figure, which meant roughly half the suite could be deleted u
 
 The **bundle budget is the same kind of ratchet**: it sat at 1090 kB while the critical path fell to
 798 kB, so the "~122 kB of headroom" its comment promised had quietly become 292 kB — enough for a
-few-hundred-kB route chunk to re-leak and still pass. It is now 900 kB. **When a budget's comment
-states a headroom, check that arithmetic against the current measurement.**
+few-hundred-kB route chunk to re-leak and still pass. It went to 900 kB then, and to **800 kB** on
+2026-11-09 when the icon and web-vitals split took the measured path to 744 kB (56 kB headroom, less
+than the smallest route chunk). **When a budget's comment states a headroom, check that arithmetic
+against the current measurement.**
 
 ## Testing
 

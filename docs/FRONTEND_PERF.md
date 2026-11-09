@@ -130,6 +130,25 @@ from 1,104,896 to 992,406 raw and keeps the lazy zod / base-ui-forms / login
 chunks out of `index.html`. A revisit of the shell revalidates to `304` with a
 0-byte body — the payload moves only on version change.
 
+## First-paint JS split (2026-11)
+
+Two atomic vendor buckets charged the entry for page-only modules:
+
+| Bucket | Before | After | What changed |
+| --- | --- | --- | --- |
+| `vendor-icons-*.js` | 67 kB | 19 kB | 170 page-only icons moved to `vendor-icons-pages-*.js` (~60 kB, lazy) |
+| `vendor-misc-*.js` | 40 kB | 31 kB | `web-vitals` (9 kB) moved to `vendor-misc-pages-*.js` (lazy) |
+| **critical path** | **800 kB** | **744 kB** | `check-bundle` budget tightened 900 → 800 kB |
+
+Method: build with one chunk per icon module (and per package for `vendor-misc`),
+walk the entry's static import closure, and take the complement as page-only.
+The icon list lives in `ICON_PAGE_ONLY` in `vite.config.ts`; an icon that is not
+listed stays in the entry bucket (a new shell icon costs ~200 B, never the whole
+lazy set). `check-bundle.mjs` also fails if `vendor-icons-pages`,
+`vendor-misc-pages` or `vendor-baseui-forms` ever appears in the closure — a
+static import from the entry pulls a whole bucket, and that leak (~60 kB) is
+small enough to pass the budget while every visitor pays it.
+
 ## First-paint fonts (2026-11)
 
 `index.html` preloads the Inter face, so it is downloaded before first paint
