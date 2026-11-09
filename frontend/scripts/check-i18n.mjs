@@ -95,8 +95,13 @@ function main() {
   // literal mention keeps those keys out of the dead list — a mention in a
   // comment only costs a false negative, never a wrong "unused" verdict.
   const mentioned = new Set();
+  const fragmentDir = path.join(I18N_DIR, "fragments");
   for (const file of walk(SRC)) {
     if (file === EN_FILE || file === ZH_FILE) continue;
+    // Fragment files are dictionaries, not consumers: counting their keys as
+    // "mentioned" would mark every agents.*/settings.* key as used and hide a
+    // genuinely dead one from the warning below.
+    if (file.startsWith(fragmentDir + path.sep)) continue;
     let src;
     try {
       src = fs.readFileSync(file, "utf8");
