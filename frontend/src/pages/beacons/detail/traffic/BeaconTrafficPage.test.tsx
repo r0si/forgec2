@@ -22,7 +22,8 @@ vi.mock("@/lib/i18n", () => {
     }
     return s;
   };
-  return { getLocale: () => "en", useI18n: () => ({ t }) };
+  // Page modules register their dictionary fragment at module scope.
+  return { getLocale: () => "en", useI18n: () => ({ t }), registerFragment: () => {} };
 });
 
 vi.mock("sonner", () => ({

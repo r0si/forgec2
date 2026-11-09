@@ -14,7 +14,8 @@ vi.mock("@/lib/i18n", () => {
   // `t` must be referentially stable: loadConfig carries it in its deps, and a
   // fresh function per render would re-run the load effect forever.
   const t = (key: string) => key;
-  return { getLocale: () => "en", useI18n: () => ({ t }) };
+  // Page modules register their dictionary fragment at module scope.
+  return { getLocale: () => "en", useI18n: () => ({ t }), registerFragment: () => {} };
 });
 
 vi.mock("sonner", () => ({
