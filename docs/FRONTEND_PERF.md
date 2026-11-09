@@ -13,7 +13,8 @@ serving- and loading-layer changes.
 | `internal/server/server_http.go` | `SetStaticFS` middleware: auth redirect for `/`+`/dashboard`, malleable-profile safety net, trailing-slash normalization, cache policy, 304 handling, compression decision |
 | `internal/server/static_assets.go` | boot-time metadata (content-hash ETag, size, compressibility), ETag/`Accept-Encoding` parsing, pooled gzip writer |
 | `internal/server/server_http_static_test.go` | cache/304/compression-skip matrix over a `fstest.MapFS` |
-| `frontend/scripts/check-bundle.mjs` | raw bundle budget (raw bytes only; compression does not shrink what it measures) and the critical-path referee |
+| `frontend/scripts/check-bundle.mjs` | raw bundle budget (raw bytes only; compression does not shrink what it measures), the critical-path referee, and the first-paint font ceiling |
+| `frontend/scripts/subset-fonts.py` | regenerates the committed Inter/JetBrains Mono subsets and verifies the symbol coverage the console relies on |
 | `frontend/vite.config.ts` | `manualChunks`, incl. the measured base-ui core/forms split (`BASEUI_PAGE_ONLY_KEYS`) |
 | `frontend/src/lib/route-prefetch.ts` + `route-imports.ts` | hover/focus + idle route prefetch; the import map is shared with `router.tsx` so both request the same chunks |
 
@@ -129,6 +130,28 @@ from 1,104,896 to 992,406 raw and keeps the lazy zod / base-ui-forms / login
 chunks out of `index.html`. A revisit of the shell revalidates to `304` with a
 0-byte body — the payload moves only on version change.
 
+## First-paint fonts (2026-11)
+
+`index.html` preloads the Inter face, so it is downloaded before first paint
+alongside the JS. The committed files are **subsets**: the console renders Latin
+and punctuation/symbols, CJK falls back to system fonts (neither family has CJK
+glyphs), so shipping the full families downloaded glyph tables nothing can use.
+
+| File | Before | After | When |
+| --- | --- | --- | --- |
+| `Inter-Variable-*.woff2` | 350,376 | 215,228 | **preloaded**, first paint |
+| `JetBrainsMono-Variable-*.woff2` | 71,520 | 55,828 | on first mono text |
+| total | 421,896 | 271,056 | −150,840 raw (−36%) |
+
+woff2 is already compressed, so the server does not gzip it and the raw delta is
+what a cold visit transfers. The ranges are Latin (basic/-1/Ext-A/B/Additional),
+general punctuation, currency, letterlike, arrows, math, box drawing, geometric
+and misc symbols, dingbats, variation selectors; `frontend/scripts/subset-fonts.py`
+holds the list, verifies the symbols the UI prints, and regenerates the files
+(`pip install fonttools brotli`). `check-bundle.mjs` now fails above **300 kB**
+of `.woff2` in `out/assets`, so restoring a full family is caught rather than
+silently costing every first paint.
+
 ## Server measurements (2026-10 batch R, local host, `curl -w '%{size_download}'`)
 
 The bytes on the wire are the same files the loading table lists above; what
@@ -165,6 +188,11 @@ go test ./internal/server/ -run TestStatic -count=1
 cd frontend && npm run build && npm run check:bundle
 node -e "const h=require('node:fs').readFileSync('out/index.html','utf8');\
 console.log(/vendor-baseui-forms/.test(h) ? 'FAIL: forms preloaded' : 'OK: forms lazy')"
+
+# font subset coverage + size ceiling (needs `pip install fonttools brotli`)
+py frontend/scripts/subset-fonts.py --check
+#   -> Inter-Variable.woff2: 210 kB, coverage OK
+#   -> JetBrainsMono-Variable.woff2: 54 kB, coverage OK
 ```
 
 ## Recorded limits / not done

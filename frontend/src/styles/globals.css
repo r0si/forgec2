@@ -13,6 +13,10 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ── Self-hosted fonts (was next/font/local) ── */
+/* Both files are SUBSETS: Latin + the punctuation/symbol ranges the console
+   prints. CJK falls back to system fonts. Regenerate with
+   `py scripts/subset-fonts.py`; check-bundle.mjs fails above 300 kB of woff2,
+   so do not replace them with the full families. */
 @font-face {
   font-family: "Inter Variable";
   font-style: normal;

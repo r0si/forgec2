@@ -10,6 +10,12 @@
 //      imports, transitively) — catches the failure the total budget cannot
 //      see: a route chunk that stops being lazily fetched.
 //
+// A third check guards the fonts: the preloaded Inter face is the largest
+// single first-paint asset (bigger than any JS chunk), and replacing the
+// subset with the full family is invisible to both byte budgets above. Total
+// .woff2 bytes must stay under FONT_LIMIT_BYTES; the subset is produced by
+// scripts/subset-fonts.py and documented in docs/FRONTEND_PERF.md.
+//
 // The second budget exists because this app shipped 928 kB of route JS inside
 // the first-paint path (route-agents-list, route-agents-detail, route-ai,
 // route-generate, route-credentials) while the TOTAL budget stayed comfortably
@@ -42,6 +48,10 @@ const TOTAL_LIMIT_BYTES = 5.0 * 1024 * 1024;
 // the regression this budget exists to catch. Set to 900 kB: ~100 kB of ordinary entry/vendor
 // headroom, and a re-leak of a few hundred kB trips it.
 const CRITICAL_PATH_LIMIT_BYTES = 900 * 1024;
+// Measured 2026-11-09: Inter 210 kB + JetBrains Mono 55 kB after the Latin/UI
+// subset (was 350 + 72 = 422 kB as the full families). 300 kB leaves ~35 kB of
+// headroom; restoring either full font trips it.
+const FONT_LIMIT_BYTES = 300 * 1024;
 const staticDir = join(fileURLToPath(new URL(".", import.meta.url)), "..", "out");
 
 function walk(dir, out) {
@@ -71,10 +81,16 @@ try {
 // ── 1. Total JS + CSS ────────────────────────────────────────────────────────
 let total = 0;
 let files = 0;
+let fontBytes = 0;
+let fontFiles = 0;
 for (const f of allFiles) {
   if (f.endsWith(".js") || f.endsWith(".css")) {
     total += statSync(f).size;
     files += 1;
+  }
+  if (f.endsWith(".woff2")) {
+    fontBytes += statSync(f).size;
+    fontFiles += 1;
   }
 }
 
@@ -142,10 +158,16 @@ if (criticalBytes > CRITICAL_PATH_LIMIT_BYTES) {
   console.error("and do not reintroduce directory-level manualChunks buckets in vite.config.ts.");
   failed = true;
 }
+if (fontBytes > FONT_LIMIT_BYTES) {
+  console.error(`FAIL: fonts are ${kb(fontBytes)} (${fontFiles} files) — exceeds ${kb(FONT_LIMIT_BYTES)}.`);
+  console.error("Re-run scripts/subset-fonts.py instead of committing the full Inter/JetBrains families.");
+  failed = true;
+}
 if (failed) process.exit(1);
 
 const routeChunks = [...critical.keys()].filter((n) => /^route-/.test(n));
 console.log(
   `OK: total ${mb(total)} (${files} files) under ${mb(TOTAL_LIMIT_BYTES)}; ` +
-    `critical path ${kb(criticalBytes)} (${critical.size} chunks, ${routeChunks.length} route) under ${kb(CRITICAL_PATH_LIMIT_BYTES)}`,
+    `critical path ${kb(criticalBytes)} (${critical.size} chunks, ${routeChunks.length} route) under ${kb(CRITICAL_PATH_LIMIT_BYTES)}; ` +
+    `fonts ${kb(fontBytes)} (${fontFiles}) under ${kb(FONT_LIMIT_BYTES)}`,
 );
