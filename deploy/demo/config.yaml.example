@@ -27,8 +27,9 @@ server:
     - 127.0.0.1
   update_check_enabled: false
   # The login log resolves the country of a sign-in IP on first sight and
-  # caches it in `login_geos`; nothing else phones out. ip-api.com is tried
-  # first (it is unreachable from this host), then ip.taobao.com.
+  # caches it in `login_geos`; nothing else phones out. Providers are tried in
+  # order: ip-api.com (unreachable from this host), ip.zxinc.org (UTF-8, no
+  # shared quota), then ip.taobao.com.
   geoip_enabled: true
   # Empty on purpose: deploy.sh generates this with `openssl rand -hex 32` and
   # writes it into the live config. Never put a real key in this example - the

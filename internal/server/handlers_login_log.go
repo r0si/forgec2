@@ -102,6 +102,14 @@ func (s *Server) handleGetLoginEvents(c *gin.Context) {
 	})
 }
 
+// loginCountryStat is one country bucket of the 24h login rollup. An empty
+// Country is "not resolved yet", not an error: the panel labels it.
+type loginCountryStat struct {
+	Country string `json:"country"`
+	Failed  int64  `json:"failed"`
+	OK      int64  `json:"ok"`
+}
+
 // loginEventSummary aggregates the last 24 hours of auth activity by country.
 //
 // Operators open the login log to answer one question first: "is someone
@@ -131,12 +139,7 @@ func (s *Server) loginEventSummary(c *gin.Context) gin.H {
 		return gin.H{}
 	}
 
-	type countryStat struct {
-		Country string `json:"country"`
-		Failed  int64  `json:"failed"`
-		OK      int64  `json:"ok"`
-	}
-	byCountry := map[string]*countryStat{}
+	byCountry := map[string]*loginCountryStat{}
 	var failedTotal, okTotal int64
 	ctx := c.Request.Context()
 	budget := loginGeoPerRequest
@@ -156,14 +159,14 @@ func (s *Server) loginEventSummary(c *gin.Context) gin.H {
 		}
 		stat := byCountry[country]
 		if stat == nil {
-			stat = &countryStat{Country: country}
+			stat = &loginCountryStat{Country: country}
 			byCountry[country] = stat
 		}
 		stat.Failed += row.Failed
 		stat.OK += row.OK
 	}
 
-	ordered := make([]countryStat, 0, len(byCountry))
+	ordered := make([]loginCountryStat, 0, len(byCountry))
 	for _, stat := range byCountry {
 		ordered = append(ordered, *stat)
 	}
