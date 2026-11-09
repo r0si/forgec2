@@ -166,14 +166,16 @@ registry between the active dictionary and the shell slice.
 | `i18n-generate-*.js` | 17,868 | 5,618 | payload factory, listeners, beacon pages, settings |
 | previous `en-*.js` | 244,088 | 66,010 | every authenticated page |
 
-Savings against the single dictionary: **−97 kB raw / −26 kB gzip** on pages
-that need none of the three namespaces (dashboard, events, AI, audit, …), −25 kB
-raw on beacon-list/detail pages (agents + generate), −53 kB raw on settings
-pages (settings + generate) and −79 kB raw on the payload factory (generate).
-The fragments stay out of `index.html`'s preload (asserted by `check-bundle` +
-e2e); the registry lives in `lib/i18n/index.tsx` because a separate registry
-module was merged into the lazy agents chunk by Rolldown, which put the 53 kB
-back into first paint.
+Savings against the single dictionary: the **startup chunk is 97 kB smaller
+(26 kB gzip less) before first paint** on every authenticated page (login
+downloads no dictionary at all). The fragments then load with the pages that
+render them: the payload factory, listeners, beacon list/detail, settings. The
+idle prefetch of `/listeners` also warms `i18n-generate` once the operator is
+idle, so the saving is on the initial load rather than a permanent per-page
+delta. The fragments stay out of `index.html`'s preload (asserted by
+`check-bundle` + e2e); the registry lives in `lib/i18n/index.tsx` because a
+separate registry module was merged into the lazy agents chunk by Rolldown,
+which put the 53 kB back into first paint.
 
 The `agents.*` / `settings.*` keys the shell itself needs were renamed to
 `nav.beacon_*` / `topbar.online_label` and moved into the bootstrap slice, so no
