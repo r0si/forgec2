@@ -304,3 +304,28 @@ func TestLoginGeoSummaryPayloadHasStableShape(t *testing.T) {
 		t.Fatalf("payload = %s, want %s", encoded, want)
 	}
 }
+
+// TestLoginGeoCacheIsPruned proves the cache has an eviction and not only a
+// writer: rows past the TTL are removed, fresh ones survive. Without this the
+// table keeps one row per source IP ever seen, forever.
+func TestLoginGeoCacheIsPruned(t *testing.T) {
+	s := &Server{db: testutil.SetupTestDB(t), ctx: context.Background()}
+
+	fresh := db.LoginGeo{IP: "203.0.113.10", Country: "中国", ResolvedAt: time.Now().Add(-time.Hour)}
+	stale := db.LoginGeo{IP: "203.0.113.11", Country: "德国", ResolvedAt: time.Now().Add(-loginGeoTTL - time.Hour)}
+	for _, row := range []db.LoginGeo{fresh, stale} {
+		if err := s.db.Create(&row).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	s.cleanupExpiredLoginGeo()
+
+	var kept []db.LoginGeo
+	if err := s.db.Order("ip").Find(&kept).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(kept) != 1 || kept[0].IP != fresh.IP {
+		t.Fatalf("kept rows = %+v, want only the fresh %s", kept, fresh.IP)
+	}
+}

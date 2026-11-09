@@ -305,6 +305,7 @@ Current timeouts, and where they live:
 | backup snapshots / `.fbk.tmp` | `removeStaleTempFiles` in `cleanupOldBackups` | 1 h |
 | `socksRelayEngine` connections | `cleanupStaleSocks` ticker | 5 min |
 | `socksRelayEngine` control/rportfwd queues | cleared by `stopSession` | — |
+| `login_geos` (table, not a map) | `cleanupOldData` → `cleanupExpiredLoginGeo` at startup and every 24h | 7 d TTL |
 
 ## Audit chain
 The audit log is a hash chain (`auditEntryHash`, `PrevHash` -> `EntryHash`).

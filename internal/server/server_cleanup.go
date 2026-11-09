@@ -138,8 +138,27 @@ func (s *Server) cleanupOldData() {
 	s.cleanOldFiles(filepath.Join(dataDir, "agents"), cutoff)
 
 	s.cleanupStaleMapEntries()
+	s.cleanupExpiredLoginGeo()
 
 	slog.Info("Old data cleanup completed")
+}
+
+// cleanupExpiredLoginGeo drops cached countries past their TTL.
+//
+// This is a table rather than an in-memory map, but the failure shape is the
+// one this repository keeps re-learning: a writer with no eviction. Before it
+// existed, `login_geos` kept one row per source IP ever seen — forever — even
+// though rows older than loginGeoTTL are never read.
+func (s *Server) cleanupExpiredLoginGeo() {
+	cutoff := time.Now().Add(-loginGeoTTL)
+	res := s.db.WithContext(s.ctx).Where("resolved_at < ?", cutoff).Delete(&db.LoginGeo{})
+	if res.Error != nil {
+		slog.Warn("Pruning expired login geo rows failed", "err", res.Error)
+		return
+	}
+	if res.RowsAffected > 0 {
+		slog.Info("Pruned expired login geo rows", "rows", res.RowsAffected, "ttl", loginGeoTTL)
+	}
 }
 
 func (s *Server) cleanupStaleMapEntries() {
