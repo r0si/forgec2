@@ -28,7 +28,9 @@ const envelope = {
   CurrentUserRole: "admin",
 };
 
-async function prepare(page: Page, theme: "light" | "dark" = "light") {
+async function prepare(page: Page, theme: "light" | "dark" = "light", extraPermissions: string[] = []) {
+  const permissions = [...envelope.data.permissions, ...extraPermissions];
+  const body = JSON.stringify({ ...envelope, data: { ...envelope.data, permissions } });
   await page.addInitScript((selectedTheme) => {
     localStorage.setItem("forgec2_theme", selectedTheme);
     localStorage.setItem("forgec2_lang", "en");
@@ -50,7 +52,7 @@ async function prepare(page: Page, theme: "light" | "dark" = "light") {
       ].includes(pathname) || /^\/api\/ai\/sessions\/[^/]+\/attachments$/.test(pathname)) {
         return route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
       }
-      return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(envelope) });
+      return route.fulfill({ status: 200, contentType: "application/json", body });
     }
     return route.continue();
   });
@@ -140,7 +142,10 @@ test.describe("responsive shell", () => {
   });
 
   test("page-only dictionary fragments load with their own pages", async ({ page }) => {
-    await prepare(page);
+    // credentials.read is only needed for the /credentials leg below; the
+    // visual-baseline tests keep the smaller permission set so their sidebar
+    // matches the committed screenshots.
+    await prepare(page, "light", ["credentials.read"]);
     const dictChunks: string[] = [];
     page.on("request", (request) => {
       const pathname = new URL(request.url()).pathname;

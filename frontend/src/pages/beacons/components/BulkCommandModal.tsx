@@ -78,7 +78,7 @@ export function BulkCommandModal({
                 {COMMAND_TYPES.map((ct) => (
                   <SelectItem key={ct.value} value={ct.value}>
                     {t(ct.labelKey)}
-                    {credActionDef(ct.value)?.quality === "scripted" ? ` (${t("cred.quality_scripted")})` : ""}
+                    {credActionDef(ct.value)?.quality === "scripted" ? ` (${t("generate.quality_scripted")})` : ""}
                   </SelectItem>
                 ))}
               </SelectContent>

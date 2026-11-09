@@ -1,9 +1,7 @@
 import { registerFragment } from "@/lib/i18n";
 import { enAgents } from "@/lib/i18n/fragments/en.agents";
-import { enCred } from "@/lib/i18n/fragments/en.cred";
 import { enGenerate } from "@/lib/i18n/fragments/en.generate";
 registerFragment(enAgents);
-registerFragment(enCred);
 registerFragment(enGenerate);
 
 import { useEffect, useRef, useState, useCallback } from "react";
@@ -33,7 +31,7 @@ import { implantBlocksDest } from "@/lib/implant-version";
 function PersistQualityMark({ quality }: { quality: DestQuality }) {
   const { t } = useI18n();
   if (quality === "experimental") return <>{t("generate.quality_experimental")}</>;
-  if (quality === "scripted") return <>{t("cred.quality_scripted")}</>;
+  if (quality === "scripted") return <>{t("generate.quality_scripted")}</>;
   if (quality === "core") return <>{t("generate.quality_core")}</>;
   return <>{t("generate.quality_hardened")}</>;
 }

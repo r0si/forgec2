@@ -33,7 +33,7 @@ criteria instead of vibes:
 | 2 | `npm run check` green (nav-perms 44/44, bundle ≤ 740kB critical / 5.0MB total, webdist byte-identical) | yes |
 | 3 | Gosec at 0 findings (windows target 1 staticcheck headroom, linux 0) | yes (65 → 0) |
 | 4 | Go statement coverage ≥ 58% | 59.1% measured |
-| 5 | Frontend statements ≥ 36.5% | 38.65% measured |
+| 5 | Frontend statements ≥ 36.5% | 38.63% measured |
 | 6 | Demo image pin matches GHCR `edge` digest; boot log error patterns at 0; read-only boundary assertions green | yes |
 | 7 | Wiki / Pages / sitemap live with 200s | yes |
 | 8 | Knowledge search: recall@5 regression test green in CI over a 200-chunk corpus (SQLite path) | yes |
@@ -366,7 +366,7 @@ Both sides carry a coverage floor, and **a floor that is never raised stops guar
 | side | floor | measured (2026-11-07) | where |
 |---|---|---|---|
 | Go | **58%** | 59.1% (was 51.5 at a 52.8 measurement — a 7-point regression would have passed) | `.github/workflows/ci.yml` "Coverage floor" |
-| frontend | **36.5%** | 38.65% statements / 24 564 | `frontend/scripts/check-coverage.mjs` (override with `COVERAGE_FLOOR`) |
+| frontend | **36.5%** | 38.63% statements / 24 562 | `frontend/scripts/check-coverage.mjs` (override with `COVERAGE_FLOOR`) |
 | first-paint bundle | **740 kB** | 713 kB critical path (4.57 MB total under a 5.0 MB cap) | `frontend/scripts/check-bundle.mjs` |
 
 Raise a floor in the same change that adds tests; lower it only as part of that change, never to make

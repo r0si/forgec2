@@ -11,6 +11,7 @@ export const enGenerate: Record<string, string> = {
   "generate.quality_core": "Core",
   "generate.quality_experimental": "Experimental",
   "generate.quality_hardened": "Hardened",
+  "generate.quality_scripted": "Scripted",
   "generate.show_all_formats": "Show all formats",
   "generate.show_delivery": "Stager / shellcode",
   "generate.show_experimental": "Show experimental transports",

@@ -2180,6 +2180,7 @@ export const zh: Record<string, string> = {
     "generate.quality_core": "核心",
     "generate.quality_experimental": "实验",
     "generate.quality_hardened": "加固",
+    "generate.quality_scripted": "脚本化",
     "generate.show_all_formats": "显示全部格式",
     "generate.show_delivery": "Stager / shellcode",
     "generate.show_experimental": "显示实验传输",
