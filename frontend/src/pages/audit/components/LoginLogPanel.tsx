@@ -8,19 +8,11 @@ import { DataTable } from "@/components/ui/data-table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { PageToolbar } from "@/components/ui/page-toolbar";
-import { Filter, RotateCw } from "lucide-react";
+import { downloadText } from "@/lib/download";
+import { loginEventsToCSV, loginLogFilename, type LoginEvent } from "./login-log";
+import { Download, Filter, RotateCw } from "lucide-react";
 
-export interface LoginEvent {
-  id: number;
-  user: string;
-  action: string;
-  ip: string;
-  country: string;
-  city?: string;
-  success: boolean;
-  details: string;
-  created_at: string;
-}
+export type { LoginEvent };
 
 export interface LoginSummary {
   window_hours: number;
@@ -104,6 +96,11 @@ export function LoginLogPanel() {
     setApplied({ user: "", result: "" });
   };
 
+  const exportPage = () => {
+    if (events.length === 0) return;
+    downloadText(loginEventsToCSV(events), loginLogFilename(), "text/csv;charset=utf-8");
+  };
+
   return (
     <div className="space-y-4">
       {summary && (
@@ -175,6 +172,10 @@ export function LoginLogPanel() {
         </Button>
         <Button variant="ghost" onClick={() => void load()} disabled={loading} aria-label={t("common.refresh")}>
           <RotateCw className="size-4" />
+        </Button>
+        <Button variant="outline" onClick={exportPage} disabled={loading || events.length === 0}>
+          <Download className="size-4" />
+          <span>{t("audit.export_page_csv")}</span>
         </Button>
       </PageToolbar>
 

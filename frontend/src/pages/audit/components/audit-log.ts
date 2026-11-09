@@ -55,7 +55,12 @@ export function normalizeAuditLogs(raw: unknown): AuditLog[] {
 
 const CSV_HEADERS = ["Timestamp", "User", "IP", "Action", "Resource", "Target", "Status", "Severity", "Details"];
 
-function csvCell(value: unknown): string {
+// csvCell quotes one value for a CSV file, with formula-injection protection.
+//
+// Exported because the login log has its own columns but must escape cells the
+// same way: two copies of this rule is how one export ends up vulnerable while
+// the other is fixed (the decided pattern in this repo: one implementation).
+export function csvCell(value: unknown): string {
   let text = String(value ?? "");
   // CSV files are routinely opened in spreadsheet software. Prefix values
   // that would otherwise be interpreted as formulas while preserving the
