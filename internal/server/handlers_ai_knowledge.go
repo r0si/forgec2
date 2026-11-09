@@ -358,12 +358,19 @@ func splitAIKnowledge(content string) []string {
 	return chunks
 }
 
-func aiSearchTerms(text string) []string {
-	set := make(map[string]struct{})
+// aiWalkSearchTokens calls fn for every searchable term in text, in order,
+// duplicates included.
+//
+// It is the single tokenizer: aiSearchTerms (the blind index), aiSearchTokens
+// (phrases) and aiSearchTermCounts (the reranker) all go through it, so the
+// index and the scorer can never disagree about what a term is.
+func aiWalkSearchTokens(text string, fn func(token string)) {
 	var word strings.Builder
 	flush := func() {
+		// Byte length is deliberate: it is what the index has always used, and
+		// changing it would change every stored HMAC token.
 		if word.Len() >= 2 {
-			set[word.String()] = struct{}{}
+			fn(word.String())
 		}
 		word.Reset()
 	}
@@ -372,7 +379,7 @@ func aiSearchTerms(text string) []string {
 		if unicode.Is(unicode.Han, r) || unicode.Is(unicode.Hiragana, r) || unicode.Is(unicode.Katakana, r) || unicode.Is(unicode.Hangul, r) {
 			flush()
 			if lastCJK != 0 {
-				set[string([]rune{lastCJK, r})] = struct{}{}
+				fn(string([]rune{lastCJK, r}))
 			}
 			lastCJK = r
 			continue
@@ -385,6 +392,18 @@ func aiSearchTerms(text string) []string {
 		}
 	}
 	flush()
+}
+
+// aiSearchTokens returns the terms of text in order, duplicates included.
+func aiSearchTokens(text string) []string {
+	var tokens []string
+	aiWalkSearchTokens(text, func(token string) { tokens = append(tokens, token) })
+	return tokens
+}
+
+func aiSearchTerms(text string) []string {
+	set := make(map[string]struct{})
+	aiWalkSearchTokens(text, func(token string) { set[token] = struct{}{} })
 	terms := make([]string, 0, len(set))
 	for term := range set {
 		terms = append(terms, term)
@@ -394,6 +413,18 @@ func aiSearchTerms(text string) []string {
 		terms = terms[:128]
 	}
 	return terms
+}
+
+// aiSearchTermCounts counts the tokens of a candidate chunk for BM25. It walks
+// the same tokenizer as the index so a phrase matched by the index is scored
+// by the reranker.
+func aiSearchTermCounts(text string) (counts map[string]int, total int) {
+	counts = make(map[string]int)
+	aiWalkSearchTokens(text, func(token string) {
+		counts[token]++
+		total++
+	})
+	return counts, total
 }
 
 func (s *Server) blindAIKnowledgeTokens(text string) string {
@@ -487,6 +518,131 @@ type aiKnowledgeSearchResult struct {
 	ChunkIndex int     `json:"chunk_index"`
 	Content    string  `json:"content"`
 	Score      float64 `json:"score"`
+}
+
+// Retrieval scores blob-shaped relevance signals, not a bag of independent
+// booleans: a term that appears twice in a short focused chunk should beat the
+// same term once in a wall of filler, and the query's phrase should beat its
+// words scattered apart.
+const (
+	aiKnowledgeBM25K1      = 1.2
+	aiKnowledgeBM25B       = 0.75
+	aiKnowledgePhraseBoost = 1.5
+)
+
+type aiQueryPhrase struct {
+	text string
+	idf  float64
+}
+
+// aiQueryPhrases extracts the strings whose adjacency is evidence: the whole
+// query and every adjacent pair of its tokens.
+//
+// CJK tokens are bigrams, so a Chinese query's phrase is the query itself
+// (its bigram pairs never appear space-separated in text).
+func aiQueryPhrases(query string, idf map[string]float64) []aiQueryPhrase {
+	tokens := aiSearchTokens(query)
+	if len(tokens) < 2 {
+		return nil
+	}
+	seen := make(map[string]bool)
+	out := make([]aiQueryPhrase, 0, len(tokens))
+	for i := 0; i+1 < len(tokens); i++ {
+		pair := tokens[i] + " " + tokens[i+1]
+		if seen[pair] {
+			continue
+		}
+		seen[pair] = true
+		out = append(out, aiQueryPhrase{
+			text: pair,
+			idf:  (idf[tokens[i]] + idf[tokens[i+1]]) / 2,
+		})
+	}
+	whole := strings.Join(strings.Fields(strings.ToLower(query)), " ")
+	if whole != "" && !seen[whole] {
+		sum := 0.0
+		for _, token := range tokens {
+			sum += idf[token]
+		}
+		out = append(out, aiQueryPhrase{text: whole, idf: sum / float64(len(tokens))})
+	}
+	return out
+}
+
+// aiKnowledgeRerank re-scores the candidate set with BM25 over the plaintext
+// content plus a bonus for query phrases found adjacent.
+//
+// The candidate set is chosen by the blinded-token index (which cannot see
+// frequencies, lengths or order). This stage is the only one that reads the
+// text, and it exists because the index's binary term matching made every
+// chunk holding the same terms tie: measured on a 200-chunk corpus where the
+// answer is the chunk containing the query's phrase, recall@5 was 2/3 and the
+// first correct hit sat at rank 2 — the long fillers won on rowid order.
+func aiKnowledgeRerank(query string, results []aiKnowledgeSearchResult) {
+	if len(results) < 2 {
+		return
+	}
+	terms := aiSearchTerms(query)
+	if len(terms) == 0 {
+		return
+	}
+	counts := make([]map[string]int, len(results))
+	lengths := make([]int, len(results))
+	totalTokens := 0
+	df := make(map[string]int, len(terms))
+	for i, r := range results {
+		c, n := aiSearchTermCounts(r.Content)
+		counts[i], lengths[i] = c, n
+		totalTokens += n
+		for _, term := range terms {
+			if c[term] > 0 {
+				df[term]++
+			}
+		}
+	}
+	n := float64(len(results))
+	avgdl := float64(totalTokens) / n
+	if avgdl <= 0 {
+		// Every candidate decrypted to empty text (or the query matched only
+		// non-content fields): nothing to rerank with.
+		return
+	}
+	idf := make(map[string]float64, len(terms))
+	for _, term := range terms {
+		idf[term] = math.Log(1 + (n-float64(df[term])+0.5)/(float64(df[term])+0.5))
+	}
+	phrases := aiQueryPhrases(query, idf)
+	for i := range results {
+		score := results[i].Score
+		dl := float64(lengths[i])
+		for _, term := range terms {
+			tf := float64(counts[i][term])
+			if tf == 0 {
+				continue
+			}
+			// BM25: term frequency saturates (k1) and long chunks are
+			// penalised (b), so repetition and focus both count.
+			score += idf[term] * (tf * (aiKnowledgeBM25K1 + 1)) /
+				(tf + aiKnowledgeBM25K1*(1-aiKnowledgeBM25B+aiKnowledgeBM25B*dl/avgdl))
+		}
+		if len(phrases) > 0 {
+			lower := strings.ToLower(results[i].Content)
+			for _, phrase := range phrases {
+				if strings.Contains(lower, phrase.text) {
+					score += aiKnowledgePhraseBoost * phrase.idf
+				}
+			}
+		}
+		results[i].Score = score
+	}
+	// Deterministic tie-break: rowid order made the same query return
+	// different winners depending on insertion history.
+	sort.SliceStable(results, func(i, j int) bool {
+		if results[i].Score != results[j].Score {
+			return results[i].Score > results[j].Score
+		}
+		return results[i].ChunkID < results[j].ChunkID
+	})
 }
 
 func (s *Server) searchAIKnowledge(principal aiPrincipal, req aiKnowledgeSearchRequest) ([]aiKnowledgeSearchResult, error) {
@@ -635,7 +791,9 @@ func (s *Server) searchAIKnowledge(principal aiPrincipal, req aiKnowledgeSearchR
 			Collection: chunk.CollectionID, ChunkIndex: chunk.Position, Content: chunk.Content, Score: score,
 		})
 	}
-	sort.SliceStable(results, func(i, j int) bool { return results[i].Score > results[j].Score })
+	// Rank, then rerank on the plaintext: the token index can only say "this
+	// term is present", which ties every chunk holding the same query terms.
+	aiKnowledgeRerank(req.Query, results)
 	if len(results) > req.Limit {
 		results = results[:req.Limit]
 	}
