@@ -53,6 +53,11 @@ export default function AuditPage() {
   const [appliedFilters, setAppliedFilters] = useState({ user: "", action: "" });
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
   const [users, setUsers] = useState<{ username: string }[]>([]);
+  // The page header's export belongs to the events table. It must disappear on
+  // the login tab: otherwise two identical "Export page CSV" buttons are
+  // visible and the header one silently exports a table the operator cannot
+  // see.
+  const [tab, setTab] = useState("events");
   const { t } = useI18n();
 
   useEffect(() => {
@@ -155,14 +160,20 @@ export default function AuditPage() {
   };
 
   return (
-    <PageContainer title={t("audit.title")} subtitle={t("audit.subtitle")} actions={<>
-        <Button onClick={handleExport} disabled={loading || logs.length === 0}>
-          <Download className="size-4" />
-          <span>{t("audit.export_page_csv")}</span>
-        </Button>
-      </>}>
+    <PageContainer
+      title={t("audit.title")}
+      subtitle={t("audit.subtitle")}
+      actions={
+        tab === "events" ? (
+          <Button onClick={handleExport} disabled={loading || logs.length === 0}>
+            <Download className="size-4" />
+            <span>{t("audit.export_page_csv")}</span>
+          </Button>
+        ) : null
+      }
+    >
 
-      <Tabs defaultValue="events">
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="events">{t("audit.tab_events")}</TabsTrigger>
           <TabsTrigger value="logins">{t("audit.tab_logins")}</TabsTrigger>
