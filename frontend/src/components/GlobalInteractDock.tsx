@@ -16,14 +16,20 @@ import { registerFragment } from "@/lib/i18n";
 // dock renders agents.* labels and can be opened from ANY page (dashboard,
 // events, ...), whose entry does not load the beacon pages' fragment. Registering
 // it here — not at module scope — keeps the 53 kB out of first paint.
-const AgentInteractDock = lazy(async () => {
+//
+// Exported so a unit test can drive the loader directly: the failure mode is
+// "dock opened from a non-beacon page shows agents.* keys", which is invisible
+// to a render test if the fragment were already registered by another import.
+export async function loadAgentInteractDock() {
   const [{ enAgents }, m] = await Promise.all([
     import("@/lib/i18n/fragments/en.agents"),
     import("@/pages/beacons/components/AgentInteractDock"),
   ]);
   registerFragment(enAgents);
   return { default: m.AgentInteractDock };
-});
+}
+
+const AgentInteractDock = lazy(loadAgentInteractDock);
 
 export default function GlobalInteractDock() {
   const navigate = useNavigate();
