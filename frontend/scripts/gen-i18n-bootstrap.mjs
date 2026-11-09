@@ -28,6 +28,11 @@ const BOOTSTRAP_PREFIXES = [
   "common.",
   "login.",
   "error.",
+  // The 404, forbidden and router error screens render outside the
+  // authenticated layout (no full dictionary yet), so their text must be in
+  // the synchronous slice.
+  "notfound.",
+  "forbidden.",
 ];
 
 const src = readFileSync(enPath, "utf8");

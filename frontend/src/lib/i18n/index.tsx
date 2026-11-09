@@ -81,17 +81,22 @@ function loadZh(): Promise<Dict> {
   return zhPromise;
 }
 
-export function I18nProvider({ children }: { children: ReactNode }) {
+export function I18nProvider({ children, full = true }: { children: ReactNode; full?: boolean }) {
   const [locale, setLocaleState] = useState<Locale>("en");
   const localeRef = useRef<Locale>("en");
   const pendingRef = useRef<Locale | null>(null);
-  const [ready, setReady] = useState<boolean>(() => enFull !== null);
+  const [ready, setReady] = useState<boolean>(() => enFull !== null || !full);
 
   // Production: the full dictionary is not on the first-paint path, so fetch it
   // once and re-render everything with it. A failure leaves the bootstrap slice
   // in place rather than blanking the UI.
+  //
+  // `full={false}` is for routes that only need the synchronous slice (the
+  // login form): loading ~238 kB of translations before the operator has even
+  // signed in was the largest avoidable transfer on the public demo's front
+  // door. Authenticated routes mount a full provider instead.
   useEffect(() => {
-    if (enFull) return;
+    if (!full || enFull) return;
     let cancelled = false;
     loadEn().then(() => {
       if (!cancelled) setReady(true);
@@ -101,7 +106,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [full]);
 
   useEffect(() => {
     let saved: string | null = null;

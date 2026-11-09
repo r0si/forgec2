@@ -10,6 +10,10 @@ import ScrollToTop from "@/components/ScrollToTop";
 import CommandPalette from "@/components/CommandPalette";
 import GlobalInteractDock from "@/components/GlobalInteractDock";
 import TelemetryCollector from "@/components/TelemetryCollector";
+import SessionTimeoutWarning from "@/components/SessionTimeoutWarning";
+import RateLimitBanner from "@/components/RateLimitBanner";
+import NetworkStatusBanner from "@/components/NetworkStatusBanner";
+import WsOutboxToast from "@/components/WsOutboxToast";
 import { useLocation } from "react-router-dom";
 import { useAppStore, selectSidebarWidth } from "@/lib/store";
 import { useI18n } from "@/lib/i18n";
@@ -152,6 +156,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <ScrollToTop />
       <CommandPalette />
       <TelemetryCollector />
+      {/* Session/link banners live inside the authenticated shell: they need
+          the full dictionary and have nothing to say on the login page. */}
+      <SessionTimeoutWarning />
+      <RateLimitBanner />
+      <NetworkStatusBanner />
+      <WsOutboxToast />
     </div>
   );
 }

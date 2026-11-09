@@ -4,10 +4,6 @@ import { I18nProvider } from "@/lib/i18n";
 import { ThemeProvider } from "@/lib/theme";
 import { WebSocketProvider } from "@/lib/wsContext";
 import ErrorBoundary from "./ErrorBoundary";
-import SessionTimeoutWarning from "./SessionTimeoutWarning";
-import RateLimitBanner from "./RateLimitBanner";
-import NetworkStatusBanner from "./NetworkStatusBanner";
-import WsOutboxToast from "./WsOutboxToast";
 import { api } from "@/lib/api";
 import { paths } from "@/lib/api-paths";
 import { useAppStore } from "@/lib/store";
@@ -153,14 +149,11 @@ export default function ClientProvider({ children }: { children: React.ReactNode
   return (
     <ErrorBoundary>
       <ThemeProvider>
-        <I18nProvider>
-          <WebSocketProvider>
-            {children}
-            <SessionTimeoutWarning />
-            <RateLimitBanner />
-            <NetworkStatusBanner />
-            <WsOutboxToast />
-          </WebSocketProvider>
+        {/* Bootstrap-only: the login, 404, forbidden and router error screens
+            render outside the authenticated layout and must not pull the full
+            ~244 kB dictionary. MainLayout mounts a full provider inside. */}
+        <I18nProvider full={false}>
+          <WebSocketProvider>{children}</WebSocketProvider>
         </I18nProvider>
       </ThemeProvider>
     </ErrorBoundary>

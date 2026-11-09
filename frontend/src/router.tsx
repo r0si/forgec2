@@ -10,6 +10,7 @@ import { PageSpinner } from "@/components/ui/spinner";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import AppLayout from "@/components/AppLayout";
 import RouterErrorView from "@/components/RouterErrorView";
+import { I18nProvider } from "@/lib/i18n";
 import NotFound from "@/pages/NotFound";
 import Forbidden from "@/pages/forbidden/ForbiddenPage";
 import { NAV_ITEMS } from "@/lib/navigation";
@@ -111,9 +112,11 @@ function LegacyPrefixRedirect({ to }: { to: string }) {
 
 function MainLayout() {
   return (
-    <AppLayout>
-      <Outlet />
-    </AppLayout>
+    <I18nProvider>
+      <AppLayout>
+        <Outlet />
+      </AppLayout>
+    </I18nProvider>
   );
 }
 

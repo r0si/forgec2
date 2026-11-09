@@ -130,6 +130,26 @@ from 1,104,896 to 992,406 raw and keeps the lazy zod / base-ui-forms / login
 chunks out of `index.html`. A revisit of the shell revalidates to `304` with a
 0-byte body — the payload moves only on version change.
 
+## Dictionary deferral (2026-11)
+
+The full English dictionary ships as its own lazy chunk (`en-*.js`, 244 kB raw /
+~66 kB gzip). The provider used to fetch it on mount on **every** route,
+including `/login`, so the public demo's front door paid it before the visitor
+signed in. Now:
+
+- `ClientProvider` mounts a **bootstrap-only** provider (183 keys: nav, topbar,
+  sections, a11y, common, login, error, notfound, forbidden).
+- `MainLayout` mounts a **full** provider for authenticated routes; `AppLayout`
+  already holds the routed page until `ready`, so no raw key can flash.
+- `e2e/layout.spec.ts` asserts `/login` makes no `en-*.js` request and
+  `/dashboard` still does.
+
+Cost: none on the authenticated path (the dictionary still loads there), and
+one extra provider instance per navigation between the public and app shells.
+The bootstrap slice is generated (`scripts/gen-i18n-bootstrap.mjs`) and gated by
+`check:i18n-bootstrap`, so a new login/shell key cannot silently fall back to
+its raw dotted name.
+
 ## First-paint JS split (2026-11)
 
 Two atomic vendor buckets charged the entry for page-only modules:

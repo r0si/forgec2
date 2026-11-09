@@ -119,6 +119,26 @@ test.describe("responsive shell", () => {
     await expectNoPageOverflow(page);
   });
 
+  test("the login page never downloads the full English dictionary", async ({ page }) => {
+    await prepare(page);
+    const enChunks: string[] = [];
+    page.on("request", (request) => {
+      if (/\/assets\/en-[\w.-]+\.js$/.test(new URL(request.url()).pathname)) enChunks.push(request.url());
+    });
+    await page.goto("/login.html");
+    await expect(page.getByRole("form")).toBeVisible();
+    // The provider fetches on mount; give that effect time to fire before
+    // asserting the absence of the request.
+    await page.waitForTimeout(600);
+    expect(enChunks, "login page fetched the full en dictionary").toHaveLength(0);
+
+    // Authenticated routes still load it: the dictionary is deferred until
+    // after sign-in, not dropped.
+    await page.goto("/dashboard.html");
+    await expect(page.locator("main h1").first()).toBeAttached({ timeout: 15_000 });
+    await expect.poll(() => enChunks.length, { timeout: 10_000 }).toBeGreaterThan(0);
+  });
+
   for (const route of ROUTES) {
     test(`${route} uses a bounded page shell`, async ({ page }) => {
       await prepare(page);
