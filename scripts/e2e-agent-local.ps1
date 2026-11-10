@@ -26,8 +26,13 @@
 #   * asserts the agent's reported TLS fingerprint: "chrome_auto (default)" when
 #     -TLSFingerprint is omitted, or the requested value ("random", "firefox",
 #     ...). This is the only observable proof that the option survived
-#     option -> config blob -> binary -> check-in; CI runs it with "random" and
-#     with a pinned profile.
+#     option -> config blob -> binary -> check-in.
+#   * in CI (GITHUB_ACTIONS=true) or with -TlsMatrix it also runs the two extra
+#     legs - "random" (rotate per connection) and "firefox" (pinned) - each on
+#     its own throwaway database (created/dropped through the forgec2-pg
+#     container) and its own ports, so the three profile assertions cannot see
+#     each other's agents. This keeps the matrix inside the script because
+#     extending the workflow file needs the protected `workflow` scope.
 #   * with -Modules (comma-separated include list, e.g. "core") it also
 #     exercises the honest exclusion layer end to end: a task owned by an
 #     excluded module must fail with the named "not compiled into this build"
@@ -63,6 +68,12 @@ param(
     # server start), so the CI container creates it and the throwaway server
     # schema-migrates it on boot.
     [string]$PgDsn = 'host=127.0.0.1 user=forgec2 password=forgec2 dbname=forgec2 port=5432 sslmode=disable',
+    # Run the two JA3/JA4 variants (randomize per connection; pin Firefox) after
+    # the default stable-Chrome leg. CI enables this automatically because the
+    # workflow file is protected by the `workflow` scope; local runs opt in.
+    [switch]$TlsMatrix,
+    # Internal: set on the child invocations so they do not recurse.
+    [switch]$NoTlsMatrix,
     [switch]$KeepWork
 )
 
@@ -527,4 +538,49 @@ finally {
 Write-Host ''
 if ($fail.Count -gt 0) { Write-Host "Go agent E2E FAILED: $($fail -join ', ')"; exit 1 }
 Write-Host 'Go agent E2E ALL GREEN'
+
+# ── JA3/JA4 matrix ──────────────────────────────────────────────────────────
+# The option -> config blob -> binary -> check-in path is only observable from a
+# real run, and the workflow file cannot be extended without the `workflow`
+# scope. CI invokes this script once, so the matrix lives here: the default leg
+# above covers the stable Chrome Auto profile, and the two legs below prove
+# "random" and a pinned profile survive the same path. A throwaway database per
+# leg keeps each assertion independent (the previous leg's agent would otherwise
+# remain in the list). Local runs opt in with -TlsMatrix; CI turns it on via
+# GITHUB_ACTIONS.
+if (($TlsMatrix -or $env:GITHUB_ACTIONS -eq 'true') -and -not $NoTlsMatrix) {
+    $dockerReady = $false
+    if (Get-Command docker -ErrorAction SilentlyContinue) {
+        $running = @(docker ps --filter 'name=forgec2-pg' --format '{{.Names}}' 2>$null)
+        $dockerReady = $running -contains 'forgec2-pg'
+    }
+    if (-not $dockerReady) {
+        Write-Host '  TLS matrix: cannot reach the forgec2-pg container (not CI); assuming the databases already exist'
+    }
+    $variants = @(
+        @{ Name = 'random'; Profile = 'random'; Db = 'forgec2_tls_random'; Port = 8120; BeaconPort = 8121 },
+        @{ Name = 'firefox'; Profile = 'firefox'; Db = 'forgec2_tls_pinned'; Port = 8130; BeaconPort = 8131 }
+    )
+    foreach ($variant in $variants) {
+        Write-Host ''
+        Write-Host "=== TLS fingerprint leg: $($variant.Profile) ==="
+        if ($dockerReady) {
+            # Best effort: a leftover database from a rerun is fine, the server
+            # migrates it and the assertion looks up this run's agent id.
+            docker exec forgec2-pg psql -U forgec2 -d forgec2 -c "CREATE DATABASE $($variant.Db)" 2>$null | Out-Null
+        }
+        $childDsn = $PgDsn -replace 'dbname=[^ ]+', "dbname=$($variant.Db)"
+        & $PSCommandPath -RepoRoot $RepoRoot -WorkDir "$WorkDir-tls-$($variant.Name)" `
+            -Port $variant.Port -BeaconPort $variant.BeaconPort `
+            -TLSFingerprint $variant.Profile -PgDsn $childDsn -NoTlsMatrix -KeepWork
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "Go agent E2E FAILED: TLS fingerprint leg '$($variant.Profile)'"
+            exit 1
+        }
+        if ($dockerReady) {
+            docker exec forgec2-pg psql -U forgec2 -d forgec2 -c "DROP DATABASE IF EXISTS $($variant.Db)" 2>$null | Out-Null
+        }
+    }
+}
+
 exit 0
