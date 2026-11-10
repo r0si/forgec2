@@ -2299,6 +2299,12 @@ paths:
           in: query
           schema:
             type: string
+        - name: match
+          in: query
+          description: Match the action exactly (default) or as a substring for the coarse events-tab verbs
+          schema:
+            type: string
+            enum: [exact, contains]
         - name: user
           in: query
           schema:
@@ -2377,6 +2383,12 @@ paths:
           in: query
           schema:
             type: string
+        - name: match
+          in: query
+          description: Match the action exactly (default) or as a substring for the coarse events-tab verbs
+          schema:
+            type: string
+            enum: [exact, contains]
         - name: user
           in: query
           schema:

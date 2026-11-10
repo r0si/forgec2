@@ -14315,6 +14315,8 @@ export interface operations {
                 pageSize?: number;
                 search?: string;
                 action?: string;
+                /** @description Match the action exactly (default) or as a substring for the coarse events-tab verbs */
+                match?: "exact" | "contains";
                 user?: string;
                 /** @description Filter to one beacon's audit rows */
                 agent_id?: string;
@@ -14357,6 +14359,8 @@ export interface operations {
             query?: {
                 search?: string;
                 action?: string;
+                /** @description Match the action exactly (default) or as a substring for the coarse events-tab verbs */
+                match?: "exact" | "contains";
                 user?: string;
                 agent_id?: string;
                 result?: "success" | "failed";

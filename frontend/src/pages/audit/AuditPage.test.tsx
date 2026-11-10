@@ -63,4 +63,23 @@ describe("AuditPage tabs", () => {
       expect(String(call?.[0])).toContain("agent_id=agent-abc");
     });
   });
+
+  it("renders a readable action label with the raw code", async () => {
+    vi.mocked(api.get).mockImplementation(async (path: string) => {
+      const p = String(path);
+      if (p.startsWith("/users")) return { users: [] };
+      if (p.startsWith("/audit/logs")) {
+        return {
+          logs: [{ id: 1, user: "alice", action: "user_create", success: true, created_at: "2026-11-10T10:00:00Z" }],
+          total: 1,
+          failed: 0,
+        };
+      }
+      return {};
+    });
+
+    renderPage();
+    expect(await screen.findByText("User create")).toBeTruthy();
+    expect(screen.getByText("user_create")).toBeTruthy();
+  });
 });

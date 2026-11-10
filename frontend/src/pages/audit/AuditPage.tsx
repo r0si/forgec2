@@ -20,19 +20,10 @@ import { StatTile } from "@/components/ui/stat-tile";
 import { IconBadge } from "@/components/ui/icon-badge";
 import type { AuditLog } from "@/types/audit";
 import { useInteractStore } from "@/lib/interact-store";
-import { auditLogsToCSV, auditSessionId, normalizeAuditLogs } from "./components/audit-log";
+import { auditActionLabel, auditActionTone, auditEventsQuery, auditLogsToCSV, auditSessionId, normalizeAuditLogs } from "./components/audit-log";
 import { LoginLogPanel } from "./components/LoginLogPanel";
 import { OperationsPanel } from "./components/OperationsPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-const ACTION_BADGES: Record<string, string> = {
-  login: "success",
-  create: "secondary",
-  update: "warning",
-  delete: "destructive",
-  logout: "secondary",
-  failed: "destructive",
-};
 
 const SEVERITY_BADGES: Record<string, string> = {
   info: "secondary",
@@ -84,13 +75,7 @@ export default function AuditPage() {
     setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams({
-        page: String(page),
-        pageSize: String(perPage),
-      });
-      if (appliedFilters.user) params.set("user", appliedFilters.user);
-      if (appliedFilters.action) params.set("action", appliedFilters.action);
-      const data = await api.get(paths.audit.logs(params.toString()), { signal });
+      const data = await api.get(paths.audit.logs(auditEventsQuery(appliedFilters, page, perPage)), { signal });
       const payload = (data && typeof data === "object") ? data as Record<string, unknown> : {};
       setLogs(normalizeAuditLogs(payload.logs));
       setTotal(Number(payload.total) || 0);
@@ -129,14 +114,6 @@ export default function AuditPage() {
       `audit-logs-page-${page}.csv`,
       "text/csv;charset=utf-8",
     );
-  };
-
-  const getActionBadge = (action: string) => {
-    const a = (action || "").toLowerCase();
-    for (const [key, badge] of Object.entries(ACTION_BADGES)) {
-      if (a.includes(key)) return badge;
-    }
-    return "secondary";
   };
 
   const getSeverityBadge = (severity: string) => {
@@ -266,11 +243,15 @@ export default function AuditPage() {
               id: "action",
               header: t("audit.action"),
               sortValue: (log) => getLogField(log, "action"),
-              cell: (log) => (
-                <Badge variant={getActionBadge(getLogField(log, "action")) as "success" | "secondary" | "warning" | "destructive"}>
-                  {getLogField(log, "action")}
-                </Badge>
-              ),
+              cell: (log) => {
+                const raw = getLogField(log, "action");
+                return (
+                  <div className="min-w-0">
+                    <Badge variant={auditActionTone(raw)}>{auditActionLabel(t, raw)}</Badge>
+                    <div className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground" title={raw}>{raw}</div>
+                  </div>
+                );
+              },
             },
             {
               id: "severity",
@@ -362,9 +343,12 @@ export default function AuditPage() {
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{field}</span>
                 <p className={`text-sm mt-0.5 ${field === "action" || field === "severity" || field === "status" ? "" : "text-muted-foreground"}`}>
                   {field === "action" ? (
-                    <Badge variant={getActionBadge(getLogField(selectedLog, field)) as "success" | "secondary" | "warning" | "destructive"}>
-                      {selectedLog.action}
-                    </Badge>
+                    <>
+                      <Badge variant={auditActionTone(getLogField(selectedLog, field))}>
+                        {auditActionLabel(t, getLogField(selectedLog, field))}
+                      </Badge>
+                      <div className="mt-1 font-mono text-xs text-muted-foreground">{getLogField(selectedLog, field)}</div>
+                    </>
                   ) : field === "severity" ? (
                     <Badge variant={getSeverityBadge(getLogField(selectedLog, field)) as "secondary" | "warning" | "destructive"}>
                       {selectedLog.severity || "info"}

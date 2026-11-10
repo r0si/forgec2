@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   auditActionLabel,
   auditActionTone,
+  auditEventsQuery,
   auditLogsToCSV,
   auditSessionId,
   humanizeAction,
@@ -97,5 +98,28 @@ describe("operation labels", () => {
     expect(auditActionTone("listener_create")).toBe("success");
     expect(auditActionTone("settings_change")).toBe("warning");
     expect(auditActionTone("view_tasks")).toBe("secondary");
+  });
+});
+
+describe("auditEventsQuery", () => {
+  it("maps the coarse action verbs to a contains match", () => {
+    const query = auditEventsQuery({ user: "alice", action: "create" }, 2, 50);
+    expect(query).toContain("page=2");
+    expect(query).toContain("pageSize=50");
+    expect(query).toContain("user=alice");
+    expect(query).toContain("action=create");
+    expect(query).toContain("match=contains");
+  });
+
+  it("maps Failed to the result filter instead of an action name", () => {
+    const query = auditEventsQuery({ user: "", action: "failed" }, 1, 50);
+    expect(query).toContain("result=failed");
+    expect(query).not.toContain("action=");
+    expect(query).not.toContain("match=");
+  });
+
+  it("sends only pagination when no filters are set", () => {
+    const query = auditEventsQuery({ user: "", action: "" }, 1, 50);
+    expect(query).toBe("page=1&pageSize=50");
   });
 });

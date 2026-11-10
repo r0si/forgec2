@@ -134,3 +134,26 @@ export function auditActionTone(action: string): "success" | "secondary" | "warn
   }
   return "secondary";
 }
+
+/**
+ * The events tab's action select uses coarse verbs (`create`, `update`,
+ * `delete`, ...) while the audit rows store specific names (`user_create`,
+ * `agent_delete`, ...). A plain exact match made those options return nothing.
+ * `contains` makes the label true; `Failed` is a result, not an action, so it
+ * maps to the `result` filter the operations view already uses.
+ */
+export function auditEventsQuery(
+  filters: { user: string; action: string },
+  page: number,
+  pageSize: number,
+): string {
+  const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+  if (filters.user) params.set("user", filters.user);
+  if (filters.action === "failed") {
+    params.set("result", "failed");
+  } else if (filters.action) {
+    params.set("action", filters.action);
+    params.set("match", "contains");
+  }
+  return params.toString();
+}

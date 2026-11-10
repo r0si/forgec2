@@ -233,10 +233,22 @@ func (s *Server) auditLogQuery(c *gin.Context) (*gorm.DB, string) {
 			like, like, like, like, like, like,
 		)
 	}
+	match := strings.ToLower(strings.TrimSpace(c.Query("match")))
+	if match != "" && match != "exact" && match != "contains" {
+		return nil, `invalid match (expected "exact" or "contains")`
+	}
 	if action := strings.TrimSpace(c.Query("action")); action != "" {
-		// Accept the catalogue's raw value and the unprefixed spelling an
-		// operator may type by hand.
-		query = query.Where("(action = ? OR action = ?)", action, "operator:"+strings.TrimPrefix(action, "operator:"))
+		if match == "contains" {
+			// The events tab's verb filter (create/update/delete/...) names a
+			// class, while rows store specific actions; a substring match makes
+			// the label true. The `operator:` form carries the same substring,
+			// so it needs no special case here.
+			query = query.Where("action LIKE ? ESCAPE '\\'", "%"+escapeLike(action)+"%")
+		} else {
+			// Accept the catalogue's raw value and the unprefixed spelling an
+			// operator may type by hand.
+			query = query.Where("(action = ? OR action = ?)", action, "operator:"+strings.TrimPrefix(action, "operator:"))
+		}
 	}
 	if user := strings.TrimSpace(c.Query("user")); user != "" {
 		query = query.Where(`"user" = ?`, user)

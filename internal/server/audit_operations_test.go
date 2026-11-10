@@ -162,6 +162,17 @@ func TestAuditOperationsFilters(t *testing.T) {
 	if got := strings.Join(auditActions(exact), ","); got != "operator:agent_delete" {
 		t.Fatalf("action=agent_delete = %q", got)
 	}
+
+	// The events tab's coarse verbs are substring filters: `create` must reach
+	// task_create, and `delete` must reach operator:agent_delete.
+	containsCreate := auditOpsQuery(s, t, "scope=operations&action=create&match=contains")
+	if got := strings.Join(auditActions(containsCreate), ","); got != "task_create" {
+		t.Fatalf("match=contains action=create = %q, want task_create", got)
+	}
+	containsDelete := auditOpsQuery(s, t, "scope=operations&action=delete&match=contains")
+	if got := strings.Join(auditActions(containsDelete), ","); got != "operator:agent_delete" {
+		t.Fatalf("match=contains action=delete = %q, want operator:agent_delete", got)
+	}
 }
 
 // TestAuditOperationsRejectInvalidFilters proves a typo answers 400 instead of
@@ -172,6 +183,7 @@ func TestAuditOperationsRejectInvalidFilters(t *testing.T) {
 		"result=bogus",
 		"category=bogus",
 		"scope=bogus",
+		"match=bogus",
 		"since=yesterday",
 		"until=yesterday",
 		"since=2026-11-10T00:00:00Z&until=2026-11-09T00:00:00Z",
