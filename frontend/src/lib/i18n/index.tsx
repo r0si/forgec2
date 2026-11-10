@@ -35,6 +35,9 @@ const zhPromises = new Map<string, Promise<void>>();
 const ZH_LOADERS: Record<string, () => Promise<Record<string, Dict>>> = {
   agents: () => import("./fragments/zh.agents"),
   settings: () => import("./fragments/zh.settings"),
+  generate: () => import("./fragments/zh.generate"),
+  ai: () => import("./fragments/zh.ai"),
+  cred: () => import("./fragments/zh.cred"),
 };
 
 /** Merge an English fragment. Idempotent per key. */

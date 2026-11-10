@@ -105,26 +105,36 @@ const MAIN_ROUTES: MainRoute[] = [
 /** zh dictionary fragments a route's page renders. Kept in one place so the
  *  page components do not each need a hook; a page not listed here keeps its
  *  zh keys in the base zh dictionary. At most two namespaces per page. */
-function zhNamespacesFor(pathname: string): [string, string] {
-  if (pathname === "/settings") return ["settings", ""];
+function zhNamespacesFor(pathname: string): string[] {
+  if (pathname === "/settings") return ["settings", "generate"];
   if (pathname.startsWith("/asset-management") || pathname === "/roles") return ["agents", "settings"];
-  if (
-    pathname.startsWith("/beacons") ||
-    pathname === "/loot" ||
-    pathname === "/tags" ||
-    pathname === "/toolkit"
-  ) {
-    return ["agents", ""];
+  if (pathname === "/payload-generator" || pathname === "/listeners") return ["generate"];
+  if (pathname === "/ai" || pathname === "/macros") return ["ai"];
+  if (pathname === "/credentials") return ["cred"];
+  if (pathname === "/beacons") return ["agents", "generate"];
+  if (pathname.startsWith("/beacons/")) {
+    const rest = pathname.slice("/beacons/".length).split("/");
+    if (rest.length >= 2) {
+      const sub = rest[1];
+      if (sub === "persistence") return ["agents", "generate"];
+      if (["config", "files", "remote-desktop", "screen", "shell", "token", "traffic"].includes(sub)) {
+        return ["agents"];
+      }
+    }
+    return ["agents", "ai", "generate", "cred"];
   }
-  return ["", ""];
+  if (pathname === "/loot" || pathname === "/tags" || pathname === "/toolkit") return ["agents"];
+  return [];
 }
 
 function PageZhGate({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
-  const [first, second] = zhNamespacesFor(pathname);
+  const namespaces = zhNamespacesFor(pathname);
   // Fixed hook count across routes: the gate is reused while navigating.
-  useZhFragment(first);
-  useZhFragment(second);
+  useZhFragment(namespaces[0] ?? "");
+  useZhFragment(namespaces[1] ?? "");
+  useZhFragment(namespaces[2] ?? "");
+  useZhFragment(namespaces[3] ?? "");
   return <>{children}</>;
 }
 

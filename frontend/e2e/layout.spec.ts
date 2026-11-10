@@ -262,7 +262,7 @@ test.describe("responsive shell", () => {
   });
 
   test("zh pages suspend until their translated dictionary fragment is ready", async ({ page }) => {
-    await prepare(page, "light", [], "zh");
+    await prepare(page, "light", ["credentials.read"], "zh");
     const zhChunks: string[] = [];
     page.on("request", (request) => {
       const pathname = new URL(request.url()).pathname;
@@ -272,9 +272,25 @@ test.describe("responsive shell", () => {
     await page.goto("/beacons.html");
     await expect(page.locator("main").first()).toBeAttached({ timeout: 15_000 });
     await expect.poll(() => zhChunks.some((c) => c.includes("i18n-zh-agents"))).toBe(true);
+    await expect.poll(() => zhChunks.some((c) => c.includes("i18n-zh-generate"))).toBe(true);
     await expect(page.locator("main")).toContainText(/[\u4e00-\u9fff]/, { timeout: 10_000 });
     const text = await page.locator("main").innerText();
     expect(text).not.toMatch(/\bagents\.[a-z_]/);
+
+    // Each page pulls exactly the translated namespaces it renders.
+    const pages: Array<[string, string]> = [
+      ["/ai", "i18n-zh-ai"],
+      ["/credentials", "i18n-zh-cred"],
+      ["/payload-generator", "i18n-zh-generate"],
+      ["/settings", "i18n-zh-settings"],
+    ];
+    for (const [path, chunk] of pages) {
+      zhChunks.length = 0;
+      await page.goto(`${path}.html`);
+      await expect(page.locator("main").first()).toBeAttached({ timeout: 15_000 });
+      await expect.poll(() => zhChunks.some((c) => c.includes(chunk)), { message: path }).toBe(true);
+      await expect(page.locator("main")).toContainText(/[\u4e00-\u9fff]/, { timeout: 10_000 });
+    }
 
     // A route whose namespaces are not split loads only the base zh chunk.
     zhChunks.length = 0;

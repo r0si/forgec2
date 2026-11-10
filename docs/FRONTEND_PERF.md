@@ -200,28 +200,35 @@ pull their own chunk, and none of those pages renders a raw dotted key.
 ## zh dictionary split (2026-11)
 
 The zh dictionary used to be one 242,506 B chunk loaded for every zh user on
-every authenticated page. It is now split for the two largest namespaces, with
-a Suspense gate that guarantees translated text instead of an English flash:
+every authenticated page. It is now split for the five largest page namespaces,
+with a Suspense gate that guarantees translated text instead of an English
+flash:
 
 | Chunk | Raw | Gzip | Loaded when |
 | --- | --- | --- | --- |
-| `zh-*.js` (base dictionary) | 164,072 | 50,339 | every zh page |
-| `i18n-zh-agents-*.js` | 53,304 | 15,803 | beacon/loot/settings pages |
+| `zh-*.js` (base dictionary) | 127,022 | 37,972 | every zh page |
+| `i18n-zh-agents-*.js` | 53,304 | 15,803 | beacon/loot/tags/toolkit pages |
 | `i18n-zh-settings-*.js` | 25,314 | 7,929 | settings/roles/asset pages |
+| `i18n-zh-generate-*.js` | 20,491 | 7,699 | payload factory, listeners, beacon pages, settings |
+| `i18n-zh-ai-*.js` | 11,338 | 4,808 | AI page, beacon detail, macros |
+| `i18n-zh-cred-*.js` | 5,490 | 2,372 | credentials page, beacon detail |
 | previous `zh-*.js` | 242,506 | ~72,000 | every zh page |
 
-Per page: dashboard/events drop **−78 kB**, beacon pages −25 kB, settings pages
-−53 kB. `useZhFragment(ns)` (in `lib/i18n/index.tsx`) starts the zh chunk and
+Per page: dashboard/events **−115 kB**, payload factory/listeners −95 kB, AI
+−104 kB, credentials −110 kB, beacon list −42 kB, beacon detail −25 kB, settings
+−70 kB. `useZhFragment(ns)` (in `lib/i18n/index.tsx`) starts the zh chunk and
 **throws its promise** while it loads; `PageZhGate` in the router maps the
-pathname to at most two namespaces and sits inside the route's Suspense
-boundary, so the page never commits in English. A failed chunk load resolves
-the promise and falls back to the English fragment instead of suspending
-forever. The gate waits only for the current route's namespaces, so the idle
-route prefetch cannot blank the page. `e2e/layout.spec.ts` asserts a zh
-`/beacons` pulls `i18n-zh-agents` and renders CJK, and that a zh dashboard
-loads only the base chunk. The login page still loads the zh base for a zh
-visitor (164 kB now, was 242 kB); the "no dictionary on /login" rule is about
-the English dictionary.
+pathname to at most four namespaces (beacon detail uses agents, AI, generate and
+cred) and sits inside the route's Suspense boundary, so the page never commits
+in English. A failed chunk load resolves the promise and falls back to the
+English fragment instead of suspending forever. The gate waits only for the
+current route's namespaces, so the idle route prefetch cannot blank the page.
+`e2e/layout.spec.ts` asserts a zh `/beacons` pulls `i18n-zh-agents` and
+`i18n-zh-generate` and renders CJK, that `/ai`, `/credentials`,
+`/payload-generator` and `/settings` pull their own zh chunk, and that a zh
+dashboard loads only the base chunk. The login page still loads the zh base for
+a zh visitor (127 kB now, was 242 kB); the "no dictionary on /login" rule is
+about the English dictionary.
 
 ## Login page payload (2026-11)
 
