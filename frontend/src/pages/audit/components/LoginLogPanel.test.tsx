@@ -3,10 +3,10 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { LoginLogPanel } from "@/pages/audit/components/LoginLogPanel";
 import { api } from "@/lib/api";
 import { paths } from "@/lib/api-paths";
-import { downloadText } from "@/lib/download";
+import { downloadBlob } from "@/lib/download";
 
-vi.mock("@/lib/api", () => ({ api: { get: vi.fn() } }));
-vi.mock("@/lib/download", () => ({ downloadText: vi.fn() }));
+vi.mock("@/lib/api", () => ({ api: { get: vi.fn(), downloadGet: vi.fn() } }));
+vi.mock("@/lib/download", () => ({ downloadBlob: vi.fn() }));
 
 vi.mock("@/lib/i18n", () => ({
   useI18n: () => ({
@@ -105,14 +105,18 @@ describe("LoginLogPanel", () => {
     expect(screen.queryByText("audit.login_empty")).toBeNull();
   });
 
-  it("exports the current page as CSV with the recorded fields", async () => {
+  it("exports the full filtered selection, not just the visible page", async () => {
+    const blob = new Blob(["Time,User\n"], { type: "text/csv" });
+    vi.mocked(api.downloadGet).mockResolvedValue({ blob, filename: "login-log-20261110-1900.csv" });
+
     render(<LoginLogPanel />);
     await screen.findByText("alice");
-    fireEvent.click(screen.getByRole("button", { name: /audit\.export_page_csv/ }));
-    expect(vi.mocked(downloadText)).toHaveBeenCalledTimes(1);
-    const [content, filename, mime] = vi.mocked(downloadText).mock.calls[0];
-    expect(String(content)).toContain('"alice","login","203.0.113.9","德国"');
-    expect(String(filename)).toMatch(/^login-log-\d{8}-\d{4}\.csv$/);
-    expect(String(mime)).toContain("text/csv");
+    fireEvent.click(screen.getByRole("button", { name: /audit\.login_export/ }));
+
+    await waitFor(() => expect(api.downloadGet).toHaveBeenCalledTimes(1));
+    const path = String(vi.mocked(api.downloadGet).mock.calls[0][0]);
+    expect(path).toContain("/audit/logins/export?");
+    expect(path).not.toContain("page=");
+    expect(vi.mocked(downloadBlob)).toHaveBeenCalledTimes(1);
   });
 });

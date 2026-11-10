@@ -8,8 +8,8 @@ import { DataTable } from "@/components/ui/data-table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { PageToolbar } from "@/components/ui/page-toolbar";
-import { downloadText } from "@/lib/download";
-import { loginEventsToCSV, loginLogFilename, type LoginEvent } from "./login-log";
+import { downloadBlob } from "@/lib/download";
+import type { LoginEvent } from "./login-log";
 import { Download, Filter, RotateCw } from "lucide-react";
 
 export type { LoginEvent };
@@ -53,6 +53,8 @@ export function LoginLogPanel() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [userFilter, setUserFilter] = useState("");
   const [resultFilter, setResultFilter] = useState("");
@@ -103,9 +105,25 @@ export function LoginLogPanel() {
     setApplied({ user: "", result: "" });
   };
 
-  const exportPage = () => {
-    if (events.length === 0) return;
-    downloadText(loginEventsToCSV(events), loginLogFilename(), "text/csv;charset=utf-8");
+  const exportCsv = async () => {
+    setExporting(true);
+    setExportError(null);
+    try {
+      const params = new URLSearchParams();
+      if (applied.user) params.set("user", applied.user);
+      if (applied.result) params.set("result", applied.result);
+      const { blob, filename } = await api.downloadGet(
+        paths.audit.exportLogins(params.toString()),
+        "login-log.csv",
+      );
+      downloadBlob(blob, filename);
+    } catch {
+      // Keep the table's load error separate: a failed export must not replace
+      // rows that loaded successfully with an error state.
+      setExportError("audit.login_export_failed");
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -183,11 +201,15 @@ export function LoginLogPanel() {
         <Button variant="ghost" onClick={() => void load()} disabled={loading} aria-label={t("common.refresh")}>
           <RotateCw className="size-4" />
         </Button>
-        <Button variant="outline" onClick={exportPage} disabled={loading || events.length === 0}>
+        <Button variant="outline" onClick={() => void exportCsv()} disabled={loading || exporting || total === 0}>
           <Download className="size-4" />
-          <span>{t("audit.export_page_csv")}</span>
+          <span>{t("audit.login_export")}</span>
         </Button>
       </PageToolbar>
+
+      {exportError && (
+        <p role="alert" className="text-sm text-destructive-ink">{t(exportError)}</p>
+      )}
 
       <Card className="overflow-hidden">
         <DataTable<LoginEvent>

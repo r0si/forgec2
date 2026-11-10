@@ -206,6 +206,7 @@ export const paths = {
     exportLogs: (query: string) => `/audit/logs/export?${query}`,
     actions: "/audit/actions",
     logins: (query: string) => `/audit/logins?${query}`,
+    exportLogins: (query: string) => `/audit/logins/export?${query}`,
   },
   /**
    * Build logs dual-use at /builds (renderPageOrJSON) — not /api/builds.

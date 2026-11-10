@@ -4,10 +4,12 @@ import (
 	"log/slog"
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/forgec2/forgec2/internal/db"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 // loginActions are the audit actions the login panel shows. The filter is an
@@ -38,21 +40,8 @@ type loginEvent struct {
 // rows stay visible to unscoped admins, as everywhere else in the audit view).
 func (s *Server) handleGetLoginEvents(c *gin.Context) {
 	p := parsePagination(c, 50, 200)
-	user := c.DefaultQuery("user", "")
-	result := c.DefaultQuery("result", "")
 
-	query := s.auditTenantScope(s.db.Model(&db.AuditLog{}), c).
-		Where("action IN ?", loginActions)
-
-	if user != "" {
-		query = query.Where("\"user\" LIKE ? ESCAPE '\\'", "%"+escapeLike(user)+"%")
-	}
-	switch result {
-	case "ok":
-		query = query.Where("success = ?", true)
-	case "failed":
-		query = query.Where("success = ?", false)
-	}
+	query := s.loginEventQuery(c)
 
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
@@ -100,6 +89,25 @@ func (s *Server) handleGetLoginEvents(c *gin.Context) {
 		"page_size": p.PageSize,
 		"summary":   s.loginEventSummary(c),
 	})
+}
+
+// loginEventQuery applies the login-log filters shared by the page and the
+// CSV export. The action allowlist is part of the query, not a caller's
+// responsibility: a future audit action must not leak into a view operators
+// treat as authentication-only.
+func (s *Server) loginEventQuery(c *gin.Context) *gorm.DB {
+	query := s.auditTenantScope(s.db.Model(&db.AuditLog{}), c).
+		Where("action IN ?", loginActions)
+	if user := strings.TrimSpace(c.Query("user")); user != "" {
+		query = query.Where(`"user" LIKE ? ESCAPE '\'`, "%"+escapeLike(user)+"%")
+	}
+	switch strings.ToLower(strings.TrimSpace(c.Query("result"))) {
+	case "ok":
+		query = query.Where("success = ?", true)
+	case "failed":
+		query = query.Where("success = ?", false)
+	}
+	return query
 }
 
 // loginRegionStat is one region bucket (country + city) of the 24h login

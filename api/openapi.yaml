@@ -2228,6 +2228,50 @@ paths:
                                     failed: {type: integer}
                                     ok: {type: integer}
 
+  /audit/logins/export:
+    get:
+      tags: [Audit]
+      summary: Export the login log as CSV
+      description: >-
+        Stream the sign-in, failed sign-in and sign-out rows selected by the
+        same user/result filters as /audit/logins as a UTF-8 CSV file. The
+        response headers publish the exported row count and whether the row cap
+        truncated the selection.
+      operationId: exportAuditLoginEvents
+      security:
+        - SessionCookie: []
+      parameters:
+        - name: user
+          in: query
+          schema:
+            type: string
+        - name: result
+          in: query
+          schema:
+            type: string
+            enum: [ok, failed]
+        - name: limit
+          in: query
+          description: Maximum rows to write (default 50000, max 200000)
+          schema:
+            type: integer
+            default: 50000
+      responses:
+        '200':
+          description: CSV file of the selected login events
+          headers:
+            X-Audit-Export-Rows:
+              schema:
+                type: integer
+            X-Audit-Export-Truncated:
+              schema:
+                type: boolean
+          content:
+            text/csv:
+              schema:
+                type: string
+        '503':
+          description: Database is not initialized
   /audit/logs:
     get:
       tags: [Audit]

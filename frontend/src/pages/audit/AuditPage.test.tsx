@@ -4,7 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import AuditPage from "@/pages/audit/AuditPage";
 import { api } from "@/lib/api";
 
-vi.mock("@/lib/api", () => ({ api: { get: vi.fn() } }));
+vi.mock("@/lib/api", () => ({ api: { get: vi.fn(), downloadGet: vi.fn() } }));
 vi.mock("@/lib/i18n", () => ({ useI18n: () => ({ t: (k: string) => k }) }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
@@ -40,10 +40,10 @@ describe("AuditPage tabs", () => {
     // The header export must disappear: otherwise it would export the events
     // table while the login log is the visible one.
     await screen.findByLabelText("audit.login_user_filter");
-    const exportButtons = screen.getAllByRole("button", { name: /audit\.export_page_csv/ });
-    expect(exportButtons).toHaveLength(1);
-    // The one that remains belongs to the login log panel.
-    expect(screen.getByRole("tabpanel").contains(exportButtons[0])).toBe(true);
+    expect(screen.queryAllByRole("button", { name: /audit\.export_page_csv/ })).toHaveLength(0);
+    // The login panel owns its own full-selection export.
+    const loginExport = screen.getByRole("button", { name: /audit\.login_export/ });
+    expect(screen.getByRole("tabpanel").contains(loginExport)).toBe(true);
 
     // Switching back restores the events export.
     fireEvent.click(screen.getByRole("tab", { name: /audit\.tab_events/ }));

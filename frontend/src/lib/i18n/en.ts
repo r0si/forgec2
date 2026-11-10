@@ -196,6 +196,8 @@ export const en: Record<string, string> = {
     "audit.login_ok": "Success",
     "audit.login_failed": "Failed",
     "audit.login_all_results": "All results",
+    "audit.login_export": "Export CSV",
+    "audit.login_export_failed": "Failed to export the login log",
     "audit.login_user_filter": "Filter by user",
     "audit.login_empty": "No sign-in events recorded yet",
     "audit.login_load_failed": "Failed to load the login log",

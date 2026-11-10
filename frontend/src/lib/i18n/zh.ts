@@ -198,6 +198,8 @@ export const zh: Record<string, string> = {
     "audit.login_ok": "成功",
     "audit.login_failed": "失败",
     "audit.login_all_results": "全部结果",
+    "audit.login_export": "导出 CSV",
+    "audit.login_export_failed": "登录日志导出失败",
     "audit.login_user_filter": "按用户筛选",
     "audit.login_empty": "暂无登录记录",
     "audit.login_load_failed": "登录日志加载失败",

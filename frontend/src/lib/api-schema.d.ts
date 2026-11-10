@@ -1210,6 +1210,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/audit/logins/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export the login log as CSV
+         * @description Stream the sign-in, failed sign-in and sign-out rows selected by the same user/result filters as /audit/logins as a UTF-8 CSV file. The response headers publish the exported row count and whether the row cap truncated the selection.
+         */
+        get: operations["exportAuditLoginEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/audit/logs": {
         parameters: {
             query?: never;
@@ -14251,6 +14271,40 @@ export interface operations {
                         };
                     };
                 };
+            };
+        };
+    };
+    exportAuditLoginEvents: {
+        parameters: {
+            query?: {
+                user?: string;
+                result?: "ok" | "failed";
+                /** @description Maximum rows to write (default 50000, max 200000) */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description CSV file of the selected login events */
+            200: {
+                headers: {
+                    "X-Audit-Export-Rows"?: number;
+                    "X-Audit-Export-Truncated"?: boolean;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            /** @description Database is not initialized */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

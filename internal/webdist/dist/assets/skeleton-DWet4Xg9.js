@@ -1,1 +1,0 @@
-import"./rolldown-runtime-XKyaHtl9.js";import{Yn as e,Zn as t}from"./vendor-baseui-BPnoxL5j.js";import{t as n}from"./utils-BVtA-G9u.js";t();var r=e();function i({className:e,...t}){return(0,r.jsx)(`div`,{"data-slot":`skeleton`,className:n(`animate-pulse rounded-md bg-muted/80`,e),...t})}export{i as t};
