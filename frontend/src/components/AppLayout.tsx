@@ -1,7 +1,5 @@
 
 import { useEffect, useCallback, useRef, lazy, Suspense } from "react";
-import Sidebar from "@/components/Sidebar";
-import TopBar from "@/components/TopBar";
 import ScrollToTop from "@/components/ScrollToTop";
 import GlobalInteractDock from "@/components/GlobalInteractDock";
 import TelemetryCollector from "@/components/TelemetryCollector";
@@ -9,6 +7,15 @@ import SessionTimeoutWarning from "@/components/SessionTimeoutWarning";
 import RateLimitBanner from "@/components/RateLimitBanner";
 import NetworkStatusBanner from "@/components/NetworkStatusBanner";
 import WsOutboxToast from "@/components/WsOutboxToast";
+
+// The shell chrome is lazy: Sidebar and TopBar are needed only inside the
+// authenticated layout, but a static import put them in the entry graph that
+// /login also downloads. Measured: removing them took the public first-paint
+// path 701 -> 656 kB. Fixed-size placeholders reserve their space so the page
+// content does not shift while the chunks arrive; the chunks load in parallel
+// with the routed page.
+const Sidebar = lazy(() => import("@/components/Sidebar"));
+const TopBar = lazy(() => import("@/components/TopBar"));
 
 // On-demand shell UI is lazy: these five used to be static imports in the entry,
 // so every page (including /login, which never mounts the layout) downloaded
@@ -112,13 +119,35 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {t("a11y.skip_to_content")}
       </a>
 
-      {!focusMode && <Sidebar />}
+      {!focusMode && (
+        <Suspense
+          fallback={
+            <div
+              aria-hidden="true"
+              className="hidden shrink-0 md:block"
+              style={{ width: sidebarWidth }}
+            />
+          }
+        >
+          <Sidebar />
+        </Suspense>
+      )}
 
       <div
         className="flex flex-col flex-1 min-w-0 min-h-0 transition-[margin] duration-200 ease-in-out"
         style={{ marginLeft: focusMode || isMobile ? 0 : sidebarWidth }}
       >
-        <TopBar onMenuToggle={handleMenuToggle} />
+        <Suspense
+          fallback={
+            <div
+              aria-hidden="true"
+              className="shrink-0"
+              style={{ height: "var(--shell-topbar-height)" }}
+            />
+          }
+        >
+          <TopBar onMenuToggle={handleMenuToggle} />
+        </Suspense>
         <main
           id="main-content"
           tabIndex={-1}

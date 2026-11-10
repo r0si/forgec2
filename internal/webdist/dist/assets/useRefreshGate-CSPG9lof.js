@@ -1,0 +1,1 @@
+import{r as e}from"./rolldown-runtime-XKyaHtl9.js";import{Zn as t}from"./vendor-baseui-BPnoxL5j.js";var n=e(t(),1);function r(){let e=(0,n.useRef)(!1);return{beginRefresh:(0,n.useCallback)((t=!1)=>t||!e.current,[]),markLoaded:(0,n.useCallback)(()=>{e.current=!0},[])}}export{r as t};

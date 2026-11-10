@@ -60,9 +60,12 @@ const TOTAL_LIMIT_BYTES = 5.0 * 1024 * 1024;
 // import map (695 kB) and the zh fragment loader/gate added another (696 kB),
 // then the generate/ai/cred zh fragments (697 kB) and the remaining page-owned
 // zh fragments (700 kB), then the demo-mode health preflight (701 kB).
-// Set to 720 kB: ~19 kB of ordinary headroom, and putting any of the removed
-// chunks back (sonner 33 kB) trips it.
-const CRITICAL_PATH_LIMIT_BYTES = 720 * 1024;
+// 2026-11-10: AppLayout's Sidebar/TopBar became lazy chunks, so the public
+// /login closure dropped 701 -> 658 kB. The signed-in path still loads them
+// (in parallel with the page): public 658 + chrome closure 48 = 706 kB, which
+// is what AUTHENTICATED_PATH_LIMIT_BYTES guards.
+const CRITICAL_PATH_LIMIT_BYTES = 675 * 1024;
+const AUTHENTICATED_PATH_LIMIT_BYTES = 720 * 1024;
 // Measured 2026-11-09: Inter 210 kB + JetBrains Mono 55 kB after the Latin/UI
 // subset (was 350 + 72 = 422 kB as the full families). 300 kB leaves ~35 kB of
 // headroom; restoring either full font trips it.
@@ -148,6 +151,42 @@ while (queue.length) {
 }
 const criticalBytes = [...critical.values()].reduce((a, b) => a + b, 0);
 
+// Authenticated first paint = the public entry closure PLUS the shell chrome
+// (Sidebar/TopBar), which AppLayout lazily imports. Splitting the chrome keeps
+// /login lean; this second budget keeps the real signed-in first paint honest
+// instead of letting the split hide ~45 kB behind a dynamic import.
+const shellChunks = [];
+const assetsDir = join(staticDir, "assets");
+for (const prefix of ["Sidebar", "TopBar"]) {
+  for (const entry of readdirSync(assetsDir)) {
+    if (entry.startsWith(prefix + "-") && entry.endsWith(".js")) shellChunks.push(entry);
+  }
+}
+if (shellChunks.length < 2) {
+  console.error(`FAIL: expected the Sidebar/TopBar (shell chrome) chunks, found ${JSON.stringify(shellChunks)}.`);
+  process.exit(1);
+}
+const shellSeen = new Map();
+const shellQueue = [...shellChunks];
+while (shellQueue.length) {
+  const name = shellQueue.pop();
+  if (critical.has(name) || shellSeen.has(name)) continue;
+  const abs = join(assetsDir, name);
+  let src;
+  try {
+    src = readFileSync(abs, "utf8");
+  } catch {
+    continue;
+  }
+  shellSeen.set(name, statSync(abs).size);
+  for (const m of src.matchAll(/from\s*"\.\/([\w.-]+\.js)"/g)) shellQueue.push(m[1]);
+}
+const shellBytes = [...shellSeen.values()].reduce((a, b) => a + b, 0);
+const authenticatedBytes = criticalBytes + shellBytes;
+// The chrome must be dynamic: a static import would put it back in the public
+// closure and /login would pay it again.
+const shellInEntry = [...shellSeen.keys()].filter((n) => critical.has(n));
+
 // These buckets exist so their contents stay out of first paint. A static
 // import from the entry pulls the whole chunk, so a hit here means the bucket
 // is mis-classified (e.g. a new shell icon was added to ICON_PAGE_ONLY, or a
@@ -180,7 +219,7 @@ if (unresolved.length) {
   failed = true;
 }
 if (criticalBytes > CRITICAL_PATH_LIMIT_BYTES) {
-  console.error(`FAIL: first-paint critical path is ${kb(criticalBytes)} — exceeds ${kb(CRITICAL_PATH_LIMIT_BYTES)}.`);
+  console.error(`FAIL: public first-paint critical path is ${kb(criticalBytes)} — exceeds ${kb(CRITICAL_PATH_LIMIT_BYTES)}.`);
   console.error("Chunks fetched before first paint:");
   for (const [name, size] of [...critical.entries()].sort((a, b) => b[1] - a[1])) {
     console.error(`  ${kb(size).padStart(8)}  ${name}`);
@@ -189,6 +228,21 @@ if (criticalBytes > CRITICAL_PATH_LIMIT_BYTES) {
     "A page or shared component is being pulled in statically. Keep it behind `lazy(() => import(...))`,",
   );
   console.error("and do not reintroduce directory-level manualChunks buckets in vite.config.ts.");
+  failed = true;
+}
+if (shellInEntry.length) {
+  console.error(`FAIL: shell chrome is back in the public entry: ${shellInEntry.join(", ")}.`);
+  console.error("Keep Sidebar/TopBar behind lazy() in AppLayout; /login must not download them.");
+  failed = true;
+}
+if (authenticatedBytes > AUTHENTICATED_PATH_LIMIT_BYTES) {
+  console.error(
+    `FAIL: authenticated first paint is ${kb(authenticatedBytes)} — exceeds ${kb(AUTHENTICATED_PATH_LIMIT_BYTES)}.`,
+  );
+  console.error(`public ${kb(criticalBytes)} + shell chrome ${kb(shellBytes)}:`);
+  for (const [name, size] of [...shellSeen.entries()].sort((a, b) => b[1] - a[1])) {
+    console.error(`  ${kb(size).padStart(8)}  ${name}`);
+  }
   failed = true;
 }
 if (fontBytes > FONT_LIMIT_BYTES) {
@@ -207,6 +261,7 @@ if (failed) process.exit(1);
 const routeChunks = [...critical.keys()].filter((n) => /^route-/.test(n));
 console.log(
   `OK: total ${mb(total)} (${files} files) under ${mb(TOTAL_LIMIT_BYTES)}; ` +
-    `critical path ${kb(criticalBytes)} (${critical.size} chunks, ${routeChunks.length} route) under ${kb(CRITICAL_PATH_LIMIT_BYTES)}; ` +
+    `public critical path ${kb(criticalBytes)} (${critical.size} chunks, ${routeChunks.length} route) under ${kb(CRITICAL_PATH_LIMIT_BYTES)}; ` +
+    `authenticated ${kb(authenticatedBytes)} (+${kb(shellBytes)} shell) under ${kb(AUTHENTICATED_PATH_LIMIT_BYTES)}; ` +
     `fonts ${kb(fontBytes)} (${fontFiles}) under ${kb(FONT_LIMIT_BYTES)}`,
 );

@@ -250,6 +250,30 @@ remaining JS is the entry/vendor shell plus the base-ui form primitives.
 `e2e/layout.spec.ts` asserts `/login` makes no `en-*.js`, `vendor-zod-*.js` or
 WebSocket request, and does not probe `/api/me`.
 
+## Shell chrome split (2026-11)
+
+`AppLayout` used to import `Sidebar` and `TopBar` statically, so the entry graph
+that `/login` downloads included the authenticated chrome even though the login
+route never mounts the layout.
+
+| Path | Before | After |
+| --- | --- | --- |
+| public `/login` first paint | 701 kB | **658 kB** |
+| authenticated first paint (public + chrome closure) | 701 kB | **706 kB** (+48 kB chrome) |
+| budgets | 720 kB | **675 kB public / 720 kB authenticated** |
+
+The chrome is `React.lazy` now and renders behind fixed-size placeholders (the
+stored sidebar width and `--shell-topbar-height`), so the page content never
+shifts; the chunks load in parallel with the routed page after the layout
+mounts. `/login` requests neither chunk. `check-bundle.mjs` walks the
+`Sidebar-*`/`TopBar-*` chunks' static closures and adds them to the public
+closure for the authenticated budget, and fails if a chrome chunk reappears in
+the public entry — otherwise moving them to a dynamic import would silently
+under-report the signed-in first paint. `e2e/layout.spec.ts` asserts `/login`
+makes no `Sidebar-*`/`TopBar-*` request and `/dashboard` makes both. The small
+authenticated increase (701 → 706 kB) is the price of the separate chunk
+boundaries; the public front door wins 43 kB.
+
 ## Deferred toaster (2026-11)
 
 `sonner` (33,562 B / ~9.5 kB gzip) was a first-paint chunk because the root

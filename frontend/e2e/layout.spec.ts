@@ -261,6 +261,23 @@ test.describe("responsive shell", () => {
     await expect.poll(() => meProbes.length, { timeout: 10_000 }).toBeGreaterThan(0);
   });
 
+  test("the public login entry omits the authenticated shell chrome", async ({ page }) => {
+    await prepare(page);
+    const shell: string[] = [];
+    page.on("request", (request) => {
+      const pathname = new URL(request.url()).pathname;
+      if (/\/assets\/(Sidebar|TopBar)-[\w.-]+\.js$/.test(pathname)) shell.push(pathname);
+    });
+    await page.goto("/login.html");
+    await expect(page.getByRole("form")).toBeVisible();
+    await page.waitForTimeout(600);
+    expect(shell, "the login page fetched the authenticated shell").toHaveLength(0);
+
+    await page.goto("/dashboard.html");
+    await expect(page.locator("main h1").first()).toBeAttached({ timeout: 15_000 });
+    await expect.poll(() => shell.length, { timeout: 10_000 }).toBe(2);
+  });
+
   test("zh pages suspend until their translated dictionary fragment is ready", async ({ page }) => {
     await prepare(
       page,
