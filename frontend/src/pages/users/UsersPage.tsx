@@ -1,4 +1,8 @@
 
+import { registerFragment } from "@/lib/i18n";
+import { enUsers } from "@/lib/i18n/fragments/en.users";
+registerFragment(enUsers);
+
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { paths } from "@/lib/api-paths";

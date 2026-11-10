@@ -1,3 +1,7 @@
+import { registerFragment } from "@/lib/i18n";
+import { enListeners } from "@/lib/i18n/fragments/en.listeners";
+registerFragment(enListeners);
+
 import { PageContainer } from "@/components/ui/page-container";
 
 import { useEffect, useState, useCallback, useMemo } from "react";

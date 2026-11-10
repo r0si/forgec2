@@ -12,6 +12,8 @@ vi.mock("@/lib/api", () => ({
 
 vi.mock("@/lib/i18n", () => ({
   getLocale: () => "en",
+  // Page modules register their dictionary fragment at module scope.
+  registerFragment: () => {},
   useI18n: () => ({
     t: (key: string, params?: Record<string, string>) => {
       if (params && typeof params === "object") {

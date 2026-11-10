@@ -1,3 +1,11 @@
+import { registerFragment } from "@/lib/i18n";
+import { enDashboard } from "@/lib/i18n/fragments/en.dashboard";
+import { enListeners } from "@/lib/i18n/fragments/en.listeners";
+import { enTasks } from "@/lib/i18n/fragments/en.tasks";
+registerFragment(enDashboard);
+registerFragment(enListeners);
+registerFragment(enTasks);
+
 import { useEffect } from "react";
 import { DASHBOARD_RANGES } from "@/lib/shortcuts";
 import { useUrlState } from "@/lib/hooks/useUrlState";

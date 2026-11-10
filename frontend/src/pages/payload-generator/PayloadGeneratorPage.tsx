@@ -1,6 +1,8 @@
 import { registerFragment } from "@/lib/i18n";
 import { enGenerate } from "@/lib/i18n/fragments/en.generate";
+import { enListeners } from "@/lib/i18n/fragments/en.listeners";
 registerFragment(enGenerate);
+registerFragment(enListeners);
 
 import { lazy, Suspense, useEffect, useState } from "react";
 

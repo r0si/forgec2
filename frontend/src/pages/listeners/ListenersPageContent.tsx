@@ -1,7 +1,11 @@
 
 import { registerFragment } from "@/lib/i18n";
+import { enDashboard } from "@/lib/i18n/fragments/en.dashboard";
 import { enGenerate } from "@/lib/i18n/fragments/en.generate";
+import { enListeners } from "@/lib/i18n/fragments/en.listeners";
 registerFragment(enGenerate);
+registerFragment(enDashboard);
+registerFragment(enListeners);
 
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";

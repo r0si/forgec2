@@ -1,6 +1,8 @@
 import { registerFragment } from "@/lib/i18n";
 import { enAI } from "@/lib/i18n/fragments/en.ai";
+import { enTasks } from "@/lib/i18n/fragments/en.tasks";
 registerFragment(enAI);
+registerFragment(enTasks);
 
 import { PageContainer } from "@/components/ui/page-container";
 import { AgentLoadError } from "@/components/AgentLoadError";

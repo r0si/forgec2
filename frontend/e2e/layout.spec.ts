@@ -150,7 +150,14 @@ test.describe("responsive shell", () => {
     // credentials.read is only needed for the /credentials leg below; the
     // visual-baseline tests keep the smaller permission set so their sidebar
     // matches the committed screenshots.
-    await prepare(page, "light", ["credentials.read", "plugins.read", "campaigns.read", "opsec.read"]);
+    await prepare(page, "light", [
+      "credentials.read",
+      "plugins.read",
+      "campaigns.read",
+      "opsec.read",
+      "automation.read",
+      "users.read",
+    ]);
     const dictChunks: string[] = [];
     page.on("request", (request) => {
       const pathname = new URL(request.url()).pathname;
@@ -207,6 +214,12 @@ test.describe("responsive shell", () => {
       ["/scripting", "i18n-scripting"],
       ["/campaign", "i18n-campaign"],
       ["/topology", "i18n-topology"],
+      ["/report", "i18n-report"],
+      ["/automation", "i18n-auto"],
+      ["/automation", "i18n-workflows"],
+      ["/users", "i18n-users"],
+      ["/listeners", "i18n-listeners"],
+      ["/listeners", "i18n-dashboard"],
     ];
     for (const [path, chunk] of singlePage) {
       dictChunks.length = 0;

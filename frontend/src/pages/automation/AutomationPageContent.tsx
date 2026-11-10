@@ -1,4 +1,10 @@
 
+import { registerFragment } from "@/lib/i18n";
+import { enAuto } from "@/lib/i18n/fragments/en.auto";
+import { enWorkflows } from "@/lib/i18n/fragments/en.workflows";
+registerFragment(enAuto);
+registerFragment(enWorkflows);
+
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { paths } from "@/lib/api-paths";

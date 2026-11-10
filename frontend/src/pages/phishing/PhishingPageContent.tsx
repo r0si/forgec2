@@ -2,8 +2,10 @@
 import { registerFragment } from "@/lib/i18n";
 import { enCampaign } from "@/lib/i18n/fragments/en.campaign";
 import { enPhishing } from "@/lib/i18n/fragments/en.phishing";
+import { enUsers } from "@/lib/i18n/fragments/en.users";
 registerFragment(enCampaign);
 registerFragment(enPhishing);
+registerFragment(enUsers);
 
 import { useState } from "react";
 import { api } from "@/lib/api";

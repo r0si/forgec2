@@ -56,8 +56,9 @@ const TOTAL_LIMIT_BYTES = 5.0 * 1024 * 1024;
 // six single-page dictionary chunks added 1 kB of entry import map (714 kB).
 // 2026-11-10: the on-demand shell UI (command palette, shortcuts help, update
 // banner/dialog, agent status banner) became lazy chunks fetched after the
-// layout mounts: 714 -> 694 kB. Set to 720 kB: ~26 kB of ordinary headroom,
-// and putting any of the removed chunks back (sonner 33 kB) trips it.
+// layout mounts: 714 -> 694 kB. The next dictionary batch added 1 kB of entry
+// import map (695 kB). Set to 720 kB: ~25 kB of ordinary headroom, and putting
+// any of the removed chunks back (sonner 33 kB) trips it.
 const CRITICAL_PATH_LIMIT_BYTES = 720 * 1024;
 // Measured 2026-11-09: Inter 210 kB + JetBrains Mono 55 kB after the Latin/UI
 // subset (was 350 + 72 = 422 kB as the full families). 300 kB leaves ~35 kB of

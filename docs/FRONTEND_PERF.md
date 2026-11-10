@@ -152,36 +152,38 @@ its raw dotted name.
 ## Page-only dictionary fragments (2026-11)
 
 `agents.*` (58 kB of source), `settings.*` (27 kB), `generate.*` (309 keys,
-19 kB), `ai.*` (221 keys, 13 kB), `cred.*` (114 keys, 6 kB) and fifteen
+19 kB), `ai.*` (221 keys, 13 kB), `cred.*` (114 keys, 6 kB), fifteen
 single-page namespaces (`bof`, `campaign`, `domain_fronting`, `infra`, `lateral`,
 `ntlm`, `opsec`, `pivoting`, `plugins`, `privesc`, `profiles`, `phishing`,
-`scripting`, `toolkit`, `topology`, ~50 kB together) are only rendered by their
-own pages, but they sat in the startup dictionary that every authenticated page
-fetches. They are now plain data modules
+`scripting`, `toolkit`, `topology`) and seven page-owned namespaces (`report`,
+`auto`, `workflows`, `users`, `tasks`, `dashboard`, `listeners`) are only
+rendered by their own pages, but they sat in the startup dictionary that every
+authenticated page fetches. They are now plain data modules
 (`lib/i18n/fragments/en.<namespace>.ts`); the route entry registers the module
 it needs with `registerFragment`, and `t()` consults that registry between the
 active dictionary and the shell slice.
 
 | Chunk | Raw | Gzip | Loaded when |
 | --- | --- | --- | --- |
-| `en-*.js` (startup dictionary) | 84,113 | 22,833 | every authenticated page |
+| `en-*.js` (startup dictionary) | 58,859 | 16,663 | every authenticated page |
 | `i18n-agents-*.js` | 53,479 | 14,345 | beacon/loot/roles/tags/toolkit/asset pages |
 | `i18n-settings-*.js` | 25,733 | 7,027 | settings/roles/asset pages |
 | `i18n-generate-*.js` | 17,907 | 5,626 | payload factory, listeners, beacon pages, settings |
 | `i18n-ai-*.js` | 11,876 | 4,097 | AI page, beacon detail (AI suggest), macros, tasks |
 | `i18n-cred-*.js` | 5,451 | 1,902 | credentials page and the beacon credential labels |
 | fifteen single-page `i18n-*` chunks | 2,270–4,276 each | 832–1,472 each | their own page only |
+| `i18n-{report,auto,workflows,users,tasks,dashboard,listeners}-*.js` | 2,713–4,616 each | 854–1,524 each | report, automation, users, beacon detail, dashboard, listeners |
 | previous `en-*.js` | 244,088 | 66,010 | every authenticated page |
 
-Savings against the single dictionary: the **startup chunk is 160 kB smaller
-(43 kB gzip less) before first paint** on every authenticated page (login
+Savings against the single dictionary: the **startup chunk is 185 kB smaller
+(49 kB gzip less) before first paint** on every authenticated page (login
 downloads no dictionary at all). The fragments then load with the pages that
 render them: the payload factory, listeners, beacon list/detail, settings, the
-AI page, macros, tasks, credentials, and the single-page routes. The idle
-prefetch of `/listeners` also warms `i18n-generate` once the operator is idle,
-so that saving is on the initial load rather than a permanent per-page delta;
-`i18n-ai`, `i18n-cred` and the single-page fragments are not warm-started by the
-three prefetched routes. The fragments stay out of `index.html`'s preload
+AI page, macros, tasks, credentials, the single-page routes, report, automation,
+users, dashboard and listeners. The idle prefetch of `/listeners` also warms
+`i18n-generate` once the operator is idle, so that saving is on the initial load
+rather than a permanent per-page delta; the other fragments are not warm-started
+by the three prefetched routes. The fragments stay out of `index.html`'s preload
 (asserted by `check-bundle` + e2e); the registry lives in `lib/i18n/index.tsx`
 because a separate registry module was merged into the lazy agents chunk by
 Rolldown, which put the 53 kB back into first paint.
@@ -192,7 +194,7 @@ header/sidebar/breadcrumb string depends on a page fragment. `check:i18n`
 counts fragment keys as defined English keys, and `e2e/layout.spec.ts` asserts
 `/beacons` pulls `i18n-agents`, `/settings` pulls `i18n-settings`,
 `/payload-generator` pulls `i18n-generate`, `/ai` pulls `i18n-ai`,
-`/credentials` pulls `i18n-cred`, the fourteen routable single-page namespaces
+`/credentials` pulls `i18n-cred`, the eighteen routable single-page namespaces
 pull their own chunk, and none of those pages renders a raw dotted key.
 
 ## Login page payload (2026-11)
