@@ -213,13 +213,16 @@ func (bm *BackupManager) Start(cronSchedule string) error {
 
 	slog.Info("Backup manager started", "schedule", cronSchedule, "interval", duration)
 
-	bm.ticker = time.NewTicker(duration)
+	ticker := time.NewTicker(duration)
 	stopCh := make(chan struct{})
 	done := make(chan struct{})
 	bm.mu.Lock()
+	bm.ticker = ticker
 	bm.stopCh = stopCh
 	bm.done = done
 	bm.mu.Unlock()
+	// The goroutine must use the local ticker: Stop() sets bm.ticker = nil
+	// under the mutex, and reading the field from here raced that write.
 	go func() {
 		defer close(done)
 		defer func() {
@@ -230,7 +233,7 @@ func (bm *BackupManager) Start(cronSchedule string) error {
 		bm.PerformBackup()
 		for {
 			select {
-			case <-bm.ticker.C:
+			case <-ticker.C:
 				bm.PerformBackup()
 			case <-stopCh:
 				return
