@@ -181,11 +181,8 @@ export default defineConfig(({ command }) => {
             // merges i18n/index.tsx into these chunks (72 kB) and preloads the
             // whole thing again, which is exactly what this split removes.
             if (id.includes("lib/i18n/fragments/")) {
-              if (id.includes("en.agents")) return "i18n-agents";
-              if (id.includes("en.settings")) return "i18n-settings";
-              if (id.includes("en.generate")) return "i18n-generate";
-              if (id.includes("en.ai")) return "i18n-ai";
-              if (id.includes("en.cred")) return "i18n-cred";
+              const frag = id.match(/lib\/i18n\/fragments\/en\.([a-z0-9_]+)\.ts$/);
+              if (frag) return `i18n-${frag[1]}`;
             }
             return;
           }

@@ -1,3 +1,7 @@
+import { registerFragment } from "@/lib/i18n";
+import { enProfiles } from "@/lib/i18n/fragments/en.profiles";
+registerFragment(enProfiles);
+
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { Link } from "react-router-dom";
 import {

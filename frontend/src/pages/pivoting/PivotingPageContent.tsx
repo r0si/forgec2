@@ -1,4 +1,8 @@
 
+import { registerFragment } from "@/lib/i18n";
+import { enPivoting } from "@/lib/i18n/fragments/en.pivoting";
+registerFragment(enPivoting);
+
 import { useState, useMemo } from "react";
 import { paths } from "@/lib/api-paths";
 import { useI18n } from "@/lib/i18n";

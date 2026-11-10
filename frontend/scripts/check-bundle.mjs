@@ -52,9 +52,11 @@ const TOTAL_LIMIT_BYTES = 5.0 * 1024 * 1024;
 // leaves ~56 kB of ordinary headroom — less than the smallest route chunk
 // (~70 kB) — so a re-leak of one page chunk trips it.
 // Re-measured again 2026-11-09: 713 kB after the toaster was deferred (sonner
-// 33.5 kB left the entry; it now loads on the first toast / on idle). Set to
-// 740 kB: ~27 kB of ordinary headroom, and putting any of the chunks just
-// removed (sonner 33 kB, agents dictionary 53 kB) back in first paint trips it.
+// 33.5 kB left the entry; it now loads on the first toast / on idle). The
+// six single-page dictionary chunks added 1 kB of entry import map (714 kB).
+// Set to 740 kB: ~26 kB of ordinary headroom, and putting any of the chunks
+// just removed (sonner 33 kB, agents dictionary 53 kB) back in first paint
+// trips it.
 const CRITICAL_PATH_LIMIT_BYTES = 740 * 1024;
 // Measured 2026-11-09: Inter 210 kB + JetBrains Mono 55 kB after the Latin/UI
 // subset (was 350 + 72 = 422 kB as the full families). 300 kB leaves ~35 kB of
@@ -155,11 +157,7 @@ const LAZY_ONLY_PREFIXES = [
   "vendor-icons-pages",
   "vendor-misc-pages",
   "vendor-baseui-forms",
-  "i18n-agents",
-  "i18n-settings",
-  "i18n-generate",
-  "i18n-ai",
-  "i18n-cred",
+  "i18n-",
 ];
 const leakedLazy = [...critical.keys()].filter((n) => LAZY_ONLY_PREFIXES.some((p) => n.startsWith(p)));
 

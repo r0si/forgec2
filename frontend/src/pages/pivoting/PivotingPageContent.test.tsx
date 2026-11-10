@@ -12,7 +12,8 @@ vi.mock("@/lib/api", () => ({
 
 vi.mock("@/lib/i18n", () => {
   const t = (key: string) => key;
-  return { getLocale: () => "en", useI18n: () => ({ t }) };
+  // Page modules register their dictionary fragment at module scope.
+  return { getLocale: () => "en", useI18n: () => ({ t }), registerFragment: () => {} };
 });
 
 vi.mock("sonner", () => ({

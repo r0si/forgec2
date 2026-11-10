@@ -150,7 +150,7 @@ test.describe("responsive shell", () => {
     // credentials.read is only needed for the /credentials leg below; the
     // visual-baseline tests keep the smaller permission set so their sidebar
     // matches the committed screenshots.
-    await prepare(page, "light", ["credentials.read"]);
+    await prepare(page, "light", ["credentials.read", "plugins.read", "campaigns.read"]);
     const dictChunks: string[] = [];
     page.on("request", (request) => {
       const pathname = new URL(request.url()).pathname;
@@ -190,6 +190,22 @@ test.describe("responsive shell", () => {
     await expect(page.locator("main").first()).toBeAttached({ timeout: 15_000 });
     await expect.poll(() => dictChunks.some((c) => c.includes("i18n-cred"))).toBe(true);
     await expect(page.locator("main")).not.toContainText(/\bcred\.[a-z_]/);
+
+    // The remaining single-page namespaces each have their own lazy chunk.
+    const singlePage: Array<[string, string]> = [
+      ["/bof", "i18n-bof"],
+      ["/plugins", "i18n-plugins"],
+      ["/phishing", "i18n-phishing"],
+      ["/pivoting", "i18n-pivoting"],
+      ["/toolkit", "i18n-toolkit"],
+    ];
+    for (const [path, chunk] of singlePage) {
+      dictChunks.length = 0;
+      await page.goto(`${path}.html`);
+      await expect(page.locator("main").first()).toBeAttached({ timeout: 15_000 });
+      await expect.poll(() => dictChunks.some((c) => c.includes(chunk)), { message: path }).toBe(true);
+    }
+    await expect(page.locator("main")).not.toContainText(/\btoolkit\.[a-z_]/);
   });
 
   test("the login page does not open the operator socket", async ({ page }) => {

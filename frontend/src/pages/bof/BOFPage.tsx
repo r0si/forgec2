@@ -1,4 +1,8 @@
 
+import { registerFragment } from "@/lib/i18n";
+import { enBOF } from "@/lib/i18n/fragments/en.bof";
+registerFragment(enBOF);
+
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
 import { useConfirm } from "@/lib/hooks/useConfirm";
