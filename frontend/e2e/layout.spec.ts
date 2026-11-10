@@ -231,6 +231,22 @@ test.describe("responsive shell", () => {
     await expect.poll(() => meProbes.length, { timeout: 10_000 }).toBeGreaterThan(0);
   });
 
+  test("the command palette still opens after the lazy shell chunk loads", async ({ page }) => {
+    await prepare(page);
+    // The keydown listener lives in the lazy chunk; wait for the response and
+    // let the effect install before pressing, otherwise the keypress is missed.
+    const chunk = page.waitForResponse(/\/assets\/CommandPalette-[\w.-]+\.js$/, { timeout: 15_000 });
+    await page.goto("/dashboard.html");
+    await expect(page.locator("main").first()).toBeAttached({ timeout: 15_000 });
+    await chunk;
+    await page.waitForTimeout(400);
+    await page.keyboard.press("Control+k");
+    const palette = page.getByRole("dialog", { name: /command palette/i });
+    await expect(palette).toBeVisible({ timeout: 10_000 });
+    await page.keyboard.press("Escape");
+    await expect(palette).toBeHidden();
+  });
+
   for (const route of ROUTES) {
     test(`${route} uses a bounded page shell`, async ({ page }) => {
       await prepare(page);

@@ -233,8 +233,32 @@ mounts `<Toaster>` on the first idle window (2 s timeout, 1.5 s timer where
 `requestIdleCallback` is missing) inside `MainLayout`, so signed-out screens
 never mount it. sonner keeps toasts in its store, so one fired before the
 toaster mounts is still shown once it does. `check-bundle` was tightened
-**800 → 740 kB**: 27 kB of headroom, less than the 33 kB chunk this removed, so
-re-importing sonner into the entry trips the gate.
+**800 → 740 kB** at that point: 27 kB of headroom, less than the 33 kB chunk
+this removed, so re-importing sonner into the entry trips the gate.
+
+## Deferred shell overlays (2026-11)
+
+Five pieces of authenticated-shell UI are only needed once the operator asks for
+them, but `AppLayout` imported them statically — so every page, including
+`/login`, downloaded them before first paint. They are `React.lazy` chunks now,
+rendered through `null` Suspense fallbacks and fetched immediately after the
+layout mounts:
+
+| Component | Why it can wait |
+| --- | --- |
+| `CommandPalette` | opens on Ctrl/⌘+K |
+| `ShortcutsHelp` | opens on `?` |
+| `UpdateBanner` / `UpdateDialog` | update notice / modal |
+| `AgentStatusBanner` | agent status notice |
+
+| | Before | After |
+| --- | --- | --- |
+| entry critical path | 714 kB (12 chunks) | **694 kB (11 chunks)** |
+| budget | 740 kB | **720 kB** (26 kB headroom) |
+
+The keyboard listener lives in the lazy palette chunk, so a very early Ctrl+K is
+ignored until the chunk arrives (fetched right after mount). `e2e/layout.spec.ts`
+waits for the chunk response and asserts the shortcut still opens the palette.
 
 ## First-paint JS split (2026-11)
 

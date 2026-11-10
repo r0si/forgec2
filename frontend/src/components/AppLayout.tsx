@@ -1,19 +1,27 @@
 
-import { useEffect, useCallback, useRef } from "react";
+import { useEffect, useCallback, useRef, lazy, Suspense } from "react";
 import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
-import UpdateBanner from "@/components/UpdateBanner";
-import { UpdateDialog } from "@/components/UpdateDialog";
-import AgentStatusBanner from "@/components/AgentStatusBanner";
-import ShortcutsHelp from "@/components/ShortcutsHelp";
 import ScrollToTop from "@/components/ScrollToTop";
-import CommandPalette from "@/components/CommandPalette";
 import GlobalInteractDock from "@/components/GlobalInteractDock";
 import TelemetryCollector from "@/components/TelemetryCollector";
 import SessionTimeoutWarning from "@/components/SessionTimeoutWarning";
 import RateLimitBanner from "@/components/RateLimitBanner";
 import NetworkStatusBanner from "@/components/NetworkStatusBanner";
 import WsOutboxToast from "@/components/WsOutboxToast";
+
+// On-demand shell UI is lazy: these five used to be static imports in the entry,
+// so every page (including /login, which never mounts the layout) downloaded
+// them before first paint. Measured: removing them from the entry closure took
+// the critical path 714 -> 692 kB. They are fetched immediately after the
+// layout mounts, in parallel, and render through their null Suspense fallback.
+const UpdateBanner = lazy(() => import("@/components/UpdateBanner"));
+const UpdateDialog = lazy(() =>
+  import("@/components/UpdateDialog").then((m) => ({ default: m.UpdateDialog })),
+);
+const AgentStatusBanner = lazy(() => import("@/components/AgentStatusBanner"));
+const ShortcutsHelp = lazy(() => import("@/components/ShortcutsHelp"));
+const CommandPalette = lazy(() => import("@/components/CommandPalette"));
 import { useLocation } from "react-router-dom";
 import { useAppStore, selectSidebarWidth } from "@/lib/store";
 import { useI18n } from "@/lib/i18n";
@@ -134,11 +142,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             )}
           >
             {!flush && (
-              <>
+              <Suspense fallback={null}>
                 <UpdateBanner />
                 <UpdateDialog />
                 <AgentStatusBanner />
-              </>
+              </Suspense>
             )}
             <div className={cn(flush && "flex min-h-0 flex-1 flex-col")}>
               {/* The full en dictionary is a separate chunk in production; hold
@@ -152,9 +160,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <GlobalInteractDock />
       </div>
 
-      <ShortcutsHelp />
       <ScrollToTop />
-      <CommandPalette />
+      <Suspense fallback={null}>
+        <ShortcutsHelp />
+        <CommandPalette />
+      </Suspense>
       <TelemetryCollector />
       {/* Session/link banners live inside the authenticated shell: they need
           the full dictionary and have nothing to say on the login page. */}

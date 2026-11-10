@@ -54,10 +54,11 @@ const TOTAL_LIMIT_BYTES = 5.0 * 1024 * 1024;
 // Re-measured again 2026-11-09: 713 kB after the toaster was deferred (sonner
 // 33.5 kB left the entry; it now loads on the first toast / on idle). The
 // six single-page dictionary chunks added 1 kB of entry import map (714 kB).
-// Set to 740 kB: ~26 kB of ordinary headroom, and putting any of the chunks
-// just removed (sonner 33 kB, agents dictionary 53 kB) back in first paint
-// trips it.
-const CRITICAL_PATH_LIMIT_BYTES = 740 * 1024;
+// 2026-11-10: the on-demand shell UI (command palette, shortcuts help, update
+// banner/dialog, agent status banner) became lazy chunks fetched after the
+// layout mounts: 714 -> 694 kB. Set to 720 kB: ~26 kB of ordinary headroom,
+// and putting any of the removed chunks back (sonner 33 kB) trips it.
+const CRITICAL_PATH_LIMIT_BYTES = 720 * 1024;
 // Measured 2026-11-09: Inter 210 kB + JetBrains Mono 55 kB after the Latin/UI
 // subset (was 350 + 72 = 422 kB as the full families). 300 kB leaves ~35 kB of
 // headroom; restoring either full font trips it.
