@@ -1,1 +1,0 @@
-import{F as e,I as t,P as n,at as r}from"./index-DwmTI4S3.js";function i(){let i=r(e=>e.currentPermissions);return{permissions:i,role:r(e=>e.currentUserRole),can:e=>n(i,e),canAny:e=>t(i,e),canAll:t=>e(i,t)}}export{i as t};

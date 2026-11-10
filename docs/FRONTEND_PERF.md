@@ -197,6 +197,32 @@ counts fragment keys as defined English keys, and `e2e/layout.spec.ts` asserts
 `/credentials` pulls `i18n-cred`, the eighteen routable single-page namespaces
 pull their own chunk, and none of those pages renders a raw dotted key.
 
+## zh dictionary split (2026-11)
+
+The zh dictionary used to be one 242,506 B chunk loaded for every zh user on
+every authenticated page. It is now split for the two largest namespaces, with
+a Suspense gate that guarantees translated text instead of an English flash:
+
+| Chunk | Raw | Gzip | Loaded when |
+| --- | --- | --- | --- |
+| `zh-*.js` (base dictionary) | 164,072 | 50,339 | every zh page |
+| `i18n-zh-agents-*.js` | 53,304 | 15,803 | beacon/loot/settings pages |
+| `i18n-zh-settings-*.js` | 25,314 | 7,929 | settings/roles/asset pages |
+| previous `zh-*.js` | 242,506 | ~72,000 | every zh page |
+
+Per page: dashboard/events drop **−78 kB**, beacon pages −25 kB, settings pages
+−53 kB. `useZhFragment(ns)` (in `lib/i18n/index.tsx`) starts the zh chunk and
+**throws its promise** while it loads; `PageZhGate` in the router maps the
+pathname to at most two namespaces and sits inside the route's Suspense
+boundary, so the page never commits in English. A failed chunk load resolves
+the promise and falls back to the English fragment instead of suspending
+forever. The gate waits only for the current route's namespaces, so the idle
+route prefetch cannot blank the page. `e2e/layout.spec.ts` asserts a zh
+`/beacons` pulls `i18n-zh-agents` and renders CJK, and that a zh dashboard
+loads only the base chunk. The login page still loads the zh base for a zh
+visitor (164 kB now, was 242 kB); the "no dictionary on /login" rule is about
+the English dictionary.
+
 ## Login page payload (2026-11)
 
 The signed-out entry is the public demo's front door, so its payload is kept

@@ -183,6 +183,8 @@ export default defineConfig(({ command }) => {
             if (id.includes("lib/i18n/fragments/")) {
               const frag = id.match(/lib\/i18n\/fragments\/en\.([a-z0-9_]+)\.ts$/);
               if (frag) return `i18n-${frag[1]}`;
+              const zhFrag = id.match(/lib\/i18n\/fragments\/zh\.([a-z0-9_]+)\.ts$/);
+              if (zhFrag) return `i18n-zh-${zhFrag[1]}`;
             }
             return;
           }

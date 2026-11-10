@@ -28,13 +28,21 @@ const envelope = {
   CurrentUserRole: "admin",
 };
 
-async function prepare(page: Page, theme: "light" | "dark" = "light", extraPermissions: string[] = []) {
+async function prepare(
+  page: Page,
+  theme: "light" | "dark" = "light",
+  extraPermissions: string[] = [],
+  lang: "en" | "zh" = "en",
+) {
   const permissions = [...envelope.data.permissions, ...extraPermissions];
   const body = JSON.stringify({ ...envelope, data: { ...envelope.data, permissions } });
-  await page.addInitScript((selectedTheme) => {
-    localStorage.setItem("forgec2_theme", selectedTheme);
-    localStorage.setItem("forgec2_lang", "en");
-  }, theme);
+  await page.addInitScript(
+    ({ selectedTheme, selectedLang }) => {
+      localStorage.setItem("forgec2_theme", selectedTheme);
+      localStorage.setItem("forgec2_lang", selectedLang);
+    },
+    { selectedTheme: theme, selectedLang: lang },
+  );
   await page.context().addCookies([
     { name: "forgec2_session", value: "layout-e2e", domain: "127.0.0.1", path: "/" },
   ]);
@@ -251,6 +259,29 @@ test.describe("responsive shell", () => {
     await expect(page.locator("main").first()).toBeAttached({ timeout: 15_000 });
     await expect.poll(() => sockets.length, { timeout: 10_000 }).toBeGreaterThan(0);
     await expect.poll(() => meProbes.length, { timeout: 10_000 }).toBeGreaterThan(0);
+  });
+
+  test("zh pages suspend until their translated dictionary fragment is ready", async ({ page }) => {
+    await prepare(page, "light", [], "zh");
+    const zhChunks: string[] = [];
+    page.on("request", (request) => {
+      const pathname = new URL(request.url()).pathname;
+      if (/\/assets\/(zh|i18n-zh-)[\w.-]+\.js$/.test(pathname)) zhChunks.push(pathname);
+    });
+
+    await page.goto("/beacons.html");
+    await expect(page.locator("main").first()).toBeAttached({ timeout: 15_000 });
+    await expect.poll(() => zhChunks.some((c) => c.includes("i18n-zh-agents"))).toBe(true);
+    await expect(page.locator("main")).toContainText(/[\u4e00-\u9fff]/, { timeout: 10_000 });
+    const text = await page.locator("main").innerText();
+    expect(text).not.toMatch(/\bagents\.[a-z_]/);
+
+    // A route whose namespaces are not split loads only the base zh chunk.
+    zhChunks.length = 0;
+    await page.goto("/dashboard.html");
+    await expect(page.locator("main").first()).toBeAttached({ timeout: 15_000 });
+    await page.waitForTimeout(1200);
+    expect(zhChunks.some((c) => c.includes("i18n-zh-"))).toBe(false);
   });
 
   test("the command palette still opens after the lazy shell chunk loads", async ({ page }) => {

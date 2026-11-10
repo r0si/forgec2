@@ -13,6 +13,7 @@ import RouterErrorView from "@/components/RouterErrorView";
 import { useCurrentUserBootstrap } from "@/components/ClientProvider";
 import DeferredToaster from "@/components/DeferredToaster";
 import { I18nProvider } from "@/lib/i18n";
+import { useZhFragment } from "@/lib/i18n";
 import { WebSocketProvider } from "@/lib/wsContext";
 import NotFound from "@/pages/NotFound";
 import Forbidden from "@/pages/forbidden/ForbiddenPage";
@@ -101,8 +102,38 @@ const MAIN_ROUTES: MainRoute[] = [
 /** Route-local suspense: each lazy page shows the standard spinner while its
  *  chunk loads (replaces the single Root-level Suspense from the declarative
  *  router). */
+/** zh dictionary fragments a route's page renders. Kept in one place so the
+ *  page components do not each need a hook; a page not listed here keeps its
+ *  zh keys in the base zh dictionary. At most two namespaces per page. */
+function zhNamespacesFor(pathname: string): [string, string] {
+  if (pathname === "/settings") return ["settings", ""];
+  if (pathname.startsWith("/asset-management") || pathname === "/roles") return ["agents", "settings"];
+  if (
+    pathname.startsWith("/beacons") ||
+    pathname === "/loot" ||
+    pathname === "/tags" ||
+    pathname === "/toolkit"
+  ) {
+    return ["agents", ""];
+  }
+  return ["", ""];
+}
+
+function PageZhGate({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation();
+  const [first, second] = zhNamespacesFor(pathname);
+  // Fixed hook count across routes: the gate is reused while navigating.
+  useZhFragment(first);
+  useZhFragment(second);
+  return <>{children}</>;
+}
+
 function withSuspense(node: ReactNode): ReactNode {
-  return <Suspense fallback={<PageSpinner />}>{node}</Suspense>;
+  return (
+    <Suspense fallback={<PageSpinner />}>
+      <PageZhGate>{node}</PageZhGate>
+    </Suspense>
+  );
 }
 
 /** Compatibility redirect for a renamed section: swaps the first path segment

@@ -19,23 +19,75 @@ export type Locale = "en" | "zh";
 // back into first paint. Page chunks import this module anyway (for useI18n),
 // so registration adds no bytes to them.
 //
-// zh is not split: it loads only for zh users and stays whole, so a zh user
-// never depends on fragment registration order. An English fragment is still
-// the fallback for a key missing from zh.
+// zh is split the same way for the largest page namespaces: when the locale is
+// zh, `registerFragment` also starts the matching zh chunk and the page gate
+// holds the page until it lands, so a zh operator never sees English labels.
+// Namespaces without a zh chunk yet keep their keys in the zh dictionary.
 type Dict = Record<string, string>;
 
-const fragments: Dict = {};
+const enFragments: Dict = {};
+const zhFragments: Dict = {};
 
-/** Merge a fragment into the lookup table. Idempotent per key. */
+// zh fragments are loaded on demand, per namespace, only for zh users.
+const zhLoaded = new Set<string>();
+const zhPromises = new Map<string, Promise<void>>();
+
+const ZH_LOADERS: Record<string, () => Promise<Record<string, Dict>>> = {
+  agents: () => import("./fragments/zh.agents"),
+  settings: () => import("./fragments/zh.settings"),
+};
+
+/** Merge an English fragment. Idempotent per key. */
 export function registerFragment(dict: Dict): void {
-  for (const key in dict) {
-    fragments[key] = dict[key];
-  }
+  Object.assign(enFragments, dict);
 }
 
-/** Value for a key registered by a loaded fragment, if any. */
+/** English value for a key registered by a fragment (test/back-compat helper). */
 export function fragmentValue(key: string): string | undefined {
-  return fragments[key];
+  return enFragments[key];
+}
+
+function localizedFragmentValue(locale: Locale, key: string): string | undefined {
+  if (locale === "zh" && zhFragments[key] !== undefined) return zhFragments[key];
+  return enFragments[key];
+}
+
+function ensureZhFragment(ns: string): Promise<void> | null {
+  if (zhLoaded.has(ns)) return null;
+  const existing = zhPromises.get(ns);
+  if (existing) return existing;
+  const loader = ZH_LOADERS[ns];
+  if (!loader) return null;
+  const promise = loader()
+    .then((mod) => {
+      const dict = Object.values(mod)[0];
+      if (dict) Object.assign(zhFragments, dict);
+    })
+    .catch(() => {
+      // Fall back to the English fragment; a failed chunk must not trap the
+      // page in Suspense forever.
+    })
+    .finally(() => {
+      zhLoaded.add(ns);
+    });
+  zhPromises.set(ns, promise);
+  return promise;
+}
+
+/**
+ * Suspend the current page until its zh dictionary fragment is ready.
+ *
+ * A page that registers an English fragment may have that namespace split out
+ * of the zh dictionary too; calling this hook before rendering the page means a
+ * zh operator waits for the translated chunk instead of seeing English labels
+ * for one network round trip. `locale` comes from the provider, and a failed
+ * load resolves the promise (English fallback) rather than suspending forever.
+ */
+export function useZhFragment(ns: string): void {
+  const { locale } = useContext(I18nContext);
+  if (locale !== "zh" || !ns || zhLoaded.has(ns)) return;
+  const promise = ensureZhFragment(ns);
+  if (promise) throw promise;
 }
 
 interface I18nContextType {
@@ -210,7 +262,7 @@ export function I18nProvider({ children, full = true }: { children: ReactNode; f
     // Registered page fragments sit between the active dictionary and the
     // synchronous shell slice: a page that imported its fragment translates
     // immediately, and it is also the fallback when zh lacks a key.
-    let val = dict[key] || fragmentValue(key) || bootstrapDict[key] || key;
+    let val = dict[key] || localizedFragmentValue(localeRef.current, key) || bootstrapDict[key] || key;
     if (params) {
       Object.entries(params).forEach(([k, v]) => {
         val = val.replace(new RegExp(`\\{${k}\\}`, "g"), String(v));
