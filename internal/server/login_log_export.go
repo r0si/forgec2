@@ -27,7 +27,12 @@ func (s *Server) handleExportLoginEventsCSV(c *gin.Context) {
 	}
 
 	var rows []db.AuditLog
-	if err := s.loginEventQuery(c).Order("created_at DESC").Limit(limit + 1).Find(&rows).Error; err != nil {
+	query, rejection := s.loginEventQuery(c)
+	if rejection != "" {
+		respondError(c, http.StatusBadRequest, rejection)
+		return
+	}
+	if err := query.Order("created_at DESC").Limit(limit + 1).Find(&rows).Error; err != nil {
 		respondError(c, http.StatusInternalServerError, "failed to read the login log")
 		return
 	}

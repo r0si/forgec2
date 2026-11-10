@@ -14227,6 +14227,10 @@ export interface operations {
                 pageSize?: number;
                 user?: string;
                 result?: "ok" | "failed";
+                /** @description Lower time bound (24h, 7d, 30d or an RFC3339 timestamp) */
+                since?: string;
+                /** @description Upper time bound (24h, 7d, 30d or an RFC3339 timestamp) */
+                until?: string;
             };
             header?: never;
             path?: never;
@@ -14279,6 +14283,10 @@ export interface operations {
             query?: {
                 user?: string;
                 result?: "ok" | "failed";
+                /** @description Lower time bound (24h, 7d, 30d or an RFC3339 timestamp) */
+                since?: string;
+                /** @description Upper time bound (24h, 7d, 30d or an RFC3339 timestamp) */
+                until?: string;
                 /** @description Maximum rows to write (default 50000, max 200000) */
                 limit?: number;
             };

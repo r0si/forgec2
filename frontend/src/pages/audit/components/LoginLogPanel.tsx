@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card } from "@/components/ui/card";
 import { PageToolbar } from "@/components/ui/page-toolbar";
 import { downloadBlob } from "@/lib/download";
-import type { LoginEvent } from "./login-log";
+import { loginFilterParams, type LoginEvent } from "./login-log";
 import { Download, Filter, RotateCw } from "lucide-react";
 
 export type { LoginEvent };
@@ -58,15 +58,16 @@ export function LoginLogPanel() {
   const [error, setError] = useState<string | null>(null);
   const [userFilter, setUserFilter] = useState("");
   const [resultFilter, setResultFilter] = useState("");
-  const [applied, setApplied] = useState({ user: "", result: "" });
+  const [range, setRange] = useState("all");
+  const [applied, setApplied] = useState({ user: "", result: "", range: "all" });
 
   const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams({ page: String(page), pageSize: String(PER_PAGE) });
-      if (applied.user) params.set("user", applied.user);
-      if (applied.result) params.set("result", applied.result);
+      const params = loginFilterParams(applied);
+      params.set("page", String(page));
+      params.set("pageSize", String(PER_PAGE));
       const payload = (await api.get(paths.audit.logins(params.toString()), { signal })) as {
         events?: LoginEvent[];
         total?: number;
@@ -96,22 +97,21 @@ export function LoginLogPanel() {
 
   const apply = () => {
     setPage(1);
-    setApplied({ user: userFilter.trim(), result: resultFilter });
+    setApplied({ user: userFilter.trim(), result: resultFilter, range });
   };
   const reset = () => {
     setUserFilter("");
     setResultFilter("");
+    setRange("all");
     setPage(1);
-    setApplied({ user: "", result: "" });
+    setApplied({ user: "", result: "", range: "all" });
   };
 
   const exportCsv = async () => {
     setExporting(true);
     setExportError(null);
     try {
-      const params = new URLSearchParams();
-      if (applied.user) params.set("user", applied.user);
-      if (applied.result) params.set("result", applied.result);
+      const params = loginFilterParams(applied);
       const { blob, filename } = await api.downloadGet(
         paths.audit.exportLogins(params.toString()),
         "login-log.csv",
@@ -164,6 +164,16 @@ export function LoginLogPanel() {
         </Card>
       )}
       <PageToolbar sticky>
+        <Select value={range} onValueChange={(v) => setRange(v || "all")}>
+          <SelectTrigger className="w-[150px]" aria-label={t("audit.login_range")}>
+            <SelectValue>{(value) => t(`audit.login_range_${value ?? "all"}`)}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            {["24h", "7d", "30d", "all"].map((id) => (
+              <SelectItem key={id} value={id}>{t(`audit.login_range_${id}`)}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Select value={resultFilter || "all"} onValueChange={(v) => setResultFilter(v === "all" || !v ? "" : v)}>
           <SelectTrigger className="w-[180px]" aria-label={t("audit.login_result")}>
             <SelectValue>

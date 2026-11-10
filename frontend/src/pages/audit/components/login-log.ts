@@ -55,3 +55,20 @@ export function loginLogFilename(now = new Date()): string {
     now.getHours(),
   )}${pad(now.getMinutes())}.csv`;
 }
+
+/** The filters shared by the login table and its CSV export. "all" means no
+ *  `since` parameter, so the page and the export cannot describe different
+ *  windows. */
+export interface LoginFilters {
+  user: string;
+  result: string;
+  range: string;
+}
+
+export function loginFilterParams(filters: LoginFilters): URLSearchParams {
+  const params = new URLSearchParams();
+  if (filters.user) params.set("user", filters.user);
+  if (filters.result) params.set("result", filters.result);
+  if (filters.range && filters.range !== "all") params.set("since", filters.range);
+  return params;
+}

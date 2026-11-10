@@ -119,4 +119,12 @@ describe("LoginLogPanel", () => {
     expect(path).not.toContain("page=");
     expect(vi.mocked(downloadBlob)).toHaveBeenCalledTimes(1);
   });
+
+  it("offers a time range and keeps all-time as the default", async () => {
+    render(<LoginLogPanel />);
+    await screen.findByText("alice");
+    expect(screen.getByLabelText("audit.login_range")).toBeTruthy();
+    const call = vi.mocked(api.get).mock.calls.find(([p]) => String(p).startsWith("/audit/logins"));
+    expect(String(call?.[0])).not.toContain("since=");
+  });
 });

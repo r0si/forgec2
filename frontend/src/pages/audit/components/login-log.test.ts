@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { loginEventsToCSV, loginLogFilename, type LoginEvent } from "./login-log";
+import { loginEventsToCSV, loginFilterParams, loginLogFilename, type LoginEvent } from "./login-log";
 
 const ROW: LoginEvent = {
   id: 3,
@@ -50,5 +50,14 @@ describe("loginEventsToCSV", () => {
 describe("loginLogFilename", () => {
   it("stamps the export so two files cannot collide", () => {
     expect(loginLogFilename(new Date(2026, 10, 9, 4, 5))).toBe("login-log-20261109-0405.csv");
+  });
+});
+
+describe("loginFilterParams", () => {
+  it("sends the time range as since and omits it for all time", () => {
+    expect(loginFilterParams({ user: "alice", result: "failed", range: "7d" }).toString()).toBe(
+      "user=alice&result=failed&since=7d",
+    );
+    expect(loginFilterParams({ user: "", result: "", range: "all" }).toString()).toBe("");
   });
 });

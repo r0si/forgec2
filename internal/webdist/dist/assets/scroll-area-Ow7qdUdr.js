@@ -1,1 +1,0 @@
-import"./rolldown-runtime-XKyaHtl9.js";import{Yn as e,Zn as t}from"./vendor-baseui-BPnoxL5j.js";import{t as n}from"./utils-CHUu-gy7.js";t();var r=e();function i({className:e,children:t,...i}){return(0,r.jsx)(`div`,{"data-slot":`scroll-area`,className:n(`relative overflow-y-auto overflow-x-hidden`,e),...i,children:t})}export{i as t};

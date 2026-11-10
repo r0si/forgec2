@@ -41,7 +41,11 @@ type loginEvent struct {
 func (s *Server) handleGetLoginEvents(c *gin.Context) {
 	p := parsePagination(c, 50, 200)
 
-	query := s.loginEventQuery(c)
+	query, rejection := s.loginEventQuery(c)
+	if rejection != "" {
+		respondError(c, http.StatusBadRequest, rejection)
+		return
+	}
 
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
@@ -95,7 +99,7 @@ func (s *Server) handleGetLoginEvents(c *gin.Context) {
 // CSV export. The action allowlist is part of the query, not a caller's
 // responsibility: a future audit action must not leak into a view operators
 // treat as authentication-only.
-func (s *Server) loginEventQuery(c *gin.Context) *gorm.DB {
+func (s *Server) loginEventQuery(c *gin.Context) (*gorm.DB, string) {
 	query := s.auditTenantScope(s.db.Model(&db.AuditLog{}), c).
 		Where("action IN ?", loginActions)
 	if user := strings.TrimSpace(c.Query("user")); user != "" {
@@ -107,7 +111,30 @@ func (s *Server) loginEventQuery(c *gin.Context) *gorm.DB {
 	case "failed":
 		query = query.Where("success = ?", false)
 	}
-	return query
+
+	// The same bounds parser the audit and task exports use, so "24h" cannot
+	// mean a different window in two security views.
+	var sinceAt, untilAt time.Time
+	if raw := strings.TrimSpace(c.Query("since")); raw != "" {
+		at, ok := parseTimeBound(raw, time.Now())
+		if !ok {
+			return nil, formatTimeBoundError("since")
+		}
+		sinceAt = at
+		query = query.Where("created_at >= ?", comparableLocalTime(at))
+	}
+	if raw := strings.TrimSpace(c.Query("until")); raw != "" {
+		at, ok := parseTimeBound(raw, time.Now())
+		if !ok {
+			return nil, formatTimeBoundError("until")
+		}
+		untilAt = at
+		query = query.Where("created_at <= ?", comparableLocalTime(at))
+	}
+	if !sinceAt.IsZero() && !untilAt.IsZero() && sinceAt.After(untilAt) {
+		return nil, "since must not be after until"
+	}
+	return query, ""
 }
 
 // loginRegionStat is one region bucket (country + city) of the 24h login

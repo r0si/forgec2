@@ -21,6 +21,7 @@ func TestLoginLogCSVExportSharesFilters(t *testing.T) {
 		{User: "alice", Action: "login", IP: "203.0.113.9", TenantID: 2, Success: true, Details: "Login successful", CreatedAt: now},
 		{User: "mallory", Action: "login_failed", IP: "198.51.100.4", TenantID: 2, Success: false, Details: "=cmd|' /C calc'!A0", CreatedAt: now.Add(-time.Minute)},
 		{User: "bob", Action: "logout", IP: "203.0.113.10", TenantID: 2, Success: true, Details: "Logout", CreatedAt: now.Add(-2 * time.Minute)},
+		{User: "old", Action: "login", IP: "203.0.113.12", TenantID: 2, Success: true, Details: "Old login", CreatedAt: now.Add(-40 * 24 * time.Hour)},
 		{User: "tenant1", Action: "login", IP: "203.0.113.11", TenantID: 1, Success: true, Details: "other tenant", CreatedAt: now},
 		{User: "alice", Action: "task_create", IP: "203.0.113.9", TenantID: 2, Success: true, Details: "not a login", CreatedAt: now},
 	}
@@ -33,6 +34,7 @@ func TestLoginLogCSVExportSharesFilters(t *testing.T) {
 		{IP: "203.0.113.9", Country: "德国", City: "法兰克福", ResolvedAt: now},
 		{IP: "198.51.100.4", Country: "美国", City: "洛杉矶", ResolvedAt: now},
 		{IP: "203.0.113.10", Country: "中国", City: "北京", ResolvedAt: now},
+		{IP: "203.0.113.12", Country: "日本", City: "东京", ResolvedAt: now},
 	} {
 		if err := s.db.Create(&geo).Error; err != nil {
 			t.Fatalf("seed geo %s: %v", geo.IP, err)
@@ -55,8 +57,8 @@ func TestLoginLogCSVExportSharesFilters(t *testing.T) {
 			t.Fatal("CSV export is missing the UTF-8 BOM")
 		}
 		if query == "" {
-			if got := w.Header().Get("X-Audit-Export-Rows"); got != "3" {
-				t.Fatalf("X-Audit-Export-Rows = %q, want 3", got)
+			if got := w.Header().Get("X-Audit-Export-Rows"); got != "4" {
+				t.Fatalf("X-Audit-Export-Rows = %q, want 4", got)
 			}
 		}
 		records, err := csv.NewReader(bytes.NewReader(bytes.TrimPrefix(raw, []byte{0xEF, 0xBB, 0xBF}))).ReadAll()
@@ -67,8 +69,8 @@ func TestLoginLogCSVExportSharesFilters(t *testing.T) {
 	}
 
 	all := export("")
-	if len(all) != 4 {
-		t.Fatalf("csv rows = %d, want header + 3: %v", len(all), all)
+	if len(all) != 5 {
+		t.Fatalf("csv rows = %d, want header + 4: %v", len(all), all)
 	}
 	if all[0][0] != "Time" || all[0][6] != "Result" {
 		t.Fatalf("header = %v", all[0])
@@ -84,6 +86,9 @@ func TestLoginLogCSVExportSharesFilters(t *testing.T) {
 	}
 	if all[3][2] != "logout" {
 		t.Fatalf("third row action = %q, want logout", all[3][2])
+	}
+	if all[4][1] != "old" {
+		t.Fatalf("oldest row = %v, want the 40-day-old login", all[4])
 	}
 	for _, r := range all[1:] {
 		if r[1] == "tenant1" {
@@ -102,5 +107,41 @@ func TestLoginLogCSVExportSharesFilters(t *testing.T) {
 	alice := export("user=alice")
 	if len(alice) != 2 || alice[1][1] != "alice" || alice[1][2] != "login" {
 		t.Fatalf("user=alice rows = %v, want header + alice's login", alice)
+	}
+
+	// The time window drops the 40-day-old row while keeping the recent three.
+	recent := export("since=24h")
+	if len(recent) != 4 {
+		t.Fatalf("since=24h rows = %d, want header + 3: %v", len(recent), recent)
+	}
+	for _, r := range recent[1:] {
+		if r[1] == "old" {
+			t.Fatalf("since=24h included the 40-day-old row: %v", recent)
+		}
+	}
+}
+
+// TestLoginEventsRejectInvalidTimeBound proves a typo answers 400 instead of
+// silently returning the whole login history.
+func TestLoginEventsRejectInvalidTimeBound(t *testing.T) {
+	s := mustTenantServer(t)
+	for _, raw := range []string{
+		"since=bogus",
+		"until=bogus",
+		"since=2026-11-10T00:00:00Z&until=2026-11-09T00:00:00Z",
+	} {
+		c, w := tenantScopedAdminContext(s, t, "tenant2-admin", 2)
+		c.Request.URL.RawQuery = raw
+		s.handleGetLoginEvents(c)
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("list %q: status=%d, want 400 (body=%s)", raw, w.Code, w.Body.String())
+		}
+
+		c2, w2 := tenantScopedAdminContext(s, t, "tenant2-admin", 2)
+		c2.Request.URL.RawQuery = raw
+		s.handleExportLoginEventsCSV(c2)
+		if w2.Code != http.StatusBadRequest {
+			t.Errorf("export %q: status=%d, want 400 (body=%s)", raw, w2.Code, w2.Body.String())
+		}
 	}
 }

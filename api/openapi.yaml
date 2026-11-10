@@ -2179,6 +2179,16 @@ paths:
           schema:
             type: string
             enum: [ok, failed]
+        - name: since
+          in: query
+          description: Lower time bound (24h, 7d, 30d or an RFC3339 timestamp)
+          schema:
+            type: string
+        - name: until
+          in: query
+          description: Upper time bound (24h, 7d, 30d or an RFC3339 timestamp)
+          schema:
+            type: string
       responses:
         '200':
           description: Login events
@@ -2250,6 +2260,16 @@ paths:
           schema:
             type: string
             enum: [ok, failed]
+        - name: since
+          in: query
+          description: Lower time bound (24h, 7d, 30d or an RFC3339 timestamp)
+          schema:
+            type: string
+        - name: until
+          in: query
+          description: Upper time bound (24h, 7d, 30d or an RFC3339 timestamp)
+          schema:
+            type: string
         - name: limit
           in: query
           description: Maximum rows to write (default 50000, max 200000)
