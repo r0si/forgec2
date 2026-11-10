@@ -41,6 +41,10 @@ services:
       - FORGEC2_TOTP_KEY=${FORGEC2_TOTP_KEY:?set in .env}
       - FORGEC2_CSRF_KEY=${FORGEC2_CSRF_KEY:?set in .env}
       - FORGEC2_DATA_DIR=/data
+      # Read-only public demo: /health reports demo_mode so the console skips the
+      # operator WebSocket (the edge answers /ws 404 by design) and shows a
+      # read-only badge instead of a reconnect warning.
+      - FORGEC2_DEMO_MODE=true
       # Loopback only: nginx owns the public port.
       - FORGEC2_HOST=127.0.0.1
       - FORGEC2_PORT=18000

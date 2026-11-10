@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -340,6 +341,12 @@ func (s *Server) handleHealthCheck(c *gin.Context) {
 		return
 	}
 	uptime := time.Since(s.startTime)
+	// FORGEC2_DEMO_MODE marks a deployment where authenticated operator actions
+	// are not available (the public read-only demo). The frontend reads it from
+	// this public endpoint and skips the /ws connect/reconnect loop, which would
+	// otherwise show a permanent "reconnecting" warning to every visitor.
+	demoMode := strings.EqualFold(os.Getenv("FORGEC2_DEMO_MODE"), "true") ||
+		os.Getenv("FORGEC2_DEMO_MODE") == "1"
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "ok",
 		"version": ServerVersion,
@@ -347,5 +354,6 @@ func (s *Server) handleHealthCheck(c *gin.Context) {
 		// uptime_seconds is the machine-readable twin for alerting.
 		"uptime":         uptime.String(),
 		"uptime_seconds": uptime.Seconds(),
+		"demo_mode":      demoMode,
 	})
 }

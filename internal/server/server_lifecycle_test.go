@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -132,6 +133,50 @@ func TestHandleHealthCheckWithDBFailure(t *testing.T) {
 		nilDBServer.handleHealthCheck(c)
 		if w.Code != http.StatusServiceUnavailable {
 			t.Errorf("expected 503, got %d; body=%s", w.Code, w.Body.String())
+		}
+	})
+}
+
+// Demo mode is a deployment flag, not a secret: the public /health answer tells
+// the frontend to skip the /ws connect/reconnect loop that a read-only demo
+// intentionally cannot satisfy.
+func TestHandleHealthCheckReportsDemoMode(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	db := testutil.SetupTestDB(t)
+	s := &Server{db: db, startTime: time.Now()}
+
+	read := func(t *testing.T) map[string]any {
+		t.Helper()
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/health", nil)
+		s.handleHealthCheck(c)
+		if w.Code != http.StatusOK {
+			t.Fatalf("health = %d; body=%s", w.Code, w.Body.String())
+		}
+		var body map[string]any
+		if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+			t.Fatalf("health JSON: %v", err)
+		}
+		return body
+	}
+
+	t.Run("enabled", func(t *testing.T) {
+		t.Setenv("FORGEC2_DEMO_MODE", "true")
+		if got := read(t)["demo_mode"]; got != true {
+			t.Fatalf("demo_mode = %v, want true", got)
+		}
+	})
+	t.Run("one also enables", func(t *testing.T) {
+		t.Setenv("FORGEC2_DEMO_MODE", "1")
+		if got := read(t)["demo_mode"]; got != true {
+			t.Fatalf("demo_mode = %v, want true", got)
+		}
+	})
+	t.Run("disabled by default", func(t *testing.T) {
+		t.Setenv("FORGEC2_DEMO_MODE", "0")
+		if got := read(t)["demo_mode"]; got != false {
+			t.Fatalf("demo_mode = %v, want false", got)
 		}
 	})
 }

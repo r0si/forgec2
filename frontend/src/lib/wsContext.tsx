@@ -49,6 +49,8 @@ export function __testDispatchWS(msg: WSMessage): void {
 interface WSContextValue {
   connected: boolean;
   reconnectFailed: boolean;
+  /** Read-only demo deployment: operator sockets are disabled by design. */
+  demoMode: boolean;
   subscribe: (listener: WSListener) => () => void;
   send: (data: unknown, opts?: { critical?: boolean }) => void;
   reconnect: () => void;
@@ -59,10 +61,10 @@ interface WSContextValue {
 // Splitting them means components that only call subscribe() (most pages)
 // no longer re-render when the socket reconnects. useWS() keeps the
 // combined shape so consumers are unchanged.
-type WSStatusValue = Pick<WSContextValue, "connected" | "reconnectFailed">;
+type WSStatusValue = Pick<WSContextValue, "connected" | "reconnectFailed" | "demoMode">;
 type WSMethodsValue = Pick<WSContextValue, "subscribe" | "send" | "reconnect">;
 
-const WSStatusContext = createContext<WSStatusValue>({ connected: false, reconnectFailed: false });
+const WSStatusContext = createContext<WSStatusValue>({ connected: false, reconnectFailed: false, demoMode: false });
 const WSMethodsContext = createContext<WSMethodsValue | null>(null);
 
 export function getHealthURL(): string {
@@ -97,6 +99,10 @@ export const WS_OUTBOX_DROP_EVENT = "forgec2:ws-outbox-drop";
 export function WebSocketProvider({ children }: { children: ReactNode }) {
   const [connected, setConnected] = useState(false);
   const [reconnectFailed, setReconnectFailed] = useState(false);
+  // A read-only demo answers /ws 404 by design. /health reports demo_mode, and
+  // the provider skips the connect/reconnect loop instead of showing every
+  // visitor a permanent "reconnecting" warning.
+  const [demoMode, setDemoMode] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -317,7 +323,30 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
     };
     document.addEventListener("visibilitychange", onVisibility);
 
-    connect();
+    // Preflight the public health payload: a read-only demo sets demo_mode and
+    // intentionally disables /ws, so do not start a loop that cannot succeed.
+    const preflight = async () => {
+      try {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 3000);
+        try {
+          const res = await fetch(getHealthURL(), { credentials: "include", signal: ctrl.signal });
+          if (res.ok) {
+            const data = (await res.json()) as { demo_mode?: boolean };
+            if (data?.demo_mode === true) {
+              if (!disposed) setDemoMode(true);
+              return;
+            }
+          }
+        } finally {
+          clearTimeout(timer);
+        }
+      } catch {
+        // Health unreachable: proceed with a normal connect.
+      }
+      if (!disposed) connect();
+    };
+    void preflight();
 
     return () => {
       disposed = true;
@@ -350,7 +379,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
   return (
     <WSMethodsContext.Provider value={methods}>
-      <WSStatusContext.Provider value={{ connected, reconnectFailed }}>
+      <WSStatusContext.Provider value={{ connected, reconnectFailed, demoMode }}>
         {children}
       </WSStatusContext.Provider>
     </WSMethodsContext.Provider>

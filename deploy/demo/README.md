@@ -41,7 +41,10 @@ The host's own nginx is untouched: the demo gateway is a separate instance
    country) — including other visitors' and the operator's.
 
 Not reachable by design: `/ws` and `/extc2/ws` (404 — no operator socket to
-anonymous visitors, the console will report the live channel as unavailable),
+anonymous visitors). The container runs with `FORGEC2_DEMO_MODE=true`, so the
+public `/health` answer carries `"demo_mode": true` and the console skips the
+WebSocket connect/reconnect loop entirely, showing a **Read-only demo** badge in
+the top bar instead of a permanent "reconnecting" warning.
 `/payloads/*`, `/api/v1/collect|generate_204|th`, `/phishing/l/*`,
 `/phishing/oauth/*`. The `/phishing` page itself is a normal read-only console
 page.

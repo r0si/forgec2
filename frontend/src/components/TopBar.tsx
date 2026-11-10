@@ -16,7 +16,7 @@ import {
 
 export default function TopBar({ onMenuToggle }: { onMenuToggle?: () => void }) {
   const { t } = useI18n();
-  const { connected, reconnectFailed, reconnect } = useWebSocket();
+  const { connected, reconnectFailed, reconnect, demoMode } = useWebSocket();
   const storeSidebarWidth = useAppStore(selectSidebarWidth);
   const focusMode = useAppStore((s) => s.focusMode);
   const toggleFocusMode = useAppStore((s) => s.toggleFocusMode);
@@ -70,16 +70,26 @@ export default function TopBar({ onMenuToggle }: { onMenuToggle?: () => void }) 
           <Tooltip>
             <TooltipTrigger render={<button type="button" className="flex min-h-8 min-w-0 items-center gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring/60" />}>
               <span role="status" aria-live="polite" className="flex min-w-0 items-center gap-2">
-                <ConnectionDot connected={connected} reconnectFailed={reconnectFailed} />
-                <span className="min-w-16 truncate text-micro-sm text-muted-foreground">{connected ? t("common.live") : reconnectFailed ? t("common.offline") : t("topbar.reconnecting")}</span>
-                {stats && (stats.online_agents ?? 0) > 0 && (
-                  <span className="hidden xl:inline-flex items-center gap-1 text-micro-sm font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">
-                    {stats.online_agents} {t("topbar.online_label")}
-                  </span>
+                {demoMode ? (
+                  <span className="min-w-16 truncate text-micro-sm text-muted-foreground">{t("topbar.demo_mode")}</span>
+                ) : (
+                  <>
+                    <ConnectionDot connected={connected} reconnectFailed={reconnectFailed} />
+                    <span className="min-w-16 truncate text-micro-sm text-muted-foreground">{connected ? t("common.live") : reconnectFailed ? t("common.offline") : t("topbar.reconnecting")}</span>
+                    {stats && (stats.online_agents ?? 0) > 0 && (
+                      <span className="hidden xl:inline-flex items-center gap-1 text-micro-sm font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">
+                        {stats.online_agents} {t("topbar.online_label")}
+                      </span>
+                    )}
+                  </>
                 )}
               </span>
             </TooltipTrigger>
-            <TooltipContent>{connected ? t("topbar.ws_connected") : reconnectFailed ? t("topbar.ws_lost") : t("topbar.reconnecting")}{stats ? ` · ${stats.online_agents ?? 0} ${t("nav.online_label")}` : ""}</TooltipContent>
+            <TooltipContent>
+              {demoMode
+                ? t("topbar.demo_mode_hint")
+                : `${connected ? t("topbar.ws_connected") : reconnectFailed ? t("topbar.ws_lost") : t("topbar.reconnecting")}${stats ? ` · ${stats.online_agents ?? 0} ${t("nav.online_label")}` : ""}`}
+            </TooltipContent>
           </Tooltip>
         </div>
 

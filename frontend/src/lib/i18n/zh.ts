@@ -1301,6 +1301,8 @@ export const zh: Record<string, string> = {
     "topbar.focus_mode": "专注模式",
     "topbar.focus_mode_exit": "退出专注模式",
     "topbar.ws_lost": "连接已断开",
+    "topbar.demo_mode": "只读演示",
+    "topbar.demo_mode_hint": "此只读演示已禁用操作员实时连接。",
 
     "traffic.all_ip": "所有 IP",
     "traffic.auto_refresh": "自动刷新",

@@ -1286,6 +1286,8 @@ export const en: Record<string, string> = {
     "topbar.focus_mode": "Focus mode",
     "topbar.focus_mode_exit": "Exit focus mode",
     "topbar.ws_lost": "Connection lost",
+    "topbar.demo_mode": "Read-only demo",
+    "topbar.demo_mode_hint": "Operator sockets are disabled in this read-only demo.",
 
     "traffic.all_ip": "All IPs",
     "traffic.auto_refresh": "Auto Refresh",

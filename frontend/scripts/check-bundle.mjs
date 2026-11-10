@@ -59,8 +59,8 @@ const TOTAL_LIMIT_BYTES = 5.0 * 1024 * 1024;
 // layout mounts: 714 -> 694 kB. The next dictionary batch added 1 kB of entry
 // import map (695 kB) and the zh fragment loader/gate added another (696 kB),
 // then the generate/ai/cred zh fragments (697 kB) and the remaining page-owned
-// zh fragments (700 kB).
-// Set to 720 kB: ~20 kB of ordinary headroom, and putting any of the removed
+// zh fragments (700 kB), then the demo-mode health preflight (701 kB).
+// Set to 720 kB: ~19 kB of ordinary headroom, and putting any of the removed
 // chunks back (sonner 33 kB) trips it.
 const CRITICAL_PATH_LIMIT_BYTES = 720 * 1024;
 // Measured 2026-11-09: Inter 210 kB + JetBrains Mono 55 kB after the Latin/UI

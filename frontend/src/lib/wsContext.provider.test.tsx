@@ -62,6 +62,12 @@ describe("WebSocketProvider outbox", () => {
   beforeEach(() => {
     FakeWebSocket.instances.length = 0;
     vi.stubGlobal("WebSocket", FakeWebSocket);
+    // The provider preflights /health before connecting; the default test
+    // deployment is not a demo.
+    vi.stubGlobal("fetch", vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ demo_mode: false }),
+    }) as unknown as Response));
   });
 
   afterEach(() => {
@@ -69,12 +75,13 @@ describe("WebSocketProvider outbox", () => {
     vi.clearAllMocks();
   });
 
-  it("buffers offline sends, sheds oldest past the cap, and reports drops", () => {
+  it("buffers offline sends, sheds oldest past the cap, and reports drops", async () => {
     const drops: number[] = [];
     const onDrop = (e: Event) => drops.push((e as CustomEvent<{ dropped: number }>).detail.dropped);
     window.addEventListener(WS_OUTBOX_DROP_EVENT, onDrop);
     try {
       const { ctx, unmount } = renderProvider();
+      await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1));
       // Socket is CONNECTING: everything buffers.
       act(() => {
         for (let i = 0; i < 52; i++) ctx.send({ n: i });
@@ -93,9 +100,10 @@ describe("WebSocketProvider outbox", () => {
     }
   });
 
-  it("flushes critical frames ahead of the normal backlog", () => {
+  it("flushes critical frames ahead of the normal backlog", async () => {
     const { ctx, unmount } = renderProvider();
     try {
+      await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1));
       act(() => {
         ctx.send({ n: 1 });
         ctx.send("arm", { critical: true });
@@ -112,9 +120,10 @@ describe("WebSocketProvider outbox", () => {
     }
   });
 
-  it("probes the session on abnormal closure instead of only after backoff", () => {
+  it("probes the session on abnormal closure instead of only after backoff", async () => {
     const { unmount } = renderProvider();
     try {
+      await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1));
       act(() => {
         FakeWebSocket.instances[0].triggerOpen();
       });
@@ -134,6 +143,7 @@ describe("WebSocketProvider outbox", () => {
     vi.stubGlobal("fetch", fetchMock);
     const { holder, unmount } = renderProvider();
     try {
+      await waitFor(() => expect(FakeWebSocket.instances.length).toBeGreaterThan(0));
       await act(async () => {
         FakeWebSocket.instances[0].triggerOpen();
       });
@@ -153,6 +163,23 @@ describe("WebSocketProvider outbox", () => {
       });
       // Two backend-up failures in a row: Offline immediately, no 10min wait.
       await waitFor(() => expect(holder.value?.reconnectFailed).toBe(true), { timeout: 8000 });
+      unmount();
+    } catch (e) {
+      unmount();
+      throw e;
+    }
+  });
+
+  it("skips the socket entirely in a read-only demo", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ demo_mode: true }),
+    }) as unknown as Response));
+    const { holder, unmount } = renderProvider();
+    try {
+      await waitFor(() => expect(holder.value?.demoMode).toBe(true));
+      expect(FakeWebSocket.instances).toHaveLength(0);
+      expect(holder.value?.reconnectFailed).toBe(false);
       unmount();
     } catch (e) {
       unmount();
