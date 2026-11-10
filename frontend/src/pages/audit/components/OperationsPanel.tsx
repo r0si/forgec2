@@ -60,6 +60,7 @@ interface AppliedFilters {
   result: string;
   user: string;
   search: string;
+  agentId: string;
   includeSystem: boolean;
 }
 
@@ -70,11 +71,14 @@ const EMPTY_FILTERS: AppliedFilters = {
   result: "",
   user: "",
   search: "",
+  agentId: "",
   includeSystem: false,
 };
 
 export interface OperationsPanelProps {
   users?: { username: string }[];
+  /** Beacon to pin the view to, set by the deep link from a beacon's page. */
+  initialAgentId?: string;
 }
 
 /**
@@ -86,8 +90,9 @@ export interface OperationsPanelProps {
  * implementation between this table and the CSV export, so the file always
  * matches the screen.
  */
-export function OperationsPanel({ users = [] }: OperationsPanelProps) {
+export function OperationsPanel({ users = [], initialAgentId = "" }: OperationsPanelProps) {
   const { t } = useI18n();
+  const initialTarget = initialAgentId.trim();
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [total, setTotal] = useState(0);
   const [failed, setFailed] = useState(0);
@@ -105,8 +110,9 @@ export function OperationsPanel({ users = [] }: OperationsPanelProps) {
   const [result, setResult] = useState("");
   const [user, setUser] = useState("");
   const [search, setSearch] = useState("");
+  const [agentId, setAgentId] = useState(initialTarget);
   const [includeSystem, setIncludeSystem] = useState(false);
-  const [applied, setApplied] = useState<AppliedFilters>(EMPTY_FILTERS);
+  const [applied, setApplied] = useState<AppliedFilters>({ ...EMPTY_FILTERS, agentId: initialTarget });
 
   useEffect(() => {
     const controller = new AbortController();
@@ -138,6 +144,7 @@ export function OperationsPanel({ users = [] }: OperationsPanelProps) {
     if (filters.category) params.set("category", filters.category);
     if (filters.result) params.set("result", filters.result);
     if (filters.search) params.set("search", filters.search);
+    if (filters.agentId) params.set("agent_id", filters.agentId);
     if (filters.range !== "all") params.set("since", filters.range);
     params.set("scope", filters.includeSystem ? "all" : "operations");
     return params.toString();
@@ -180,6 +187,7 @@ export function OperationsPanel({ users = [] }: OperationsPanelProps) {
       result,
       user: user.trim(),
       search: search.trim(),
+      agentId: agentId.trim(),
       includeSystem,
     });
   };
@@ -191,9 +199,16 @@ export function OperationsPanel({ users = [] }: OperationsPanelProps) {
     setResult("");
     setUser("");
     setSearch("");
+    setAgentId("");
     setIncludeSystem(false);
     setPage(1);
     setApplied(EMPTY_FILTERS);
+  };
+
+  const clearTarget = () => {
+    setAgentId("");
+    setApplied((prev) => ({ ...prev, agentId: "" }));
+    setPage(1);
   };
 
   const actionOptions = useMemo(() => {
@@ -346,6 +361,17 @@ export function OperationsPanel({ users = [] }: OperationsPanelProps) {
           className="h-9 w-[200px] rounded-lg border border-border bg-card px-3 text-sm"
         />
 
+        <input
+          value={agentId}
+          onChange={(e) => setAgentId(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") apply();
+          }}
+          placeholder={t("audit.ops_target_ph")}
+          aria-label={t("audit.ops_target_ph")}
+          className="h-9 w-[220px] rounded-lg border border-border bg-card px-3 font-mono text-xs"
+        />
+
         <label className="flex items-center gap-2 text-sm text-muted-foreground">
           <input
             type="checkbox"
@@ -372,6 +398,17 @@ export function OperationsPanel({ users = [] }: OperationsPanelProps) {
 
       {exportError && (
         <p role="alert" className="text-sm text-destructive-ink">{t(exportError)}</p>
+      )}
+
+      {applied.agentId && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="secondary" className="gap-1 font-mono" title={applied.agentId}>
+            {t("audit.ops_target_applied", { id: applied.agentId.slice(0, 12) })}
+          </Badge>
+          <Button variant="ghost" size="xs" onClick={clearTarget}>
+            {t("audit.ops_target_clear")}
+          </Button>
+        </div>
       )}
 
       <Card className="overflow-hidden">

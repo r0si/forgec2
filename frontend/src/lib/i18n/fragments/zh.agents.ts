@@ -504,6 +504,7 @@ export const zhAgents: Record<string, string> = {
   "agents.header_migrate": "进程迁移",
   "agents.header_mimikatz": "Mimikatz",
   "agents.header_more": "更多",
+  "agents.header_operations": "操作日志",
   "agents.header_privesc_hint": "仅侦察检查，不保证提权成功",
   "agents.host_sessions": "{n} 个 Beacon",
   "agents.history_title": "浏览器历史记录",

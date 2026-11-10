@@ -505,6 +505,7 @@ export const enAgents: Record<string, string> = {
   "agents.header_migrate": "Migrate",
   "agents.header_mimikatz": "Mimikatz",
   "agents.header_more": "More",
+  "agents.header_operations": "Audit log",
   "agents.header_privesc_hint": "Recon check only — not a guaranteed elevation",
   "agents.host_sessions": "{n} beacons",
   "agents.history_title": "Browser History",

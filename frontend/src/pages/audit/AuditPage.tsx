@@ -1,5 +1,6 @@
 
 import { useEffect, useState, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { paths } from "@/lib/api-paths";
 import { toast } from "sonner";
@@ -58,7 +59,12 @@ export default function AuditPage() {
   // the login tab: otherwise two identical "Export page CSV" buttons are
   // visible and the header one silently exports a table the operator cannot
   // see.
-  const [tab, setTab] = useState("events");
+  const [searchParams] = useSearchParams();
+  const [tab, setTab] = useState(() => {
+    const wanted = searchParams.get("tab");
+    return wanted === "operations" || wanted === "logins" ? wanted : "events";
+  });
+  const initialAgentId = searchParams.get("agent_id") || "";
   const { t } = useI18n();
 
   useEffect(() => {
@@ -379,7 +385,7 @@ export default function AuditPage() {
         </TabsContent>
 
         <TabsContent value="operations">
-          <OperationsPanel users={users} />
+          <OperationsPanel key={initialAgentId} users={users} initialAgentId={initialAgentId} />
         </TabsContent>
 
         <TabsContent value="logins">

@@ -112,4 +112,20 @@ describe("OperationsPanel", () => {
     expect(await screen.findByText("audit.ops_detail_title")).toBeTruthy();
     expect(screen.getAllByText("Created task").length).toBeGreaterThan(0);
   });
+
+  it("pins the view to a beacon from a deep link and can clear it", async () => {
+    render(<OperationsPanel initialAgentId="agent-abc" />);
+    await screen.findByText("Created task");
+
+    const first = vi.mocked(api.get).mock.calls.find(([path]) => String(path).startsWith("/audit/logs"));
+    expect(String(first?.[0])).toContain("agent_id=agent-abc");
+    expect(screen.getByText("audit.ops_target_applied")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /audit\.ops_target_clear/ }));
+    await waitFor(() => {
+      const calls = vi.mocked(api.get).mock.calls.filter(([path]) => String(path).startsWith("/audit/logs"));
+      const last = calls[calls.length - 1];
+      expect(String(last?.[0])).not.toContain("agent_id=");
+    });
+  });
 });

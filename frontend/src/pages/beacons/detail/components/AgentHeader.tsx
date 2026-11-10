@@ -7,11 +7,12 @@ import { CopyButton } from "@/components/ui/copy-button";
 import { StatusBadge } from "@/components/ui/status-indicator";
 import { Spinner } from "@/components/ui/spinner";
 import type { AgentDetail, AgentStatus } from "@/types/agent";
-import { Activity, Apple, Bot, Camera, Clipboard, Crown, Database, FolderOpen, Key, Keyboard, Link as LinkIcon, ListChecks, MapPin, Monitor, MoreHorizontal, PictureInPicture2, Radio, RefreshCw, Shield, Skull, SlidersHorizontal, Terminal, Trash2 } from "lucide-react";
+import { Activity, Apple, Bot, Camera, Clipboard, Crown, Database, FolderOpen, Key, Keyboard, Link as LinkIcon, ListChecks, MapPin, Monitor, MoreHorizontal, PictureInPicture2, Radio, RefreshCw, ScrollText, Shield, Skull, SlidersHorizontal, Terminal, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useI18n } from "@/lib/i18n";
+import { usePermissions } from "@/lib/hooks/usePermissions";
 import type { ModuleAvailability } from "@/lib/cred-quality";
 import { isExperimentalDesktop, sessionActionQuality, type SessionActionQuality } from "./session-quality";
 import { implantBlocksDest, knownImplantVersion } from "@/lib/implant-version";
@@ -56,6 +57,7 @@ export default memo(function AgentHeader({
   actionLoading, onQuickAction, credCount, mimikatzReady = null, avProducts = [], avStatus = "unknown", onKill, onUninstall, onMigrate, onPopOut,
 }: AgentHeaderProps) {
   const { t } = useI18n();
+  const { can } = usePermissions();
   const hostname = agent.hostname || "\u2014";
   const ip = agent.ip || "\u2014";
   const publicIP = agent.public_ip || "";
@@ -206,6 +208,11 @@ export default memo(function AgentHeader({
                   </DropdownMenuItem>
                   <DropdownMenuItem render={<Link to={`/beacons/${agentId}/config`} />}><SlidersHorizontal className="size-4" /> {t("agents.config_hot_config")}</DropdownMenuItem>
                   <DropdownMenuItem render={<Link to={`/beacons/${agentId}/traffic`} />}><Activity className="size-4" /> {t("agents.traffic_title")}</DropdownMenuItem>
+                  {can("audit.read") && (
+                    <DropdownMenuItem render={<Link to={`/audit?tab=operations&agent_id=${encodeURIComponent(agentId)}`} />}>
+                      <ScrollText className="size-4" /> {t("agents.header_operations")}
+                    </DropdownMenuItem>
+                  )}
                   {onMigrate && (
                     <DropdownMenuItem onClick={onMigrate}><RefreshCw className="size-4" /> {t("agents.header_migrate")}</DropdownMenuItem>
                   )}
