@@ -2259,6 +2259,38 @@ paths:
           in: query
           schema:
             type: string
+        - name: agent_id
+          in: query
+          description: Filter to one beacon's audit rows
+          schema:
+            type: string
+        - name: result
+          in: query
+          description: Filter by outcome
+          schema:
+            type: string
+            enum: [success, failed]
+        - name: category
+          in: query
+          description: Operation category (auth, agents, tasks, credentials, files, infrastructure, automation, ai, tenants, settings, system, other)
+          schema:
+            type: string
+        - name: scope
+          in: query
+          description: The operations view excludes beacon transport events by default; "all" includes them. An explicit category overrides the exclusion.
+          schema:
+            type: string
+            enum: [operations, all]
+        - name: since
+          in: query
+          description: Lower time bound (24h, 7d, 30d or an RFC3339 timestamp)
+          schema:
+            type: string
+        - name: until
+          in: query
+          description: Upper time bound (24h, 7d, 30d or an RFC3339 timestamp)
+          schema:
+            type: string
       responses:
         '200':
           description: Audit logs

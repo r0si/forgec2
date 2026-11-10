@@ -824,27 +824,27 @@ func (s *Server) handleAuditLogPage(c *gin.Context) {
 func (s *Server) handleGetAuditLogs(c *gin.Context) {
 	var logs []db.AuditLog
 	p := parsePagination(c, 50, 200)
-	search := c.DefaultQuery("search", "")
-	action := c.DefaultQuery("action", "")
-	user := c.DefaultQuery("user", "")
-
-	query := s.auditTenantScope(s.db.Model(&db.AuditLog{}), c).Order("created_at DESC")
-
-	if search != "" {
-		query = query.Where("(\"user\" LIKE ? ESCAPE '\\' OR resource LIKE ? ESCAPE '\\' OR details LIKE ? ESCAPE '\\')",
-			"%"+escapeLike(search)+"%", "%"+escapeLike(search)+"%", "%"+escapeLike(search)+"%")
-	}
-
-	if action != "" {
-		query = query.Where("action = ?", action)
-	}
-
-	if user != "" {
-		query = query.Where("\"user\" = ?", user)
+	// One filter implementation for the list and the CSV export: what an
+	// operator sees here is exactly what the export writes.
+	query, rejection := s.auditLogQuery(c)
+	if rejection != "" {
+		respondError(c, http.StatusBadRequest, rejection)
+		return
 	}
 
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
+		respondError(c, http.StatusInternalServerError, "failed to count audit logs")
+		return
+	}
+	// The operations summary wants the failure count for the same selection.
+	// It is a subset of total, not a second filter, so it cannot disagree.
+	// A fresh query is used here: GORM's Count rewrites the statement's
+	// SELECT, and reusing the paginated query afterwards can leave the
+	// success filter attached to the row read.
+	failedQuery, _ := s.auditLogQuery(c)
+	var failed int64
+	if err := failedQuery.Where("success = ?", false).Count(&failed).Error; err != nil {
 		respondError(c, http.StatusInternalServerError, "failed to count audit logs")
 		return
 	}
@@ -855,8 +855,9 @@ func (s *Server) handleGetAuditLogs(c *gin.Context) {
 	}
 
 	respond(c, gin.H{
-		"logs":  logs,
-		"total": total,
+		"logs":   logs,
+		"total":  total,
+		"failed": failed,
 	})
 }
 

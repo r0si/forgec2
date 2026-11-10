@@ -14222,6 +14222,18 @@ export interface operations {
                 search?: string;
                 action?: string;
                 user?: string;
+                /** @description Filter to one beacon's audit rows */
+                agent_id?: string;
+                /** @description Filter by outcome */
+                result?: "success" | "failed";
+                /** @description Operation category (auth, agents, tasks, credentials, files, infrastructure, automation, ai, tenants, settings, system, other) */
+                category?: string;
+                /** @description The operations view excludes beacon transport events by default; "all" includes them. An explicit category overrides the exclusion. */
+                scope?: "operations" | "all";
+                /** @description Lower time bound (24h, 7d, 30d or an RFC3339 timestamp) */
+                since?: string;
+                /** @description Upper time bound (24h, 7d, 30d or an RFC3339 timestamp) */
+                until?: string;
             };
             header?: never;
             path?: never;

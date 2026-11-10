@@ -21,6 +21,7 @@ import type { AuditLog } from "@/types/audit";
 import { useInteractStore } from "@/lib/interact-store";
 import { auditLogsToCSV, auditSessionId, normalizeAuditLogs } from "./components/audit-log";
 import { LoginLogPanel } from "./components/LoginLogPanel";
+import { OperationsPanel } from "./components/OperationsPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const ACTION_BADGES: Record<string, string> = {
@@ -176,6 +177,7 @@ export default function AuditPage() {
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="events">{t("audit.tab_events")}</TabsTrigger>
+          <TabsTrigger value="operations">{t("audit.tab_operations")}</TabsTrigger>
           <TabsTrigger value="logins">{t("audit.tab_logins")}</TabsTrigger>
         </TabsList>
 
@@ -374,6 +376,10 @@ export default function AuditPage() {
           </div>)}
         </DialogContent>
       </Dialog>
+        </TabsContent>
+
+        <TabsContent value="operations">
+          <OperationsPanel users={users} />
         </TabsContent>
 
         <TabsContent value="logins">

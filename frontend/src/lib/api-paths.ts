@@ -203,6 +203,8 @@ export const paths = {
    */
   audit: {
     logs: (query: string) => `/audit/logs?${query}`,
+    exportLogs: (query: string) => `/audit/logs/export?${query}`,
+    actions: "/audit/actions",
     logins: (query: string) => `/audit/logins?${query}`,
   },
   /**

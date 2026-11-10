@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { auditLogsToCSV, auditSessionId, looksLikeAgentId, normalizeAuditLog, normalizeAuditLogs } from "./audit-log";
+import {
+  auditActionLabel,
+  auditActionTone,
+  auditLogsToCSV,
+  auditSessionId,
+  humanizeAction,
+  looksLikeAgentId,
+  normalizeAuditLog,
+  normalizeAuditLogs,
+} from "./audit-log";
 
 describe("normalizeAuditLog", () => {
   it("maps teamserver fields onto the operator row", () => {
@@ -67,5 +76,26 @@ describe("auditLogsToCSV", () => {
     }]);
     expect(csv).toContain('"\'=HYPERLINK(""https://example.test"")"');
     expect(csv).toContain('"\'+cmd|\' /C calc\'!A0"');
+  });
+});
+
+describe("operation labels", () => {
+  const t = (key: string) => (key === "audit.act.agent_delete" ? "Deleted beacon" : key);
+
+  it("labels a known action and strips the operator namespace", () => {
+    expect(auditActionLabel(t, "operator:agent_delete")).toBe("Deleted beacon");
+    expect(auditActionLabel(t, "agent_delete")).toBe("Deleted beacon");
+  });
+
+  it("humanizes an action the dictionary does not know yet", () => {
+    expect(humanizeAction("future_kind_of_thing")).toBe("Future kind of thing");
+    expect(auditActionLabel(t, "future_kind_of_thing")).toBe("Future kind of thing");
+  });
+
+  it("derives the badge tone from the verb, not the category", () => {
+    expect(auditActionTone("agent_delete")).toBe("destructive");
+    expect(auditActionTone("listener_create")).toBe("success");
+    expect(auditActionTone("settings_change")).toBe("warning");
+    expect(auditActionTone("view_tasks")).toBe("secondary");
   });
 });

@@ -83,3 +83,54 @@ export function auditLogsToCSV(logs: AuditLog[]): string {
   ].map(csvCell).join(","));
   return [CSV_HEADERS.map(csvCell).join(","), ...rows].join("\r\n") + "\r\n";
 }
+
+/**
+ * The operations log stores actions in two namespaces: the middleware writes
+ * coarse values (`agent_action`, `settings_change`) and LogOperatorAction
+ * writes `operator:<name>`. The UI labels the bare name in both cases.
+ */
+export function auditActionCode(action: string): string {
+  return String(action || "").replace(/^operator:/, "");
+}
+
+/**
+ * A readable fallback for an action with no dictionary entry. The catalogue
+ * covers the common verbs; a future action must still render as words rather
+ * than as `new_thing_done` the day it ships.
+ */
+export function humanizeAction(action: string): string {
+  const words = auditActionCode(action).replace(/[:_-]+/g, " ").trim();
+  if (!words) return "";
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+export function auditActionLabel(
+  t: (key: string) => string,
+  action: string,
+): string {
+  const code = auditActionCode(action);
+  if (!code) return "";
+  const key = `audit.act.${code}`;
+  const label = t(key);
+  return label === key ? humanizeAction(code) : label;
+}
+
+/**
+ * The badge tone is derived from the verb, not from the category: a
+ * destructive operation on a listener must look as dangerous as one on a
+ * beacon. Order matters — "disable" contains no "enable", but "revoke" and
+ * "reset" can appear in the same string, so destructive wins first.
+ */
+export function auditActionTone(action: string): "success" | "secondary" | "warning" | "destructive" {
+  const a = auditActionCode(action).toLowerCase();
+  if (/(delete|purge|revoke|kill|stop|disable|close|reject|deny|fail|tamper|expire|unlink|quarantine|stop)/.test(a)) {
+    return "destructive";
+  }
+  if (/(create|start|enable|approve|install|add|upload|run|execute|dispatch|import|link|restore|recover)/.test(a)) {
+    return "success";
+  }
+  if (/(update|edit|config|change|set|rotate|toggle|reset|regenerate|save|modify|rename)/.test(a)) {
+    return "warning";
+  }
+  return "secondary";
+}
