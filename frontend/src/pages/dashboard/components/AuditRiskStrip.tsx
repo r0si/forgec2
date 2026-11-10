@@ -1,0 +1,131 @@
+import { useCallback, useEffect, useState } from "react";
+import { api } from "@/lib/api";
+import { paths } from "@/lib/api-paths";
+import { useI18n } from "@/lib/i18n";
+import { usePermissions } from "@/lib/hooks/usePermissions";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { DataError } from "@/components/ui/data-state";
+import { SectionCard } from "@/components/ui/section-card";
+import { StatTile } from "@/components/ui/stat-tile";
+import { AlertTriangle } from "lucide-react";
+
+interface LoginSummary {
+  failed: number;
+  ok: number;
+  distinct_ips: number;
+  by_region: { country: string; city?: string; failed: number; ok: number }[];
+}
+
+/**
+ * A compact security strip on the dashboard: failed operations and failed
+ * sign-ins over the same 24h window as the login rollup, plus the regions the
+ * failures came from. It reuses the audit endpoints rather than adding a
+ * second aggregation path, and disappears for roles without `audit.read`.
+ */
+export function AuditRiskStrip() {
+  const { t } = useI18n();
+  const { can } = usePermissions();
+  const allowed = can("audit.read");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [failedOps, setFailedOps] = useState(0);
+  const [summary, setSummary] = useState<LoginSummary | null>(null);
+
+  const load = useCallback(async (signal?: AbortSignal) => {
+    if (!allowed) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const [ops, logins] = await Promise.all([
+        api.get(paths.audit.logs("pageSize=1&since=24h&result=failed&scope=operations"), { signal }),
+        api.get(paths.audit.logins("pageSize=1&since=24h"), { signal }),
+      ]);
+      const opsPayload = (ops && typeof ops === "object" ? ops : {}) as Record<string, unknown>;
+      const loginPayload = (logins && typeof logins === "object" ? logins : {}) as {
+        summary?: LoginSummary;
+      };
+      setFailedOps(Number(opsPayload.failed ?? opsPayload.total) || 0);
+      setSummary(loginPayload.summary ?? null);
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return;
+      setError("dashboard.audit_unavailable");
+      setFailedOps(0);
+      setSummary(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [allowed]);
+
+  useEffect(() => {
+    if (!allowed) return;
+    const controller = new AbortController();
+    void load(controller.signal);
+    return () => controller.abort();
+  }, [allowed, load]);
+
+  if (!allowed) return null;
+
+  const failedLogins = summary?.failed ?? 0;
+  const distinctIPs = summary?.distinct_ips ?? 0;
+  const regions = (summary?.by_region ?? []).filter((r) => r.failed > 0).slice(0, 5);
+
+  return (
+    <SectionCard
+      title={t("dashboard.audit_risk_title")}
+      icon={AlertTriangle}
+      tone="warning"
+      href="/audit?tab=operations"
+      linkLabel={t("dashboard.audit_open")}
+    >
+      <div className="space-y-4 p-(--card-spacing)">
+        {error ? (
+          <DataError message={t(error)} onRetry={() => void load()} />
+        ) : (
+          <>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <Card className="p-(--card-spacing)">
+                <StatTile
+                  label={t("dashboard.audit_failed_ops")}
+                  value={loading ? "—" : failedOps}
+                  tone={failedOps > 0 ? "destructive" : "success"}
+                />
+              </Card>
+              <Card className="p-(--card-spacing)">
+                <StatTile
+                  label={t("dashboard.audit_failed_logins")}
+                  value={loading ? "—" : failedLogins}
+                  tone={failedLogins > 0 ? "destructive" : "success"}
+                />
+              </Card>
+              <Card className="p-(--card-spacing)">
+                <StatTile
+                  label={t("dashboard.audit_distinct_ips")}
+                  value={loading ? "—" : distinctIPs}
+                  tone="muted"
+                />
+              </Card>
+            </div>
+            {!loading && failedOps === 0 && failedLogins === 0 ? (
+              <p className="text-sm text-muted-foreground">{t("dashboard.audit_no_anomalies")}</p>
+            ) : regions.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-medium text-muted-foreground">
+                  {t("dashboard.audit_top_regions")}
+                </span>
+                {regions.map((r) => (
+                  <Badge key={`${r.country}|${r.city || ""}`} variant="destructive">
+                    {[r.country || t("dashboard.audit_region_unknown"), r.city]
+                      .filter(Boolean)
+                      .join(" · ")}{" "}
+                    · {r.failed}
+                  </Badge>
+                ))}
+              </div>
+            ) : null}
+          </>
+        )}
+      </div>
+    </SectionCard>
+  );
+}

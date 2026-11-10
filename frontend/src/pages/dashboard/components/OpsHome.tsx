@@ -27,6 +27,7 @@ import {
 } from "./ops-home";
 import { healthIndicatorStatus, translateHealthStatus } from "@/lib/listener-health";
 import ActiveMissions from "./ActiveMissions";
+import { AuditRiskStrip } from "./AuditRiskStrip";
 
 function Panel({
   title,
@@ -96,6 +97,8 @@ export default memo(function OpsHome() {
       )}
 
       <DashboardStatTiles loading={loading} healthUnknown={healthUnknown} unhealthyCount={unhealthy.length} lootCount={lootItems.length} online={sessions.online.length} total={agents.length} />
+
+      <AuditRiskStrip />
 
       <QuickLaunch />
 

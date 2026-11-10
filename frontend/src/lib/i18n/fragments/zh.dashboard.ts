@@ -3,6 +3,15 @@
  * see lib/i18n/index.tsx and the PageZhGate map in router.tsx.
  */
 export const zhDashboard: Record<string, string> = {
+  "dashboard.audit_risk_title": "24 小时安全信号",
+  "dashboard.audit_failed_ops": "失败操作",
+  "dashboard.audit_failed_logins": "失败登录",
+  "dashboard.audit_distinct_ips": "来源 IP",
+  "dashboard.audit_top_regions": "失败地区 Top",
+  "dashboard.audit_open": "打开审计日志",
+  "dashboard.audit_no_anomalies": "最近 24 小时没有失败操作或登录。",
+  "dashboard.audit_unavailable": "安全摘要不可用",
+  "dashboard.audit_region_unknown": "未知地区",
   "dashboard.attention": "需要处理",
   "dashboard.failed_tasks": "失败任务",
   "dashboard.listener_health": "监听器健康",
