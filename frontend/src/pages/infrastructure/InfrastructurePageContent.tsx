@@ -1,4 +1,8 @@
 
+import { registerFragment } from "@/lib/i18n";
+import { enInfra } from "@/lib/i18n/fragments/en.infra";
+registerFragment(enInfra);
+
 import { useEffect } from "react";
 import { api } from "@/lib/api";
 import { paths } from "@/lib/api-paths";

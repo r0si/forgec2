@@ -1,6 +1,8 @@
 
 import { registerFragment } from "@/lib/i18n";
+import { enCampaign } from "@/lib/i18n/fragments/en.campaign";
 import { enPhishing } from "@/lib/i18n/fragments/en.phishing";
+registerFragment(enCampaign);
 registerFragment(enPhishing);
 
 import { useState } from "react";

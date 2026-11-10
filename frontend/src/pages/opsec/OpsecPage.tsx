@@ -1,4 +1,8 @@
 
+import { registerFragment } from "@/lib/i18n";
+import { enOpsec } from "@/lib/i18n/fragments/en.opsec";
+registerFragment(enOpsec);
+
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { paths } from "@/lib/api-paths";

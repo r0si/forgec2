@@ -1,4 +1,8 @@
 
+import { registerFragment } from "@/lib/i18n";
+import { enLateral } from "@/lib/i18n/fragments/en.lateral";
+registerFragment(enLateral);
+
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { paths } from "@/lib/api-paths";

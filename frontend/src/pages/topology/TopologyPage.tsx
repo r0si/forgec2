@@ -1,4 +1,8 @@
 
+import { registerFragment } from "@/lib/i18n";
+import { enTopology } from "@/lib/i18n/fragments/en.topology";
+registerFragment(enTopology);
+
 import { useEffect, useState, useCallback, useRef, lazy, Suspense } from "react";
 
 import { api } from "@/lib/api";

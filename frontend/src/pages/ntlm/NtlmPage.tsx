@@ -1,4 +1,8 @@
 
+import { registerFragment } from "@/lib/i18n";
+import { enNtlm } from "@/lib/i18n/fragments/en.ntlm";
+registerFragment(enNtlm);
+
 import { useState } from "react";
 import { Spinner } from "@/components/ui/spinner";
 import { EmptyState } from "@/components/ui/empty-state";

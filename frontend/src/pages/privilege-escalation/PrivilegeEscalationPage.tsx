@@ -1,4 +1,8 @@
 
+import { registerFragment } from "@/lib/i18n";
+import { enPrivesc } from "@/lib/i18n/fragments/en.privesc";
+registerFragment(enPrivesc);
+
 import { useEffect, useState, useCallback, useRef } from "react";
 import { api } from "@/lib/api";
 import { paths } from "@/lib/api-paths";

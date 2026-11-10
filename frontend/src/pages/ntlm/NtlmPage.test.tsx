@@ -18,7 +18,8 @@ vi.mock("@/lib/agents", () => ({
 vi.mock("@/lib/i18n", () => {
   // Must be referentially stable: the mutations' callbacks carry it.
   const t = (key: string) => key;
-  return { getLocale: () => "en", useI18n: () => ({ t }) };
+  // Page modules register their dictionary fragment at module scope.
+  return { getLocale: () => "en", useI18n: () => ({ t }), registerFragment: () => {} };
 });
 
 vi.mock("sonner", () => ({

@@ -1,4 +1,8 @@
 
+import { registerFragment } from "@/lib/i18n";
+import { enCampaign } from "@/lib/i18n/fragments/en.campaign";
+registerFragment(enCampaign);
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { paths } from "@/lib/api-paths";
