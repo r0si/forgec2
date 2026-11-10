@@ -14,6 +14,7 @@ beforeEach(() => {
     const p = String(path);
     if (p.startsWith("/audit/logins")) return { events: [], total: 0, summary: null };
     if (p.startsWith("/audit/actions")) return { actions: [], categories: [] };
+    if (p.startsWith("/audit/verify")) return { ok: true, checked: 42, first_bad_id: 0, reason: "" };
     if (p.startsWith("/audit/logs")) return { logs: [], total: 0, failed: 0 };
     if (p.startsWith("/users")) return { users: [] };
     return {};
@@ -81,5 +82,30 @@ describe("AuditPage tabs", () => {
     renderPage();
     expect(await screen.findByText("User create")).toBeTruthy();
     expect(screen.getByText("user_create")).toBeTruthy();
+  });
+
+  it("verifies the newest audit rows on demand", async () => {
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: /audit\.verify_chain/ }));
+
+    expect(await screen.findByText("audit.verify_ok")).toBeTruthy();
+    const call = vi.mocked(api.get).mock.calls.find(([p]) => String(p).startsWith("/audit/verify"));
+    expect(String(call?.[0])).toContain("limit=5000");
+  });
+
+  it("shows the first broken row when verification fails", async () => {
+    vi.mocked(api.get).mockImplementation(async (path: string) => {
+      const p = String(path);
+      if (p.startsWith("/audit/verify")) {
+        return { ok: false, checked: 100, first_bad_id: 7, reason: "hash mismatch" };
+      }
+      if (p.startsWith("/audit/logs")) return { logs: [], total: 0, failed: 0 };
+      if (p.startsWith("/users")) return { users: [] };
+      return {};
+    });
+
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: /audit\.verify_chain/ }));
+    expect(await screen.findByText("audit.verify_failed")).toBeTruthy();
   });
 });

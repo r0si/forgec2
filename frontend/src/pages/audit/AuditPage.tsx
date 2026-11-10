@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DataTable } from "@/components/ui/data-table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Download, FileText, Filter, Terminal } from "lucide-react";
+import { Download, FileText, Filter, ShieldCheck, Terminal } from "lucide-react";
 import { StatTile } from "@/components/ui/stat-tile";
 import { IconBadge } from "@/components/ui/icon-badge";
 import type { AuditLog } from "@/types/audit";
@@ -46,6 +46,10 @@ export default function AuditPage() {
   const [appliedFilters, setAppliedFilters] = useState({ user: "", action: "" });
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
   const [users, setUsers] = useState<{ username: string }[]>([]);
+  const [verifyState, setVerifyState] = useState<{
+    running: boolean;
+    result: { ok: boolean; checked: number; first_bad_id: number; reason: string } | null;
+  }>({ running: false, result: null });
   // The page header's export belongs to the events table. It must disappear on
   // the login tab: otherwise two identical "Export page CSV" buttons are
   // visible and the header one silently exports a table the operator cannot
@@ -116,6 +120,26 @@ export default function AuditPage() {
     );
   };
 
+  const verifyChain = async () => {
+    setVerifyState({ running: true, result: null });
+    try {
+      const data = await api.get(paths.audit.verify("limit=5000"));
+      const payload = (data && typeof data === "object" ? data : {}) as Record<string, unknown>;
+      setVerifyState({
+        running: false,
+        result: {
+          ok: Boolean(payload.ok),
+          checked: Number(payload.checked) || 0,
+          first_bad_id: Number(payload.first_bad_id) || 0,
+          reason: typeof payload.reason === "string" ? payload.reason : "",
+        },
+      });
+    } catch {
+      setVerifyState({ running: false, result: null });
+      toast.error(t("audit.verify_error"));
+    }
+  };
+
   const getSeverityBadge = (severity: string) => {
     const s = (severity || "").toLowerCase();
     return SEVERITY_BADGES[s] || "secondary";
@@ -149,10 +173,21 @@ export default function AuditPage() {
       subtitle={t("audit.subtitle")}
       actions={
         tab === "events" ? (
-          <Button onClick={handleExport} disabled={loading || logs.length === 0}>
-            <Download className="size-4" />
-            <span>{t("audit.export_page_csv")}</span>
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => void verifyChain()}
+              disabled={verifyState.running}
+              title={t("audit.verify_hint")}
+            >
+              <ShieldCheck className="size-4" />
+              <span>{verifyState.running ? t("audit.verify_running") : t("audit.verify_chain")}</span>
+            </Button>
+            <Button onClick={handleExport} disabled={loading || logs.length === 0}>
+              <Download className="size-4" />
+              <span>{t("audit.export_page_csv")}</span>
+            </Button>
+          </div>
         ) : null
       }
     >
@@ -165,6 +200,18 @@ export default function AuditPage() {
         </TabsList>
 
         <TabsContent value="events" className="space-y-4">
+      {verifyState.result && (
+        <div className="flex flex-wrap items-center gap-2">
+          {verifyState.result.ok ? (
+            <Badge variant="success">{t("audit.verify_ok", { n: verifyState.result.checked })}</Badge>
+          ) : (
+            <Badge variant="destructive" title={verifyState.result.reason}>
+              {t("audit.verify_failed", { id: verifyState.result.first_bad_id })}
+            </Badge>
+          )}
+        </div>
+      )}
+
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-5">
         <Card className="p-(--card-spacing)">
           <div className="flex items-center justify-between">
