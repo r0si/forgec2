@@ -152,10 +152,54 @@ func (s *Server) resolveGeoLocation(ctx context.Context, ip string) (geoLocation
 			continue
 		}
 		if loc.Country != "" {
-			return loc, true
+			if isCountryName(loc.Country) {
+				return loc, true
+			}
+			// A region-only answer is not a country: try the next provider
+			// instead of stopping here with "北美地区".
+			slog.Debug("Geo provider answered only a region; trying the next provider",
+				"provider", p.name, "ip", ip, "country", loc.Country)
+			continue
 		}
 	}
 	return geoLocation{}, false
+}
+
+// regionOnlyPlaces are answers that name a continent/region rather than a
+// country. ip.zxinc.org answers "北美地区" when it only knows the continent;
+// accepting it made the login log show a region where the operator asked for a
+// country and stopped the chain before ip.taobao.com could return "美国".
+var regionOnlyPlaces = map[string]bool{
+	"北美地区": true, "南美地区": true, "中美洲": true, "加勒比地区": true,
+	"北美洲": true, "南美洲": true, "欧洲": true, "亚洲": true, "非洲": true,
+	"大洋洲": true, "南极洲": true, "海外": true, "海外地区": true, "未知": true,
+	"north america": true, "south america": true, "europe": true, "asia": true,
+	"africa": true, "oceania": true, "antarctica": true, "unknown": true, "xx": true,
+}
+
+// normalizePlace trims a provider value and drops the sentinels the free APIs
+// use for "no city" ("XX" from ip.taobao.com, "unknown", "-").
+func normalizePlace(v string) string {
+	v = strings.TrimSpace(v)
+	switch strings.ToLower(v) {
+	case "", "xx", "unknown", "未知", "-", "0":
+		return ""
+	}
+	return v
+}
+
+// isCountryName reports whether a provider value names a country. Region-only
+// answers must fall through: showing "北美地区" as the country is the defect
+// this function exists to prevent.
+func isCountryName(v string) bool {
+	v = strings.TrimSpace(v)
+	if v == "" || regionOnlyPlaces[strings.ToLower(v)] {
+		return false
+	}
+	if strings.HasSuffix(v, "地区") {
+		return false
+	}
+	return true
 }
 
 // locateIPAPI reads ip-api.com's answer, including coordinates. A non-empty
@@ -225,6 +269,7 @@ func locateTaobao(body []byte) (geoLocation, string) {
 		Data struct {
 			Country string `json:"country"`
 			City    string `json:"city"`
+			Region  string `json:"region"`
 		} `json:"data"`
 	}
 	if json.Unmarshal(body, &r) != nil {
@@ -236,9 +281,15 @@ func locateTaobao(body []byte) (geoLocation, string) {
 		}
 		return geoLocation{}, ""
 	}
-	// The provider answers "XX" for unknown, which is not a country.
-	if r.Data.Country == "" || r.Data.Country == "XX" {
+	country := normalizePlace(r.Data.Country)
+	if country == "" {
 		return geoLocation{}, ""
 	}
-	return geoLocation{Country: r.Data.Country, City: r.Data.City}, ""
+	// The provider answers "XX" for an unknown city and still knows the region
+	// (e.g. "佛罗里达"); the region is the best city-level fact available.
+	city := normalizePlace(r.Data.City)
+	if city == "" {
+		city = normalizePlace(r.Data.Region)
+	}
+	return geoLocation{Country: country, City: city}, ""
 }

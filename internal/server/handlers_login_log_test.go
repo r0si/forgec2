@@ -29,7 +29,9 @@ func TestLoginEventsReportIPTimeAndCountry(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	signedInAt := time.Date(2026, 11, 9, 8, 30, 0, 0, time.UTC)
+	// Relative to now: the 24h rollup below filters by wall-clock time, so a
+	// fixed date makes this test expire the day after it was written.
+	signedInAt := time.Now().UTC().Truncate(time.Second).Add(-2 * time.Hour)
 	rows := []db.AuditLog{
 		{User: "alice", Action: "login", Resource: "auth", IP: "203.0.113.9", Success: true, Details: "Login successful", CreatedAt: signedInAt},
 		{User: "mallory", Action: "login_failed", Resource: "auth", IP: "198.51.100.4", Success: false, Error: "bad password", Details: "Wrong password", CreatedAt: signedInAt.Add(time.Minute)},

@@ -329,3 +329,77 @@ func TestLoginGeoCacheIsPruned(t *testing.T) {
 		t.Fatalf("kept rows = %+v, want only the fresh %s", kept, fresh.IP)
 	}
 }
+
+// TestIsCountryName pins the distinction the demo exposed: a provider that
+// only knows the continent answers "北美地区", which must not be stored or
+// displayed as the country.
+func TestIsCountryName(t *testing.T) {
+	valid := []string{"中国", "美国", "德国", "日本", "United States", "Germany"}
+	for _, v := range valid {
+		if !isCountryName(v) {
+			t.Fatalf("isCountryName(%q) = false, want true", v)
+		}
+	}
+	invalid := []string{"", "XX", "unknown", "未知", "北美地区", "南美地区", "欧洲", "亚洲", "非洲", "大洋洲", "海外地区", "North America", "Europe"}
+	for _, v := range invalid {
+		if isCountryName(v) {
+			t.Fatalf("isCountryName(%q) = true, want false", v)
+		}
+	}
+}
+
+// TestLoginGeoSkipsRegionOnlyAnswer is the demo fix: ip.zxinc.org answers only
+// "北美地区" for some IPs, and the chain must continue to ip.taobao.com, which
+// knows the country and the region instead of stopping at the continent.
+func TestLoginGeoSkipsRegionOnlyAnswer(t *testing.T) {
+	clearProviderBackoff(t)
+	transport := &cannedProviderTransport{bodys: map[string]string{
+		"ip-api.com":    `{"status":"fail","message":"quota exceeded"}`,
+		"ip.zxinc.org":  `{"code":0,"data":{"country":"北美地区"}}`,
+		"ip.taobao.com": `{"code":0,"data":{"country":"美国","city":"XX","region":"佛罗里达"}}`,
+	}}
+	s := &Server{httpClient: &http.Client{Transport: transport}}
+
+	country, city := s.resolveLoginGeo(context.Background(), "104.239.127.132")
+	if country != "美国" || city != "佛罗里达" {
+		t.Fatalf("resolved %q/%q, want 美国/佛罗里达", country, city)
+	}
+	calls := transport.calls()
+	want := []string{"ip-api.com", "ip.zxinc.org", "ip.taobao.com"}
+	if len(calls) != len(want) {
+		t.Fatalf("provider calls = %v, want %v", calls, want)
+	}
+	for i := range want {
+		if calls[i] != want[i] {
+			t.Fatalf("provider calls = %v, want %v", calls, want)
+		}
+	}
+}
+
+// TestLocateTaobaoUsesRegionWhenCityUnknown covers the "city":"XX" sentinel:
+// the region is the best city-level fact the provider has.
+func TestLocateTaobaoUsesRegionWhenCityUnknown(t *testing.T) {
+	loc, refusal := locateTaobao([]byte(`{"code":0,"data":{"country":"美国","city":"XX","region":"佛罗里达"}}`))
+	if refusal != "" || loc.Country != "美国" || loc.City != "佛罗里达" {
+		t.Fatalf("location = %q/%q refusal=%q, want 美国/佛罗里达", loc.Country, loc.City, refusal)
+	}
+}
+
+// TestCachedRegionOnlyCountryIsTreatedAsMiss lets an existing bad cache row
+// heal after the provider fix instead of serving "北美地区" for another week.
+func TestCachedRegionOnlyCountryIsTreatedAsMiss(t *testing.T) {
+	s := mustTenantServer(t)
+	if err := s.db.Create(&db.LoginGeo{IP: "104.239.127.132", Country: "北美地区", ResolvedAt: time.Now()}).Error; err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	if country, city := s.cachedLoginCountry(context.Background(), "104.239.127.132"); country != "" || city != "" {
+		t.Fatalf("region-only cache = %q/%q, want a miss", country, city)
+	}
+
+	if err := s.db.Create(&db.LoginGeo{IP: "203.0.113.9", Country: "美国", City: "佛罗里达", ResolvedAt: time.Now()}).Error; err != nil {
+		t.Fatalf("seed good: %v", err)
+	}
+	if country, city := s.cachedLoginCountry(context.Background(), "203.0.113.9"); country != "美国" || city != "佛罗里达" {
+		t.Fatalf("good cache = %q/%q, want 美国/佛罗里达", country, city)
+	}
+}

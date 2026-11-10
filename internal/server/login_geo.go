@@ -49,6 +49,12 @@ func (s *Server) cachedLoginCountry(ctx context.Context, ip string) (country, ci
 	if time.Since(cached.ResolvedAt) >= loginGeoTTL {
 		return "", ""
 	}
+	if !isCountryName(cached.Country) {
+		// A region-only row from before the provider fix ("北美地区") is a
+		// miss: the worker must re-resolve it so the panel can show a country
+		// and the next-level place.
+		return "", ""
+	}
 	return cached.Country, cached.City
 }
 
