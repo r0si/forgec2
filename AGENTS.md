@@ -14,7 +14,7 @@ The `bash` tool runs **PowerShell 5.1**, not bash. Adapt accordingly:
 
 "Done" for an optimization round = every applicable box checked, not "looks clean":
 
-- `npm run check` green (nav-perms 44/44, webdist byte-identical, bundle 697/720 kB, coverage ≥ 36.5%).
+- `npm run check` green (nav-perms 44/44, webdist byte-identical, bundle 700/720 kB, coverage ≥ 36.5%).
 - CI on the tip is `completed/success` (fuzz alone skipped).
 - When a container image ships, the demo host pins the new digest by UI or
   compose value and the boundary checks (read-only edges, 404 controls) pass.
@@ -33,7 +33,7 @@ criteria instead of vibes:
 | 2 | `npm run check` green (nav-perms 44/44, bundle ≤ 720kB critical / 5.0MB total, webdist byte-identical) | yes |
 | 3 | Gosec at 0 findings (windows target 1 staticcheck headroom, linux 0) | yes (65 → 0) |
 | 4 | Go statement coverage ≥ 58% | 59.1% measured |
-| 5 | Frontend statements ≥ 36.5% | 38.65% measured |
+| 5 | Frontend statements ≥ 36.5% | 38.52% measured |
 | 6 | Demo image pin matches GHCR `edge` digest; boot log error patterns at 0; read-only boundary assertions green | yes |
 | 7 | Wiki / Pages / sitemap live with 200s | yes |
 | 8 | Knowledge search: recall@5 regression test green in CI over a 200-chunk corpus (SQLite path) | yes |
@@ -366,8 +366,8 @@ Both sides carry a coverage floor, and **a floor that is never raised stops guar
 | side | floor | measured (2026-11-07) | where |
 |---|---|---|---|
 | Go | **58%** | 59.1% (was 51.5 at a 52.8 measurement — a 7-point regression would have passed) | `.github/workflows/ci.yml` "Coverage floor" |
-| frontend | **36.5%** | 38.65% statements / 24 698 | `frontend/scripts/check-coverage.mjs` (override with `COVERAGE_FLOOR`) |
-| first-paint bundle | **720 kB** | 697 kB critical path (4.57 MB total under a 5.0 MB cap) | `frontend/scripts/check-bundle.mjs` |
+| frontend | **36.5%** | 38.52% statements / 24 784 | `frontend/scripts/check-coverage.mjs` (override with `COVERAGE_FLOOR`) |
+| first-paint bundle | **720 kB** | 700 kB critical path (4.57 MB total under a 5.0 MB cap) | `frontend/scripts/check-bundle.mjs` |
 
 Raise a floor in the same change that adds tests; lower it only as part of that change, never to make
 a regression pass. ~1 point of headroom is deliberate: it absorbs ordinary page work while a large
@@ -384,8 +384,9 @@ map (714 kB); making the on-demand shell UI lazy (command palette, shortcuts hel
 banner/dialog, agent status banner) took it to **694 kB**, and the budget went to 720 kB. The
 report/auto/workflows/users/tasks/dashboard/listeners batch then added 1 kB of entry import map
 (**695 kB**), and the zh fragment loader/gate added another 1 kB (**696 kB**), then the
-generate/ai/cred zh fragments another (**697 kB**). **When a budget's comment states a headroom,
-check that arithmetic against the current measurement.**
+generate/ai/cred zh fragments another (**697 kB**), then the remaining page-owned zh fragments
+(**700 kB**). **When a budget's comment states a headroom, check that arithmetic against the
+current measurement.**
 
 ## Testing
 

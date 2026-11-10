@@ -108,7 +108,9 @@ const MAIN_ROUTES: MainRoute[] = [
 function zhNamespacesFor(pathname: string): string[] {
   if (pathname === "/settings") return ["settings", "generate"];
   if (pathname.startsWith("/asset-management") || pathname === "/roles") return ["agents", "settings"];
-  if (pathname === "/payload-generator" || pathname === "/listeners") return ["generate"];
+  if (pathname === "/payload-generator") return ["generate", "listeners", "profiles"];
+  if (pathname === "/listeners") return ["listeners", "generate", "dashboard"];
+  if (pathname.startsWith("/listeners/")) return ["listeners"];
   if (pathname === "/ai" || pathname === "/macros") return ["ai"];
   if (pathname === "/credentials") return ["cred"];
   if (pathname === "/beacons") return ["agents", "generate"];
@@ -123,7 +125,26 @@ function zhNamespacesFor(pathname: string): string[] {
     }
     return ["agents", "ai", "generate", "cred"];
   }
-  if (pathname === "/loot" || pathname === "/tags" || pathname === "/toolkit") return ["agents"];
+  if (pathname === "/dashboard") return ["dashboard", "listeners", "tasks"];
+  if (pathname === "/events") return ["tasks", "ai"];
+  if (pathname === "/campaign") return ["campaign"];
+  if (pathname === "/phishing") return ["phishing", "campaign", "users"];
+  if (pathname === "/automation") return ["auto", "workflows"];
+  if (pathname === "/report") return ["report"];
+  if (pathname === "/users") return ["users"];
+  if (pathname === "/topology") return ["topology"];
+  if (pathname === "/bof") return ["bof"];
+  if (pathname === "/plugins") return ["plugins"];
+  if (pathname === "/toolkit") return ["agents", "toolkit"];
+  if (pathname === "/loot" || pathname === "/tags") return ["agents"];
+  if (pathname === "/pivoting") return ["pivoting"];
+  if (pathname === "/privilege-escalation") return ["privesc"];
+  if (pathname === "/lateral") return ["lateral"];
+  if (pathname === "/opsec") return ["opsec"];
+  if (pathname === "/ntlm") return ["ntlm"];
+  if (pathname === "/domain-fronting") return ["domain_fronting"];
+  if (pathname === "/scripting") return ["scripting"];
+  if (pathname === "/infrastructure") return ["infra"];
   return [];
 }
 

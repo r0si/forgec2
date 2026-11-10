@@ -262,7 +262,12 @@ test.describe("responsive shell", () => {
   });
 
   test("zh pages suspend until their translated dictionary fragment is ready", async ({ page }) => {
-    await prepare(page, "light", ["credentials.read"], "zh");
+    await prepare(
+      page,
+      "light",
+      ["credentials.read", "users.read", "automation.read", "campaigns.read"],
+      "zh",
+    );
     const zhChunks: string[] = [];
     page.on("request", (request) => {
       const pathname = new URL(request.url()).pathname;
@@ -283,6 +288,15 @@ test.describe("responsive shell", () => {
       ["/credentials", "i18n-zh-cred"],
       ["/payload-generator", "i18n-zh-generate"],
       ["/settings", "i18n-zh-settings"],
+      ["/events", "i18n-zh-tasks"],
+      ["/campaign", "i18n-zh-campaign"],
+      ["/report", "i18n-zh-report"],
+      ["/users", "i18n-zh-users"],
+      ["/automation", "i18n-zh-auto"],
+      ["/bof", "i18n-zh-bof"],
+      ["/topology", "i18n-zh-topology"],
+      ["/dashboard", "i18n-zh-dashboard"],
+      ["/dashboard", "i18n-zh-listeners"],
     ];
     for (const [path, chunk] of pages) {
       zhChunks.length = 0;
@@ -291,13 +305,6 @@ test.describe("responsive shell", () => {
       await expect.poll(() => zhChunks.some((c) => c.includes(chunk)), { message: path }).toBe(true);
       await expect(page.locator("main")).toContainText(/[\u4e00-\u9fff]/, { timeout: 10_000 });
     }
-
-    // A route whose namespaces are not split loads only the base zh chunk.
-    zhChunks.length = 0;
-    await page.goto("/dashboard.html");
-    await expect(page.locator("main").first()).toBeAttached({ timeout: 15_000 });
-    await page.waitForTimeout(1200);
-    expect(zhChunks.some((c) => c.includes("i18n-zh-"))).toBe(false);
   });
 
   test("the command palette still opens after the lazy shell chunk loads", async ({ page }) => {
