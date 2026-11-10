@@ -2313,6 +2313,123 @@ paths:
                               $ref: '#/components/schemas/AuditLog'
                           total:
                             type: integer
+  /audit/logs/export:
+    get:
+      tags: [Audit]
+      summary: Export the filtered operations log as CSV
+      description: >-
+        Stream the audit rows selected by the same filters as /audit/logs as a
+        UTF-8 CSV file. The response headers publish the exported row count and
+        whether the row cap truncated the selection.
+      operationId: exportAuditLogsCSV
+      security:
+        - SessionCookie: []
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: user
+          in: query
+          schema:
+            type: string
+        - name: agent_id
+          in: query
+          schema:
+            type: string
+        - name: result
+          in: query
+          schema:
+            type: string
+            enum: [success, failed]
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: scope
+          in: query
+          schema:
+            type: string
+            enum: [operations, all]
+        - name: since
+          in: query
+          schema:
+            type: string
+        - name: until
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Maximum rows to write (default 50000, max 200000)
+          schema:
+            type: integer
+            default: 50000
+      responses:
+        '200':
+          description: CSV file of the selected audit rows
+          headers:
+            X-Audit-Export-Rows:
+              schema:
+                type: integer
+            X-Audit-Export-Truncated:
+              schema:
+                type: boolean
+          content:
+            text/csv:
+              schema:
+                type: string
+        '400':
+          description: Invalid filter or time bound
+        '503':
+          description: Database is not initialized
+  /audit/actions:
+    get:
+      tags: [Audit]
+      summary: List audit actions
+      description: Distinct actions in the caller's tenant, with category and count, for the operations filters
+      operationId: getAuditActions
+      security:
+        - SessionCookie: []
+      responses:
+        '200':
+          description: Action catalogue
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          actions:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                action:
+                                  type: string
+                                category:
+                                  type: string
+                                count:
+                                  type: integer
+                          categories:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: string
+                                count:
+                                  type: integer
+        '503':
+          description: Database is not initialized
   /audit/verify:
     get:
       tags: [Audit]

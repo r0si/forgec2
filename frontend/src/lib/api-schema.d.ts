@@ -1230,6 +1230,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/audit/logs/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export the filtered operations log as CSV
+         * @description Stream the audit rows selected by the same filters as /audit/logs as a UTF-8 CSV file. The response headers publish the exported row count and whether the row cap truncated the selection.
+         */
+        get: operations["exportAuditLogsCSV"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/audit/actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List audit actions
+         * @description Distinct actions in the caller's tenant, with category and count, for the operations filters
+         */
+        get: operations["getAuditActions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/audit/verify": {
         parameters: {
             query?: never;
@@ -14255,6 +14295,93 @@ export interface operations {
                         };
                     };
                 };
+            };
+        };
+    };
+    exportAuditLogsCSV: {
+        parameters: {
+            query?: {
+                search?: string;
+                action?: string;
+                user?: string;
+                agent_id?: string;
+                result?: "success" | "failed";
+                category?: string;
+                scope?: "operations" | "all";
+                since?: string;
+                until?: string;
+                /** @description Maximum rows to write (default 50000, max 200000) */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description CSV file of the selected audit rows */
+            200: {
+                headers: {
+                    "X-Audit-Export-Rows"?: number;
+                    "X-Audit-Export-Truncated"?: boolean;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            /** @description Invalid filter or time bound */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Database is not initialized */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getAuditActions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Action catalogue */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessResponse"] & {
+                        data?: {
+                            actions?: {
+                                action?: string;
+                                category?: string;
+                                count?: number;
+                            }[];
+                            categories?: {
+                                id?: string;
+                                count?: number;
+                            }[];
+                        };
+                    };
+                };
+            };
+            /** @description Database is not initialized */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
