@@ -1,0 +1,30 @@
+# The canonical GHCR manifest the public demo runs.
+#
+# digest    - the GHCR manifest list: the pin a fresh `docker pull` resolves to
+# platform - the linux/amd64 manifest inside that list
+# config    - the image config digest, which is the container's image ID
+# diff_id   - the uncompressed layer digests, in order
+#
+# verify-image.sh compares the running container against this file, so the pin
+# stays checkable on a host that cannot reach the registry (the mirror that
+# normally serves the demo has been answering 502, which is why the image is
+# loaded from GHCR by hand and runs under a local tag).
+digest sha256:16b5ac5450233f00e3b9a56fe4d2740e3b42106656e3b0513f98a1bdf41c317d
+platform sha256:74eebd5e58fd99d3ff02e2834a14beeba2023cd7fde673eb7a4943bd450987f9
+config sha256:a8beea3b97b61e21b3c3049f4d56a234ac09e18add12e54e6dd5d19a85ce1d08
+diff_id sha256:7223ea1323e8c1159ec17f07d35acc27bdd1cc2bc3ed425b44ef21dac9915db0
+diff_id sha256:8fa10c0194df9b7c054c90dbe482585f768a54428fc90a5b78a0066a123b1bba
+diff_id sha256:35b5ba6e08cdd034b8d1920f9c7203e5d66f258e1915f164a01de0af14f34710
+diff_id sha256:114dde0fefebbca13165d0da9c500a66190e497a82a53dcaabc3172d630be1e9
+diff_id sha256:4d049f83d9cf21d1f5cc0e11deaf36df02790d0e60c1a3829538fb4b61685368
+diff_id sha256:af5aa97ebe6ce1604747ec1e21af7136ded391bcabe4acef882e718a87c86bcc
+diff_id sha256:6f1cdceb6a3146f0ccb986521156bef8a422cdbb0863396f7f751f575ba308f4
+diff_id sha256:bd3cdfae1d3fdd83a2231d608969b38b82349777c2fff9a7c12d54f8ac5c9b38
+diff_id sha256:4cde6b0bb6f50a5f255eef7b2a42162c661cf776b803225dcac9a659e396bb6b
+diff_id sha256:ad51d0769d16ba578106a177987dfe3d2e02c1668c852b795b2f6b024068242a
+diff_id sha256:6e7fbcf090d09b73a4aa85f9dce690d0ace73877c150b7c56955487b6e7a822a
+diff_id sha256:5904c32f457c96a16c8c68f5ccdf518c8138cd9e5971de9ce6d564fc481af222
+diff_id sha256:edda3e94d2edb5a01b28e87d1966cf4aec4a8bcd8398ff1b491b45f6ebf5850c
+diff_id sha256:d429545f9ae7067b0ef8ff9dff773bddd074f9aa11ef54ae80961ddb2c43fa07
+diff_id sha256:94726ff2b0fc5a261cd9e6101585743de648d12d22857fffd92e412aaf0883c6
+diff_id sha256:5f70bf18a086007016e948b04aed3b82103a36bea41755b6cddfaf10ace3c6ef

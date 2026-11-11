@@ -13,7 +13,9 @@ name: forgec2-demo
 # `edge` and its sha-<commit> tag resolve to the same manifest. On hosts where
 # GHCR is unreachable, a read-only mirror serves the identical manifest; set
 # FORGEC2_IMAGE to that mirror (tag or digest) in .env and note in the runbook
-# which mirror was used and why.
+# which mirror was used and why. If the mirror cannot serve the digest at all,
+# load the same image from GHCR and run it under a local tag:
+# deploy/demo/verify-image.sh proves the two are the same content.
 services:
   forgec2:
     image: ${FORGEC2_IMAGE:-ghcr.io/r0si/forgec2:edge}
