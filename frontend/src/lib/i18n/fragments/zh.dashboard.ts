@@ -11,6 +11,7 @@ export const zhDashboard: Record<string, string> = {
   "dashboard.audit_top_regions": "失败地区 Top",
   "dashboard.audit_open": "打开审计日志",
   "dashboard.audit_no_anomalies": "最近 24 小时没有失败操作或登录。",
+  "dashboard.audit_failed_list_title": "最近失败操作",
   "dashboard.audit_unavailable": "安全摘要不可用",
   "dashboard.audit_region_unknown": "未知地区",
   "dashboard.attention": "需要处理",

@@ -11,6 +11,7 @@ export const enDashboard: Record<string, string> = {
   "dashboard.audit_top_regions": "Top failed regions",
   "dashboard.audit_open": "Open audit log",
   "dashboard.audit_no_anomalies": "No failed operations or sign-ins in the last 24 hours.",
+  "dashboard.audit_failed_list_title": "Recent failures",
   "dashboard.audit_unavailable": "Security summary unavailable",
   "dashboard.audit_region_unknown": "Unknown region",
   "dashboard.attention": "Needs action",

@@ -13,7 +13,22 @@ beforeEach(() => {
   vi.clearAllMocks();
   can.mockReturnValue(true);
   vi.mocked(api.get).mockImplementation(async (path: string) => {
-    if (String(path).startsWith("/audit/logs")) return { failed: 18, total: 18 };
+    if (String(path).startsWith("/audit/logs")) {
+      return {
+        failed: 18,
+        total: 18,
+        logs: [
+          {
+            id: "9",
+            user: "demo",
+            action: "command_result",
+            success: false,
+            created_at: "2026-11-10T09:00:00Z",
+            details: "whoami /priv failed",
+          },
+        ],
+      };
+    }
     if (String(path).startsWith("/audit/logins")) {
       return {
         summary: {
@@ -52,6 +67,14 @@ describe("AuditRiskStrip", () => {
     expect(screen.getByText("美国 · 佛罗里达 · 2")).toBeTruthy();
     expect(screen.queryByText("中国 · 北京 · 0")).toBeNull();
     expect(screen.getByText("dashboard.audit_open")).toBeTruthy();
+  });
+
+  it("lists the operations that actually failed, not just their number", async () => {
+    renderStrip();
+    expect(await screen.findByText("dashboard.audit_failed_list_title")).toBeTruthy();
+    // The action label falls back to a humanized name without a dictionary entry.
+    expect(screen.getByText("Command result")).toBeTruthy();
+    expect(screen.getByText("demo · whoami /priv failed")).toBeTruthy();
   });
 
   it("renders nothing without audit.read", () => {
