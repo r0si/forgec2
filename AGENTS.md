@@ -14,7 +14,7 @@ The `bash` tool runs **PowerShell 5.1**, not bash. Adapt accordingly:
 
 "Done" for an optimization round = every applicable box checked, not "looks clean":
 
-- `npm run check` green (nav-perms 44/44, webdist byte-identical, bundle 658/675 kB public + 706/720 kB authenticated, coverage ≥ 36.5%).
+- `npm run check` green (nav-perms 44/44, webdist byte-identical, bundle 658/675 kB public + 706/720 kB authenticated, coverage ≥ 38.5%).
 - CI on the tip is `completed/success` (fuzz alone skipped).
 - When a container image ships, the demo host pins the new digest by UI or
   compose value and the boundary checks (read-only edges, 404 controls) pass.
@@ -33,7 +33,7 @@ criteria instead of vibes:
 | 2 | `npm run check` green (nav-perms 44/44, bundle ≤ 675kB public / 720kB authenticated critical / 5.0MB total, webdist byte-identical) | yes |
 | 3 | Gosec at 0 findings (windows target 1 staticcheck headroom, linux 0) | yes (65 → 0) |
 | 4 | Go statement coverage ≥ 58% | 59.1% measured |
-| 5 | Frontend statements ≥ 36.5% | 38.52% measured |
+| 5 | Frontend statements ≥ 38.5% | 39.36% measured |
 | 6 | Demo image pin matches GHCR `edge` digest; boot log error patterns at 0; read-only boundary assertions green | yes |
 | 7 | Wiki / Pages / sitemap live with 200s | yes |
 | 8 | Knowledge search: recall@5 regression test green in CI over a 200-chunk corpus (SQLite path) | yes |
@@ -366,7 +366,7 @@ Both sides carry a coverage floor, and **a floor that is never raised stops guar
 | side | floor | measured (2026-11-07) | where |
 |---|---|---|---|
 | Go | **58%** | 59.1% (was 51.5 at a 52.8 measurement — a 7-point regression would have passed) | `.github/workflows/ci.yml` "Coverage floor" |
-| frontend | **36.5%** | 38.52% statements / 24 805 | `frontend/scripts/check-coverage.mjs` (override with `COVERAGE_FLOOR`) |
+| frontend | **38.5%** | 39.36% statements / 25 095 | `frontend/scripts/check-coverage.mjs` (override with `COVERAGE_FLOOR`) |
 | first-paint bundle | **675 kB public / 720 kB authenticated** | 658 kB public, 706 kB authenticated (4.61 MB total under a 5.0 MB cap) | `frontend/scripts/check-bundle.mjs` |
 
 Raise a floor in the same change that adds tests; lower it only as part of that change, never to make
