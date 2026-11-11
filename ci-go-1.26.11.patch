@@ -1,0 +1,98 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 868e31872..70e984683 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -21,7 +21,7 @@ jobs:
+           fetch-depth: 0
+       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+         with:
+-          go-version: '1.26.10'
++          go-version: '1.26.11'
+           cache: true
+           cache-dependency-path: go.sum
+       - run: go mod download
+@@ -180,7 +180,7 @@ jobs:
+       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+         with:
+-          go-version: '1.26.10'
++          go-version: '1.26.11'
+           cache: true
+           cache-dependency-path: go.sum
+       - run: go mod download
+@@ -230,7 +230,7 @@ jobs:
+       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+         with:
+-          go-version: '1.26.10'
++          go-version: '1.26.11'
+           cache: true
+           cache-dependency-path: go.sum
+       - run: go mod download
+@@ -251,7 +251,7 @@ jobs:
+       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+         with:
+-          go-version: '1.26.10'
++          go-version: '1.26.11'
+           cache: true
+           cache-dependency-path: go.sum
+       - run: go mod download
+@@ -339,7 +339,7 @@ jobs:
+       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+         with:
+-          go-version: '1.26.10'
++          go-version: '1.26.11'
+           cache: true
+           cache-dependency-path: go.sum
+       - run: go mod download
+@@ -382,7 +382,7 @@ jobs:
+       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+         with:
+-          go-version: '1.26.10'
++          go-version: '1.26.11'
+           cache: true
+           cache-dependency-path: go.sum
+       - run: go mod download
+@@ -442,7 +442,7 @@ jobs:
+       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+         with:
+-          go-version: '1.26.10'
++          go-version: '1.26.11'
+           cache: true
+           cache-dependency-path: go.sum
+       - run: go mod download
+@@ -536,7 +536,7 @@ jobs:
+       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+         with:
+-          go-version: '1.26.10'
++          go-version: '1.26.11'
+           cache: true
+           cache-dependency-path: go.sum
+       - run: go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
+@@ -633,7 +633,7 @@ jobs:
+       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+         with:
+-          go-version: '1.26.10'
++          go-version: '1.26.11'
+           cache: true
+           cache-dependency-path: go.sum
+       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+diff --git a/.github/workflows/release.yml b/.github/workflows/release.yml
+index 996f5ec4b..ce429e8d5 100644
+--- a/.github/workflows/release.yml
++++ b/.github/workflows/release.yml
+@@ -50,7 +50,7 @@ jobs:
+       - name: Setup Go
+         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+         with:
+-          go-version: "1.26.10"
++          go-version: "1.26.11"
+ 
+       - name: Download fresh webdist
+         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2

@@ -443,7 +443,7 @@ go test ./internal/config/... ./internal/crypto/... ./internal/db/... ./internal
 
 ## Build caveats
 - `go build ./...` passes (the `data/e2e/` helpers have `//go:build ignore` tags).
-- Go version: **1.26.0** (go.mod) with `toolchain go1.26.10` pinned for the standard-library security patches (net/http, crypto/tls, html/template, net/textproto). CI's `setup-go` uses the same 1.26.10.
+- Go version: **1.26.0** (go.mod) with `toolchain go1.26.11` pinned for the standard-library security patches (net/http, crypto/tls, html/template, net/textproto). The Dockerfile's `golang:1.26.11-alpine` base uses the same 1.26.11 — `GO-2026-6859` (net/http) was fixed in go1.26.11, and the 1.27 line had not yet backported it, so the image base follows the patched 1.26 line. The CI `setup-go` pins still name 1.26.10 and **cannot be pushed from this environment** (the OAuth token has no `workflow` scope), so the bump is delivered as `ci-go-1.26.11.patch` (`git apply ci-go-1.26.11.patch`) — apply it, or grant the scope, or CI's `security` job keeps scanning with the vulnerable toolchain.
 - sqlite driver is **`github.com/glebarez/sqlite`** (pure Go, no cgo). Any DB-verification temp program MUST use this driver, NOT `gorm.io/driver/sqlite` (which needs cgo).
 
 ## CSRF Protection (IMPORTANT)
