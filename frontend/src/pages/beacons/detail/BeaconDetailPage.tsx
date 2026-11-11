@@ -42,6 +42,7 @@ import AgentStatusBar from "./components/AgentStatusBar";
 import QuickShellSection from "./components/QuickShellSection";
 import { AISuggestCard } from "./components/AISuggestCard";
 import NotesTagsSection from "./components/NotesTagsSection";
+import BeaconOperationsSection from "./components/BeaconOperationsSection";
 // Below-fold sections load on demand so the detail chunk parses faster.
 const ProcessSection = lazy(() => import("./components/ProcessSection"));
 const ConnectionLogSection = lazy(() => import("./components/ConnectionLogSection"));
@@ -593,6 +594,7 @@ export default memo(function BeaconDetailPage({ agentId: agentIdProp, onClose }:
                 <Banner tone="warning" className="mb-4">{t("agents.detail_c_implant_notice")}</Banner>
               )}
               <Suspense fallback={null}><HostInfoCard agentId={id} online={status === "online"} /></Suspense>
+              <BeaconOperationsSection agentId={id} />
             </TabsContent>
 
             <TabsContent value="tasks">
