@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { paths } from "@/lib/api-paths";
 import { useI18n } from "@/lib/i18n";
@@ -26,6 +26,34 @@ export interface LoginSummary {
 
 const PER_PAGE = 50;
 
+/** Result ids the login log accepts ("ok" / "failed"). */
+const LOGIN_RESULT_IDS = ["ok", "failed"] as const;
+/** Range ids the login log accepts. */
+const LOGIN_RANGE_IDS = ["24h", "7d", "30d", "all"] as const;
+
+export interface LoginLogPanelProps {
+  /** Filters carried by the deep link; unknown values are ignored. */
+  initialResult?: string;
+  initialRange?: string;
+}
+
+/**
+ * Read the filters a deep link carries and keep only the values the server
+ * accepts - an unknown result or range would otherwise be sent as-is and come
+ * back as an empty table.
+ */
+export function normalizeLoginDeepLink(input: {
+  result?: string | null;
+  range?: string | null;
+}): { result: string; range: string } {
+  const result = (input.result || "").trim().toLowerCase();
+  const range = (input.range || "").trim().toLowerCase();
+  return {
+    result: (LOGIN_RESULT_IDS as readonly string[]).includes(result) ? result : "",
+    range: (LOGIN_RANGE_IDS as readonly string[]).includes(range) ? range : "all",
+  };
+}
+
 /**
  * A region is the country plus, when a provider knows it, the city. The login
  * log is about "from where", and two sign-ins from the same country but
@@ -48,8 +76,12 @@ function regionLabel(t: (key: string) => string, country: string, city?: string)
  * IP→region table. The panel never mutates the audit rows: writing a region
  * after the fact would break the chain those rows exist to protect.
  */
-export function LoginLogPanel() {
+export function LoginLogPanel({ initialResult, initialRange }: LoginLogPanelProps = {}) {
   const { t } = useI18n();
+  const deepLink = useMemo(
+    () => normalizeLoginDeepLink({ result: initialResult, range: initialRange }),
+    [initialResult, initialRange],
+  );
   const [events, setEvents] = useState<LoginEvent[]>([]);
   const [summary, setSummary] = useState<LoginSummary | null>(null);
   const [total, setTotal] = useState(0);
@@ -59,9 +91,9 @@ export function LoginLogPanel() {
   const [exportError, setExportError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [userFilter, setUserFilter] = useState("");
-  const [resultFilter, setResultFilter] = useState("");
-  const [range, setRange] = useState("all");
-  const [applied, setApplied] = useState({ user: "", result: "", range: "all" });
+  const [resultFilter, setResultFilter] = useState(deepLink.result);
+  const [range, setRange] = useState(deepLink.range);
+  const [applied, setApplied] = useState({ user: "", result: deepLink.result, range: deepLink.range });
 
   const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);

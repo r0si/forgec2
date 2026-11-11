@@ -54,13 +54,28 @@ export default function AuditPage() {
   // the login tab: otherwise two identical "Export page CSV" buttons are
   // visible and the header one silently exports a table the operator cannot
   // see.
-  const [searchParams] = useSearchParams();
-  const [tab, setTab] = useState(() => {
-    const wanted = searchParams.get("tab");
-    return wanted === "operations" || wanted === "logins" ? wanted : "events";
-  });
+  const [searchParams, setSearchParams] = useSearchParams();
+  // The tab lives in the URL. A drill-down from the dashboard has to land on
+  // the right tab even when the operator is already on the audit page, and
+  // the address has to survive a reload or a shared link.
+  const requestedTab = searchParams.get("tab");
+  const tab = requestedTab === "operations" || requestedTab === "logins" ? requestedTab : "events";
   const initialAgentId = searchParams.get("agent_id") || "";
+  const initialResult = searchParams.get("result") || "";
+  const initialCategory = searchParams.get("category") || "";
+  const initialAction = searchParams.get("action") || "";
+  const initialRange = searchParams.get("range") || "";
   const { t } = useI18n();
+
+  const handleTabChange = useCallback(
+    (next: string) => {
+      const params = new URLSearchParams(searchParams);
+      if (next === "events") params.delete("tab");
+      else params.set("tab", next);
+      setSearchParams(params);
+    },
+    [searchParams, setSearchParams],
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -192,7 +207,7 @@ export default function AuditPage() {
       }
     >
 
-      <Tabs value={tab} onValueChange={setTab}>
+      <Tabs value={tab} onValueChange={handleTabChange}>
         <TabsList>
           <TabsTrigger value="events">{t("audit.tab_events")}</TabsTrigger>
           <TabsTrigger value="operations">{t("audit.tab_operations")}</TabsTrigger>
@@ -416,11 +431,26 @@ export default function AuditPage() {
         </TabsContent>
 
         <TabsContent value="operations">
-          <OperationsPanel key={initialAgentId} users={users} initialAgentId={initialAgentId} />
+          {/* The key carries the deep-link filters: a new selection in the URL
+              has to rebuild the panel, because the panel reads its filters
+              once when it mounts. */}
+          <OperationsPanel
+            key={`${initialAgentId}|${initialResult}|${initialCategory}|${initialAction}|${initialRange}`}
+            users={users}
+            initialAgentId={initialAgentId}
+            initialResult={initialResult}
+            initialCategory={initialCategory}
+            initialAction={initialAction}
+            initialRange={initialRange}
+          />
         </TabsContent>
 
         <TabsContent value="logins">
-          <LoginLogPanel />
+          <LoginLogPanel
+            key={`${initialResult}|${initialRange}`}
+            initialResult={initialResult}
+            initialRange={initialRange}
+          />
         </TabsContent>
       </Tabs>
     </PageContainer>

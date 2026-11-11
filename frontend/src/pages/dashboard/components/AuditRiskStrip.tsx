@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { paths } from "@/lib/api-paths";
 import { useI18n } from "@/lib/i18n";
@@ -94,34 +95,46 @@ export function AuditRiskStrip() {
         ) : (
           <>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <Card className="p-(--card-spacing)">
-                <StatTile
-                  label={t("dashboard.audit_failed_ops")}
-                  value={loading ? "—" : failedOps}
-                  tone={failedOps > 0 ? "destructive" : "success"}
-                />
-              </Card>
-              <Card className="p-(--card-spacing)">
-                <StatTile
-                  label={t("dashboard.audit_failed_logins")}
-                  value={loading ? "—" : failedLogins}
-                  tone={failedLogins > 0 ? "destructive" : "success"}
-                />
-              </Card>
-              <Card className="p-(--card-spacing)">
-                <StatTile
-                  label={t("dashboard.audit_distinct_ips")}
-                  value={loading ? "—" : distinctIPs}
-                  tone="muted"
-                />
-              </Card>
-              <Card className="p-(--card-spacing)">
-                <StatTile
-                  label={t("dashboard.audit_new_ip")}
-                  value={loading ? "—" : newIPs}
-                  tone={newIPs > 0 ? "warning" : "muted"}
-                />
-              </Card>
+              {/* Every tile is a drill-down: the count is a question, and the
+                  answer is the matching selection in the audit log. The links
+                  carry the same 24h window the tiles count, so the number on
+                  the dashboard and the rows behind it always agree. */}
+              <Link to="/audit?tab=operations&result=failed&range=24h">
+                <Card interactive className="p-(--card-spacing) hover:ring-1 hover:ring-primary/20">
+                  <StatTile
+                    label={t("dashboard.audit_failed_ops")}
+                    value={loading ? "—" : failedOps}
+                    tone={failedOps > 0 ? "destructive" : "success"}
+                  />
+                </Card>
+              </Link>
+              <Link to="/audit?tab=logins&result=failed&range=24h">
+                <Card interactive className="p-(--card-spacing) hover:ring-1 hover:ring-primary/20">
+                  <StatTile
+                    label={t("dashboard.audit_failed_logins")}
+                    value={loading ? "—" : failedLogins}
+                    tone={failedLogins > 0 ? "destructive" : "success"}
+                  />
+                </Card>
+              </Link>
+              <Link to="/audit?tab=logins&range=24h">
+                <Card interactive className="p-(--card-spacing) hover:ring-1 hover:ring-primary/20">
+                  <StatTile
+                    label={t("dashboard.audit_distinct_ips")}
+                    value={loading ? "—" : distinctIPs}
+                    tone="muted"
+                  />
+                </Card>
+              </Link>
+              <Link to="/audit?tab=operations&action=login_new_ip&range=24h">
+                <Card interactive className="p-(--card-spacing) hover:ring-1 hover:ring-primary/20">
+                  <StatTile
+                    label={t("dashboard.audit_new_ip")}
+                    value={loading ? "—" : newIPs}
+                    tone={newIPs > 0 ? "warning" : "muted"}
+                  />
+                </Card>
+              </Link>
             </div>
             {!loading && failedOps === 0 && failedLogins === 0 ? (
               <p className="text-sm text-muted-foreground">{t("dashboard.audit_no_anomalies")}</p>

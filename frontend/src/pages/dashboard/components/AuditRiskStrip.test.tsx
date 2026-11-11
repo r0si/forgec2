@@ -69,6 +69,19 @@ describe("AuditRiskStrip", () => {
     expect(screen.getByText("dashboard.audit_open")).toBeTruthy();
   });
 
+  it("links every tile to the matching selection in the audit log", async () => {
+    renderStrip();
+    await screen.findByText("dashboard.audit_failed_ops");
+
+    const hrefs = screen.getAllByRole("link").map((l) => l.getAttribute("href"));
+    // The count is a question; the link is the answer, in the same 24h
+    // window the tile counts.
+    expect(hrefs).toContain("/audit?tab=operations&result=failed&range=24h");
+    expect(hrefs).toContain("/audit?tab=logins&result=failed&range=24h");
+    expect(hrefs).toContain("/audit?tab=logins&range=24h");
+    expect(hrefs).toContain("/audit?tab=operations&action=login_new_ip&range=24h");
+  });
+
   it("lists the operations that actually failed, not just their number", async () => {
     renderStrip();
     expect(await screen.findByText("dashboard.audit_failed_list_title")).toBeTruthy();

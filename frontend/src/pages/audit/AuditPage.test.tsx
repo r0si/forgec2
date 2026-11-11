@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { useEffect } from "react";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import AuditPage from "@/pages/audit/AuditPage";
 import { api } from "@/lib/api";
 
@@ -8,7 +9,20 @@ vi.mock("@/lib/api", () => ({ api: { get: vi.fn(), downloadGet: vi.fn() } }));
 vi.mock("@/lib/i18n", () => ({ useI18n: () => ({ t: (k: string) => k }) }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
+// The probe records the address bar. It writes into an object rather than a
+// plain variable so the render stays pure (the lint rule forbids reassigning
+// an outer binding during render).
+const locationProbe = { search: "" };
+function LocationProbe() {
+  const location = useLocation();
+  useEffect(() => {
+    locationProbe.search = location.search;
+  }, [location.search]);
+  return null;
+}
+
 beforeEach(() => {
+  locationProbe.search = "";
   vi.clearAllMocks();
   vi.mocked(api.get).mockImplementation(async (path: string) => {
     const p = String(path);
@@ -24,6 +38,7 @@ beforeEach(() => {
 function renderPage(entry = "/audit") {
   return render(
     <MemoryRouter initialEntries={[entry]}>
+      <LocationProbe />
       <AuditPage />
     </MemoryRouter>,
   );
@@ -63,6 +78,26 @@ describe("AuditPage tabs", () => {
       expect(call).toBeTruthy();
       expect(String(call?.[0])).toContain("agent_id=agent-abc");
     });
+  });
+
+  it("opens the operations tab with the filters a deep link carries", async () => {
+    renderPage("/audit?tab=operations&result=failed&range=24h");
+
+    await waitFor(() => {
+      const call = vi.mocked(api.get).mock.calls.find(([path]) => String(path).startsWith("/audit/logs"));
+      expect(call).toBeTruthy();
+      expect(String(call?.[0])).toContain("result=failed");
+      expect(String(call?.[0])).toContain("since=24h");
+    });
+  });
+
+  it("keeps the selected tab in the address bar", async () => {
+    renderPage();
+    fireEvent.click(await screen.findByRole("tab", { name: /audit\.tab_operations/ }));
+
+    // The tab is part of the URL now: a drill-down from the dashboard has to
+    // land on the right tab, and a reload has to keep it.
+    await waitFor(() => expect(locationProbe.search).toContain("tab=operations"));
   });
 
   it("renders a readable action label with the raw code", async () => {

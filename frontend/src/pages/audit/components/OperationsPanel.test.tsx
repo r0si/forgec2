@@ -113,6 +113,44 @@ describe("OperationsPanel", () => {
     expect(screen.getAllByText("Created task").length).toBeGreaterThan(0);
   });
 
+  it("starts from the filters a deep link carries", async () => {
+    render(
+      <OperationsPanel
+        initialResult="failed"
+        initialCategory="tasks"
+        initialAction="task_create"
+        initialRange="24h"
+      />,
+    );
+    await screen.findByText("Created task");
+
+    const first = vi.mocked(api.get).mock.calls.find(([path]) => String(path).startsWith("/audit/logs"));
+    const query = String(first?.[0]);
+    expect(query).toContain("result=failed");
+    expect(query).toContain("category=tasks");
+    expect(query).toContain("action=task_create");
+    expect(query).toContain("since=24h");
+  });
+
+  it("drops a filter value the server would reject", async () => {
+    // A hand-written link can carry anything; an unknown result or category
+    // would be answered with 400 and leave an empty table behind.
+    render(
+      <OperationsPanel
+        initialResult="bogus"
+        initialCategory="not-a-category"
+        initialRange="forever"
+      />,
+    );
+    await screen.findByText("Created task");
+
+    const first = vi.mocked(api.get).mock.calls.find(([path]) => String(path).startsWith("/audit/logs"));
+    const query = String(first?.[0]);
+    expect(query).not.toContain("result=");
+    expect(query).not.toContain("category=");
+    expect(query).toContain("since=7d");
+  });
+
   it("pins the view to a beacon from a deep link and can clear it", async () => {
     render(<OperationsPanel initialAgentId="agent-abc" />);
     await screen.findByText("Created task");

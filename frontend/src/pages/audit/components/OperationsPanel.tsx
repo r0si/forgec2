@@ -42,6 +42,46 @@ const CATEGORY_IDS = [
 const RANGE_IDS = ["24h", "7d", "30d", "all"] as const;
 type RangeId = (typeof RANGE_IDS)[number];
 
+/** Result ids mirror the server's audit filter ("success" / "failed"). */
+const RESULT_IDS = ["success", "failed"] as const;
+
+export interface OperationsDeepLink {
+  result: string;
+  category: string;
+  action: string;
+  range: RangeId;
+}
+
+/**
+ * Read the filters a deep link carries and keep only the values the server
+ * accepts.
+ *
+ * A link is written by another page or typed by a human, so it can carry
+ * anything. An unknown category or result would be answered with 400 and the
+ * operator would be left with an empty table and no explanation, so the
+ * unknown values are dropped and the view lands on the unfiltered selection.
+ */
+export function normalizeOperationsDeepLink(input: {
+  result?: string | null;
+  category?: string | null;
+  action?: string | null;
+  range?: string | null;
+}): OperationsDeepLink {
+  const result = (input.result || "").trim().toLowerCase();
+  const category = (input.category || "").trim().toLowerCase();
+  const action = (input.action || "").trim();
+  const range = (input.range || "").trim().toLowerCase();
+  return {
+    result: (RESULT_IDS as readonly string[]).includes(result) ? result : "",
+    category: (CATEGORY_IDS as readonly string[]).includes(category) ? category : "",
+    // The action is matched exactly server-side, and the server also accepts
+    // the bare spelling of an "operator:"-prefixed action, so keep it as
+    // written - but bounded, so a long pasted string cannot ride along.
+    action: action.slice(0, 64),
+    range: (RANGE_IDS as readonly string[]).includes(range) ? (range as RangeId) : "7d",
+  };
+}
+
 interface AuditActionStat {
   action: string;
   category: string;
@@ -79,6 +119,11 @@ export interface OperationsPanelProps {
   users?: { username: string }[];
   /** Beacon to pin the view to, set by the deep link from a beacon's page. */
   initialAgentId?: string;
+  /** Filters carried by the deep link; unknown values are ignored. */
+  initialResult?: string;
+  initialCategory?: string;
+  initialAction?: string;
+  initialRange?: string;
 }
 
 /**
@@ -90,9 +135,26 @@ export interface OperationsPanelProps {
  * implementation between this table and the CSV export, so the file always
  * matches the screen.
  */
-export function OperationsPanel({ users = [], initialAgentId = "" }: OperationsPanelProps) {
+export function OperationsPanel({
+  users = [],
+  initialAgentId = "",
+  initialResult,
+  initialCategory,
+  initialAction,
+  initialRange,
+}: OperationsPanelProps) {
   const { t } = useI18n();
   const initialTarget = initialAgentId.trim();
+  const deepLink = useMemo(
+    () =>
+      normalizeOperationsDeepLink({
+        result: initialResult,
+        category: initialCategory,
+        action: initialAction,
+        range: initialRange,
+      }),
+    [initialResult, initialCategory, initialAction, initialRange],
+  );
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [total, setTotal] = useState(0);
   const [failed, setFailed] = useState(0);
@@ -104,15 +166,22 @@ export function OperationsPanel({ users = [], initialAgentId = "" }: OperationsP
   const [catalogue, setCatalogue] = useState<AuditCatalogue>({ actions: [], categories: [] });
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
 
-  const [range, setRange] = useState<RangeId>("7d");
-  const [category, setCategory] = useState("");
-  const [action, setAction] = useState("");
-  const [result, setResult] = useState("");
+  const [range, setRange] = useState<RangeId>(deepLink.range);
+  const [category, setCategory] = useState(deepLink.category);
+  const [action, setAction] = useState(deepLink.action);
+  const [result, setResult] = useState(deepLink.result);
   const [user, setUser] = useState("");
   const [search, setSearch] = useState("");
   const [agentId, setAgentId] = useState(initialTarget);
   const [includeSystem, setIncludeSystem] = useState(false);
-  const [applied, setApplied] = useState<AppliedFilters>({ ...EMPTY_FILTERS, agentId: initialTarget });
+  const [applied, setApplied] = useState<AppliedFilters>({
+    ...EMPTY_FILTERS,
+    range: deepLink.range,
+    category: deepLink.category,
+    action: deepLink.action,
+    result: deepLink.result,
+    agentId: initialTarget,
+  });
 
   useEffect(() => {
     const controller = new AbortController();
