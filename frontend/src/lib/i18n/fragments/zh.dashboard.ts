@@ -7,6 +7,7 @@ export const zhDashboard: Record<string, string> = {
   "dashboard.audit_failed_ops": "失败操作",
   "dashboard.audit_failed_logins": "失败登录",
   "dashboard.audit_distinct_ips": "来源 IP",
+  "dashboard.audit_new_ip": "新 IP 登录",
   "dashboard.audit_top_regions": "失败地区 Top",
   "dashboard.audit_open": "打开审计日志",
   "dashboard.audit_no_anomalies": "最近 24 小时没有失败操作或登录。",

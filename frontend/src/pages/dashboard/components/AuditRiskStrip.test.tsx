@@ -20,6 +20,7 @@ beforeEach(() => {
           failed: 4,
           ok: 20,
           distinct_ips: 3,
+          new_ip: 2,
           by_region: [
             { country: "美国", city: "佛罗里达", failed: 2, ok: 0 },
             { country: "中国", city: "北京", failed: 0, ok: 10 },
@@ -46,6 +47,7 @@ describe("AuditRiskStrip", () => {
     expect(screen.getByText("18")).toBeTruthy();
     expect(screen.getByText("4")).toBeTruthy();
     expect(screen.getByText("3")).toBeTruthy();
+    expect(screen.getByText("dashboard.audit_new_ip")).toBeTruthy();
     // Only failed regions are listed; a region with zero failures is noise.
     expect(screen.getByText("美国 · 佛罗里达 · 2")).toBeTruthy();
     expect(screen.queryByText("中国 · 北京 · 0")).toBeNull();

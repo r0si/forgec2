@@ -7,6 +7,7 @@ export const enDashboard: Record<string, string> = {
   "dashboard.audit_failed_ops": "Failed operations",
   "dashboard.audit_failed_logins": "Failed sign-ins",
   "dashboard.audit_distinct_ips": "Source IPs",
+  "dashboard.audit_new_ip": "New-IP sign-ins",
   "dashboard.audit_top_regions": "Top failed regions",
   "dashboard.audit_open": "Open audit log",
   "dashboard.audit_no_anomalies": "No failed operations or sign-ins in the last 24 hours.",

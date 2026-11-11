@@ -14,6 +14,8 @@ interface LoginSummary {
   failed: number;
   ok: number;
   distinct_ips: number;
+  /** Sign-ins from an address the account has never used (24h window). */
+  new_ip?: number;
   by_region: { country: string; city?: string; failed: number; ok: number }[];
 }
 
@@ -68,6 +70,7 @@ export function AuditRiskStrip() {
 
   const failedLogins = summary?.failed ?? 0;
   const distinctIPs = summary?.distinct_ips ?? 0;
+  const newIPs = summary?.new_ip ?? 0;
   const regions = (summary?.by_region ?? []).filter((r) => r.failed > 0).slice(0, 5);
 
   return (
@@ -83,7 +86,7 @@ export function AuditRiskStrip() {
           <DataError message={t(error)} onRetry={() => void load()} />
         ) : (
           <>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <Card className="p-(--card-spacing)">
                 <StatTile
                   label={t("dashboard.audit_failed_ops")}
@@ -103,6 +106,13 @@ export function AuditRiskStrip() {
                   label={t("dashboard.audit_distinct_ips")}
                   value={loading ? "—" : distinctIPs}
                   tone="muted"
+                />
+              </Card>
+              <Card className="p-(--card-spacing)">
+                <StatTile
+                  label={t("dashboard.audit_new_ip")}
+                  value={loading ? "—" : newIPs}
+                  tone={newIPs > 0 ? "warning" : "muted"}
                 />
               </Card>
             </div>

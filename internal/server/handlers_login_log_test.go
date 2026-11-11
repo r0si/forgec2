@@ -186,6 +186,7 @@ type loginEventsResponse struct {
 			Failed      int64 `json:"failed"`
 			OK          int64 `json:"ok"`
 			DistinctIPs int   `json:"distinct_ips"`
+			NewIP       int64 `json:"new_ip"`
 			ByRegion    []struct {
 				Country string `json:"country"`
 				City    string `json:"city"`
@@ -194,4 +195,48 @@ type loginEventsResponse struct {
 			} `json:"by_region"`
 		} `json:"summary"`
 	} `json:"data"`
+}
+
+// TestLoginSummaryCountsNewIPSignIns proves the anomalous-login signal: the
+// 24h rollup counts first sign-ins from an address the account has never
+// used, and only from the caller's own tenant.
+func TestLoginSummaryCountsNewIPSignIns(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	s := mustTenantServer(t)
+	now := time.Now()
+	for _, geo := range []db.LoginGeo{
+		{IP: "203.0.113.20", Country: "德国", City: "法兰克福", ResolvedAt: now},
+		{IP: "198.51.100.7", Country: "美国", ResolvedAt: now},
+		{IP: "198.51.100.8", Country: "中国", ResolvedAt: now},
+	} {
+		if err := s.db.Create(&geo).Error; err != nil {
+			t.Fatalf("seed geo %s: %v", geo.IP, err)
+		}
+	}
+	rows := []db.AuditLog{
+		{User: "alice", Action: "login_new_ip", Resource: "auth", IP: "203.0.113.20", TenantID: 2, Success: true, Details: "First login from 203.0.113.20", CreatedAt: now.Add(-2 * time.Hour)},
+		{User: "alice", Action: "login", Resource: "auth", IP: "203.0.113.20", TenantID: 2, Success: true, CreatedAt: now.Add(-time.Hour)},
+		// Outside the 24h window: the rollup must not count it.
+		{User: "old", Action: "login_new_ip", Resource: "auth", IP: "198.51.100.7", TenantID: 2, Success: true, CreatedAt: now.Add(-40 * time.Hour)},
+		// Another tenant: never visible.
+		{User: "tenant1", Action: "login_new_ip", Resource: "auth", IP: "198.51.100.8", TenantID: 1, Success: true, CreatedAt: now.Add(-time.Hour)},
+	}
+	for i := range rows {
+		if err := s.db.Create(&rows[i]).Error; err != nil {
+			t.Fatalf("seed row %d: %v", i, err)
+		}
+	}
+
+	c, w := tenantScopedAdminContext(s, t, "tenant2-admin", 2)
+	s.handleGetLoginEvents(c)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d %s", w.Code, w.Body.String())
+	}
+	var body loginEventsResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode: %v (%s)", err, w.Body.String())
+	}
+	if got := body.Data.Summary.NewIP; got != 1 {
+		t.Fatalf("summary new_ip = %d, want 1 (the recent, own-tenant sign-in)", got)
+	}
 }

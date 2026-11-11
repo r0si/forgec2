@@ -37,6 +37,7 @@ describe("LoginLogPanel", () => {
     failed: 2,
     ok: 7,
     distinct_ips: 3,
+    new_ip: 1,
     by_region: [
       { country: "美国", failed: 2, ok: 0 },
       { country: "中国", city: "北京", failed: 0, ok: 5 },
@@ -62,6 +63,8 @@ describe("LoginLogPanel", () => {
     expect(screen.getByText("本地 / 内网 · 0/2")).toBeTruthy();
     // An unresolved IP is named, not blank: it fills in on the next refresh.
     expect(screen.getByText("audit.login_region_unknown · 0/1")).toBeTruthy();
+    // The anomalous-login signal rides along: sign-ins from a new address.
+    expect(screen.getByText("audit.login_new_ip")).toBeTruthy();
   });
 
   it("renders the recorded time, user, IP and region (country · city) per sign-in", async () => {

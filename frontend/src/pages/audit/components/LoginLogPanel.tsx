@@ -19,6 +19,8 @@ export interface LoginSummary {
   failed: number;
   ok: number;
   distinct_ips: number;
+  /** Sign-ins from an address the account has never used (24h window). */
+  new_ip?: number;
   by_region: { country: string; city?: string; failed: number; ok: number }[];
 }
 
@@ -143,6 +145,9 @@ export function LoginLogPanel() {
             </span>
             <span className="text-sm text-muted-foreground">
               {t("audit.login_summary_ips")} <span className="font-mono text-foreground">{summary.distinct_ips}</span>
+            </span>
+            <span className="text-sm text-muted-foreground">
+              {t("audit.login_new_ip")} <span className="font-mono text-foreground">{summary.new_ip ?? 0}</span>
             </span>
           </div>
           {summary.by_region.length > 0 && (

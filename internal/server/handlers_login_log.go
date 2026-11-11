@@ -206,6 +206,18 @@ func (s *Server) loginEventSummary(c *gin.Context) gin.H {
 		stat.OK += row.OK
 	}
 
+	// New-IP sign-ins are the "anomalous login" signal: the first sign-in of
+	// an account from an address it has never used. Counted over the same
+	// window as the rollup, so both numbers describe the same period.
+	var newIP int64
+	if err := s.auditTenantScope(s.db.Model(&db.AuditLog{}), c).
+		Where("action = ?", "login_new_ip").
+		Where("created_at >= ?", since).
+		Count(&newIP).Error; err != nil {
+		// Advisory: a failed count must not hide the rows or the rollup.
+		slog.Warn("Login new-IP count failed", "err", err)
+	}
+
 	ordered := make([]loginRegionStat, 0, len(byRegion))
 	for _, stat := range byRegion {
 		ordered = append(ordered, *stat)
@@ -231,5 +243,6 @@ func (s *Server) loginEventSummary(c *gin.Context) gin.H {
 		"ok":           okTotal,
 		"by_region":    ordered,
 		"distinct_ips": len(counts),
+		"new_ip":       newIP,
 	}
 }
