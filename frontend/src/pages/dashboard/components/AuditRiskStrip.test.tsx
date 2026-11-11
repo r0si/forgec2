@@ -79,7 +79,7 @@ describe("AuditRiskStrip", () => {
     expect(hrefs).toContain("/audit?tab=operations&result=failed&range=24h");
     expect(hrefs).toContain("/audit?tab=logins&result=failed&range=24h");
     expect(hrefs).toContain("/audit?tab=logins&range=24h");
-    expect(hrefs).toContain("/audit?tab=operations&action=login_new_ip&range=24h");
+    expect(hrefs).toContain("/audit?tab=logins&new_ip=1&range=24h");
   });
 
   it("lists the operations that actually failed, not just their number", async () => {

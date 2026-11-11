@@ -197,6 +197,89 @@ type loginEventsResponse struct {
 	} `json:"data"`
 }
 
+// TestLoginEventsCanShowNewAddressSignIns proves the login log can answer
+// "which sign-ins came from an address the account had never used?".
+//
+// The dashboard counted that signal, but the rows themselves stayed in the
+// audit log - where an operator looking for sign-ins does not look. The
+// filter swaps the row set for the new-address rows instead of widening the
+// allowlist: a new-address sign-in would otherwise show up twice, once as
+// the sign-in and once as the anomaly.
+func TestLoginEventsCanShowNewAddressSignIns(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	s := mustTenantServer(t)
+
+	now := time.Now().UTC().Truncate(time.Second)
+	for _, geo := range []db.LoginGeo{
+		{IP: "203.0.113.30", Country: "德国", City: "法兰克福", ResolvedAt: now},
+		{IP: "198.51.100.30", Country: "美国", ResolvedAt: now},
+	} {
+		if err := s.db.Create(&geo).Error; err != nil {
+			t.Fatalf("seed geo %s: %v", geo.IP, err)
+		}
+	}
+
+	rows := []db.AuditLog{
+		// The sign-in itself.
+		{User: "alice", Action: "login", Resource: "auth", IP: "203.0.113.30", Success: true, Details: "Login successful", CreatedAt: now.Add(-2 * time.Hour)},
+		// The anomaly the server wrote next to it.
+		{User: "alice", Action: "login_new_ip", Resource: "auth", IP: "203.0.113.30", Success: true, Details: "First login from 203.0.113.30", CreatedAt: now.Add(-2 * time.Hour)},
+		// An ordinary sign-in from another address: not an anomaly.
+		{User: "bob", Action: "login", Resource: "auth", IP: "198.51.100.30", Success: true, Details: "Login successful", CreatedAt: now.Add(-time.Hour)},
+	}
+	for i := range rows {
+		if err := s.db.Create(&rows[i]).Error; err != nil {
+			t.Fatalf("seed audit row %d: %v", i, err)
+		}
+	}
+
+	call := func(query string) loginEventsResponse {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = httptest.NewRequest(http.MethodGet, "/audit/logins"+query, nil)
+		c.Set("user", "root")
+		c.Set("user_role", db.RoleAdmin)
+		c.Set("user_id", uint(1))
+		c.Set(middleware.TenantIDContextKey, uint(1))
+		s.handleGetLoginEvents(c)
+		if w.Code != http.StatusOK {
+			t.Fatalf("status = %d %s", w.Code, w.Body.String())
+		}
+		var body loginEventsResponse
+		if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+			t.Fatalf("decode: %v (%s)", err, w.Body.String())
+		}
+		return body
+	}
+
+	// The default view is the sign-in/out events; the anomaly row is not one.
+	def := call("?page=1&pageSize=50")
+	if len(def.Data.Events) != 2 {
+		t.Fatalf("default events = %d, want the 2 sign-in rows: %+v", len(def.Data.Events), def.Data.Events)
+	}
+	for _, e := range def.Data.Events {
+		if e.Action == "login_new_ip" {
+			t.Fatalf("the anomaly row must not appear in the default view: %+v", e)
+		}
+	}
+
+	// With the filter, only the new-address sign-ins are listed.
+	newIP := call("?page=1&pageSize=50&new_ip=1")
+	if len(newIP.Data.Events) != 1 {
+		t.Fatalf("new_ip events = %d, want 1: %+v", len(newIP.Data.Events), newIP.Data.Events)
+	}
+	row := newIP.Data.Events[0]
+	if row.Action != "login_new_ip" || row.User != "alice" || row.IP != "203.0.113.30" {
+		t.Fatalf("new_ip row = %+v, want alice's first sign-in from 203.0.113.30", row)
+	}
+	if row.Country != "德国" {
+		t.Fatalf("new_ip row country = %q, want the cached 德国", row.Country)
+	}
+	if newIP.Data.Total != 1 {
+		t.Fatalf("new_ip total = %d, want 1", newIP.Data.Total)
+	}
+}
+
 // TestLoginSummaryCountsNewIPSignIns proves the anomalous-login signal: the
 // 24h rollup counts first sign-ins from an address the account has never
 // used, and only from the caller's own tenant.

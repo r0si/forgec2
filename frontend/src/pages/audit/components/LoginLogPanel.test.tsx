@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { LoginLogPanel } from "@/pages/audit/components/LoginLogPanel";
 import { api } from "@/lib/api";
 import { paths } from "@/lib/api-paths";
@@ -14,6 +15,15 @@ vi.mock("@/lib/i18n", () => ({
       key === "audit.login_region_local" ? "本地 / 内网" : key,
   }),
 }));
+
+/** The panel links to the audit log itself, so it needs a router. */
+function renderPanel(props: { initialNewIp?: boolean } = {}) {
+  return render(
+    <MemoryRouter>
+      <LoginLogPanel {...props} />
+    </MemoryRouter>,
+  );
+}
 
 const ROWS = [
   {
@@ -52,7 +62,7 @@ describe("LoginLogPanel", () => {
   });
 
   it("summarises the last 24 hours by country", async () => {
-    render(<LoginLogPanel />);
+    renderPanel();
     await screen.findByText("audit.login_summary_title");
     expect(screen.getByText("2")).toBeTruthy();
     expect(screen.getByText("7")).toBeTruthy();
@@ -68,7 +78,7 @@ describe("LoginLogPanel", () => {
   });
 
   it("renders the recorded time, user, IP and region (country · city) per sign-in", async () => {
-    render(<LoginLogPanel />);
+    renderPanel();
     await screen.findByText("alice");
     expect(screen.getByText("203.0.113.9")).toBeTruthy();
     // Country and city travel together in the Region column.
@@ -79,14 +89,14 @@ describe("LoginLogPanel", () => {
   });
 
   it("marks failed attempts and keeps them visually distinct", async () => {
-    render(<LoginLogPanel />);
+    renderPanel();
     await screen.findByText("mallory");
     expect(screen.getByText("audit.login_failed")).toBeTruthy();
     expect(screen.getByText("Wrong password")).toBeTruthy();
   });
 
   it("sends the result and user filters to the server", async () => {
-    render(<LoginLogPanel />);
+    renderPanel();
     await screen.findByText("alice");
 
     fireEvent.change(screen.getByLabelText("audit.login_user_filter"), { target: { value: "mal" } });
@@ -103,7 +113,7 @@ describe("LoginLogPanel", () => {
 
   it("reports a load failure instead of an empty table", async () => {
     vi.mocked(api.get).mockRejectedValue(new Error("offline"));
-    render(<LoginLogPanel />);
+    renderPanel();
     await waitFor(() => expect(screen.getByText("audit.login_load_failed")).toBeTruthy());
     expect(screen.queryByText("audit.login_empty")).toBeNull();
   });
@@ -112,7 +122,7 @@ describe("LoginLogPanel", () => {
     const blob = new Blob(["Time,User\n"], { type: "text/csv" });
     vi.mocked(api.downloadGet).mockResolvedValue({ blob, filename: "login-log-20261110-1900.csv" });
 
-    render(<LoginLogPanel />);
+    renderPanel();
     await screen.findByText("alice");
     fireEvent.click(screen.getByRole("button", { name: /audit\.login_export/ }));
 
@@ -124,10 +134,40 @@ describe("LoginLogPanel", () => {
   });
 
   it("offers a time range and keeps all-time as the default", async () => {
-    render(<LoginLogPanel />);
+    renderPanel();
     await screen.findByText("alice");
     expect(screen.getByLabelText("audit.login_range")).toBeTruthy();
     const call = vi.mocked(api.get).mock.calls.find(([p]) => String(p).startsWith("/audit/logins"));
     expect(String(call?.[0])).not.toContain("since=");
+  });
+
+  it("asks for the sign-ins from a new address when the toggle is on", async () => {
+    renderPanel();
+    await screen.findByText("alice");
+
+    fireEvent.click(screen.getByLabelText("audit.login_new_ip_only"));
+    fireEvent.click(screen.getByRole("button", { name: /audit\.apply/ }));
+
+    await waitFor(() => {
+      const calls = vi.mocked(api.get).mock.calls.map(([p]) => String(p));
+      const last = calls[calls.length - 1];
+      expect(last).toContain("new_ip=1");
+    });
+  });
+
+  it("starts on the new-address sign-ins when the deep link asks for them", async () => {
+    renderPanel({ initialNewIp: true });
+    await screen.findByText("alice");
+
+    const call = vi.mocked(api.get).mock.calls.find(([p]) => String(p).startsWith("/audit/logins"));
+    expect(String(call?.[0])).toContain("new_ip=1");
+  });
+
+  it("links the new-address count to the sign-ins it counts", async () => {
+    renderPanel();
+    await screen.findByText("alice");
+
+    const link = screen.getByRole("link", { name: "1" });
+    expect(link.getAttribute("href")).toBe("/audit?tab=logins&new_ip=1&range=24h");
   });
 });

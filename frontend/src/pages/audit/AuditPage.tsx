@@ -65,6 +65,7 @@ export default function AuditPage() {
   const initialCategory = searchParams.get("category") || "";
   const initialAction = searchParams.get("action") || "";
   const initialRange = searchParams.get("range") || "";
+  const initialNewIp = searchParams.get("new_ip") === "1";
   const { t } = useI18n();
 
   const handleTabChange = useCallback(
@@ -447,9 +448,10 @@ export default function AuditPage() {
 
         <TabsContent value="logins">
           <LoginLogPanel
-            key={`${initialResult}|${initialRange}`}
+            key={`${initialResult}|${initialRange}|${initialNewIp}`}
             initialResult={initialResult}
             initialRange={initialRange}
+            initialNewIp={initialNewIp}
           />
         </TabsContent>
       </Tabs>

@@ -63,12 +63,15 @@ export interface LoginFilters {
   user: string;
   result: string;
   range: string;
+  /** Only the sign-ins that came from an address the account had never used. */
+  newIp?: boolean;
 }
 
 export function loginFilterParams(filters: LoginFilters): URLSearchParams {
   const params = new URLSearchParams();
   if (filters.user) params.set("user", filters.user);
   if (filters.result) params.set("result", filters.result);
+  if (filters.newIp) params.set("new_ip", "1");
   if (filters.range && filters.range !== "all") params.set("since", filters.range);
   return params;
 }

@@ -2179,6 +2179,11 @@ paths:
           schema:
             type: string
             enum: [ok, failed]
+        - name: new_ip
+          in: query
+          description: Only the sign-ins that came from an address the account had never used
+          schema:
+            type: boolean
         - name: since
           in: query
           description: Lower time bound (24h, 7d, 30d or an RFC3339 timestamp)
@@ -2244,9 +2249,9 @@ paths:
       summary: Export the login log as CSV
       description: >-
         Stream the sign-in, failed sign-in and sign-out rows selected by the
-        same user/result filters as /audit/logins as a UTF-8 CSV file. The
-        response headers publish the exported row count and whether the row cap
-        truncated the selection.
+        same user/result/new-address filters as /audit/logins as a UTF-8 CSV
+        file. The response headers publish the exported row count and whether
+        the row cap truncated the selection.
       operationId: exportAuditLoginEvents
       security:
         - SessionCookie: []
@@ -2260,6 +2265,11 @@ paths:
           schema:
             type: string
             enum: [ok, failed]
+        - name: new_ip
+          in: query
+          description: Only the sign-ins that came from an address the account had never used
+          schema:
+            type: boolean
         - name: since
           in: query
           description: Lower time bound (24h, 7d, 30d or an RFC3339 timestamp)

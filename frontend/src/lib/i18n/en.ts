@@ -206,6 +206,8 @@ export const en: Record<string, string> = {
     "audit.login_summary_failed": "Failures",
     "audit.login_summary_ips": "Distinct IPs",
     "audit.login_new_ip": "New-IP sign-ins",
+"audit.login_new_ip_only": "New address only",
+"audit.login_new_ip_view": "Show the sign-ins that came from a new address",
     "audit.login_range": "Time range",
     "audit.login_range_24h": "Last 24 hours",
     "audit.login_range_7d": "Last 7 days",

@@ -100,8 +100,18 @@ func (s *Server) handleGetLoginEvents(c *gin.Context) {
 // responsibility: a future audit action must not leak into a view operators
 // treat as authentication-only.
 func (s *Server) loginEventQuery(c *gin.Context) (*gorm.DB, string) {
-	query := s.auditTenantScope(s.db.Model(&db.AuditLog{}), c).
-		Where("action IN ?", loginActions)
+	query := s.auditTenantScope(s.db.Model(&db.AuditLog{}), c)
+	// The row set is either the sign-in/out events or - when the operator asks
+	// for them - the "first sign-in from this address" rows. Both are facts
+	// about a sign-in, but the new-address rows are not sign-in/out events, so
+	// the allowlist is swapped rather than widened: a new-address sign-in
+	// would otherwise appear twice, once as the sign-in and once as the
+	// anomaly.
+	if loginNewIPOnly(c) {
+		query = query.Where("action = ?", "login_new_ip")
+	} else {
+		query = query.Where("action IN ?", loginActions)
+	}
 	if user := strings.TrimSpace(c.Query("user")); user != "" {
 		query = query.Where(`"user" LIKE ? ESCAPE '\'`, "%"+escapeLike(user)+"%")
 	}
@@ -135,6 +145,17 @@ func (s *Server) loginEventQuery(c *gin.Context) (*gorm.DB, string) {
 		return nil, "since must not be after until"
 	}
 	return query, ""
+}
+
+// loginNewIPOnly reports whether the caller asked for the sign-ins that came
+// from an address the account had never used before - the anomalous-login
+// signal the dashboard counts.
+func loginNewIPOnly(c *gin.Context) bool {
+	switch strings.ToLower(strings.TrimSpace(c.Query("new_ip"))) {
+	case "1", "true", "yes":
+		return true
+	}
+	return false
 }
 
 // loginRegionStat is one region bucket (country + city) of the 24h login

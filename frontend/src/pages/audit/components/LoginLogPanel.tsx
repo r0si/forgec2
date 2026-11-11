@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { paths } from "@/lib/api-paths";
 import { useI18n } from "@/lib/i18n";
@@ -35,6 +36,8 @@ export interface LoginLogPanelProps {
   /** Filters carried by the deep link; unknown values are ignored. */
   initialResult?: string;
   initialRange?: string;
+  /** Only the sign-ins from an address the account had never used. */
+  initialNewIp?: boolean;
 }
 
 /**
@@ -45,12 +48,14 @@ export interface LoginLogPanelProps {
 export function normalizeLoginDeepLink(input: {
   result?: string | null;
   range?: string | null;
-}): { result: string; range: string } {
+  newIp?: boolean | null;
+}): { result: string; range: string; newIp: boolean } {
   const result = (input.result || "").trim().toLowerCase();
   const range = (input.range || "").trim().toLowerCase();
   return {
     result: (LOGIN_RESULT_IDS as readonly string[]).includes(result) ? result : "",
     range: (LOGIN_RANGE_IDS as readonly string[]).includes(range) ? range : "all",
+    newIp: input.newIp === true,
   };
 }
 
@@ -76,11 +81,11 @@ function regionLabel(t: (key: string) => string, country: string, city?: string)
  * IP→region table. The panel never mutates the audit rows: writing a region
  * after the fact would break the chain those rows exist to protect.
  */
-export function LoginLogPanel({ initialResult, initialRange }: LoginLogPanelProps = {}) {
+export function LoginLogPanel({ initialResult, initialRange, initialNewIp }: LoginLogPanelProps = {}) {
   const { t } = useI18n();
   const deepLink = useMemo(
-    () => normalizeLoginDeepLink({ result: initialResult, range: initialRange }),
-    [initialResult, initialRange],
+    () => normalizeLoginDeepLink({ result: initialResult, range: initialRange, newIp: initialNewIp }),
+    [initialResult, initialRange, initialNewIp],
   );
   const [events, setEvents] = useState<LoginEvent[]>([]);
   const [summary, setSummary] = useState<LoginSummary | null>(null);
@@ -93,7 +98,13 @@ export function LoginLogPanel({ initialResult, initialRange }: LoginLogPanelProp
   const [userFilter, setUserFilter] = useState("");
   const [resultFilter, setResultFilter] = useState(deepLink.result);
   const [range, setRange] = useState(deepLink.range);
-  const [applied, setApplied] = useState({ user: "", result: deepLink.result, range: deepLink.range });
+  const [newIpOnly, setNewIpOnly] = useState(deepLink.newIp);
+  const [applied, setApplied] = useState({
+    user: "",
+    result: deepLink.result,
+    range: deepLink.range,
+    newIp: deepLink.newIp,
+  });
 
   const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
@@ -131,14 +142,15 @@ export function LoginLogPanel({ initialResult, initialRange }: LoginLogPanelProp
 
   const apply = () => {
     setPage(1);
-    setApplied({ user: userFilter.trim(), result: resultFilter, range });
+    setApplied({ user: userFilter.trim(), result: resultFilter, range, newIp: newIpOnly });
   };
   const reset = () => {
     setUserFilter("");
     setResultFilter("");
     setRange("all");
+    setNewIpOnly(false);
     setPage(1);
-    setApplied({ user: "", result: "", range: "all" });
+    setApplied({ user: "", result: "", range: "all", newIp: false });
   };
 
   const exportCsv = async () => {
@@ -179,7 +191,16 @@ export function LoginLogPanel({ initialResult, initialRange }: LoginLogPanelProp
               {t("audit.login_summary_ips")} <span className="font-mono text-foreground">{summary.distinct_ips}</span>
             </span>
             <span className="text-sm text-muted-foreground">
-              {t("audit.login_new_ip")} <span className="font-mono text-foreground">{summary.new_ip ?? 0}</span>
+              {t("audit.login_new_ip")}{" "}
+              {/* The count is a question ("which sign-ins?"); the link is the
+                  answer, in the login log itself. */}
+              <Link
+                to="/audit?tab=logins&new_ip=1&range=24h"
+                className="font-mono text-foreground underline-offset-2 hover:underline"
+                title={t("audit.login_new_ip_view")}
+              >
+                {summary.new_ip ?? 0}
+              </Link>
             </span>
           </div>
           {summary.by_region.length > 0 && (
@@ -238,6 +259,15 @@ export function LoginLogPanel({ initialResult, initialRange }: LoginLogPanelProp
           aria-label={t("audit.login_user_filter")}
           className="h-9 w-[180px] rounded-lg border border-border bg-card px-3 text-sm"
         />
+        <label className="flex items-center gap-2 text-sm text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={newIpOnly}
+            onChange={(e) => setNewIpOnly(e.target.checked)}
+            className="size-4 accent-current"
+          />
+          {t("audit.login_new_ip_only")}
+        </label>
         <Button onClick={apply} disabled={loading}>
           <Filter className="size-4" />
           <span>{t("audit.apply")}</span>

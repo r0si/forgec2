@@ -126,7 +126,7 @@ export function AuditRiskStrip() {
                   />
                 </Card>
               </Link>
-              <Link to="/audit?tab=operations&action=login_new_ip&range=24h">
+              <Link to="/audit?tab=logins&new_ip=1&range=24h">
                 <Card interactive className="p-(--card-spacing) hover:ring-1 hover:ring-primary/20">
                   <StatTile
                     label={t("dashboard.audit_new_ip")}

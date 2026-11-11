@@ -1219,7 +1219,7 @@ export interface paths {
         };
         /**
          * Export the login log as CSV
-         * @description Stream the sign-in, failed sign-in and sign-out rows selected by the same user/result filters as /audit/logins as a UTF-8 CSV file. The response headers publish the exported row count and whether the row cap truncated the selection.
+         * @description Stream the sign-in, failed sign-in and sign-out rows selected by the same user/result/new-address filters as /audit/logins as a UTF-8 CSV file. The response headers publish the exported row count and whether the row cap truncated the selection.
          */
         get: operations["exportAuditLoginEvents"];
         put?: never;
@@ -14227,6 +14227,8 @@ export interface operations {
                 pageSize?: number;
                 user?: string;
                 result?: "ok" | "failed";
+                /** @description Only the sign-ins that came from an address the account had never used */
+                new_ip?: boolean;
                 /** @description Lower time bound (24h, 7d, 30d or an RFC3339 timestamp) */
                 since?: string;
                 /** @description Upper time bound (24h, 7d, 30d or an RFC3339 timestamp) */
@@ -14283,6 +14285,8 @@ export interface operations {
             query?: {
                 user?: string;
                 result?: "ok" | "failed";
+                /** @description Only the sign-ins that came from an address the account had never used */
+                new_ip?: boolean;
                 /** @description Lower time bound (24h, 7d, 30d or an RFC3339 timestamp) */
                 since?: string;
                 /** @description Upper time bound (24h, 7d, 30d or an RFC3339 timestamp) */

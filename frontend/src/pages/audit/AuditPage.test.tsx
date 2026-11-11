@@ -91,6 +91,17 @@ describe("AuditPage tabs", () => {
     });
   });
 
+  it("opens the login tab on the new-address sign-ins from a deep link", async () => {
+    renderPage("/audit?tab=logins&new_ip=1&range=24h");
+
+    await waitFor(() => {
+      const call = vi.mocked(api.get).mock.calls.find(([path]) => String(path).startsWith("/audit/logins"));
+      expect(call).toBeTruthy();
+      expect(String(call?.[0])).toContain("new_ip=1");
+      expect(String(call?.[0])).toContain("since=24h");
+    });
+  });
+
   it("keeps the selected tab in the address bar", async () => {
     renderPage();
     fireEvent.click(await screen.findByRole("tab", { name: /audit\.tab_operations/ }));

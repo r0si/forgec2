@@ -208,6 +208,8 @@ export const zh: Record<string, string> = {
     "audit.login_summary_failed": "失败",
     "audit.login_summary_ips": "独立 IP",
     "audit.login_new_ip": "新 IP 登录",
+    "audit.login_new_ip_only": "仅新地址",
+    "audit.login_new_ip_view": "查看来自新地址的登录",
     "audit.login_range": "时间范围",
     "audit.login_range_24h": "最近 24 小时",
     "audit.login_range_7d": "最近 7 天",
