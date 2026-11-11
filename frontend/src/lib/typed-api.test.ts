@@ -11,17 +11,34 @@ describe("fetchAgentsPage", () => {
     vi.restoreAllMocks();
   });
 
-  it("returns agents + total from the data envelope", async () => {
+  it("returns agents + total from the enveloped list the server actually sends", async () => {
+    // The shape GET /api/agents really answers: the list sits inside the
+    // standard envelope. Reading it at the top level returned nothing.
     vi.mocked(api.get).mockResolvedValue({
       success: true,
-      data: [{ id: "a1", hostname: "h1" }],
-      total: 1,
+      data: {
+        agents: [{ id: "a1", hostname: "h1" }],
+        data: [{ id: "a1", hostname: "h1" }],
+        total: 1,
+        page: 1,
+        page_size: 50,
+      },
     });
     const r = await fetchAgentsPage();
     expect(r.agents).toHaveLength(1);
     expect(r.agents[0].hostname).toBe("h1");
     expect(r.total).toBe(1);
     expect(api.get).toHaveBeenCalledWith(paths.agents.list(""), { unwrap: false });
+  });
+
+  it("still reads a bare data array and a raw agents body", async () => {
+    vi.mocked(api.get).mockResolvedValue({ success: true, data: [{ id: "a0", hostname: "h0" }] });
+    expect((await fetchAgentsPage()).agents).toHaveLength(1);
+
+    vi.mocked(api.get).mockResolvedValue({ agents: [{ id: "a2" }], total: "42" });
+    const r = await fetchAgentsPage();
+    expect(r.agents).toHaveLength(1);
+    expect(r.total).toBe(42);
   });
 
   it("falls back to the agents key and coerces string totals", async () => {

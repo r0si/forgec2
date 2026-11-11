@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { paths } from "@/lib/api-paths";
 import { errorText } from "@/lib/errors";
+import { unwrapEnvelope } from "@/lib/envelope";
 import { useErrorToast } from "@/lib/hooks/useErrorToast";
 import { downloadText } from "@/lib/download";
 import type { Beacon, BulkResult } from "./types";
@@ -254,7 +255,8 @@ export function useAgentBulkOps(deps: BulkOpsDeps) {
         q.set("sort_key", sortKey);
         q.set("sort_dir", sortDir);
         const d = await api.get<{ agents?: Beacon[]; total?: number | string }>(paths.agents.list(q.toString()), { unwrap: false, signal: controller.signal });
-        const pageList = (d.agents || []) as Beacon[];
+        const body = unwrapEnvelope(d) as { agents?: Beacon[]; total?: number | string };
+        const pageList = (body.agents || []) as Beacon[];
         all.push(...pageList);
         if (pageList.length < PAGE) break;
         // Yield to the event loop so the UI (and the cancel click) stays live.

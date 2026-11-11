@@ -5,6 +5,7 @@ import {
   firstField,
   firstNumber,
   normalizeListEnvelope,
+  unwrapEnvelope,
 } from "./envelope";
 
 describe("envelope helpers", () => {
@@ -36,5 +37,14 @@ describe("envelope helpers", () => {
     expect(normalizeListEnvelope({ users: [{ id: "u" }] })).toEqual([{ id: "u" }]);
     expect(normalizeListEnvelope({ data: [{ id: "d" }] })).toEqual([{ id: "d" }]);
     expect(normalizeListEnvelope({ foo: 1 })).toEqual([]);
+  });
+
+  it("unwrapEnvelope returns the payload of an envelope body and leaves others alone", () => {
+    expect(unwrapEnvelope({ success: true, data: { total: 3 } })).toEqual({ total: 3 });
+    // A body without the envelope markers is returned untouched, so a
+    // legacy/raw endpoint keeps working.
+    expect(unwrapEnvelope({ agents: [] })).toEqual({ agents: [] });
+    expect(unwrapEnvelope([1, 2])).toEqual([1, 2]);
+    expect(unwrapEnvelope(null)).toBeNull();
   });
 });

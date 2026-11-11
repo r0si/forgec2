@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { paths } from "@/lib/api-paths";
 import { errorText } from "@/lib/errors";
+import { unwrapEnvelope } from "@/lib/envelope";
 import { useCachedData } from "@/lib/hooks/useCachedData";
 import { useApiResource } from "@/lib/hooks/useApiResource";
 import type { Beacon } from "./types";
@@ -71,7 +72,10 @@ export function useAgentData(t: (key: string) => string) {
         paths.agents.list(p.toString()),
         { signal, unwrap: false },
       );
-      const list = (d.agents || []) as Beacon[];
+      // The list arrives inside the standard envelope, so the payload is one
+      // level down. Reading it at the top level returned no rows at all.
+      const body = unwrapEnvelope(d) as { agents?: Beacon[]; total?: number | string };
+      const list = (body.agents || []) as Beacon[];
       const countMap: Record<string, number> = {};
       for (const b of list) {
         const aid = b.id || "";

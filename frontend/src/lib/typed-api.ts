@@ -1,7 +1,7 @@
 import type { components } from "./api-schema";
 import { api } from "./api";
 import { paths } from "./api-paths";
-import { firstArray, firstNumber } from "./envelope";
+import { firstArray, firstNumber, unwrapEnvelope } from "./envelope";
 
 /**
  * Contract-backed API layer.
@@ -49,6 +49,9 @@ export async function fetchAgentsPage(query: AgentsListQuery = {}, signal?: Abor
   }
   const suffix = q.size ? `?${q.toString()}` : "";
   const raw = await api.get<unknown>(paths.agents.list(suffix), { unwrap: false, signal });
-  const agents = firstArray(raw, ["data", "agents", "Agents"]) as AgentDTO[];
-  return { agents, total: firstNumber(raw, ["total"], agents.length) };
+  // The server wraps every 200 body, so the list is under `data`. Reading the
+  // top level found nothing and reported an empty fleet.
+  const body = unwrapEnvelope(raw);
+  const agents = firstArray(body, ["agents", "Agents", "data"]) as AgentDTO[];
+  return { agents, total: firstNumber(body, ["total"], agents.length) };
 }

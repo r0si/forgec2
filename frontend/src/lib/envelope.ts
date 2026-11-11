@@ -51,3 +51,23 @@ export function normalizeListEnvelope(
 ): unknown[] {
   return firstArray(data, keys);
 }
+
+/**
+ * Unwrap the standard response envelope one level.
+ *
+ * Every JSON 200 body from this server is `{"success":true,"data":{...}}`. A
+ * caller that reads the raw body (`unwrap:false`) used to find its payload at
+ * the top level; after the envelope migration the same payload sits under
+ * `data`. Reading the top level then yields undefined - and a list endpoint
+ * answers "0 rows" while the rows are right there in the response.
+ *
+ * This returns the inner object for an envelope body and the body itself
+ * otherwise, so a caller reads its fields at one fixed depth. It only unwraps
+ * a body that actually carries the envelope markers.
+ */
+export function unwrapEnvelope(data: unknown): unknown {
+  const o = asRecord(data);
+  if (!o) return data;
+  if ("success" in o && "data" in o) return o.data;
+  return data;
+}

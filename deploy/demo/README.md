@@ -139,8 +139,20 @@ install it with:
 sudo install -m 0644 deploy/demo/logrotate.conf /etc/logrotate.d/forgec2-demo
 ```
 
-A backup is only real once it has been restored somewhere. `restore-drill.sh`
-restores the newest dump into a scratch database on the same cluster and
+The demo needs something to show. `seed-beacon.sh` inserts one demo beacon
+(offline, tenant-scoped), its task history and the audit rows for those
+operations - with `prev_hash`/`entry_hash` computed in SQL from the server's
+exact chain layout, so the audit page's **Verify chain** keeps reporting an
+intact chain instead of a seeded row with a broken link. It is idempotent (the
+beacon has a fixed id, the demo tasks are replaced, and the audit rows are
+skipped when the beacon already has some) and reads the same `.env` as the
+server:
+
+```bash
+sudo bash deploy/demo/seed-beacon.sh
+```
+
+A backup is only real once it has been restored somewhere. `restore-drill.sh`restores the newest dump into a scratch database on the same cluster and
 compares row counts on the tables that matter (needs sudo access to the
 postgres superuser for database creation):
 

@@ -1,6 +1,7 @@
 import type { StateCreator } from "zustand";
 import { api } from "../api";
 import { paths } from "../api-paths";
+import { unwrapEnvelope } from "../envelope";
 import { logger } from "../logger";
 import type { DashboardStats } from "@/types/agent";
 import type { AppStore } from "./types";
@@ -30,7 +31,10 @@ export const createStatsSlice: StateCreator<AppStore, [], [], StatsSlice> = (set
             .get<{ total?: number }>(`${paths.listeners.list}?page=1&page_size=1`, { unwrap: false })
             .catch(() => undefined),
         ]);
-        const scoped = typeof listeners?.total === "number" ? listeners.total : undefined;
+        // The scoped total lives inside the response envelope; reading it at
+        // the top level silently fell back to the deployment-wide count.
+        const listenerBody = unwrapEnvelope(listeners) as { total?: number } | undefined;
+        const scoped = typeof listenerBody?.total === "number" ? listenerBody.total : undefined;
         set({
           stats: scoped === undefined ? stats : { ...stats, total_listeners: scoped },
           statsError: undefined,
