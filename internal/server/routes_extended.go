@@ -149,6 +149,11 @@ func (s *Server) registerExtendedRoutes(auth *gin.RouterGroup) {
 	{
 		tagsRead.GET("/api/tags", s.handleAPITagList)
 		tagsRead.GET("/api/agents/:id/tags", s.handleAgentTags)
+		// A batch READ: the console fetches the tags of every visible beacon
+		// in one call. It used to sit in the write group, so a read-only role
+		// (and the public demo's observer) got 403 and the beacons page
+		// reported "Could not read: beacon tags" above a fleet it could see.
+		tagsRead.POST("/agents/batch/tags", s.handleBatchAgentTags)
 	}
 
 	tagsWrite := auth.Group("/")
@@ -157,7 +162,6 @@ func (s *Server) registerExtendedRoutes(auth *gin.RouterGroup) {
 		tagsWrite.POST("/api/tags", s.handleAPITagCreate)
 		tagsWrite.PUT("/api/tags/:id", s.handleAPITagUpdate)
 		tagsWrite.DELETE("/api/tags/:id", s.handleAPITagDelete)
-		tagsWrite.POST("/agents/batch/tags", s.handleBatchAgentTags)
 	}
 }
 

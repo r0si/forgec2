@@ -173,7 +173,10 @@ export function useAgentData(t: (key: string) => string) {
         // overwrite tags fetched for a newer id set.
         .then((d) => {
           if (!ac.signal.aborted && keyAtStart === idsKeyRef.current) {
-            setTagsByAgent(d.tags || {});
+            // The payload is a map keyed by agent id. Reading a "tags" field
+            // out of it found nothing, so every agent looked untagged.
+            const payload = unwrapEnvelope(d) as Record<string, AgentTag[]>;
+            setTagsByAgent(payload || {});
             setTagsError(false);
           }
         })
