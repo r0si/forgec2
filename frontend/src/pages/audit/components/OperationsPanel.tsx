@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { paths } from "@/lib/api-paths";
 import { useI18n } from "@/lib/i18n";
@@ -127,6 +127,8 @@ export interface OperationsPanelProps {
   initialCategory?: string;
   initialAction?: string;
   initialRange?: string;
+  initialUser?: string;
+  initialSearch?: string;
 }
 
 /**
@@ -145,6 +147,8 @@ export function OperationsPanel({
   initialCategory,
   initialAction,
   initialRange,
+  initialUser = "",
+  initialSearch = "",
 }: OperationsPanelProps) {
   const { t } = useI18n();
   const { can } = usePermissions();
@@ -176,8 +180,8 @@ export function OperationsPanel({
   const [category, setCategory] = useState(deepLink.category);
   const [action, setAction] = useState(deepLink.action);
   const [result, setResult] = useState(deepLink.result);
-  const [user, setUser] = useState("");
-  const [search, setSearch] = useState("");
+  const [user, setUser] = useState(initialUser.trim());
+  const [search, setSearch] = useState(initialSearch.trim());
   const [agentId, setAgentId] = useState(initialTarget);
   const [includeSystem, setIncludeSystem] = useState(false);
   const [applied, setApplied] = useState<AppliedFilters>({
@@ -186,8 +190,33 @@ export function OperationsPanel({
     category: deepLink.category,
     action: deepLink.action,
     result: deepLink.result,
+    user: initialUser.trim(),
+    search: initialSearch.trim(),
     agentId: initialTarget,
   });
+
+  // The address bar holds the selection, in both directions: a link carries
+  // it in, and applying a filter writes it back out. Without the second half
+  // the operator's own selection dies on the next reload and cannot be shared.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const writeSelection = useCallback(
+    (filters: AppliedFilters) => {
+      const params = new URLSearchParams(searchParams);
+      const put = (key: string, value: string) => {
+        if (value) params.set(key, value);
+        else params.delete(key);
+      };
+      put("result", filters.result);
+      put("category", filters.category);
+      put("action", filters.action);
+      put("range", filters.range === "7d" ? "" : filters.range);
+      put("agent_id", filters.agentId);
+      put("user", filters.user);
+      put("search", filters.search);
+      setSearchParams(params, { replace: true });
+    },
+    [searchParams, setSearchParams],
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -260,8 +289,7 @@ export function OperationsPanel({
   }, [load]);
 
   const apply = () => {
-    setPage(1);
-    setApplied({
+    const next: AppliedFilters = {
       range,
       category,
       action,
@@ -270,7 +298,10 @@ export function OperationsPanel({
       search: search.trim(),
       agentId: agentId.trim(),
       includeSystem,
-    });
+    };
+    setPage(1);
+    setApplied(next);
+    writeSelection(next);
   };
 
   const reset = () => {
@@ -284,12 +315,15 @@ export function OperationsPanel({
     setIncludeSystem(false);
     setPage(1);
     setApplied(EMPTY_FILTERS);
+    writeSelection(EMPTY_FILTERS);
   };
 
   const clearTarget = () => {
     setAgentId("");
-    setApplied((prev) => ({ ...prev, agentId: "" }));
+    const next = { ...applied, agentId: "" };
+    setApplied(next);
     setPage(1);
+    writeSelection(next);
   };
 
   const changeCategory = (value: string) => {
@@ -315,7 +349,7 @@ export function OperationsPanel({
       const stat = catalogue.actions.find((a) => a.action === action);
       const nextAction = stat && stat.category !== next ? "" : action;
       setAction(nextAction);
-      setApplied({
+      const appliedNext: AppliedFilters = {
         range,
         category: next,
         action: nextAction,
@@ -324,13 +358,13 @@ export function OperationsPanel({
         search: search.trim(),
         agentId: agentId.trim(),
         includeSystem,
-      });
+      };
+      setApplied(appliedNext);
+      writeSelection(appliedNext);
     } else {
-      setApplied({
-        ...applied,
-        category: "",
-        action: "",
-      });
+      const appliedNext = { ...applied, category: "", action: "" };
+      setApplied(appliedNext);
+      writeSelection(appliedNext);
     }
   };
 

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { useEffect } from "react";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { LoginLogPanel } from "@/pages/audit/components/LoginLogPanel";
 import { api } from "@/lib/api";
 import { paths } from "@/lib/api-paths";
@@ -16,10 +17,21 @@ vi.mock("@/lib/i18n", () => ({
   }),
 }));
 
+// The probe records the address bar (the panel writes its selection back).
+const locationProbe = { search: "" };
+function LocationProbe() {
+  const location = useLocation();
+  useEffect(() => {
+    locationProbe.search = location.search;
+  }, [location.search]);
+  return null;
+}
+
 /** The panel links to the audit log itself, so it needs a router. */
 function renderPanel(props: { initialNewIp?: boolean } = {}) {
   return render(
     <MemoryRouter>
+      <LocationProbe />
       <LoginLogPanel {...props} />
     </MemoryRouter>,
   );
@@ -139,6 +151,18 @@ describe("LoginLogPanel", () => {
     expect(screen.getByLabelText("audit.login_range")).toBeTruthy();
     const call = vi.mocked(api.get).mock.calls.find(([p]) => String(p).startsWith("/audit/logins"));
     expect(String(call?.[0])).not.toContain("since=");
+  });
+
+  it("writes the applied selection into the address bar", async () => {
+    // The address bar holds the selection in both directions: the operator's
+    // own choice survives a reload and can be shared.
+    renderPanel();
+    await screen.findByText("alice");
+
+    fireEvent.click(screen.getByLabelText("audit.login_new_ip_only"));
+    fireEvent.click(screen.getByRole("button", { name: /audit\.apply/ }));
+
+    await waitFor(() => expect(locationProbe.search).toContain("new_ip=1"));
   });
 
   it("asks for the sign-ins from a new address when the toggle is on", async () => {

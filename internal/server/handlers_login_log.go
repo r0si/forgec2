@@ -116,9 +116,9 @@ func (s *Server) loginEventQuery(c *gin.Context) (*gorm.DB, string) {
 		query = query.Where(`"user" LIKE ? ESCAPE '\'`, "%"+escapeLike(user)+"%")
 	}
 	switch strings.ToLower(strings.TrimSpace(c.Query("result"))) {
-	case "ok":
+	case "ok", "success":
 		query = query.Where("success = ?", true)
-	case "failed":
+	case "failed", "failure", "error":
 		query = query.Where("success = ?", false)
 	}
 

@@ -126,6 +126,9 @@ export function ActionPicker({
                   size="xs"
                   className="w-full justify-start text-xs"
                   aria-pressed={value === entry.action}
+                  // The count is part of the name: a screen reader otherwise
+                  // reads two identical labels for two different actions.
+                  aria-label={`${auditActionLabel(t, entry.action)} (${entry.count})`}
                   onClick={() => {
                     onChange(entry.action);
                     setOpen(false);

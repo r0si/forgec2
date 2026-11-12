@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { useEffect } from "react";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { OperationsPanel } from "./OperationsPanel";
 import { api } from "@/lib/api";
 
@@ -17,10 +18,23 @@ vi.mock("@/lib/i18n", () => ({
 const can = vi.fn(() => true);
 vi.mock("@/lib/hooks/usePermissions", () => ({ usePermissions: () => ({ can }) }));
 
+// The probe records the address bar. It writes into an object rather than a
+// plain variable so the render stays pure (the lint rule forbids reassigning
+// an outer binding during render).
+const locationProbe = { search: "" };
+function LocationProbe() {
+  const location = useLocation();
+  useEffect(() => {
+    locationProbe.search = location.search;
+  }, [location.search]);
+  return null;
+}
+
 /** The panel links to the beacon a row belongs to, so it needs a router. */
 function renderPanel(props: Partial<React.ComponentProps<typeof OperationsPanel>> = {}) {
   return render(
     <MemoryRouter>
+      <LocationProbe />
       <OperationsPanel {...props} />
     </MemoryRouter>,
   );
@@ -231,6 +245,24 @@ describe("OperationsPanel", () => {
     renderPanel();
     await screen.findByText("Created task");
     expect(screen.queryByRole("link", { name: /11111111/ })).toBeNull();
+  });
+
+  it("writes the applied selection into the address bar", async () => {
+    // The address bar holds the selection in both directions: a link carries
+    // it in, and the operator's own selection goes back out. Without this the
+    // selection dies on the next reload and cannot be shared.
+    renderPanel();
+    await screen.findByText("Created task");
+
+    const chip = await screen.findByRole("button", { name: /tasks · 3/ });
+    fireEvent.click(chip);
+    await waitFor(() => expect(locationProbe.search).toContain("category=tasks"));
+
+    // Pick an action in the picker and apply it.
+    fireEvent.click(screen.getByRole("button", { name: "audit.ops_all_actions" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Created task \(3\)/ }));
+    fireEvent.click(screen.getByRole("button", { name: /audit\.apply/ }));
+    await waitFor(() => expect(locationProbe.search).toContain("action=task_create"));
   });
 
   it("filters by a category from the catalogue chips", async () => {

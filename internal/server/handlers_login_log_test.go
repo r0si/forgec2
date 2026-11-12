@@ -116,6 +116,18 @@ func TestLoginEventsReportIPTimeAndCountry(t *testing.T) {
 		}
 	}
 
+	// result=success is the same filter under the name the audit list uses,
+	// so one URL can describe a selection in either tab.
+	_, success := call("?result=success")
+	if len(success.Data.Events) != len(ok.Data.Events) {
+		t.Fatalf("result=success returned %d events, want the %d of result=ok", len(success.Data.Events), len(ok.Data.Events))
+	}
+	for _, e := range success.Data.Events {
+		if e.User == "mallory" {
+			t.Fatalf("result=success returned a failed attempt: %+v", e)
+		}
+	}
+
 	// user filter matches by substring.
 	_, byUser := call("?user=mal")
 	if len(byUser.Data.Events) != 1 || byUser.Data.Events[0].User != "mallory" {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { paths } from "@/lib/api-paths";
 import { useI18n } from "@/lib/i18n";
@@ -28,8 +28,9 @@ export interface LoginSummary {
 
 const PER_PAGE = 50;
 
-/** Result ids the login log accepts ("ok" / "failed"). */
-const LOGIN_RESULT_IDS = ["ok", "failed"] as const;
+/** Result ids the login log accepts ("success" / "failed"; the server also
+ *  accepts the older "ok" spelling). */
+const LOGIN_RESULT_IDS = ["success", "failed"] as const;
 /** Range ids the login log accepts. */
 const LOGIN_RANGE_IDS = ["24h", "7d", "30d", "all"] as const;
 
@@ -37,6 +38,7 @@ export interface LoginLogPanelProps {
   /** Filters carried by the deep link; unknown values are ignored. */
   initialResult?: string;
   initialRange?: string;
+  initialUser?: string;
   /** Only the sign-ins from an address the account had never used. */
   initialNewIp?: boolean;
 }
@@ -45,6 +47,9 @@ export interface LoginLogPanelProps {
  * Read the filters a deep link carries and keep only the values the server
  * accepts - an unknown result or range would otherwise be sent as-is and come
  * back as an empty table.
+ *
+ * The vocabulary is the one the Operations tab uses ("success" / "failed"), so
+ * one URL can describe a selection in either tab.
  */
 export function normalizeLoginDeepLink(input: {
   result?: string | null;
@@ -82,7 +87,12 @@ function regionLabel(t: (key: string) => string, country: string, city?: string)
  * IP→region table. The panel never mutates the audit rows: writing a region
  * after the fact would break the chain those rows exist to protect.
  */
-export function LoginLogPanel({ initialResult, initialRange, initialNewIp }: LoginLogPanelProps = {}) {
+export function LoginLogPanel({
+  initialResult,
+  initialRange,
+  initialUser = "",
+  initialNewIp,
+}: LoginLogPanelProps = {}) {
   const { t } = useI18n();
   const deepLink = useMemo(
     () => normalizeLoginDeepLink({ result: initialResult, range: initialRange, newIp: initialNewIp }),
@@ -96,16 +106,36 @@ export function LoginLogPanel({ initialResult, initialRange, initialNewIp }: Log
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [userFilter, setUserFilter] = useState("");
+  const [userFilter, setUserFilter] = useState(initialUser.trim());
   const [resultFilter, setResultFilter] = useState(deepLink.result);
   const [range, setRange] = useState(deepLink.range);
   const [newIpOnly, setNewIpOnly] = useState(deepLink.newIp);
   const [applied, setApplied] = useState({
-    user: "",
+    user: initialUser.trim(),
     result: deepLink.result,
     range: deepLink.range,
     newIp: deepLink.newIp,
   });
+
+  // The address bar holds the selection, in both directions - the same
+  // contract the Operations tab follows, with the same vocabulary.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const writeSelection = useCallback(
+    (filters: { user: string; result: string; range: string; newIp: boolean }) => {
+      const params = new URLSearchParams(searchParams);
+      const put = (key: string, value: string) => {
+        if (value) params.set(key, value);
+        else params.delete(key);
+      };
+      put("result", filters.result);
+      put("range", filters.range === "all" ? "" : filters.range);
+      put("user", filters.user);
+      if (filters.newIp) params.set("new_ip", "1");
+      else params.delete("new_ip");
+      setSearchParams(params, { replace: true });
+    },
+    [searchParams, setSearchParams],
+  );
 
   const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
@@ -142,8 +172,10 @@ export function LoginLogPanel({ initialResult, initialRange, initialNewIp }: Log
   }, [load]);
 
   const apply = () => {
+    const next = { user: userFilter.trim(), result: resultFilter, range, newIp: newIpOnly };
     setPage(1);
-    setApplied({ user: userFilter.trim(), result: resultFilter, range, newIp: newIpOnly });
+    setApplied(next);
+    writeSelection(next);
   };
   const reset = () => {
     setUserFilter("");
@@ -151,7 +183,9 @@ export function LoginLogPanel({ initialResult, initialRange, initialNewIp }: Log
     setRange("all");
     setNewIpOnly(false);
     setPage(1);
-    setApplied({ user: "", result: "", range: "all", newIp: false });
+    const next = { user: "", result: "", range: "all", newIp: false };
+    setApplied(next);
+    writeSelection(next);
   };
 
   const exportCsv = async () => {
@@ -246,7 +280,7 @@ export function LoginLogPanel({ initialResult, initialRange, initialNewIp }: Log
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{t("audit.login_all_results")}</SelectItem>
-            <SelectItem value="ok">{t("audit.login_ok")}</SelectItem>
+            <SelectItem value="success">{t("audit.login_ok")}</SelectItem>
             <SelectItem value="failed">{t("audit.login_failed")}</SelectItem>
           </SelectContent>
         </Select>
