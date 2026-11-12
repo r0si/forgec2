@@ -234,6 +234,7 @@ export const en: Record<string, string> = {
     "audit.ops_target_ph": "Beacon ID",
     "audit.ops_target_applied": "Target: {id}",
     "audit.ops_target_clear": "Clear target",
+    "audit.ops_host_applied": "Host: {host}",
     "audit.ops_include_system": "Include system events",
     "audit.ops_export": "Export CSV",
     "audit.ops_empty": "No operations match these filters",

@@ -67,6 +67,7 @@ export default function AuditPage() {
   const initialRange = searchParams.get("range") || "";
   const initialUser = searchParams.get("user") || "";
   const initialSearch = searchParams.get("search") || "";
+  const initialHost = searchParams.get("host") || "";
   const initialNewIp = searchParams.get("new_ip") === "1";
   const { t } = useI18n();
 
@@ -438,7 +439,7 @@ export default function AuditPage() {
               has to rebuild the panel, because the panel reads its filters
               once when it mounts. */}
           <OperationsPanel
-            key={`${initialAgentId}|${initialResult}|${initialCategory}|${initialAction}|${initialRange}|${initialUser}|${initialSearch}`}
+            key={`${initialAgentId}|${initialResult}|${initialCategory}|${initialAction}|${initialRange}|${initialUser}|${initialSearch}|${initialHost}`}
             users={users}
             initialAgentId={initialAgentId}
             initialResult={initialResult}
@@ -447,6 +448,7 @@ export default function AuditPage() {
             initialRange={initialRange}
             initialUser={initialUser}
             initialSearch={initialSearch}
+            initialHost={initialHost}
           />
         </TabsContent>
 

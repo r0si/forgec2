@@ -104,6 +104,8 @@ interface AppliedFilters {
   user: string;
   search: string;
   agentId: string;
+  /** The host key ("h:<name>", "ip:<addr>") the selection is scoped to. */
+  host: string;
   includeSystem: boolean;
 }
 
@@ -115,6 +117,7 @@ const EMPTY_FILTERS: AppliedFilters = {
   user: "",
   search: "",
   agentId: "",
+  host: "",
   includeSystem: false,
 };
 
@@ -129,6 +132,8 @@ export interface OperationsPanelProps {
   initialRange?: string;
   initialUser?: string;
   initialSearch?: string;
+  /** The host the selection is scoped to ("h:<name>" / "ip:<addr>"). */
+  initialHost?: string;
 }
 
 /**
@@ -149,6 +154,7 @@ export function OperationsPanel({
   initialRange,
   initialUser = "",
   initialSearch = "",
+  initialHost = "",
 }: OperationsPanelProps) {
   const { t } = useI18n();
   const { can } = usePermissions();
@@ -183,6 +189,7 @@ export function OperationsPanel({
   const [user, setUser] = useState(initialUser.trim());
   const [search, setSearch] = useState(initialSearch.trim());
   const [agentId, setAgentId] = useState(initialTarget);
+  const [host, setHost] = useState(initialHost.trim());
   const [includeSystem, setIncludeSystem] = useState(false);
   const [applied, setApplied] = useState<AppliedFilters>({
     ...EMPTY_FILTERS,
@@ -193,6 +200,7 @@ export function OperationsPanel({
     user: initialUser.trim(),
     search: initialSearch.trim(),
     agentId: initialTarget,
+    host: initialHost.trim(),
   });
 
   // The address bar holds the selection, in both directions: a link carries
@@ -211,6 +219,7 @@ export function OperationsPanel({
       put("action", filters.action);
       put("range", filters.range === "7d" ? "" : filters.range);
       put("agent_id", filters.agentId);
+      put("host", filters.host);
       put("user", filters.user);
       put("search", filters.search);
       setSearchParams(params, { replace: true });
@@ -255,6 +264,7 @@ export function OperationsPanel({
     if (filters.result) params.set("result", filters.result);
     if (filters.search) params.set("search", filters.search);
     if (filters.agentId) params.set("agent_id", filters.agentId);
+    if (filters.host) params.set("host", filters.host);
     if (filters.range !== "all") params.set("since", filters.range);
     params.set("scope", filters.includeSystem ? "all" : "operations");
     return params.toString();
@@ -297,6 +307,7 @@ export function OperationsPanel({
       user: user.trim(),
       search: search.trim(),
       agentId: agentId.trim(),
+      host: host.trim(),
       includeSystem,
     };
     setPage(1);
@@ -312,6 +323,7 @@ export function OperationsPanel({
     setUser("");
     setSearch("");
     setAgentId("");
+    setHost("");
     setIncludeSystem(false);
     setPage(1);
     setApplied(EMPTY_FILTERS);
@@ -321,6 +333,14 @@ export function OperationsPanel({
   const clearTarget = () => {
     setAgentId("");
     const next = { ...applied, agentId: "" };
+    setApplied(next);
+    setPage(1);
+    writeSelection(next);
+  };
+
+  const clearHost = () => {
+    setHost("");
+    const next = { ...applied, host: "" };
     setApplied(next);
     setPage(1);
     writeSelection(next);
@@ -357,6 +377,7 @@ export function OperationsPanel({
         user: user.trim(),
         search: search.trim(),
         agentId: agentId.trim(),
+        host: host.trim(),
         includeSystem,
       };
       setApplied(appliedNext);
@@ -576,6 +597,17 @@ export function OperationsPanel({
             {t("audit.ops_target_applied", { id: applied.agentId.slice(0, 12) })}
           </Badge>
           <Button variant="ghost" size="xs" onClick={clearTarget}>
+            {t("audit.ops_target_clear")}
+          </Button>
+        </div>
+      )}
+
+      {applied.host && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="secondary" className="gap-1 font-mono" title={applied.host}>
+            {t("audit.ops_host_applied", { host: applied.host.replace(/^[a-z]+:/, "") })}
+          </Badge>
+          <Button variant="ghost" size="xs" onClick={clearHost}>
             {t("audit.ops_target_clear")}
           </Button>
         </div>

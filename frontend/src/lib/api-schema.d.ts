@@ -14338,6 +14338,8 @@ export interface operations {
                 user?: string;
                 /** @description Filter to one beacon's audit rows */
                 agent_id?: string;
+                /** @description Filter to the audit rows of every beacon on one machine, using the fleet list's host key (h:<name>, ip:<address>, id:<beacon>) */
+                host?: string;
                 /** @description Filter by outcome */
                 result?: "success" | "failed";
                 /** @description Operation category (auth, agents, tasks, credentials, files, infrastructure, automation, ai, tenants, settings, system, other) */

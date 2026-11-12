@@ -286,6 +286,26 @@ func (s *Server) auditLogQuery(c *gin.Context) (*gorm.DB, string) {
 	if agentID := strings.TrimSpace(c.Query("agent_id")); agentID != "" {
 		query = query.Where("agent_id = ?", agentID)
 	}
+	if host := strings.TrimSpace(c.Query("host")); host != "" {
+		// The same host vocabulary the fleet list groups by ("h:<name>",
+		// "ip:<address>", "id:<beacon>"): one machine can carry several
+		// sessions, and the operator asking "what happened on this host?"
+		// means all of them.
+		implants := s.tenantScope(s.db.Model(&db.Implant{}), c).Select("id")
+		switch {
+		case strings.HasPrefix(host, "h:"):
+			implants = implants.Where("LOWER(hostname) = ?", strings.TrimPrefix(host, "h:"))
+		case strings.HasPrefix(host, "ip:"):
+			addr := strings.TrimPrefix(host, "ip:")
+			implants = implants.Where("ip = ? OR public_ip = ?", addr, addr)
+		case strings.HasPrefix(host, "id:"):
+			implants = implants.Where("id = ?", strings.TrimPrefix(host, "id:"))
+		default:
+			// A bare hostname or address: match either.
+			implants = implants.Where("LOWER(hostname) = ? OR ip = ? OR public_ip = ?", strings.ToLower(host), host, host)
+		}
+		query = query.Where("agent_id IN (?)", implants)
+	}
 	if result := strings.ToLower(strings.TrimSpace(c.Query("result"))); result != "" {
 		switch result {
 		case "success", "ok":

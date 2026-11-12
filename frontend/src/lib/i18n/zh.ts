@@ -235,6 +235,7 @@ export const zh: Record<string, string> = {
     "audit.ops_search_ph": "搜索用户、操作、目标或详情",
     "audit.ops_target_ph": "Beacon ID",
     "audit.ops_target_applied": "目标：{id}",
+    "audit.ops_host_applied": "主机：{host}",
     "audit.ops_target_clear": "清除目标",
     "audit.ops_include_system": "包含系统事件",
     "audit.ops_export": "导出 CSV",

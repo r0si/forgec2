@@ -265,6 +265,18 @@ describe("OperationsPanel", () => {
     await waitFor(() => expect(locationProbe.search).toContain("action=task_create"));
   });
 
+  it("scopes the selection to a host from the deep link", async () => {
+    // One machine can carry several sessions; "what happened on this host?"
+    // means all of them.
+    renderPanel({ initialHost: "h:workstation-a" });
+    await screen.findByText("Created task");
+
+    const first = vi.mocked(api.get).mock.calls.find(([path]) => String(path).startsWith("/audit/logs"));
+    expect(String(first?.[0])).toContain("host=h%3Aworkstation-a");
+    // The chip says what the selection is scoped to, and can be cleared.
+    expect(screen.getByText("audit.ops_host_applied")).toBeTruthy();
+  });
+
   it("filters by a category from the catalogue chips", async () => {
     renderPanel();
     await screen.findByText("Created task");

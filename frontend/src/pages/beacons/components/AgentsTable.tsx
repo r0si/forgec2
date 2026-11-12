@@ -1,6 +1,7 @@
-import { Fragment, memo, type ReactNode, type RefObject } from "react";
+import { Fragment, memo, useMemo, type ReactNode, type RefObject } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -119,6 +120,18 @@ export default memo(function AgentsTable(props: AgentsTableProps) {
   } = props;
 
   const hostGroups = groupByHost ? groupSessionsByHost(visibleBeacons) : null;
+  // The failure totals per host, for the host row: the column below counts
+  // the sessions, and the host row has to show the sum or the two disagree.
+  const hostFailures = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const group of hostGroups ?? []) {
+      totals.set(
+        group.key,
+        group.sessions.reduce((sum, s) => sum + (Number(s.failure_count ?? 0) || 0), 0),
+      );
+    }
+    return totals;
+  }, [hostGroups]);
 
   const allVisibleSelected = beacons.length > 0 && beacons.every((b) => b.id && selected.has(b.id));
   const someVisibleSelected = selected.size > 0 && !allVisibleSelected;
@@ -194,7 +207,9 @@ export default memo(function AgentsTable(props: AgentsTableProps) {
               <TableCell colSpan={emptyColSpan} style={{ height: agentOffsetTop, padding: 0, border: 0 }} />
             </TableRow>
           )}
-          {!loading && hostGroups && hostGroups.map((group) => (
+          {!loading && hostGroups && hostGroups.map((group) => {
+            const hostFailureCount = hostFailures.get(group.key) ?? 0;
+            return (
             <Fragment key={group.key}>
               <TableRow className="bg-muted/40 hover:bg-muted/50">
                 <TableCell colSpan={emptyColSpan} className="py-2 px-3 sm:px-4">
@@ -207,6 +222,17 @@ export default memo(function AgentsTable(props: AgentsTableProps) {
                       <span className="shrink-0 rounded-md bg-primary/10 px-1.5 py-0.5 text-micro-sm font-medium text-primary">
                         {t("agents.group_host_sessions", { n: group.sessions.length })}
                       </span>
+                    )}
+                    {/* The host's own failures: the column below counts the
+                        sessions, and a host is as unhealthy as its sessions. */}
+                    {hostFailureCount > 0 && (
+                      <Link
+                        to={`/audit?tab=operations&result=failed&host=${encodeURIComponent(group.key)}`}
+                        className="shrink-0"
+                        title={t("agents.col_failures_open")}
+                      >
+                        <Badge variant="destructive" className="font-mono">{hostFailureCount}</Badge>
+                      </Link>
                     )}
                   </div>
                 </TableCell>
@@ -231,7 +257,8 @@ export default memo(function AgentsTable(props: AgentsTableProps) {
                 />
               ))}
             </Fragment>
-          ))}
+            );
+          })}
           {!loading && !hostGroups && visibleBeacons.map((beacon) => (
             <AgentRow
               key={beacon.id || ""}

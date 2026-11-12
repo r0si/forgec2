@@ -97,6 +97,66 @@ func auditOpsQuery(s *Server, t *testing.T, rawQuery string) auditOpsResponse {
 	return body
 }
 
+// TestAuditOperationsFilterByHost proves the operations log can be scoped to
+// a machine.
+//
+// One host carries several sessions, and "what happened on this host?" means
+// all of them - the fleet list groups by exactly that key, so the audit log
+// speaks the same vocabulary ("h:<name>", "ip:<address>").
+func TestAuditOperationsFilterByHost(t *testing.T) {
+	s := auditOpsServer(t)
+	now := time.Now()
+	implants := []db.Implant{
+		{ID: "host-a-1", Hostname: "WORKSTATION-A", IP: "10.0.0.1", TenantID: 2, LastSeen: now},
+		{ID: "host-a-2", Hostname: "workstation-a", IP: "10.0.0.2", TenantID: 2, LastSeen: now},
+		{ID: "host-b-1", Hostname: "WORKSTATION-B", IP: "10.0.0.3", TenantID: 2, LastSeen: now},
+	}
+	for i := range implants {
+		if err := s.db.Create(&implants[i]).Error; err != nil {
+			t.Fatalf("seed implant %d: %v", i, err)
+		}
+	}
+	rows := []db.AuditLog{
+		{User: "alice", Action: "task_create", Resource: "task", AgentID: "host-a-1", TenantID: 2, Success: true, CreatedAt: now.Add(-time.Hour)},
+		{User: "alice", Action: "command_result", Resource: "task", AgentID: "host-a-2", TenantID: 2, Success: false, CreatedAt: now.Add(-2 * time.Hour)},
+		{User: "bob", Action: "task_create", Resource: "task", AgentID: "host-b-1", TenantID: 2, Success: true, CreatedAt: now.Add(-time.Hour)},
+	}
+	for i := range rows {
+		if err := s.db.Create(&rows[i]).Error; err != nil {
+			t.Fatalf("seed row %d: %v", i, err)
+		}
+	}
+
+	// The host key is case-insensitive on the hostname, like the fleet list's
+	// grouping: two sessions of one machine differ only in case.
+	body := auditOpsQuery(s, t, "host=h%3Aworkstation-a")
+	if body.Data.Total != 2 {
+		t.Fatalf("host filter returned %d rows, want the 2 of WORKSTATION-A: %v", body.Data.Total, auditActions(body))
+	}
+	for _, row := range body.Data.Logs {
+		if row.AgentID == "host-b-1" {
+			t.Fatalf("the host filter leaked another host: %+v", row)
+		}
+	}
+
+	// The address spelling works too.
+	byIP := auditOpsQuery(s, t, "host=ip%3A10.0.0.3")
+	if byIP.Data.Total != 1 {
+		t.Fatalf("host=ip filter returned %d rows, want 1", byIP.Data.Total)
+	}
+
+	// A bare hostname matches the same host.
+	bare := auditOpsQuery(s, t, "host=WORKSTATION-B")
+	if bare.Data.Total != 1 {
+		t.Fatalf("bare host filter returned %d rows, want 1", bare.Data.Total)
+	}
+
+	// Another tenant's beacons are never in scope, even with the same name.
+	if body := auditOpsQuery(s, t, "host=h%3Aworkstation-a"); body.Data.Total != 2 {
+		t.Fatalf("tenant scope broken: %d rows", body.Data.Total)
+	}
+}
+
 func auditActions(body auditOpsResponse) []string {
 	out := make([]string, 0, len(body.Data.Logs))
 	for _, row := range body.Data.Logs {

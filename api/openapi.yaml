@@ -2360,6 +2360,13 @@ paths:
           description: Filter to one beacon's audit rows
           schema:
             type: string
+        - name: host
+          in: query
+          description: >-
+            Filter to the audit rows of every beacon on one machine, using the
+            fleet list's host key (h:<name>, ip:<address>, id:<beacon>)
+          schema:
+            type: string
         - name: result
           in: query
           description: Filter by outcome
