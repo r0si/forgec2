@@ -854,11 +854,34 @@ func (s *Server) handleGetAuditLogs(c *gin.Context) {
 		return
 	}
 
+	// The name of the beacon each row belongs to. "Which host?" is the first
+	// question about an operation, and the agent id alone does not answer it.
+	names := s.agentHostnames(c, auditAgentIDs(logs))
+	items := make([]auditLogItem, 0, len(logs))
+	for i := range logs {
+		items = append(items, auditLogItem{AuditLog: logs[i], AgentHostname: names[logs[i].AgentID]})
+	}
+
 	respond(c, gin.H{
-		"logs":   logs,
+		"logs":   items,
 		"total":  total,
 		"failed": failed,
 	})
+}
+
+// auditAgentIDs collects the distinct beacon ids of the given rows.
+func auditAgentIDs(rows []db.AuditLog) []string {
+	seen := map[string]bool{}
+	out := make([]string, 0, len(rows))
+	for i := range rows {
+		id := strings.TrimSpace(rows[i].AgentID)
+		if id == "" || seen[id] {
+			continue
+		}
+		seen[id] = true
+		out = append(out, id)
+	}
+	return out
 }
 
 func (s *Server) handleGetSettingsWebhooks(c *gin.Context) {

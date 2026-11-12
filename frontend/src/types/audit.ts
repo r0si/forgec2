@@ -11,5 +11,7 @@ export interface AuditLog {
   details?: string;
   ip?: string;
   severity?: string;
+  /** The name of the beacon the row belongs to (the server resolves it). */
+  agent_hostname?: string;
   agent_id?: string;
 }

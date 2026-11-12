@@ -15294,6 +15294,9 @@ components:
           type: string
         agent_id:
           type: string
+        agent_hostname:
+          type: string
+          description: The name of the beacon the row belongs to
         ip:
           type: string
         success:

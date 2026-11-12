@@ -12011,6 +12011,8 @@ export interface components {
             action?: string;
             resource?: string;
             agent_id?: string;
+            /** @description The name of the beacon the row belongs to */
+            agent_hostname?: string;
             ip?: string;
             success?: boolean;
             error?: string;

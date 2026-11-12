@@ -76,9 +76,9 @@ func auditOpsServer(t *testing.T) *Server {
 
 type auditOpsResponse struct {
 	Data struct {
-		Logs   []db.AuditLog `json:"logs"`
-		Total  int64         `json:"total"`
-		Failed int64         `json:"failed"`
+		Logs   []auditLogItem `json:"logs"`
+		Total  int64          `json:"total"`
+		Failed int64          `json:"failed"`
 	} `json:"data"`
 }
 
@@ -154,6 +154,49 @@ func TestAuditOperationsFilterByHost(t *testing.T) {
 	// Another tenant's beacons are never in scope, even with the same name.
 	if body := auditOpsQuery(s, t, "host=h%3Aworkstation-a"); body.Data.Total != 2 {
 		t.Fatalf("tenant scope broken: %d rows", body.Data.Total)
+	}
+}
+
+// TestAuditOperationsNameTheBeacon proves every audit row carries the name of
+// the beacon it belongs to.
+//
+// "Which host?" is the first question about an operation, and the agent id
+// alone does not answer it - an operator would have to look every id up in
+// the fleet list.
+func TestAuditOperationsNameTheBeacon(t *testing.T) {
+	s := auditOpsServer(t)
+	now := time.Now()
+	implants := []db.Implant{
+		{ID: "named-1", Hostname: "WORKSTATION-A", IP: "10.0.0.1", TenantID: 2, LastSeen: now},
+		{ID: "named-2", Hostname: "WORKSTATION-B", IP: "10.0.0.2", TenantID: 2, LastSeen: now},
+	}
+	for i := range implants {
+		if err := s.db.Create(&implants[i]).Error; err != nil {
+			t.Fatalf("seed implant %d: %v", i, err)
+		}
+	}
+	rows := []db.AuditLog{
+		{User: "alice", Action: "task_create", Resource: "task", AgentID: "named-1", TenantID: 2, Success: true, CreatedAt: now.Add(-time.Hour)},
+		{User: "alice", Action: "command_result", Resource: "task", AgentID: "named-2", TenantID: 2, Success: false, CreatedAt: now.Add(-2 * time.Hour)},
+		// A row without a beacon has no name to answer with.
+		{User: "bob", Action: "settings_change", Resource: "settings", TenantID: 2, Success: true, CreatedAt: now.Add(-time.Hour)},
+	}
+	for i := range rows {
+		if err := s.db.Create(&rows[i]).Error; err != nil {
+			t.Fatalf("seed row %d: %v", i, err)
+		}
+	}
+
+	body := auditOpsQuery(s, t, "")
+	names := map[string]string{}
+	for _, row := range body.Data.Logs {
+		names[row.AgentID] = row.AgentHostname
+	}
+	if names["named-1"] != "WORKSTATION-A" || names["named-2"] != "WORKSTATION-B" {
+		t.Fatalf("agent names = %+v, want the beacon names", names)
+	}
+	if names[""] != "" {
+		t.Fatalf("a row without a beacon must not carry a name: %+v", names)
 	}
 }
 

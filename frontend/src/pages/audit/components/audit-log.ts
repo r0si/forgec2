@@ -47,6 +47,7 @@ export function normalizeAuditLog(raw: unknown): AuditLog | null {
     details: firstStr(o, ["details", "Details"]),
     ip: firstStr(o, ["ip", "IP"]),
     severity: firstStr(o, ["severity", "Severity"], status === "failed" ? "error" : "info"),
+    agent_hostname: firstStr(o, ["agent_hostname", "agentHostname", "AgentHostname"]),
     agent_id: agentId,
   };
 }

@@ -160,7 +160,7 @@ export function AuditRiskStrip() {
                               <Link to={href} className="flex min-w-0 items-center gap-2 hover:underline">
                                 <Badge variant="destructive">{auditActionLabel(t, row.action || "")}</Badge>
                                 <span className="truncate text-xs text-muted-foreground">
-                                  {[row.username, row.details].filter(Boolean).join(" · ")}
+                                  {[row.username, row.agent_hostname, row.details].filter(Boolean).join(" · ")}
                                 </span>
                               </Link>
                             </div>

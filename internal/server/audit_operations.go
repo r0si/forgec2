@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/csv"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -410,6 +411,47 @@ func safeCSVCell(value string) string {
 		return "'" + value
 	}
 	return value
+}
+
+// auditLogItem is one audit row for the console: the chain fields plus the
+// name of the beacon it belongs to.
+//
+// "Which host?" is the first question about an operation, and the agent id
+// alone does not answer it - an operator reading the audit log would have to
+// look every id up in the fleet list.
+type auditLogItem struct {
+	db.AuditLog
+	AgentHostname string `json:"agent_hostname,omitempty"`
+}
+
+// agentHostnames resolves the beacon names of the given ids.
+//
+// One bounded query over the page's beacons: the audit rows carry an id, and
+// the console needs the name next to it.
+func (s *Server) agentHostnames(c *gin.Context, ids []string) map[string]string {
+	names := map[string]string{}
+	if len(ids) == 0 {
+		return names
+	}
+	type row struct {
+		ID       string
+		Hostname string
+	}
+	var rows []row
+	if err := s.tenantScope(s.db.Model(&db.Implant{}), c).
+		Select("id, hostname").
+		Where("id IN ?", ids).
+		Scan(&rows).Error; err != nil {
+		// Advisory: the name is a convenience, the rows must still load.
+		slog.Warn("Audit agent names unavailable", "err", err)
+		return names
+	}
+	for _, r := range rows {
+		if r.Hostname != "" {
+			names[r.ID] = r.Hostname
+		}
+	}
+	return names
 }
 
 // handleExportAuditLogsCSV streams the filtered operations log as CSV. The

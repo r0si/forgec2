@@ -277,6 +277,36 @@ describe("OperationsPanel", () => {
     expect(screen.getByText("audit.ops_host_applied")).toBeTruthy();
   });
 
+  it("shows the beacon's name, not only its id", async () => {
+    vi.mocked(api.get).mockImplementation(async (path: string) => {
+      const p = String(path);
+      if (p.startsWith("/audit/actions")) return { actions: [], categories: [] };
+      if (p.startsWith("/audit/logs")) {
+        return {
+          logs: [
+            {
+              id: 1,
+              user: "alice",
+              action: "task_create",
+              agent_id: "11111111-2222-4333-8444-555555555555",
+              agent_hostname: "WORKSTATION-A",
+              success: true,
+              created_at: "2026-11-10T10:00:00Z",
+            },
+          ],
+          total: 1,
+          failed: 0,
+        };
+      }
+      return {};
+    });
+
+    renderPanel();
+    // "Which host?" is the first question about an operation; the id alone
+    // does not answer it.
+    expect(await screen.findByText("WORKSTATION-A")).toBeTruthy();
+  });
+
   it("filters by a category from the catalogue chips", async () => {
     renderPanel();
     await screen.findByText("Created task");

@@ -654,6 +654,9 @@ export function OperationsPanel({
               cell: (log) => {
                 const target = field(log, "target");
                 const agentId = log.agent_id || "";
+                // The beacon's name, not its id: "which host?" is the first
+                // question about an operation, and an id does not answer it.
+                const label = log.agent_hostname || target;
                 // The target of an operation is usually the beacon it ran on.
                 // A link turns "which host was this?" into one click.
                 if (agentId && canOpenBeacon) {
@@ -663,13 +666,13 @@ export function OperationsPanel({
                       className="font-mono text-xs text-primary hover:underline"
                       title={target}
                     >
-                      {target.slice(0, 12)}
+                      {label.slice(0, 24)}
                     </Link>
                   );
                 }
                 return (
                   <span className="text-xs font-mono" title={target}>
-                    {target.slice(0, 12)}
+                    {label.slice(0, 24)}
                   </span>
                 );
               },
