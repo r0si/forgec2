@@ -1279,7 +1279,7 @@ export interface paths {
         };
         /**
          * List audit actions
-         * @description Distinct actions in the caller's tenant, with category and count, for the operations filters
+         * @description Distinct actions in the caller's tenant, with category and count, for the operations filters. The counts honour the same time window as /audit/logs, so a count is the number of rows behind it.
          */
         get: operations["getAuditActions"];
         put?: never;
@@ -14418,7 +14418,12 @@ export interface operations {
     };
     getAuditActions: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Lower time bound (24h, 7d, 30d or an RFC3339 timestamp) */
+                since?: string;
+                /** @description Upper time bound (24h, 7d, 30d or an RFC3339 timestamp) */
+                until?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;

@@ -151,6 +151,20 @@ describe("OperationsPanel", () => {
     expect(query).toContain("since=7d");
   });
 
+  it("counts the catalogue over the same window the table shows", async () => {
+    // The chip counts must describe the rows behind them: a catalogue
+    // counted over all time next to a seven-day table is a number the page
+    // cannot honour.
+    render(<OperationsPanel initialRange="24h" />);
+    await screen.findByText("Created task");
+
+    const catalogue = vi.mocked(api.get).mock.calls.find(([path]) => String(path).startsWith("/audit/actions"));
+    expect(String(catalogue?.[0])).toContain("since=24h");
+
+    const logs = vi.mocked(api.get).mock.calls.find(([path]) => String(path).startsWith("/audit/logs"));
+    expect(String(logs?.[0])).toContain("since=24h");
+  });
+
   it("filters by a category from the catalogue chips", async () => {
     render(<OperationsPanel />);
     await screen.findByText("Created task");

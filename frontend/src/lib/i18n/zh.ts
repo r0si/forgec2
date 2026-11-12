@@ -228,6 +228,8 @@ export const zh: Record<string, string> = {
     "audit.ops_categories_aria": "按分类筛选",
     "audit.ops_action": "操作",
     "audit.ops_all_actions": "全部操作",
+    "audit.ops_action_search": "搜索操作",
+    "audit.ops_action_none": "没有匹配的操作",
     "audit.ops_result": "结果",
     "audit.ops_all_results": "全部结果",
     "audit.ops_search_ph": "搜索用户、操作、目标或详情",

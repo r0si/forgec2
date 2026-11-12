@@ -217,6 +217,36 @@ func auditCategoryRuleCondition(rule auditCategoryRule) (string, []any, bool) {
 	return "(" + strings.Join(conds, " OR ") + ")", args, true
 }
 
+// auditTimeBounds applies the shared time window (since / until) to a query.
+//
+// The audit list, its CSV export and the action catalogue must describe the
+// same window: a catalogue count taken over all time while the list shows
+// the last seven days is a number the page cannot honour, and an operator
+// comparing the two concludes the list is broken.
+func auditTimeBounds(c *gin.Context, query *gorm.DB) (*gorm.DB, string) {
+	var sinceAt, untilAt time.Time
+	if raw := strings.TrimSpace(c.Query("since")); raw != "" {
+		at, ok := parseTimeBound(raw, time.Now())
+		if !ok {
+			return nil, formatTimeBoundError("since")
+		}
+		sinceAt = at
+		query = query.Where("created_at >= ?", comparableLocalTime(at))
+	}
+	if raw := strings.TrimSpace(c.Query("until")); raw != "" {
+		at, ok := parseTimeBound(raw, time.Now())
+		if !ok {
+			return nil, formatTimeBoundError("until")
+		}
+		untilAt = at
+		query = query.Where("created_at <= ?", comparableLocalTime(at))
+	}
+	if !sinceAt.IsZero() && !untilAt.IsZero() && sinceAt.After(untilAt) {
+		return nil, "since must not be after until"
+	}
+	return query, ""
+}
+
 // auditLogQuery applies every operations-log filter to one query. The list and
 // the CSV export share it, so "what I see" and "what I exported" cannot be two
 // different selections.
@@ -286,27 +316,9 @@ func (s *Server) auditLogQuery(c *gin.Context) (*gorm.DB, string) {
 		}
 	}
 
-	var sinceAt, untilAt time.Time
-	if raw := strings.TrimSpace(c.Query("since")); raw != "" {
-		at, ok := parseTimeBound(raw, time.Now())
-		if !ok {
-			return nil, formatTimeBoundError("since")
-		}
-		sinceAt = at
-		query = query.Where("created_at >= ?", comparableLocalTime(at))
-	}
-	if raw := strings.TrimSpace(c.Query("until")); raw != "" {
-		at, ok := parseTimeBound(raw, time.Now())
-		if !ok {
-			return nil, formatTimeBoundError("until")
-		}
-		untilAt = at
-		query = query.Where("created_at <= ?", comparableLocalTime(at))
-	}
-	if !sinceAt.IsZero() && !untilAt.IsZero() && sinceAt.After(untilAt) {
-		return nil, "since must not be after until"
-	}
-	return query, ""
+	// The scope exclusion is skipped when a category is explicit (see above),
+	// so the window is the last filter the list applies.
+	return auditTimeBounds(c, query)
 }
 
 // auditActionCount is one row of the catalogue: what the action is called, the
@@ -321,16 +333,28 @@ type auditActionCount struct {
 // handleGetAuditActions returns the distinct actions in the caller's tenant,
 // with counts. It is a read-only catalogue for the operations filters; the
 // limit keeps a pathological audit table from producing an unbounded dropdown.
+//
+// The counts honour the same time window as the list (since / until), so the
+// number next to a category is the number of rows that category shows. The
+// scope exclusion is deliberately NOT applied: the catalogue covers every
+// category, so the system events stay reachable - picking one is an explicit
+// choice that overrides the default exclusion on the list.
 func (s *Server) handleGetAuditActions(c *gin.Context) {
 	if s == nil || s.db == nil {
 		respondError(c, http.StatusServiceUnavailable, "database is not initialized")
+		return
+	}
+	base := s.auditTenantScope(s.db.Model(&db.AuditLog{}), c)
+	query, rejection := auditTimeBounds(c, base)
+	if rejection != "" {
+		respondError(c, http.StatusBadRequest, rejection)
 		return
 	}
 	var rows []struct {
 		Action string
 		Count  int64
 	}
-	if err := s.auditTenantScope(s.db.Model(&db.AuditLog{}), c).
+	if err := query.
 		Select("action, COUNT(*) AS count").
 		Group("action").
 		Order("count DESC, action ASC").

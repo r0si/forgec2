@@ -2477,10 +2477,24 @@ paths:
     get:
       tags: [Audit]
       summary: List audit actions
-      description: Distinct actions in the caller's tenant, with category and count, for the operations filters
+      description: >-
+        Distinct actions in the caller's tenant, with category and count, for
+        the operations filters. The counts honour the same time window as
+        /audit/logs, so a count is the number of rows behind it.
       operationId: getAuditActions
       security:
         - SessionCookie: []
+      parameters:
+        - name: since
+          in: query
+          description: Lower time bound (24h, 7d, 30d or an RFC3339 timestamp)
+          schema:
+            type: string
+        - name: until
+          in: query
+          description: Upper time bound (24h, 7d, 30d or an RFC3339 timestamp)
+          schema:
+            type: string
       responses:
         '200':
           description: Action catalogue

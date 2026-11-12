@@ -19,6 +19,7 @@ import {
   auditSessionId,
   normalizeAuditLogs,
 } from "./audit-log";
+import { ActionPicker } from "./ActionPicker";
 import { Download, Filter, RotateCw, Terminal } from "lucide-react";
 
 const PER_PAGE = 50;
@@ -185,7 +186,13 @@ export function OperationsPanel({
 
   useEffect(() => {
     const controller = new AbortController();
-    api.get(paths.audit.actions, { signal: controller.signal })
+    // The catalogue is counted over the same window the table shows, so the
+    // number next to a category is the number of rows behind it. A catalogue
+    // counted over all time next to a seven-day table is a number the page
+    // cannot honour.
+    const params = new URLSearchParams();
+    if (applied.range !== "all") params.set("since", applied.range);
+    api.get(paths.audit.actions(params.toString()), { signal: controller.signal })
       .then((data) => {
         const payload = (data && typeof data === "object" ? data : {}) as Partial<AuditCatalogue>;
         setCatalogue({
@@ -200,7 +207,7 @@ export function OperationsPanel({
         setCatalogue({ actions: [], categories: [] });
       });
     return () => controller.abort();
-  }, []);
+  }, [applied.range]);
 
   const queryFor = useCallback((filters: AppliedFilters, pageNumber?: number) => {
     const params = new URLSearchParams();
@@ -279,12 +286,6 @@ export function OperationsPanel({
     setApplied((prev) => ({ ...prev, agentId: "" }));
     setPage(1);
   };
-
-  const actionOptions = useMemo(() => {
-    const list = catalogue.actions;
-    if (!category) return list;
-    return list.filter((a) => a.category === category);
-  }, [catalogue.actions, category]);
 
   const changeCategory = (value: string) => {
     setCategory(value);
@@ -410,21 +411,24 @@ export function OperationsPanel({
           </SelectContent>
         </Select>
 
-        <Select value={action || "all"} onValueChange={(v) => setAction(v === "all" || !v ? "" : v)}>
-          <SelectTrigger className="w-[210px]" aria-label={t("audit.ops_action")}>
-            <SelectValue>
-              {(value) => (value === "all" ? t("audit.ops_all_actions") : auditActionLabel(t, String(value ?? "")))}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t("audit.ops_all_actions")}</SelectItem>
-            {actionOptions.map((a) => (
-              <SelectItem key={a.action} value={a.action}>
-                {auditActionLabel(t, a.action)} ({a.count})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <ActionPicker
+          actions={catalogue.actions}
+          value={action}
+          onChange={(next) => {
+            setAction(next);
+            // An action from another category would silently AND with the
+            // current category and return nothing; clear the category so the
+            // visible filter and the request agree.
+            if (next) {
+              const stat = catalogue.actions.find((a) => a.action === next);
+              if (category && stat && stat.category !== category) setCategory("");
+            }
+          }}
+          category={category}
+          allLabel={t("audit.ops_all_actions")}
+          placeholder={t("audit.ops_action_search")}
+          emptyLabel={t("audit.ops_action_none")}
+        />
 
         <Select value={result || "all"} onValueChange={(v) => setResult(v === "all" || !v ? "" : v)}>
           <SelectTrigger className="w-[150px]" aria-label={t("audit.ops_result")}>

@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -249,6 +250,68 @@ func TestAuditActionCatalogue(t *testing.T) {
 	}
 	if _, ok := counts["auth"]; !ok {
 		t.Fatal("catalogue must publish every category id, including empty ones")
+	}
+}
+
+// TestAuditActionCatalogueCountsTheSameWindow proves the catalogue counts the
+// rows the list would show.
+//
+// The console prints a count next to every category ("Infrastructure 573").
+// That number has to describe the window the table is showing: a catalogue
+// counted over all time next to a seven-day table is a number the page cannot
+// honour, and an operator comparing the two concludes the list is broken.
+func TestAuditActionCatalogueCountsTheSameWindow(t *testing.T) {
+	s := auditOpsServer(t)
+
+	// One recent row and one outside the window.
+	now := time.Now()
+	rows := []db.AuditLog{
+		{User: "alice", Action: "task_create", Resource: "task", TenantID: 2, Success: true, CreatedAt: now.Add(-2 * time.Hour)},
+		{User: "alice", Action: "task_create", Resource: "task", TenantID: 2, Success: true, CreatedAt: now.Add(-40 * time.Hour)},
+	}
+	for i := range rows {
+		if err := s.db.Create(&rows[i]).Error; err != nil {
+			t.Fatalf("seed row %d: %v", i, err)
+		}
+	}
+
+	count := func(query string) (int64, int) {
+		c, w := tenantScopedAdminContext(s, t, "tenant2-admin", 2)
+		c.Request = httptest.NewRequest(http.MethodGet, "/audit/actions"+query, nil)
+		s.handleGetAuditActions(c)
+		if w.Code != http.StatusOK {
+			return -1, w.Code
+		}
+		var body struct {
+			Data struct {
+				Actions []struct {
+					Action string `json:"action"`
+					Count  int64  `json:"count"`
+				} `json:"actions"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+			t.Fatalf("decode: %v body=%s", err, w.Body.String())
+		}
+		for _, a := range body.Data.Actions {
+			if a.Action == "task_create" {
+				return a.Count, w.Code
+			}
+		}
+		return 0, w.Code
+	}
+
+	// The fixture already holds one task_create row for this tenant.
+	if got, code := count(""); got != 3 || code != http.StatusOK {
+		t.Fatalf("unbounded catalogue count = %d (status %d), want 3 (every row)", got, code)
+	}
+	if got, code := count("?since=24h"); got != 2 || code != http.StatusOK {
+		t.Fatalf("24h catalogue count = %d (status %d), want 2 (the rows inside the window)", got, code)
+	}
+	// An invalid window is rejected, not silently ignored: the catalogue would
+	// otherwise count a window the list cannot show.
+	if _, code := count("?since=bogus"); code != http.StatusBadRequest {
+		t.Fatalf("an invalid window must be rejected, got status %d", code)
 	}
 }
 

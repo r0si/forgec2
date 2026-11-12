@@ -226,6 +226,8 @@ export const en: Record<string, string> = {
 "audit.ops_all_categories": "All categories",
     "audit.ops_action": "Action",
     "audit.ops_all_actions": "All actions",
+"audit.ops_action_search": "Search actions",
+"audit.ops_action_none": "No action matches the search",
     "audit.ops_result": "Result",
     "audit.ops_all_results": "All results",
     "audit.ops_search_ph": "Search user, action, target or details",
