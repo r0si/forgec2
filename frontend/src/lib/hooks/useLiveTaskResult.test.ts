@@ -70,7 +70,7 @@ describe("useLiveTaskResult", () => {
     expect(result.current.running).toBe(false);
   });
 
-  it("treats cancelled as failed and falls back to the i18n message", async () => {
+  it("reports a cancelled task as cancelled, not failed", async () => {
     vi.mocked(runTask).mockResolvedValue({ id: 4, status: "cancelled" });
     const { result } = renderHook(() => useLiveTaskResult());
 
@@ -78,9 +78,9 @@ describe("useLiveTaskResult", () => {
       await result.current.run("a", "/p", {});
     });
 
-    expect(result.current.status).toBe("failed");
-    expect(result.current.error).toBe("T:common.task_failed");
-    expect(mocks.t).toHaveBeenCalledWith("common.task_failed");
+    expect(result.current.status).toBe("cancelled");
+    expect(result.current.error).toBe("T:common.task_cancelled");
+    expect(mocks.t).toHaveBeenCalledWith("common.task_cancelled");
   });
 
   it("keeps the server's error text for a cancelled task", async () => {
@@ -91,7 +91,7 @@ describe("useLiveTaskResult", () => {
       await result.current.run("a", "/p", {});
     });
 
-    expect(result.current.status).toBe("failed");
+    expect(result.current.status).toBe("cancelled");
     expect(result.current.error).toBe("cancelled by operator");
     expect(mocks.t).not.toHaveBeenCalled();
   });

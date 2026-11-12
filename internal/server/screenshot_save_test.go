@@ -136,3 +136,84 @@ func TestWriteScreenshotFileDefaultDir(t *testing.T) {
 	}
 	_ = db.Implant{}
 }
+
+// TestWriteScreenshotFileNamesJPEGCorrectly pins the format contract: the
+// implant captures JPEG, so the stored filename must not claim ".png" (a
+// download would carry the wrong extension and MIME).
+func TestWriteScreenshotFileNamesJPEGCorrectly(t *testing.T) {
+	s := mustTenantServer(t)
+	dataDir := t.TempDir()
+	// The JPEG magic is enough for content sniffing; the bytes need not decode
+	// to a complete image for this storage-level assertion.
+	payload := []byte{0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 'J', 'F', 'I', 'F', 0x00, 0x01, 0x01, 0x00}
+	b64 := base64.StdEncoding.EncodeToString(payload)
+
+	if err := s.writeScreenshotFile(dataDir, "agent-jpeg", 5, b64); err != nil {
+		t.Fatalf("write screenshot: %v", err)
+	}
+	dir := filepath.Join(dataDir, "screenshots", "agent-jpeg")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("files = %d, want 1", len(entries))
+	}
+	if name := entries[0].Name(); !strings.HasSuffix(name, ".jpg") {
+		t.Fatalf("filename = %q, want a .jpg capture", name)
+	}
+	if got := screenshotMime(payload); got != "image/jpeg" {
+		t.Fatalf("mime = %q, want image/jpeg", got)
+	}
+}
+
+// TestWriteScreenshotFileReportsInvalidBase64 pins the new error return: a
+// caller that claims a capture completed must be able to see that it did not.
+func TestWriteScreenshotFileReportsInvalidBase64(t *testing.T) {
+	s := mustTenantServer(t)
+	if err := s.writeScreenshotFile(t.TempDir(), "agent-bad", 6, "!!!not-base64!!!"); err == nil {
+		t.Fatal("invalid base64 returned no error")
+	}
+}
+
+// TestScreenshotResultSaveFailureFailsTask is the operator-visible half of the
+// same rule: a capture that could not be written must not be reported as a
+// completed screenshot task with an empty gallery.
+func TestScreenshotResultSaveFailureFailsTask(t *testing.T) {
+	s := mustTenantServer(t)
+	oldEncrypt := encryptTaskFieldsFn
+	encryptTaskFieldsFn = func(*db.Task) error { return nil }
+	t.Cleanup(func() { encryptTaskFieldsFn = oldEncrypt })
+	dataDir := t.TempDir()
+	s.cfg.Server.DataDir = dataDir
+	// A FILE named screenshots makes MkdirAll fail, which is the same class of
+	// local storage failure as a full disk or a permission error.
+	if err := os.WriteFile(filepath.Join(dataDir, "screenshots"), []byte("blocked"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	const agentID = "shot-save-fail"
+	if err := s.db.Create(&db.Implant{ID: agentID, TenantID: 1, Hostname: "shot", Status: "online"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	task := db.Task{AgentID: agentID, TenantID: 1, Type: "screenshot", Status: "running"}
+	if err := s.db.Create(&task).Error; err != nil {
+		t.Fatal(err)
+	}
+	s.processTaskResults(db.Implant{ID: agentID}, []taskResult{{
+		TaskID: task.ID,
+		Type:   "screenshot",
+		Output: base64.StdEncoding.EncodeToString([]byte("jpeg-bytes")),
+	}}, agentID, time.Now())
+
+	var got db.Task
+	if err := s.db.First(&got, task.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != "failed" {
+		t.Fatalf("status = %q, want failed when the capture could not be written", got.Status)
+	}
+	if !strings.Contains(got.Error, "screenshot") {
+		t.Fatalf("error = %q, want a screenshot save failure", got.Error)
+	}
+}

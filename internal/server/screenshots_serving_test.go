@@ -1,6 +1,9 @@
 package server
 
 import (
+	"bytes"
+	"image"
+	"image/jpeg"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -94,6 +97,49 @@ func TestServeScreenshotPathTraversal(t *testing.T) {
 	s.handleServeScreenshot(c)
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("foreign agent screenshot = %d %s", w.Code, w.Body.String())
+	}
+}
+
+// TestGetAgentScreenshotAcceptsJPEG pins the newer capture format: the dock's
+// "latest screenshot" reader used to filter ".png" only, so a JPEG capture
+// (what the implant actually produces) answered 404 even though the file
+// existed. It also reports the real MIME and dimensions.
+func TestGetAgentScreenshotAcceptsJPEG(t *testing.T) {
+	s := newAgentTestServer(t)
+	dataDir := t.TempDir()
+	s.cfg.Server.DataDir = dataDir
+	agent := db.Implant{ID: "jpeg-agent", Hostname: "JPEG01", Status: "online"}
+	if err := s.db.Create(&agent).Error; err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(dataDir, "screenshots", agent.ID)
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	img := image.NewRGBA(image.Rect(0, 0, 3, 2))
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, img, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "screenshot_7_1.jpg"), buf.Bytes(), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/agents/jpeg-agent/screenshot", nil)
+	c.Params = gin.Params{{Key: "id", Value: agent.ID}}
+	s.handleGetAgentScreenshot(c)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("JPEG screenshot = %d %s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "data:image/jpeg;base64,") {
+		t.Fatalf("capture is not labelled JPEG: %.200s", body)
+	}
+	if !strings.Contains(body, `"width":3`) || !strings.Contains(body, `"height":2`) {
+		t.Fatalf("JPEG dimensions missing: %.200s", body)
 	}
 }
 

@@ -195,7 +195,11 @@ func (s *Server) processTaskResults(agent db.Implant, results []taskResult, uuid
 				slog.Debug("Partial chunk dropped: task already finalised", "agent_id", uuid, "task_id", r.TaskID, "status", task.Status)
 				continue
 			}
-			appendTaskResultTail(task, r.Output)
+			// Streaming deltas are base64 on the wire (shell output is text, so
+			// decode it); the final path below uses the same normaliser. Storing
+			// the encoded form made a long-running command's live tail read as
+			// base64 in the console, with multibyte UTF-8 mangled at the cap.
+			appendTaskResultTail(task, decodeTaskResult(r.Type, r.Encoding, r.Output))
 			task.UpdatedAt = now
 			if uerr := s.withBusyRetryDB("result", func() *gorm.DB {
 				return s.db.Model(&db.Task{}).Where("id = ?", task.ID).
@@ -266,7 +270,14 @@ func (s *Server) processTaskResults(agent db.Implant, results []taskResult, uuid
 			// active. Continuous screen_frame messages remain memory-only, so this
 			// does not turn a live stream into unbounded disk retention.
 			task.Result = r.Output
-			s.saveScreenshot(s.rawDataDir(), uuid, task.ID, r.Output)
+			if err := s.saveScreenshot(s.rawDataDir(), uuid, task.ID, r.Output); err != nil {
+				// The capture exists only if it reached the disk; a failed write
+				// is a failed task, not a completed task with an empty gallery.
+				task.Status = "failed"
+				task.Error = "screenshot could not be saved"
+				task.Result = ""
+				slog.Error("Failed to persist screenshot result", "agent_id", uuid, "task_id", task.ID, "error", err)
+			}
 			if s.IsScreenMonitoring(uuid) {
 				s.BroadcastScreenshot(uuid, r.Output)
 			}

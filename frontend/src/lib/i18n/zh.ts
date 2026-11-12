@@ -571,6 +571,7 @@ export const zh: Record<string, string> = {
     "common.shortcuts_hint": "键盘快捷键 (Ctrl+/)",
     "common.submit_failed": "表单提交失败",
 
+    "common.task_cancelled": "任务已取消",
     "common.task_failed": "任务失败",
     "common.timeout_error": "请求超时，请重试",
 

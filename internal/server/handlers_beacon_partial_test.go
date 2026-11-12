@@ -1,11 +1,13 @@
 package server
 
 import (
+	"encoding/base64"
 	"fmt"
 	"strings"
 	"testing"
 	"time"
 
+	forgecrypto "github.com/forgec2/forgec2/internal/crypto"
 	"github.com/forgec2/forgec2/internal/db"
 	"github.com/forgec2/forgec2/internal/testutil"
 )
@@ -14,6 +16,10 @@ import (
 func partialTestServer(t *testing.T) *Server {
 	t.Helper()
 	ginSetTestMode(t)
+	// Result finalisation encrypts at rest. Initialise the vault here so this
+	// test does not depend on another test having run first (InitLootEncryption
+	// keeps an existing key).
+	forgecrypto.InitLootEncryption(testStorageKeyHex)
 	database := testutil.SetupTestDB(t)
 	s := &Server{db: database, eventManager: NewEventManager(database)}
 	s.agentPendingTasks = make(map[string]int)
@@ -71,6 +77,38 @@ func TestPartialResultsAppendWhileRunning(t *testing.T) {
 	}
 	if after := s.agentPendingTasks[uuid]; after != before {
 		t.Fatalf("pending counter changed on partial: %d -> %d", before, after)
+	}
+}
+
+// TestPartialBase64ChunkIsDecoded pins the streaming encoding contract: the
+// shell sends deltas base64-encoded, exactly like the final result, so the
+// stored live tail must be decoded too. Storing the encoded form showed
+// base64 to the operator for the whole duration of a long command.
+func TestPartialBase64ChunkIsDecoded(t *testing.T) {
+	s := partialTestServer(t)
+	const uuid = "partial-agent-b64"
+	if err := s.db.Create(&db.Implant{ID: uuid, Status: "online"}).Error; err != nil {
+		t.Fatalf("seed implant: %v", err)
+	}
+	task := seedRunningTask(t, s, uuid)
+
+	// Multibyte UTF-8 is called out on purpose: a decoder that splits the
+	// string at the byte cap would turn these into replacement characters.
+	want := "编译完成：中文输出 ✓\n"
+	s.processTaskResults(db.Implant{ID: uuid}, []taskResult{{
+		TaskID:   task.ID,
+		Type:     "shell",
+		Output:   base64.StdEncoding.EncodeToString([]byte(want)),
+		Encoding: "base64",
+		Partial:  true,
+	}}, uuid, time.Now())
+
+	var got db.Task
+	if err := s.db.First(&got, task.ID).Error; err != nil {
+		t.Fatalf("reload: %v", err)
+	}
+	if got.Result != want {
+		t.Fatalf("stored live tail = %q, want decoded UTF-8 %q", got.Result, want)
 	}
 }
 

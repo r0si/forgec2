@@ -1,8 +1,10 @@
 package server
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/binary"
+	"image/jpeg"
 	"log/slog"
 	"net/http"
 	"os"
@@ -61,7 +63,7 @@ func (s *Server) handleGetAgentScreenshot(c *gin.Context) {
 	var newest os.DirEntry
 	var newestTime time.Time
 	for _, e := range entries {
-		if e.IsDir() || !strings.EqualFold(filepath.Ext(e.Name()), ".png") {
+		if e.IsDir() || !isScreenshotFile(e.Name()) {
 			continue
 		}
 		info, err := e.Info()
@@ -84,20 +86,43 @@ func (s *Server) handleGetAgentScreenshot(c *gin.Context) {
 		respondError(c, http.StatusInternalServerError, "failed to read screenshot")
 		return
 	}
-	width, height := pngDimensions(data)
+	width, height := screenshotDimensions(data)
 
 	// The live-monitor branch above answers with a flat image/width/height
 	// object. respond() wraps exactly once, so this branch must use the same
 	// shape; the previous gin.H{"data": ...} produced a second envelope and
 	// the dock's screenshot card showed "no screenshot" for a file that exists.
 	respond(c, gin.H{
-		"image":       "data:image/png;base64," + base64.StdEncoding.EncodeToString(data),
+		"image":       "data:" + screenshotMime(data) + ";base64," + base64.StdEncoding.EncodeToString(data),
 		"width":       width,
 		"height":      height,
 		"window_name": "Desktop",
 		"capture_id":  newest.Name(),
 		"captured_at": newestTime.UTC().Format(time.RFC3339Nano),
 	})
+}
+
+// isScreenshotFile accepts every image extension the serving route allows.
+// The list must match handleServeScreenshot: the dock reads via this handler
+// while the gallery links to the serving route.
+func isScreenshotFile(name string) bool {
+	switch strings.ToLower(filepath.Ext(name)) {
+	case ".png", ".jpg", ".jpeg", ".gif", ".webp":
+		return true
+	default:
+		return false
+	}
+}
+
+// screenshotDimensions reads width/height without decoding the full image.
+func screenshotDimensions(data []byte) (int, int) {
+	if len(data) >= 4 && data[0] == 0xFF && data[1] == 0xD8 {
+		if cfg, err := jpeg.DecodeConfig(bytes.NewReader(data)); err == nil {
+			return cfg.Width, cfg.Height
+		}
+		return 0, 0
+	}
+	return pngDimensions(data)
 }
 
 // pngDimensions reads width/height from a PNG IHDR chunk without decoding the full image.

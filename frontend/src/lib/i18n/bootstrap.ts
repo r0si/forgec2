@@ -76,6 +76,7 @@ export const enBootstrap: Record<string, string> = {
   "common.shortcuts_hint": "Keyboard shortcuts (Ctrl+/)",
   "common.submit_failed": "Form submission failed",
   "common.task_failed": "Task failed",
+  "common.task_cancelled": "Task cancelled",
   "common.timeout_error": "Request timed out — please retry",
   "common.toggle_menu": "Toggle menu",
   "common.total": "Total",

@@ -379,7 +379,7 @@ Both sides carry a coverage floor, and **a floor that is never raised stops guar
 |---|---|---|---|
 | Go | **58%** | 59.1% (was 51.5 at a 52.8 measurement — a 7-point regression would have passed) | `.github/workflows/ci.yml` "Coverage floor" |
 | frontend | **38.5%** | 39.36% statements / 25 095 | `frontend/scripts/check-coverage.mjs` (override with `COVERAGE_FLOOR`) |
-| first-paint bundle | **675 kB public / 720 kB authenticated** | 658 kB public, 706 kB authenticated (4.61 MB total under a 5.0 MB cap) | `frontend/scripts/check-bundle.mjs` |
+| first-paint bundle | **675 kB public / 720 kB authenticated** | 660 kB public, 708 kB authenticated (4.65 MB total under a 5.0 MB cap) | `frontend/scripts/check-bundle.mjs` |
 
 Raise a floor in the same change that adds tests; lower it only as part of that change, never to make
 a regression pass. ~1 point of headroom is deliberate: it absorbs ordinary page work while a large
@@ -398,8 +398,8 @@ report/auto/workflows/users/tasks/dashboard/listeners batch then added 1 kB of e
 (**695 kB**), and the zh fragment loader/gate added another 1 kB (**696 kB**), then the
 generate/ai/cred zh fragments another (**697 kB**), then the remaining page-owned zh fragments
 (**700 kB**), then the demo-mode /health preflight (**701 kB**). Splitting the shell chrome into
-lazy Sidebar/TopBar chunks then took the **public** path to **658 kB** while the **authenticated**
-path (public + the chrome closure) is **706 kB**; the two budgets are 675 and 720 kB. **When a
+lazy Sidebar/TopBar chunks then took the **public** path to **660 kB** while the **authenticated**
+path (public + the chrome closure) is **708 kB**; the two budgets are 675 and 720 kB. **When a
 budget's comment states a headroom, check that arithmetic against the current measurement.**
 
 ## Testing
