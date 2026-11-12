@@ -7,6 +7,7 @@ import { unwrapEnvelope } from "@/lib/envelope";
 import { useErrorToast } from "@/lib/hooks/useErrorToast";
 import { downloadText } from "@/lib/download";
 import type { Beacon, BulkResult } from "./types";
+import type { FailureWindow } from "./useAgentFilters";
 
 type TKey = (key: string, params?: Record<string, string | number>) => string;
 type ConfirmState = { type: "kill" | "delete" | "uninstall" | "batch-delete" | "bulk-kill" | "bulk-uninstall"; id?: string; hostname?: string } | null;
@@ -234,12 +235,16 @@ export function useAgentBulkOps(deps: BulkOpsDeps) {
     } catch (e) { setActionMsg(errorText(t, e, () => t("agents.notes_failed"))); }
   }, [editingNotesId, editNotesText, t, setActionMsg, closeNotesEdit, loadBeacons]);
 
-  const exportCSV = useCallback(async () => {
+  const exportCSV = useCallback(async (windowOverride?: FailureWindow) => {
     // Second click cancels an in-flight export (up to 100k rows otherwise).
     if (exporting) {
       exportAbortRef.current?.abort();
       return;
     }
+    // The file names the window its failure counts describe; the caller may
+    // override the page's window (the toolbar asks first, because the file
+    // is what leaves the console).
+    const failuresWindow = windowOverride ?? failureWindow;
     setExporting(true);
     const controller = new AbortController();
     exportAbortRef.current = controller;
@@ -260,7 +265,7 @@ export function useAgentBulkOps(deps: BulkOpsDeps) {
         // The failure counts the list shows; a file without them cannot answer
         // which beacon is failing?.
         q.set("failures", "1");
-        q.set("failures_window", failureWindow);
+        q.set("failures_window", failuresWindow);
         const d = await api.get<{ agents?: Beacon[]; total?: number | string }>(paths.agents.list(q.toString()), { unwrap: false, signal: controller.signal });
         const body = unwrapEnvelope(d) as { agents?: Beacon[]; total?: number | string };
         const pageList = (body.agents || []) as Beacon[];
@@ -277,7 +282,7 @@ export function useAgentBulkOps(deps: BulkOpsDeps) {
         toast.info(t("agents.no_beacons"));
         return;
       }
-      const headers = ["Hostname", "User", "OS", "IP", "Status", `Failures (${failureWindow})`, "Last Seen", "Version", "Active Window", "Notes"];
+      const headers = ["Hostname", "User", "OS", "IP", "Status", `Failures (${failuresWindow})`, "Last Seen", "Version", "Active Window", "Notes"];
       const rows = all.map((b) => [
         b.hostname || "", b.username || "", b.os || "", b.ip || "",
         b.status || "", String(b.failure_count ?? 0), b.last_seen || "", b.version || "",

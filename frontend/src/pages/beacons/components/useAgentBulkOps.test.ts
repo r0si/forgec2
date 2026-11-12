@@ -138,6 +138,42 @@ describe("useAgentBulkOps failure reporting", () => {
     expect(setActionMsg).toHaveBeenCalledWith("agents.batch_result");
   });
 
+  it("exports CSV with the 7d window when asked", async () => {
+    const downloads: string[] = [];
+    vi.mocked(downloadText).mockImplementation((csv: string) => {
+      downloads.push(csv);
+    });
+    vi.mocked(api.get).mockResolvedValue({
+      success: true,
+      data: {
+        agents: [
+          {
+            id: "a1",
+            hostname: "web-01",
+            ip: "10.0.0.5",
+            status: "offline",
+            failure_count: 2,
+          },
+        ],
+        total: 1,
+      },
+    });
+
+    const { deps } = makeDeps();
+    const { result } = renderHook(() => useAgentBulkOps(deps));
+    await act(async () => {
+      await result.current.exportCSV("7d");
+    });
+
+    const csv = downloads.join("\n");
+    // The header names the window the counts describe.
+    expect(csv).toContain("Failures (7d)");
+    expect(csv).toContain("web-01");
+    // And the export asks the server for the window it publishes.
+    const request = String(vi.mocked(api.get).mock.calls[0][0]);
+    expect(request).toContain("failures_window=7d");
+  });
+
   it("exports the failure counts the list shows", async () => {
     const downloads: string[] = [];
     vi.mocked(downloadText).mockImplementation((csv: string) => {

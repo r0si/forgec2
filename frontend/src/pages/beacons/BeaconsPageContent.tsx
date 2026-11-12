@@ -25,7 +25,7 @@ import { AgentContextMenu } from "./components/AgentContextMenu";
 import AgentsTable from "./components/AgentsTable";
 import AgentsToolbar from "./components/AgentsToolbar";
 import AgentsConfirmDialogs from "./components/AgentsConfirmDialogs";
-import { useAgentFilters } from "./components/useAgentFilters";
+import { useAgentFilters, type FailureWindow } from "./components/useAgentFilters";
 import { useAgentSelection } from "./components/useAgentSelection";
 import { useAgentData } from "./components/useAgentData";
 import { useAgentModals } from "./components/useAgentModals";
@@ -298,7 +298,7 @@ export default function AgentsPageContent() {
         showResults={showResults}
         onToggleResults={() => { setShowResults((p) => !p); if (!showResults) setBulkMode(true); }}
         exporting={exporting}
-        onExport={() => void exportCSV()}
+        onExport={(w) => void exportCSV(w as FailureWindow | undefined)}
         autoRefresh={autoRefresh}
         onToggleAutoRefresh={() => setAutoRefresh((p) => !p)}
         effectiveViewMode={effectiveViewMode}

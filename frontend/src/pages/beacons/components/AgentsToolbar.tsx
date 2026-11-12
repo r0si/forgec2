@@ -6,6 +6,7 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -32,7 +33,7 @@ interface AgentsToolbarProps {
   showResults: boolean;
   onToggleResults: () => void;
   exporting: boolean;
-  onExport: () => void;
+  onExport: (window?: string) => void;
   autoRefresh: boolean;
   onToggleAutoRefresh: () => void;
   effectiveViewMode: "table" | "grid";
@@ -100,8 +101,17 @@ export default memo(function AgentsToolbar({
           <DropdownMenuCheckboxItem checked={showResults} onCheckedChange={() => onToggleResults()}>
             <History className="size-4" /> {t("agents.results")}
           </DropdownMenuCheckboxItem>
-          <DropdownMenuItem disabled={exporting} onClick={onExport}>
-            <Download className="size-4" /> {t("agents.export")}
+          <DropdownMenuLabel>{t("agents.failures_window_24h")}</DropdownMenuLabel>
+          <DropdownMenuItem disabled={exporting} onClick={() => onExport("24h")}>
+            <Download className="size-4" /> {t("agents.export_24h")}
+            <span className="ml-auto text-micro text-muted-foreground">CSV</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem disabled={exporting} onClick={() => onExport("7d")}>
+            <Download className="size-4" /> {t("agents.export_7d")}
+            <span className="ml-auto text-micro text-muted-foreground">CSV</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem disabled={exporting} onClick={() => onExport("30d")}>
+            <Download className="size-4" /> {t("agents.export_30d")}
             <span className="ml-auto text-micro text-muted-foreground">CSV</span>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
