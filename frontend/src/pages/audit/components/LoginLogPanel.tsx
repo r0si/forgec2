@@ -11,6 +11,7 @@ import { Card } from "@/components/ui/card";
 import { PageToolbar } from "@/components/ui/page-toolbar";
 import { downloadBlob } from "@/lib/download";
 import { loginFilterParams, type LoginEvent } from "./login-log";
+import { auditActionLabel, auditActionTone } from "./audit-log";
 import { Download, Filter, RotateCw } from "lucide-react";
 
 export type { LoginEvent };
@@ -318,6 +319,19 @@ export function LoginLogPanel({ initialResult, initialRange, initialNewIp }: Log
               id: "region",
               header: t("audit.login_region"),
               cell: (e) => <span className="text-xs">{regionLabel(t, e.country, e.city)}</span>,
+            },
+            {
+              id: "event",
+              header: t("audit.login_event"),
+              sortValue: (e) => e.action || "",
+              // The result badge alone says "Success" for every new-address
+              // sign-in, which hides the one thing that made the row
+              // interesting. The event names it.
+              cell: (e) => (
+                <Badge variant={auditActionTone(e.action || "")}>
+                  {auditActionLabel(t, e.action || "") || e.action || "-"}
+                </Badge>
+              ),
             },
             {
               id: "result",

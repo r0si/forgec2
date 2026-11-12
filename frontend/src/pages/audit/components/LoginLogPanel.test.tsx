@@ -163,6 +163,25 @@ describe("LoginLogPanel", () => {
     expect(String(call?.[0])).toContain("new_ip=1");
   });
 
+  it("names the event, so a new-address sign-in does not read as a plain success", async () => {
+    vi.mocked(api.get).mockResolvedValue({
+      events: [
+        {
+          id: 9, user: "demo", action: "login_new_ip", ip: "203.0.113.30", country: "德国",
+          success: true, details: "First login from 203.0.113.30", created_at: "2026-11-09T08:30:00Z",
+        },
+      ],
+      total: 1,
+      summary: SUMMARY,
+    });
+
+    renderPanel();
+    // The event column carries the readable action; the result badge alone
+    // would say "Success" and hide the anomaly. The dictionary has no entry
+    // in this mock, so the label falls back to the humanized action.
+    expect(await screen.findByText(/login new ip/i)).toBeTruthy();
+  });
+
   it("links the new-address count to the sign-ins it counts", async () => {
     renderPanel();
     await screen.findByText("alice");

@@ -195,6 +195,7 @@ export const zh: Record<string, string> = {
     "audit.login_region_local": "本地 / 内网",
     "audit.login_region_unknown": "未知（解析中）",
     "audit.login_result": "结果",
+    "audit.login_event": "事件",
     "audit.login_ok": "成功",
     "audit.login_failed": "失败",
     "audit.login_all_results": "全部结果",

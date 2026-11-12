@@ -193,6 +193,7 @@ export const en: Record<string, string> = {
     "audit.login_region_local": "Local / LAN",
     "audit.login_region_unknown": "Unknown (resolving)",
     "audit.login_result": "Result",
+"audit.login_event": "Event",
     "audit.login_ok": "Success",
     "audit.login_failed": "Failed",
     "audit.login_all_results": "All results",
