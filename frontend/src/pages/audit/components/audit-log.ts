@@ -41,6 +41,9 @@ export function normalizeAuditLog(raw: unknown): AuditLog | null {
     resource: firstStr(o, ["resource", "Resource"]),
     target: firstStr(o, ["target", "Target"]) || agentId,
     status,
+    // The server stores the boolean and the failed-result filter queries it;
+    // dropping it here would make every view re-derive it from `status`.
+    success: typeof success === "boolean" ? success : undefined,
     details: firstStr(o, ["details", "Details"]),
     ip: firstStr(o, ["ip", "IP"]),
     severity: firstStr(o, ["severity", "Severity"], status === "failed" ? "error" : "info"),

@@ -88,9 +88,17 @@ export default memo(function BeaconOperationsSection({ agentId }: BeaconOperatio
             {logs.map((log, i) => (
               <div key={log.id || i} className="flex items-center justify-between gap-2 py-2">
                 <div className="flex min-w-0 items-center gap-2">
-                  <Badge variant={auditActionTone(log.action || "")}>
+                  {/* A failed operation is the one that needs the operator's
+                      eye: the tone follows the outcome, not the action's
+                      usual category colour. */}
+                  <Badge variant={log.success === false ? "destructive" : auditActionTone(log.action || "")}>
                     {auditActionLabel(t, log.action || "")}
                   </Badge>
+                  {log.success === false && (
+                    <span className="micro-sm font-medium text-destructive-ink">
+                      {t("agents.operations_failed")}
+                    </span>
+                  )}
                   {log.details && (
                     <span className="truncate text-xs text-muted-foreground">{log.details}</span>
                   )}

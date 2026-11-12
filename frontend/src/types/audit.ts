@@ -6,6 +6,8 @@ export interface AuditLog {
   resource?: string;
   target?: string;
   status?: string;
+  /** Whether the action succeeded; the server stores it and the failed-result filter is a query over it. */
+  success?: boolean;
   details?: string;
   ip?: string;
   severity?: string;

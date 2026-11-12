@@ -61,6 +61,14 @@ describe("BeaconOperationsSection", () => {
     expect(call).toContain("pageSize=5");
   });
 
+  it("marks a failed operation so the operator sees which one broke", async () => {
+    renderSection();
+    expect(await screen.findByText("agents.operations_failed")).toBeTruthy();
+    // The failing row keeps its action label and its detail.
+    expect(screen.getByText("Command result")).toBeTruthy();
+    expect(screen.getByText("whoami /priv failed")).toBeTruthy();
+  });
+
   it("renders nothing for a role without audit.read", () => {
     can.mockReturnValue(false);
     renderSection();

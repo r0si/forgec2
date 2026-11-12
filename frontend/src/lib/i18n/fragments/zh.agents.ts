@@ -508,6 +508,7 @@ export const zhAgents: Record<string, string> = {
   "agents.operations_view_all": "查看全部",
   "agents.operations_empty": "暂无该 Beacon 的操作记录。",
   "agents.operations_unavailable": "最近操作不可用",
+  "agents.operations_failed": "失败",
   "agents.header_operations": "操作日志",
   "agents.header_privesc_hint": "仅侦察检查，不保证提权成功",
   "agents.host_sessions": "{n} 个 Beacon",

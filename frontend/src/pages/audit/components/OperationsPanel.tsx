@@ -296,6 +296,38 @@ export function OperationsPanel({
     }
   };
 
+  // The chips are the category select, shortcut form: one click on the
+  // category the operator already has in mind. The catalogue supplies the
+  // counts, so a category nobody used yet is visible and not hidden.
+  const pickCategory = (id: string) => {
+    const next = applied.category === id ? "" : id;
+    changeCategory(next);
+    setPage(1);
+    if (next) {
+      // Applying straight away is the point of a chip; the pending selects
+      // follow, so the visible filter and the request cannot disagree.
+      const stat = catalogue.actions.find((a) => a.action === action);
+      const nextAction = stat && stat.category !== next ? "" : action;
+      setAction(nextAction);
+      setApplied({
+        range,
+        category: next,
+        action: nextAction,
+        result,
+        user: user.trim(),
+        search: search.trim(),
+        agentId: agentId.trim(),
+        includeSystem,
+      });
+    } else {
+      setApplied({
+        ...applied,
+        category: "",
+        action: "",
+      });
+    }
+  };
+
   const exportCsv = async () => {
     setExporting(true);
     setExportError(null);
@@ -467,6 +499,31 @@ export function OperationsPanel({
 
       {exportError && (
         <p role="alert" className="text-sm text-destructive-ink">{t(exportError)}</p>
+      )}
+
+      {catalogue.categories.length > 0 && (
+        <div
+          className="flex flex-wrap items-center gap-1.5"
+          aria-label={t("audit.ops_categories_aria")}
+        >
+          {CATEGORY_IDS.map((id) => {
+            const stat = catalogue.categories.find((c) => c.id === id);
+            // A category nobody used yet is not a shortcut anyone needs.
+            if (!stat || stat.count === 0) return null;
+            const active = applied.category === id;
+            return (
+              <Button
+                key={id}
+                size="xs"
+                variant={active ? "default" : "outline"}
+                aria-pressed={active}
+                onClick={() => pickCategory(id)}
+              >
+                {categoryLabel(id)} · {stat.count}
+              </Button>
+            );
+          })}
+        </div>
       )}
 
       {applied.agentId && (

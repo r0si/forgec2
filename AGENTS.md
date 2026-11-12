@@ -236,6 +236,18 @@ by hand at least once; do not weaken one to make a change pass — fix the chang
   canonical `etagMatches(header, etag)` now lives in `etag.go` with `ifNoneMatch(c, etag)` as the
   handler-side wrapper, and the restored test (`TestIfNoneMatchUnit`) covers exact, unquoted, wildcard
   and non-matching inputs.
+- `check:envelope-reads` (`frontend/scripts/check-envelope-reads.mjs`) — a **raw-body read must go through an
+  envelope helper**. Every JSON 200 from this server is `{"success":true,"data":{...}}`, and the api client
+  unwraps one level by default, so a caller that opts out with `unwrap:false` gets the *envelope*, not the
+  payload. Reading a payload field off that value returns `undefined`, and a list endpoint answers "0 rows"
+  while the rows sit right there in the response — **that is how the fleet list shipped empty on every
+  deployment**: the API returned the agents, the Beacons page rendered none, and nothing failed loudly. The
+  gate requires the value of every `unwrap:false` call to reach `unwrapEnvelope`/`firstArray`/`firstField`/
+  `asRecord`/`normalizeListEnvelope`/`unwrapBody` **before** it is used; the first use of the value must be
+  that helper call. The allowlist is empty on purpose — a call shape the script cannot recognise is reported,
+  not ignored. The detector is exported (`analyzeSource`) and pinned by `frontend/scripts/check-envelope-reads.test.mjs`
+  (7 cases: the defect, the helper, a call spread over lines, the `Promise.all` element, a comment that only
+  mentions `unwrap:false`, and a value that is never normalised).
 - `check:docs` (`gen-command-reference.mjs --check` + `gen-capability-matrix.mjs --check`) —
   the generated docs must match their sources: the command reference, and the **generated
   task-inventory block** plus the version stamp in `docs/CAPABILITY_MATRIX.md`. CI runs these

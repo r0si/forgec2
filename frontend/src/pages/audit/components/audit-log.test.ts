@@ -39,6 +39,14 @@ describe("normalizeAuditLog", () => {
     expect(normalizeAuditLog({ success: false, action: "login" })?.status).toBe("failed");
     expect(normalizeAuditLog({ success: false })?.severity).toBe("error");
   });
+
+  it("keeps the server's success boolean, not only the status word", () => {
+    // Views that colour a row by outcome read the boolean; re-deriving it from
+    // `status` would silently answer "unknown" for a row the server marked.
+    expect(normalizeAuditLog({ success: false })?.success).toBe(false);
+    expect(normalizeAuditLog({ success: true })?.success).toBe(true);
+    expect(normalizeAuditLog({ status: "failed" })?.success).toBeUndefined();
+  });
 });
 
 describe("auditSessionId", () => {

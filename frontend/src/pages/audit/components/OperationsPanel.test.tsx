@@ -151,6 +151,24 @@ describe("OperationsPanel", () => {
     expect(query).toContain("since=7d");
   });
 
+  it("filters by a category from the catalogue chips", async () => {
+    render(<OperationsPanel />);
+    await screen.findByText("Created task");
+
+    // The chips carry the counts the catalogue reported. The label falls back
+    // to the raw id when the dictionary has no entry (as in this mock).
+    const chip = await screen.findByRole("button", { name: /tasks · 3/ });
+    expect(chip.getAttribute("aria-pressed")).toBe("false");
+
+    fireEvent.click(chip);
+
+    await waitFor(() => {
+      const calls = vi.mocked(api.get).mock.calls.filter(([p]) => String(p).startsWith("/audit/logs"));
+      expect(String(calls[calls.length - 1][0])).toContain("category=tasks");
+    });
+    expect(screen.getByRole("button", { name: /tasks · 3/ }).getAttribute("aria-pressed")).toBe("true");
+  });
+
   it("pins the view to a beacon from a deep link and can clear it", async () => {
     render(<OperationsPanel initialAgentId="agent-abc" />);
     await screen.findByText("Created task");

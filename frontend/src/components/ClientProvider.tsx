@@ -99,8 +99,10 @@ function readCurrentUser(payload: unknown): CurrentUser {
 }
 
 /** Load authorization independently of the sidebar so focus/mobile layouts
- * receive the same permission state. `unwrap:false` also tolerates legacy and
- * current `/api/me` response shapes during rolling upgrades. */
+ * receive the same permission state. The default unwrap is used on purpose:
+ * `readCurrentUser` accepts the unwrapped payload and the raw envelope body
+ * alike, so a rolling upgrade between an envelope and a legacy answer cannot
+ * leave the shell with no permissions. */
 // MainLayout calls this for the authenticated shell. Signed-out screens
 // (login, forbidden, 404) must not probe /api/me: they have no session, and
 // the call only added a 401/404 to every visit's console.
@@ -111,7 +113,7 @@ export function useCurrentUserBootstrap() {
 
   useEffect(() => {
     let active = true;
-    void api.get<unknown>(paths.auth.me, { unwrap: false }).then((payload) => {
+    void api.get<unknown>(paths.auth.me).then((payload) => {
       if (!active) return;
       const user = readCurrentUser(payload);
       if (user.username) setCurrentUsername(user.username);

@@ -224,6 +224,7 @@ export const zh: Record<string, string> = {
     "audit.ops_range_all": "全部时间",
     "audit.ops_category": "分类",
     "audit.ops_all_categories": "全部分类",
+    "audit.ops_categories_aria": "按分类筛选",
     "audit.ops_action": "操作",
     "audit.ops_all_actions": "全部操作",
     "audit.ops_result": "结果",
