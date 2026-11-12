@@ -504,6 +504,7 @@ export function OperationsPanel({
       {catalogue.categories.length > 0 && (
         <div
           className="flex flex-wrap items-center gap-1.5"
+          role="group"
           aria-label={t("audit.ops_categories_aria")}
         >
           {CATEGORY_IDS.map((id) => {

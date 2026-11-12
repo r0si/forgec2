@@ -510,6 +510,7 @@ export const enAgents: Record<string, string> = {
   "agents.operations_empty": "No operations recorded for this beacon yet.",
   "agents.operations_unavailable": "Recent operations unavailable",
   "agents.operations_failed": "Failed",
+  "agents.operations_failures_only": "Failures only",
   "agents.header_operations": "Audit log",
   "agents.header_privesc_hint": "Recon check only — not a guaranteed elevation",
   "agents.host_sessions": "{n} beacons",

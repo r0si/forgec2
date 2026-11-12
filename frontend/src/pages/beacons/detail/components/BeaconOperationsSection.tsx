@@ -33,6 +33,10 @@ export default memo(function BeaconOperationsSection({ agentId }: BeaconOperatio
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [unavailable, setUnavailable] = useState(false);
+  // "Failures only" is a server-side filter, not a client-side one: the panel
+  // shows the newest rows, so a failure older than those rows would be missed
+  // by filtering here.
+  const [failuresOnly, setFailuresOnly] = useState(false);
 
   const load = useCallback(
     async (signal?: AbortSignal) => {
@@ -40,7 +44,9 @@ export default memo(function BeaconOperationsSection({ agentId }: BeaconOperatio
       setLoading(true);
       setUnavailable(false);
       try {
-        const query = `pageSize=${PAGE_SIZE}&agent_id=${encodeURIComponent(agentId)}&scope=operations`;
+        const query = `pageSize=${PAGE_SIZE}&agent_id=${encodeURIComponent(agentId)}&scope=operations${
+          failuresOnly ? "&result=failed" : ""
+        }`;
         const payload = (await api.get(paths.audit.logs(query), { signal })) as Record<string, unknown> | null;
         setLogs(normalizeAuditLogs(payload?.logs));
       } catch (err) {
@@ -52,7 +58,7 @@ export default memo(function BeaconOperationsSection({ agentId }: BeaconOperatio
         setLoading(false);
       }
     },
-    [agentId, allowed],
+    [agentId, allowed, failuresOnly],
   );
 
   useEffect(() => {
@@ -70,10 +76,23 @@ export default memo(function BeaconOperationsSection({ agentId }: BeaconOperatio
       title={t("agents.operations_title")}
       icon={History}
       tone="muted"
-      href={`/audit?tab=operations&agent_id=${encodeURIComponent(agentId)}`}
+      href={`/audit?tab=operations&agent_id=${encodeURIComponent(agentId)}${
+        failuresOnly ? "&result=failed" : ""
+      }`}
       linkLabel={t("agents.operations_view_all")}
     >
       <div className="px-4 py-2">
+        <div className="mb-1 flex items-center justify-end gap-2">
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={failuresOnly}
+              onChange={(e) => setFailuresOnly(e.target.checked)}
+              className="size-3.5 accent-current"
+            />
+            {t("agents.operations_failures_only")}
+          </label>
+        </div>
         {loading ? (
           <Skeleton className="h-6 w-full" />
         ) : unavailable ? (

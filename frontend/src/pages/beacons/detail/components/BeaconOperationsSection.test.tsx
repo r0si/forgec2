@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import BeaconOperationsSection from "./BeaconOperationsSection";
 import { api } from "@/lib/api";
@@ -67,6 +67,24 @@ describe("BeaconOperationsSection", () => {
     // The failing row keeps its action label and its detail.
     expect(screen.getByText("Command result")).toBeTruthy();
     expect(screen.getByText("whoami /priv failed")).toBeTruthy();
+  });
+
+  it("asks the server for the failures only when the toggle is on", async () => {
+    renderSection();
+    await screen.findByText("Command result");
+
+    fireEvent.click(screen.getByLabelText("agents.operations_failures_only"));
+
+    await waitFor(() => {
+      const calls = vi.mocked(api.get).mock.calls.map(([p]) => String(p));
+      const last = calls[calls.length - 1];
+      expect(last).toContain("result=failed");
+      expect(last).toContain("agent_id=a1");
+    });
+    // The "view all" link carries the same selection.
+    expect(screen.getByRole("link", { name: /agents.operations_view_all/ }).getAttribute("href")).toBe(
+      "/audit?tab=operations&agent_id=a1&result=failed",
+    );
   });
 
   it("renders nothing for a role without audit.read", () => {
