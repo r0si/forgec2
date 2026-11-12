@@ -27,6 +27,7 @@ func TestAgentFleetCSVExport(t *testing.T) {
 	if err := s.db.Create(&engagement).Error; err != nil {
 		t.Fatalf("seed engagement: %v", err)
 	}
+	// The failure count column carries the same numbers the list shows.
 	for _, agent := range []db.Implant{
 		{ID: "a-1", TenantID: 1, Hostname: "web-01", IP: "10.0.0.5", OS: "windows", Username: "svc",
 			Status: "online", LastSeen: now, EngagementID: &engagement.ID},
@@ -35,6 +36,16 @@ func TestAgentFleetCSVExport(t *testing.T) {
 		agent := agent
 		if err := s.db.Create(&agent).Error; err != nil {
 			t.Fatalf("seed agent: %v", err)
+		}
+	}
+	// Two failed operations on the first beacon, inside the window.
+	for i := 0; i < 2; i++ {
+		row := db.AuditLog{
+			User: "op", Action: "command_result", Resource: "task", AgentID: "a-1",
+			TenantID: 1, Success: false, CreatedAt: now.Add(-time.Duration(i+1) * time.Hour),
+		}
+		if err := s.db.Create(&row).Error; err != nil {
+			t.Fatalf("seed audit row: %v", err)
 		}
 	}
 
@@ -59,21 +70,28 @@ func TestAgentFleetCSVExport(t *testing.T) {
 	if len(rows) != 3 {
 		t.Fatalf("rows = %d, want a header and the two agents: %v", len(rows), rows)
 	}
-	if got := strings.Join(rows[0], ","); got != "ID,Hostname,IP,OS,Username,Status,Protocol,Last Seen,Engagement" {
+	if got := strings.Join(rows[0], ","); got != "ID,Hostname,IP,OS,Username,Status,Protocol,Last Seen,Engagement,Failures (24h)" {
 		t.Fatalf("header = %q", got)
 	}
 	// The engagement column is what makes the file answer "who was in scope" rather than "who exists". Keyed by hostname
 	// because the list has its own default ordering, and a positional assertion would fail the day that order changes.
 	wantEngagement := strconv.FormatUint(uint64(engagement.ID), 10)
 	engagementByHost := map[string]string{}
+	failuresByHost := map[string]string{}
 	for _, row := range rows[1:] {
 		engagementByHost[row[1]] = row[8]
+		failuresByHost[row[1]] = row[9]
 	}
 	if engagementByHost["web-01"] != wantEngagement {
 		t.Fatalf("engagement for web-01 = %q, want %q", engagementByHost["web-01"], wantEngagement)
 	}
 	if engagementByHost["db-02"] != "" {
 		t.Fatalf("engagement for the unlinked agent = %q, want empty", engagementByHost["db-02"])
+	}
+	// The file carries the same failure count the list shows: a handover file
+	// that cannot say which beacon is failing is half an answer.
+	if failuresByHost["web-01"] != "2" || failuresByHost["db-02"] != "0" {
+		t.Fatalf("failure counts = %+v, want web-01=2 db-02=0", failuresByHost)
 	}
 	// Everything fits on one page, so nothing was cut.
 	if got := w.Header().Get("X-Export-Truncated"); got != "" {

@@ -824,8 +824,11 @@ func (s *Server) writeAgentListJSON(c *gin.Context) {
 	// The failure counts of the page: one bounded query over the page's
 	// beacons, served by the (agent_id, created_at) index. It runs when the
 	// console asks for the column or sorts by it - in the grouped view too,
-	// which is the one the console actually uses.
-	if len(failureCounts) == 0 && (c.Query("failures") == "1" || sortKey == agentSortFailures) {
+	// which is the one the console actually uses - and always for the CSV,
+	// whose rows must carry the same numbers as the screen.
+	if len(failureCounts) == 0 &&
+		(c.Query("failures") == "1" || sortKey == agentSortFailures ||
+			strings.EqualFold(strings.TrimSpace(c.Query("format")), "csv")) {
 		failureCounts = s.agentFailureCounts(c, ids)
 	}
 	stats := computeTaskStats(s.db, ids)
@@ -856,7 +859,7 @@ func (s *Server) writeAgentListJSON(c *gin.Context) {
 	if strings.EqualFold(strings.TrimSpace(c.Query("format")), "csv") {
 		var buf strings.Builder
 		writer := csv.NewWriter(&buf)
-		header := []string{"ID", "Hostname", "IP", "OS", "Username", "Status", "Protocol", "Last Seen", "Engagement"}
+		header := []string{"ID", "Hostname", "IP", "OS", "Username", "Status", "Protocol", "Last Seen", "Engagement", "Failures (24h)"}
 		if err := writer.Write(header); err != nil {
 			handleQueryError(c, err, "Failed to encode the fleet list")
 			return
@@ -885,6 +888,9 @@ func (s *Server) writeAgentListJSON(c *gin.Context) {
 				protocolVersion,
 				lastSeen,
 				engagement,
+				// The same number the list shows: a file that cannot answer
+				// "which beacon is failing?" is half an answer.
+				strconv.FormatInt(item.FailureCount, 10),
 			}); err != nil {
 				handleQueryError(c, err, "Failed to encode the fleet list")
 				return

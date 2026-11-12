@@ -499,7 +499,11 @@ func (s *Server) handleExportAuditLogsCSV(c *gin.Context) {
 		return
 	}
 	w := csv.NewWriter(c.Writer)
-	_ = w.Write([]string{"Time", "User", "IP", "Action", "Category", "Resource", "Target", "Result", "Details"})
+	_ = w.Write([]string{"Time", "User", "IP", "Action", "Category", "Resource", "Target", "Host", "Result", "Details"})
+	// The beacon names of the exported rows: the file has to answer "which
+	// host?" as well as the screen does. The distinct ids are bounded by the
+	// fleet, not by the row count.
+	hostnames := s.agentHostnames(c, auditAgentIDs(rows))
 	for i := range rows {
 		row := &rows[i]
 		result := "success"
@@ -521,6 +525,7 @@ func (s *Server) handleExportAuditLogsCSV(c *gin.Context) {
 			auditActionCategory(row.Action),
 			safeCSVCell(row.Resource),
 			safeCSVCell(row.AgentID),
+			safeCSVCell(hostnames[row.AgentID]),
 			result,
 			safeCSVCell(details),
 		})

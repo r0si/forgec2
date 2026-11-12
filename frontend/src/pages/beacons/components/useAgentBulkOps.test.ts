@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { downloadText } from "@/lib/download";
 import { useAgentBulkOps, parseSleepInput } from "./useAgentBulkOps";
 
 vi.mock("@/lib/api", () => ({
@@ -17,6 +18,8 @@ vi.mock("@/lib/i18n", () => {
 vi.mock("sonner", () => ({
   toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() }),
 }));
+
+vi.mock("@/lib/download", () => ({ downloadText: vi.fn() }));
 
 const errorToast = vi.mocked(toast.error);
 
@@ -75,6 +78,7 @@ function makeDeps(overrides: Record<string, unknown> = {}) {
     linkedFilter: "",
     sortKey: "",
     sortDir: "",
+    failureWindow: "24h",
     ...overrides,
   };
   return { deps, setActionMsg, setConfirm };
@@ -132,6 +136,36 @@ describe("useAgentBulkOps failure reporting", () => {
     });
 
     expect(setActionMsg).toHaveBeenCalledWith("agents.batch_result");
+  });
+
+  it("exports the failure counts the list shows", async () => {
+    const downloads: string[] = [];
+    vi.mocked(downloadText).mockImplementation((csv: string) => {
+      downloads.push(csv);
+    });
+    vi.mocked(api.get).mockResolvedValue({
+      success: true,
+      data: {
+        agents: [{ id: "a1", hostname: "web-01", ip: "10.0.0.5", status: "offline", failure_count: 3 }],
+        total: 1,
+      },
+    });
+
+    const { deps } = makeDeps();
+    const { result } = renderHook(() => useAgentBulkOps(deps));
+    await act(async () => {
+      await result.current.exportCSV();
+    });
+
+    // The file has to answer "which beacon is failing?" like the screen does.
+    const csv = downloads.join("\n");
+    expect(csv).toContain("Failures");
+    expect(csv).toContain("web-01");
+    expect(csv).toContain('"3"');
+    // And the export asks the server for the counts it writes.
+    const request = String(vi.mocked(api.get).mock.calls[0][0]);
+    expect(request).toContain("failures=1");
+    expect(request).toContain("failures_window=24h");
   });
 
   it("routes an export failure through the normalizer", async () => {

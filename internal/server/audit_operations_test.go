@@ -461,13 +461,16 @@ func TestAuditOperationsCSVExport(t *testing.T) {
 	if records[0][0] != "Time" || records[0][4] != "Category" {
 		t.Fatalf("header = %v", records[0])
 	}
+	if records[0][7] != "Host" {
+		t.Fatalf("header = %v, want the Host column the list shows", records[0])
+	}
 	if records[1][4] != "tasks" {
 		t.Fatalf("category cell = %q, want tasks", records[1][4])
 	}
 	if !strings.HasPrefix(records[1][1], "'=") {
 		t.Fatalf("user cell = %q, want a formula-neutralized value", records[1][1])
 	}
-	if !strings.HasPrefix(records[1][8], "'+") {
-		t.Fatalf("details cell = %q, want a formula-neutralized value", records[1][8])
+	if !strings.HasPrefix(records[1][9], "'+") {
+		t.Fatalf("details cell = %q, want a formula-neutralized value", records[1][9])
 	}
 }

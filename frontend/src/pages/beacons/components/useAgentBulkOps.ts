@@ -42,6 +42,8 @@ interface BulkOpsDeps {
   linkedFilter: string;
   sortKey: string;
   sortDir: string;
+  // The window the failure counts describe; the export carries the same numbers.
+  failureWindow: string;
 }
 
 /** Shared interval/jitter validation for both sleep submit paths. */
@@ -66,6 +68,7 @@ export function useAgentBulkOps(deps: BulkOpsDeps) {
     quickSleepAgent, sleepInterval, sleepJitter, closeQuickSleep,
     editingNotesId, editNotesText, closeNotesEdit,
     searchQuery, statusFilter, osFilter, tagFilter, linkedFilter, sortKey, sortDir,
+    failureWindow,
   } = deps;
 
   const { toastError } = useErrorToast();
@@ -254,6 +257,10 @@ export function useAgentBulkOps(deps: BulkOpsDeps) {
         if (linkedFilter) q.set("linked", linkedFilter);
         q.set("sort_key", sortKey);
         q.set("sort_dir", sortDir);
+        // The failure counts the list shows; a file without them cannot answer
+        // which beacon is failing?.
+        q.set("failures", "1");
+        q.set("failures_window", failureWindow);
         const d = await api.get<{ agents?: Beacon[]; total?: number | string }>(paths.agents.list(q.toString()), { unwrap: false, signal: controller.signal });
         const body = unwrapEnvelope(d) as { agents?: Beacon[]; total?: number | string };
         const pageList = (body.agents || []) as Beacon[];
@@ -270,10 +277,11 @@ export function useAgentBulkOps(deps: BulkOpsDeps) {
         toast.info(t("agents.no_beacons"));
         return;
       }
-      const headers = ["Hostname", "User", "OS", "IP", "Status", "Last Seen", "Version", "Active Window", "Notes"];
+      const headers = ["Hostname", "User", "OS", "IP", "Status", "Failures", "Last Seen", "Version", "Active Window", "Notes"];
       const rows = all.map((b) => [
         b.hostname || "", b.username || "", b.os || "", b.ip || "",
-        b.status || "", b.last_seen || "", b.version || "", b.active_window || "", b.notes || "",
+        b.status || "", String(b.failure_count ?? 0), b.last_seen || "", b.version || "",
+        b.active_window || "", b.notes || "",
       ]);
       const csv = [headers.join(","), ...rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))].join("\n");
       downloadText(csv, `agents-${new Date().toISOString().slice(0, 10)}.csv`, "text/csv");
@@ -288,7 +296,7 @@ export function useAgentBulkOps(deps: BulkOpsDeps) {
       exportAbortRef.current = null;
       setExporting(false);
     }
-  }, [exporting, t, searchQuery, statusFilter, osFilter, tagFilter, linkedFilter, sortKey, sortDir, toastError]);
+  }, [exporting, t, searchQuery, statusFilter, osFilter, tagFilter, linkedFilter, sortKey, sortDir, failureWindow, toastError]);
 
   return {
     exporting, runBatch, bulkTask,

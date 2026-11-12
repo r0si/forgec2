@@ -256,6 +256,7 @@ export default function AgentsPageContent() {
     quickSleepAgent, sleepInterval, sleepJitter, closeQuickSleep,
     editingNotesId, editNotesText, closeNotesEdit,
     searchQuery, statusFilter, osFilter, tagFilter, linkedFilter, sortKey, sortDir,
+    failureWindow,
   });
   const {
     exporting, batchScreenshot, batchSleep,
