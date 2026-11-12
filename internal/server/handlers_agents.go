@@ -823,8 +823,9 @@ func (s *Server) writeAgentListJSON(c *gin.Context) {
 	}
 	// The failure counts of the page: one bounded query over the page's
 	// beacons, served by the (agent_id, created_at) index. It runs when the
-	// console asks for the column or sorts by it.
-	if len(failureCounts) == 0 && !groupHost && (c.Query("failures") == "1" || sortKey == agentSortFailures) {
+	// console asks for the column or sorts by it - in the grouped view too,
+	// which is the one the console actually uses.
+	if len(failureCounts) == 0 && (c.Query("failures") == "1" || sortKey == agentSortFailures) {
 		failureCounts = s.agentFailureCounts(c, ids)
 	}
 	stats := computeTaskStats(s.db, ids)

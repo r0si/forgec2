@@ -112,6 +112,16 @@ func TestAgentListSortsByRecentFailures(t *testing.T) {
 	if asc.Agents[0].FailureCount != 0 {
 		t.Fatalf("asc first agent failures = %d, want 0 (fewest failures first)", asc.Agents[0].FailureCount)
 	}
+	// The grouped view is the one the console uses, so the counts must be
+	// published there too.
+	grouped := call("?group=host&failures=1&failures_window=7d")
+	groupedCounts := map[string]int64{}
+	for _, a := range grouped.Agents {
+		groupedCounts[a.ID] = a.FailureCount
+	}
+	if groupedCounts["broken"] != 2 || groupedCounts["quiet"] != 1 || groupedCounts["older"] != 1 {
+		t.Fatalf("grouped failure counts = %+v, want broken=2 quiet=1 older=1 (all inside 7d)", groupedCounts)
+	}
 }
 
 // TestAgentFailureCountsHonourTheWindow proves the operator can choose the
