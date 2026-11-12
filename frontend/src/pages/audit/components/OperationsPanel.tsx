@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { paths } from "@/lib/api-paths";
 import { useI18n } from "@/lib/i18n";
+import { usePermissions } from "@/lib/hooks/usePermissions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -145,6 +147,9 @@ export function OperationsPanel({
   initialRange,
 }: OperationsPanelProps) {
   const { t } = useI18n();
+  const { can } = usePermissions();
+  // Only offer the beacon link to an operator who may open a beacon page.
+  const canOpenBeacon = can("agents.read");
   const initialTarget = initialAgentId.trim();
   const deepLink = useMemo(
     () =>
@@ -580,11 +585,28 @@ export function OperationsPanel({
             {
               id: "target",
               header: t("audit.col_target"),
-              cell: (log) => (
-                <span className="text-xs font-mono" title={field(log, "target")}>
-                  {field(log, "target").slice(0, 12)}
-                </span>
-              ),
+              cell: (log) => {
+                const target = field(log, "target");
+                const agentId = log.agent_id || "";
+                // The target of an operation is usually the beacon it ran on.
+                // A link turns "which host was this?" into one click.
+                if (agentId && canOpenBeacon) {
+                  return (
+                    <Link
+                      to={`/beacons/${encodeURIComponent(agentId)}`}
+                      className="font-mono text-xs text-primary hover:underline"
+                      title={target}
+                    >
+                      {target.slice(0, 12)}
+                    </Link>
+                  );
+                }
+                return (
+                  <span className="text-xs font-mono" title={target}>
+                    {target.slice(0, 12)}
+                  </span>
+                );
+              },
             },
             {
               id: "resource",

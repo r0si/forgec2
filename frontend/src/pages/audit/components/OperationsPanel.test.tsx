@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { OperationsPanel } from "./OperationsPanel";
 import { api } from "@/lib/api";
 
@@ -13,9 +14,21 @@ vi.mock("@/lib/i18n", () => ({
       })[k] ?? k,
   }),
 }));
+const can = vi.fn(() => true);
+vi.mock("@/lib/hooks/usePermissions", () => ({ usePermissions: () => ({ can }) }));
+
+/** The panel links to the beacon a row belongs to, so it needs a router. */
+function renderPanel(props: Partial<React.ComponentProps<typeof OperationsPanel>> = {}) {
+  return render(
+    <MemoryRouter>
+      <OperationsPanel {...props} />
+    </MemoryRouter>,
+  );
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
+  can.mockReturnValue(true);
   vi.mocked(api.get).mockImplementation(async (path: string) => {
     const p = String(path);
     if (p.startsWith("/audit/actions")) {
@@ -62,7 +75,7 @@ beforeEach(() => {
 
 describe("OperationsPanel", () => {
   it("loads the operator view by default, without beacon transport noise", async () => {
-    render(<OperationsPanel users={[{ username: "alice" }]} />);
+    renderPanel();
 
     expect(await screen.findByText("Created task")).toBeTruthy();
     // The raw action stays visible as the machine-readable subtitle.
@@ -78,7 +91,7 @@ describe("OperationsPanel", () => {
   });
 
   it("shows both the total and the failed count for the same selection", async () => {
-    render(<OperationsPanel />);
+    renderPanel();
     await screen.findByText("Created task");
     expect(screen.getByText("audit.ops_total")).toBeTruthy();
     expect(screen.getByText("audit.ops_failed")).toBeTruthy();
@@ -91,7 +104,7 @@ describe("OperationsPanel", () => {
     const blob = new Blob(["Time,User\n"], { type: "text/csv" });
     vi.mocked(api.downloadGet).mockResolvedValue({ blob, filename: "audit-operations.csv" });
 
-    render(<OperationsPanel />);
+    renderPanel();
     await screen.findByText("Created task");
     fireEvent.click(screen.getByRole("button", { name: /audit\.ops_export/ }));
 
@@ -105,7 +118,7 @@ describe("OperationsPanel", () => {
   });
 
   it("opens a detail dialog with the selected operation", async () => {
-    render(<OperationsPanel />);
+    renderPanel();
     const raw = await screen.findByText("task_create");
     fireEvent.click(raw);
 
@@ -114,14 +127,12 @@ describe("OperationsPanel", () => {
   });
 
   it("starts from the filters a deep link carries", async () => {
-    render(
-      <OperationsPanel
-        initialResult="failed"
-        initialCategory="tasks"
-        initialAction="task_create"
-        initialRange="24h"
-      />,
-    );
+    renderPanel({
+      initialResult: "failed",
+      initialCategory: "tasks",
+      initialAction: "task_create",
+      initialRange: "24h",
+    });
     await screen.findByText("Created task");
 
     const first = vi.mocked(api.get).mock.calls.find(([path]) => String(path).startsWith("/audit/logs"));
@@ -135,13 +146,11 @@ describe("OperationsPanel", () => {
   it("drops a filter value the server would reject", async () => {
     // A hand-written link can carry anything; an unknown result or category
     // would be answered with 400 and leave an empty table behind.
-    render(
-      <OperationsPanel
-        initialResult="bogus"
-        initialCategory="not-a-category"
-        initialRange="forever"
-      />,
-    );
+    renderPanel({
+      initialResult: "bogus",
+      initialCategory: "not-a-category",
+      initialRange: "forever",
+    });
     await screen.findByText("Created task");
 
     const first = vi.mocked(api.get).mock.calls.find(([path]) => String(path).startsWith("/audit/logs"));
@@ -155,7 +164,7 @@ describe("OperationsPanel", () => {
     // The chip counts must describe the rows behind them: a catalogue
     // counted over all time next to a seven-day table is a number the page
     // cannot honour.
-    render(<OperationsPanel initialRange="24h" />);
+    renderPanel({ initialRange: "24h" });
     await screen.findByText("Created task");
 
     const catalogue = vi.mocked(api.get).mock.calls.find(([path]) => String(path).startsWith("/audit/actions"));
@@ -165,8 +174,67 @@ describe("OperationsPanel", () => {
     expect(String(logs?.[0])).toContain("since=24h");
   });
 
+  it("links the target of an operation to its beacon", async () => {
+    vi.mocked(api.get).mockImplementation(async (path: string) => {
+      const p = String(path);
+      if (p.startsWith("/audit/actions")) return { actions: [], categories: [] };
+      if (p.startsWith("/audit/logs")) {
+        return {
+          logs: [
+            {
+              id: 1,
+              user: "alice",
+              action: "task_create",
+              resource: "task",
+              agent_id: "11111111-2222-4333-8444-555555555555",
+              success: true,
+              created_at: "2026-11-10T10:00:00Z",
+            },
+          ],
+          total: 1,
+          failed: 0,
+        };
+      }
+      return {};
+    });
+
+    renderPanel();
+    // The cell shows the first 12 characters; the link carries the whole id.
+    const link = await screen.findByRole("link", { name: /11111111/ });
+    expect(link.getAttribute("href")).toBe("/beacons/11111111-2222-4333-8444-555555555555");
+  });
+
+  it("keeps the target plain for an operator who may not open beacons", async () => {
+    can.mockReturnValue(false);
+    vi.mocked(api.get).mockImplementation(async (path: string) => {
+      const p = String(path);
+      if (p.startsWith("/audit/actions")) return { actions: [], categories: [] };
+      if (p.startsWith("/audit/logs")) {
+        return {
+          logs: [
+            {
+              id: 1,
+              user: "alice",
+              action: "task_create",
+              agent_id: "11111111-2222-4333-8444-555555555555",
+              success: true,
+              created_at: "2026-11-10T10:00:00Z",
+            },
+          ],
+          total: 1,
+          failed: 0,
+        };
+      }
+      return {};
+    });
+
+    renderPanel();
+    await screen.findByText("Created task");
+    expect(screen.queryByRole("link", { name: /11111111/ })).toBeNull();
+  });
+
   it("filters by a category from the catalogue chips", async () => {
-    render(<OperationsPanel />);
+    renderPanel();
     await screen.findByText("Created task");
 
     // The chips carry the counts the catalogue reported. The label falls back
@@ -184,7 +252,7 @@ describe("OperationsPanel", () => {
   });
 
   it("pins the view to a beacon from a deep link and can clear it", async () => {
-    render(<OperationsPanel initialAgentId="agent-abc" />);
+    renderPanel({ initialAgentId: "agent-abc" });
     await screen.findByText("Created task");
 
     const first = vi.mocked(api.get).mock.calls.find(([path]) => String(path).startsWith("/audit/logs"));

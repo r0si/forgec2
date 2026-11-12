@@ -146,19 +146,30 @@ export function AuditRiskStrip() {
                       {t("dashboard.audit_failed_list_title")}
                     </span>
                     <div className="divide-y divide-border">
-                      {failedRows.map((row, i) => (
-                        <div key={row.id || i} className="flex items-center justify-between gap-3 py-1.5">
-                          <div className="flex min-w-0 items-center gap-2">
-                            <Badge variant="destructive">{auditActionLabel(t, row.action || "")}</Badge>
-                            <span className="truncate text-xs text-muted-foreground">
-                              {[row.username, row.details].filter(Boolean).join(" · ")}
+                      {failedRows.map((row, i) => {
+                        const agentId = row.agent_id || "";
+                        // A failure that names a beacon leads straight to that
+                        // beacon's operations - the next question after
+                        // "what failed?" is "on which host?".
+                        const href = agentId
+                          ? `/audit?tab=operations&result=failed&agent_id=${encodeURIComponent(agentId)}`
+                          : "/audit?tab=operations&result=failed";
+                        return (
+                          <div key={row.id || i} className="flex items-center justify-between gap-3 py-1.5">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <Link to={href} className="flex min-w-0 items-center gap-2 hover:underline">
+                                <Badge variant="destructive">{auditActionLabel(t, row.action || "")}</Badge>
+                                <span className="truncate text-xs text-muted-foreground">
+                                  {[row.username, row.details].filter(Boolean).join(" · ")}
+                                </span>
+                              </Link>
+                            </div>
+                            <span className="micro-sm whitespace-nowrap text-muted-foreground">
+                              {row.timestamp ? timeAgo(String(row.timestamp), t) : ""}
                             </span>
                           </div>
-                          <span className="micro-sm whitespace-nowrap text-muted-foreground">
-                            {row.timestamp ? timeAgo(String(row.timestamp), t) : ""}
-                          </span>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}

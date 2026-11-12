@@ -25,6 +25,7 @@ beforeEach(() => {
             success: false,
             created_at: "2026-11-10T09:00:00Z",
             details: "whoami /priv failed",
+            agent_id: "agent-7",
           },
         ],
       };
@@ -80,6 +81,15 @@ describe("AuditRiskStrip", () => {
     expect(hrefs).toContain("/audit?tab=logins&result=failed&range=24h");
     expect(hrefs).toContain("/audit?tab=logins&range=24h");
     expect(hrefs).toContain("/audit?tab=logins&new_ip=1&range=24h");
+  });
+
+  it("links every failure to the audit selection it belongs to", async () => {
+    renderStrip();
+    await screen.findByText("dashboard.audit_failed_ops");
+
+    const hrefs = screen.getAllByRole("link").map((l) => l.getAttribute("href"));
+    // A failure that names a beacon leads to that beacon's failures.
+    expect(hrefs).toContain("/audit?tab=operations&result=failed&agent_id=agent-7");
   });
 
   it("lists the operations that actually failed, not just their number", async () => {
