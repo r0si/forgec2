@@ -22,7 +22,9 @@ func TestWriteScreenshotFile(t *testing.T) {
 	payload := []byte("PNG-BYTES")
 	b64 := base64.StdEncoding.EncodeToString(payload)
 
-	s.writeScreenshotFile(dataDir, "agent-1", 42, b64)
+	if err := s.writeScreenshotFile(dataDir, "agent-1", 42, b64); err != nil {
+		t.Fatalf("write screenshot: %v", err)
+	}
 
 	dir := filepath.Join(dataDir, "screenshots", "agent-1")
 	entries, err := os.ReadDir(dir)
@@ -59,7 +61,9 @@ func TestWriteScreenshotFile(t *testing.T) {
 	// An agent id that tries to escape the screenshots root writes nothing.
 	escapeDir := filepath.Join(dataDir, "screenshots")
 	before := len(entries)
-	s.writeScreenshotFile(dataDir, "../../etc", 7, b64)
+	if err := s.writeScreenshotFile(dataDir, "../../etc", 7, b64); err == nil {
+		t.Fatal("traversal agent id returned no error")
+	}
 	after, err := os.ReadDir(escapeDir)
 	if err != nil {
 		t.Fatal(err)
@@ -69,7 +73,9 @@ func TestWriteScreenshotFile(t *testing.T) {
 	}
 
 	// Invalid base64 is dropped silently.
-	s.writeScreenshotFile(dataDir, "agent-1", 43, "!!!not-base64!!!")
+	if err := s.writeScreenshotFile(dataDir, "agent-1", 43, "!!!not-base64!!!"); err == nil {
+		t.Fatal("invalid base64 returned no error")
+	}
 	entries, err = os.ReadDir(dir)
 	if err != nil {
 		t.Fatal(err)
@@ -87,7 +93,9 @@ func TestSaveScreenshotSkipsDuringMonitoring(t *testing.T) {
 	b64 := base64.StdEncoding.EncodeToString([]byte("frame"))
 
 	// Not monitoring: the file lands.
-	s.saveScreenshot(dataDir, "agent-2", 1, b64)
+	if err := s.saveScreenshot(dataDir, "agent-2", 1, b64); err != nil {
+		t.Fatalf("save screenshot: %v", err)
+	}
 	dir := filepath.Join(dataDir, "screenshots", "agent-2")
 	if entries, err := os.ReadDir(dir); err != nil || len(entries) != 1 {
 		t.Fatalf("expected one screenshot, got %v (err %v)", entries, err)
@@ -104,7 +112,9 @@ func TestSaveScreenshotSkipsDuringMonitoring(t *testing.T) {
 		delete(s.screenMonitorImplants, strings.ToLower("agent-2"))
 		s.screenMonitorMu.Unlock()
 	})
-	s.saveScreenshot(dataDir, "agent-2", 2, b64)
+	if err := s.saveScreenshot(dataDir, "agent-2", 2, b64); err != nil {
+		t.Fatalf("save screenshot while monitoring: %v", err)
+	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		t.Fatal(err)
@@ -130,7 +140,9 @@ func TestWriteScreenshotFileDefaultDir(t *testing.T) {
 	t.Cleanup(func() { _ = os.Chdir(wd) })
 
 	b64 := base64.StdEncoding.EncodeToString([]byte("x"))
-	s.writeScreenshotFile("", "agent-3", 9, b64)
+	if err := s.writeScreenshotFile("", "agent-3", 9, b64); err != nil {
+		t.Fatalf("write screenshot with default dir: %v", err)
+	}
 	if _, err := os.Stat(filepath.Join(tmp, "data", "screenshots", "agent-3")); err != nil {
 		t.Fatalf("default data dir not used: %v", err)
 	}

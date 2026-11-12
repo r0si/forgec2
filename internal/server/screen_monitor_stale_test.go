@@ -81,7 +81,9 @@ func TestSaveScreenshotResumesAfterDeadStream(t *testing.T) {
 	s.ensureScreenMonitorMapsLocked()
 	s.screenMonitorImplants["agent-9"] = time.Now()
 	s.screenMonitorMu.Unlock()
-	s.saveScreenshot(dataDir, "agent-9", 1, b64)
+	if err := s.saveScreenshot(dataDir, "agent-9", 1, b64); err != nil {
+		t.Fatalf("save screenshot during live stream: %v", err)
+	}
 	if entries, err := os.ReadDir(dir); err == nil && len(entries) != 0 {
 		t.Fatalf("a frame was retained during a live stream: %d", len(entries))
 	}
@@ -91,7 +93,9 @@ func TestSaveScreenshotResumesAfterDeadStream(t *testing.T) {
 	s.screenMonitorMu.Lock()
 	s.screenMonitorImplants["agent-9"] = time.Now().Add(-2 * screenMonitorStaleAfter)
 	s.screenMonitorMu.Unlock()
-	s.saveScreenshot(dataDir, "agent-9", 2, b64)
+	if err := s.saveScreenshot(dataDir, "agent-9", 2, b64); err != nil {
+		t.Fatalf("save screenshot after dead stream: %v", err)
+	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		t.Fatalf("read dir: %v", err)

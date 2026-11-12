@@ -144,7 +144,9 @@ func (s *Server) processTaskResults(agent db.Implant, results []taskResult, uuid
 			continue
 		}
 		if r.Type == "screen_trigger" && r.Output != "" {
-			s.writeScreenshotFile(s.rawDataDir(), uuid, r.TaskID, r.Output)
+			if err := s.writeScreenshotFile(s.rawDataDir(), uuid, r.TaskID, r.Output); err != nil {
+				slog.Warn("Failed to persist screen-trigger capture", "agent_id", uuid, "task_id", r.TaskID, "error", err)
+			}
 			s.BroadcastScreenshot(uuid, r.Output)
 			continue
 		}
