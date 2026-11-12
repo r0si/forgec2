@@ -157,9 +157,10 @@ describe("useAgentBulkOps failure reporting", () => {
       await result.current.exportCSV();
     });
 
-    // The file has to answer "which beacon is failing?" like the screen does.
+    // The file answers "which beacon is failing?" like the screen does,
+    // including the window the screen is showing.
     const csv = downloads.join("\n");
-    expect(csv).toContain("Failures");
+    expect(csv).toContain("Failures (24h)");
     expect(csv).toContain("web-01");
     expect(csv).toContain('"3"');
     // And the export asks the server for the counts it writes.

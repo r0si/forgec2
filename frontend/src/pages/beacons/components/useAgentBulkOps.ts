@@ -277,7 +277,7 @@ export function useAgentBulkOps(deps: BulkOpsDeps) {
         toast.info(t("agents.no_beacons"));
         return;
       }
-      const headers = ["Hostname", "User", "OS", "IP", "Status", "Failures", "Last Seen", "Version", "Active Window", "Notes"];
+      const headers = ["Hostname", "User", "OS", "IP", "Status", `Failures (${failureWindow})`, "Last Seen", "Version", "Active Window", "Notes"];
       const rows = all.map((b) => [
         b.hostname || "", b.username || "", b.os || "", b.ip || "",
         b.status || "", String(b.failure_count ?? 0), b.last_seen || "", b.version || "",

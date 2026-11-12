@@ -698,6 +698,17 @@ type agentListItem struct {
 // the most failed operations in the failure window.
 const agentSortFailures = "failures"
 
+func agentFailureWindowID(c *gin.Context) string {
+	switch strings.ToLower(strings.TrimSpace(c.Query("failures_window"))) {
+	case "7d":
+		return "7d"
+	case "30d":
+		return "30d"
+	default:
+		return "24h"
+	}
+}
+
 // agentFailureWindowFromQuery returns the window the failure counts describe.
 //
 // The operator's choice (24h / 7d / 30d) or the 24h default. An unknown value
@@ -859,7 +870,7 @@ func (s *Server) writeAgentListJSON(c *gin.Context) {
 	if strings.EqualFold(strings.TrimSpace(c.Query("format")), "csv") {
 		var buf strings.Builder
 		writer := csv.NewWriter(&buf)
-		header := []string{"ID", "Hostname", "IP", "OS", "Username", "Status", "Protocol", "Last Seen", "Engagement", "Failures (24h)"}
+		header := []string{"ID", "Hostname", "IP", "OS", "Username", "Status", "Protocol", "Last Seen", "Engagement", fmt.Sprintf("Failures (%s)", agentFailureWindowID(c))}
 		if err := writer.Write(header); err != nil {
 			handleQueryError(c, err, "Failed to encode the fleet list")
 			return

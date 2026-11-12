@@ -93,6 +93,23 @@ func TestAgentFleetCSVExport(t *testing.T) {
 	if failuresByHost["web-01"] != "2" || failuresByHost["db-02"] != "0" {
 		t.Fatalf("failure counts = %+v, want web-01=2 db-02=0", failuresByHost)
 	}
+	// The header names the window the counts describe, so a file taken with
+	// a different window cannot be mistaken for this one.
+	w7 := httptest.NewRecorder()
+	c7, _ := gin.CreateTestContext(w7)
+	c7.Request = httptest.NewRequest(http.MethodGet, "/api/agents?format=csv&page_size=100&failures_window=7d", nil)
+	c7.Set("user", "op")
+	c7.Set("user_role", db.RoleAdmin)
+	c7.Set("user_id", uint(1))
+	c7.Set(middleware.TenantIDContextKey, uint(1))
+	s.handleListAgents(c7)
+	if w7.Code != http.StatusOK {
+		t.Fatalf("7d csv status = %d (%s)", w7.Code, w7.Body.String())
+	}
+	if !strings.Contains(w7.Body.String(), "Failures (7d)") {
+		t.Fatalf("the 7d export must name its window, got:\n%s", w7.Body.String())
+	}
+
 	// Everything fits on one page, so nothing was cut.
 	if got := w.Header().Get("X-Export-Truncated"); got != "" {
 		t.Fatalf("X-Export-Truncated = %q, want it absent when the whole fleet fits", got)
