@@ -7,6 +7,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { SearchInput } from "@/components/SearchInput";
 import { useI18n } from "@/lib/i18n";
 import type { Tag } from "./types";
+import { FAILURE_WINDOWS, type FailureWindow } from "./useAgentFilters";
 import { Apple, Columns, Monitor, Terminal, Wifi } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { ReactNode } from "react";
@@ -17,6 +18,8 @@ interface AgentFiltersProps {
   osFilter: string; setOsFilter: (v: string) => void;
   tagFilter: string; setTagFilter: (v: string) => void;
   linkedFilter: string; setLinkedFilter: (v: string) => void;
+  /** The window the failure counts describe. */
+  failureWindow: FailureWindow; setFailureWindow: (v: FailureWindow) => void;
   allTags: Tag[];
   visibleCols: Record<string, boolean>; setVisibleCols: (v: Record<string, boolean> | ((prev: Record<string, boolean>) => Record<string, boolean>)) => void;
   onlineCount: number;
@@ -31,6 +34,7 @@ export function AgentFilters({
   osFilter, setOsFilter,
   tagFilter, setTagFilter,
   linkedFilter, setLinkedFilter,
+  failureWindow, setFailureWindow,
   allTags,
   visibleCols, setVisibleCols,
   onlineCount,
@@ -92,6 +96,16 @@ export function AgentFilters({
               <SelectItem value="">{t("agents.all_links")}</SelectItem>
               <SelectItem value="direct">{t("agents.direct_c2")}</SelectItem>
               <SelectItem value="chained">{t("agents.p2p_chained")}</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={failureWindow} onValueChange={(v) => setFailureWindow((v || "24h") as FailureWindow)}>
+            <SelectTrigger aria-label={t("agents.filter_failures_window_aria")} className="w-full sm:w-auto sm:flex-none">
+              <SelectValue placeholder={t("agents.failures_window_24h")} />
+            </SelectTrigger>
+            <SelectContent>
+              {FAILURE_WINDOWS.map((id) => (
+                <SelectItem key={id} value={id}>{t(`agents.failures_window_${id}`)}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <DropdownMenu>

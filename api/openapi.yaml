@@ -307,10 +307,17 @@ paths:
         - name: failures
           in: query
           description: >-
-            Answer with the failed operations of the last 24 hours per beacon
-            (failures_24h); the count is bounded by the page's beacons
+            Answer with the failed operations of the failure window per beacon
+            (failure_count); the count is bounded by the page's beacons
           schema:
             type: boolean
+        - name: failures_window
+          in: query
+          description: The window the failure counts describe (24h, 7d or 30d)
+          schema:
+            type: string
+            enum: [24h, 7d, 30d]
+            default: 24h
       responses:
         '200':
           description: Successful response
@@ -15057,6 +15064,11 @@ components:
         protocol_current:
           type: integer
           description: The wire protocol version the server speaks
+        failure_count:
+          type: integer
+          description: >-
+            Failed operations on this beacon in the failure window
+            (failures_window, 24h by default)
         created_at:
           type: string
           format: date-time

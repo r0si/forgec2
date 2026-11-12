@@ -101,6 +101,7 @@ export default function AgentsPageContent() {
     page, setPage, sortKey, sortDir, toggleSort, setSortKey, setSortDir,
     linkedFilter, setLinkedFilter, tagFilter, setTagFilter,
     autoRefresh, setAutoRefresh, viewMode, setViewMode,
+    failureWindow, setFailureWindow,
     groupByHost, setGroupByHost,
     visibleCols, setVisibleCols,
     sortedBeacons,
@@ -165,8 +166,8 @@ export default function AgentsPageContent() {
   }, [sortedBeacons, groupByHost, agentVirtualized, agentVirtStart, agentVirtEnd]);
 
   const loadBeacons = useCallback(() => {
-    loadBeaconsRaw(searchQuery, statusFilter, osFilter, page, 50, tagFilter, linkedFilter, sortKey, sortDir);
-  }, [loadBeaconsRaw, searchQuery, statusFilter, osFilter, page, tagFilter, linkedFilter, sortKey, sortDir]);
+    loadBeaconsRaw(searchQuery, statusFilter, osFilter, page, 50, tagFilter, linkedFilter, sortKey, sortDir, failureWindow);
+  }, [loadBeaconsRaw, searchQuery, statusFilter, osFilter, page, tagFilter, linkedFilter, sortKey, sortDir, failureWindow]);
 
   const loadBeaconsRef = useRef(loadBeacons);
   loadBeaconsRef.current = loadBeacons;
@@ -361,6 +362,8 @@ export default function AgentsPageContent() {
         setTagFilter={(v) => { setTagFilter(v); setPage(1); }}
         linkedFilter={linkedFilter}
         setLinkedFilter={(v) => { setLinkedFilter(v as "" | "direct" | "chained"); setPage(1); }}
+        failureWindow={failureWindow}
+        setFailureWindow={(v) => { setFailureWindow(v); setPage(1); }}
         allTags={allTags}
         visibleCols={visibleCols}
         setVisibleCols={setVisibleCols}
@@ -414,6 +417,7 @@ export default function AgentsPageContent() {
         sortIcon={sortIcon}
         handleSortKeyDown={handleSortKeyDown}
         visibleCols={visibleCols}
+        failureWindow={failureWindow}
         loading={loading}
         emptyColSpan={emptyColSpan}
         agentVirtualized={agentVirtualized && !groupByHost}

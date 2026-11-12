@@ -11872,6 +11872,8 @@ export interface components {
             protocol_outdated?: boolean;
             /** @description The wire protocol version the server speaks */
             protocol_current?: number;
+            /** @description Failed operations on this beacon in the failure window (failures_window, 24h by default) */
+            failure_count?: number;
             /** Format: date-time */
             created_at?: string;
             /** Format: date-time */
@@ -12566,8 +12568,10 @@ export interface operations {
                 sort_key?: "hostname" | "username" | "os" | "ip" | "last_seen" | "version" | "status" | "failures";
                 /** @description Sort direction */
                 sort_dir?: "asc" | "desc";
-                /** @description Answer with the failed operations of the last 24 hours per beacon (failures_24h); the count is bounded by the page's beacons */
+                /** @description Answer with the failed operations of the failure window per beacon (failure_count); the count is bounded by the page's beacons */
                 failures?: boolean;
+                /** @description The window the failure counts describe (24h, 7d or 30d) */
+                failures_window?: "24h" | "7d" | "30d";
             };
             header?: never;
             path?: never;

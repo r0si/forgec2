@@ -14,9 +14,9 @@ import (
 // unwraps the envelope, so the fields map to the payload's keys.
 type agentListResponse struct {
 	Agents []struct {
-		ID          string `json:"id"`
-		Hostname    string `json:"hostname"`
-		Failures24h int64  `json:"failures_24h"`
+		ID           string `json:"id"`
+		Hostname     string `json:"hostname"`
+		FailureCount int64  `json:"failure_count"`
 	} `json:"agents"`
 	Total int64 `json:"total"`
 }
@@ -82,13 +82,13 @@ func TestAgentListSortsByRecentFailures(t *testing.T) {
 	if sorted.Agents[0].ID != "broken" {
 		t.Fatalf("first agent = %q, want the beacon with the most failures: %+v", sorted.Agents[0].ID, sorted.Agents)
 	}
-	if sorted.Agents[0].Failures24h != 2 {
-		t.Fatalf("first agent failures = %d, want 2", sorted.Agents[0].Failures24h)
+	if sorted.Agents[0].FailureCount != 2 {
+		t.Fatalf("first agent failures = %d, want 2", sorted.Agents[0].FailureCount)
 	}
 	// The failure outside the window must not count, and the row still has to
 	// be listed.
 	for _, a := range sorted.Agents {
-		if a.ID == "older" && a.Failures24h != 0 {
+		if a.ID == "older" && a.FailureCount != 0 {
 			t.Fatalf("a failure outside the 24h window counted: %+v", a)
 		}
 	}
@@ -98,7 +98,7 @@ func TestAgentListSortsByRecentFailures(t *testing.T) {
 	counted := call("?failures=1")
 	counts := map[string]int64{}
 	for _, a := range counted.Agents {
-		counts[a.ID] = a.Failures24h
+		counts[a.ID] = a.FailureCount
 	}
 	if counts["broken"] != 2 || counts["quiet"] != 1 || counts["older"] != 0 {
 		t.Fatalf("failure counts = %+v, want broken=2 quiet=1 older=0", counts)
@@ -109,8 +109,66 @@ func TestAgentListSortsByRecentFailures(t *testing.T) {
 	if len(asc.Agents) != 3 {
 		t.Fatalf("asc agents = %d, want 3", len(asc.Agents))
 	}
-	if asc.Agents[0].Failures24h != 0 {
-		t.Fatalf("asc first agent failures = %d, want 0 (fewest failures first)", asc.Agents[0].Failures24h)
+	if asc.Agents[0].FailureCount != 0 {
+		t.Fatalf("asc first agent failures = %d, want 0 (fewest failures first)", asc.Agents[0].FailureCount)
+	}
+}
+
+// TestAgentFailureCountsHonourTheWindow proves the operator can choose the
+// window the counts describe - "how long ago" is part of the question.
+func TestAgentFailureCountsHonourTheWindow(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	s := newAgentTestServer(t)
+
+	now := time.Now()
+	agent := db.Implant{ID: "a1", Hostname: "HOST01", IP: "10.0.0.1", LastSeen: now}
+	if err := s.db.Create(&agent).Error; err != nil {
+		t.Fatalf("seed agent: %v", err)
+	}
+	rows := []db.AuditLog{
+		{User: "op", Action: "command_result", Resource: "task", AgentID: "a1", Success: false, CreatedAt: now.Add(-2 * time.Hour)},
+		{User: "op", Action: "command_result", Resource: "task", AgentID: "a1", Success: false, CreatedAt: now.Add(-5 * 24 * time.Hour)},
+	}
+	for i := range rows {
+		if err := s.db.Create(&rows[i]).Error; err != nil {
+			t.Fatalf("seed audit row: %v", err)
+		}
+	}
+
+	count := func(query string) int64 {
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request, _ = http.NewRequest(http.MethodGet, "/api/agents"+query, nil)
+		c.Set("user", "root")
+		c.Set("user_role", db.RoleAdmin)
+		c.Set("user_id", uint(1))
+		s.handleListAgents(c)
+		if w.Code != http.StatusOK {
+			t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+		}
+		var resp agentListResponse
+		unmarshalData(t, w.Body.Bytes(), &resp)
+		for _, a := range resp.Agents {
+			if a.ID == "a1" {
+				return a.FailureCount
+			}
+		}
+		return 0
+	}
+
+	if got := count("?failures=1"); got != 1 {
+		t.Fatalf("24h count = %d, want 1 (the recent failure)", got)
+	}
+	if got := count("?failures=1&failures_window=7d"); got != 2 {
+		t.Fatalf("7d count = %d, want 2 (both failures)", got)
+	}
+	if got := count("?failures=1&failures_window=30d"); got != 2 {
+		t.Fatalf("30d count = %d, want 2", got)
+	}
+	// An unknown window falls back to the default instead of emptying the
+	// fleet: it is a display option, not a filter.
+	if got := count("?failures=1&failures_window=forever"); got != 1 {
+		t.Fatalf("an unknown window must fall back to 24h, got %d", got)
 	}
 }
 

@@ -6,6 +6,9 @@ import type { Beacon } from "./types";
 export type AgentSortKey = "hostname" | "username" | "os" | "ip" | "last_seen" | "status" | "failures";
 type SortKey = AgentSortKey;
 type LinkedFilter = "" | "direct" | "chained";
+/** The windows the failure counts can describe. */
+export const FAILURE_WINDOWS = ["24h", "7d", "30d"] as const;
+export type FailureWindow = (typeof FAILURE_WINDOWS)[number];
 
 export function useAgentFilters(beacons: Beacon[]) {
   const [searchInput, setSearchInput] = useState("");
@@ -18,6 +21,10 @@ export function useAgentFilters(beacons: Beacon[]) {
   const [linkedFilter, setLinkedFilter] = useState<LinkedFilter>("");
   const [tagFilter, setTagFilter] = useState("");
   const [autoRefresh, setAutoRefresh] = useState(false);
+  // The window the failure counts describe. The fleet list shows how many
+  // operations failed on each beacon; "how long ago" is part of that
+  // question, so the operator picks the window.
+  const [failureWindow, setFailureWindow] = useState<FailureWindow>("24h");
   const [viewMode, setViewMode] = useState<"table" | "grid">("table");
   const [groupByHost, setGroupByHost] = useState(false);
   const [visibleCols, setVisibleCols] = useState<Record<string, boolean>>({
@@ -51,6 +58,7 @@ export function useAgentFilters(beacons: Beacon[]) {
     linkedFilter, setLinkedFilter,
     tagFilter, setTagFilter,
     autoRefresh, setAutoRefresh,
+    failureWindow, setFailureWindow,
     viewMode, setViewMode,
     groupByHost, setGroupByHost,
     visibleCols, setVisibleCols,

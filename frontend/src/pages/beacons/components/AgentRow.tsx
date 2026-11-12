@@ -1,5 +1,6 @@
 
 import { memo } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-indicator";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
@@ -57,7 +58,7 @@ export const AgentRow = memo(function AgentRow({
   const os = beacon.os || "";
   const arch = beacon.arch || "";
   const status = beacon.status || "offline";
-  const failures = Number(beacon.failures_24h ?? 0) || 0;
+  const failures = Number(beacon.failure_count ?? 0) || 0;
   const lastSeen = beacon.last_seen || "";
   const integrity = beacon.integrity || "";
   const elevated = beacon.elevated || false;
@@ -277,11 +278,17 @@ export const AgentRow = memo(function AgentRow({
       )}
       {visibleCols.failures && (
       <TableCell className="py-1 px-2 text-center">
-        {/* The failed operations of the last 24 hours. Zero is not a warning,
-            but a beacon that fails and fails is the one the operator has to
-            look at - so the count is the column's whole point. */}
+        {/* The failed operations of the window. Zero is not a warning, but a
+            beacon that fails and fails is the one the operator has to look
+            at - so the count is a link to exactly those operations. */}
         {failures > 0 ? (
-          <Badge variant="destructive" className="font-mono">{failures}</Badge>
+          <Link
+            to={`/audit?tab=operations&result=failed&agent_id=${encodeURIComponent(beacon.id || "")}`}
+            className="inline-block"
+            title={t("agents.col_failures_open")}
+          >
+            <Badge variant="destructive" className="font-mono">{failures}</Badge>
+          </Link>
         ) : (
           <span className="text-xs text-muted-foreground">0</span>
         )}

@@ -99,6 +99,8 @@ interface AgentsTableProps {
   operatorPresence: Record<string, string[]>;
   tagsByAgent: Record<string, AgentTag[]>;
   groupByHost?: boolean;
+  /** The window the failure counts describe (24h / 7d / 30d). */
+  failureWindow?: string;
 }
 
 /** Virtualized agents table card with sortable header + pagination. */
@@ -113,6 +115,7 @@ export default memo(function AgentsTable(props: AgentsTableProps) {
     onSelectAgent, onMenu, onQuickNav, onEditNotes,
     taskCountMap, agentLocks, locksUnread, operatorPresence, tagsByAgent,
     groupByHost = false,
+    failureWindow = "24h",
   } = props;
 
   const hostGroups = groupByHost ? groupSessionsByHost(visibleBeacons) : null;
@@ -123,9 +126,10 @@ export default memo(function AgentsTable(props: AgentsTableProps) {
   const sortableHead = (
     field: AgentSortKey,
     labelKey: string,
+    params?: Record<string, string>,
   ) => (
     <TableHead className="text-left py-3 px-3 sm:py-3.5 sm:px-4 cursor-pointer select-none" tabIndex={0} role="columnheader" aria-sort={sortKey === field ? (sortDir === "asc" ? "ascending" : "descending") : "none"} onClick={() => toggleSort(field)} onKeyDown={handleSortKeyDown(field)}>
-      {t(labelKey)} {sortIcon(field)}
+      {t(labelKey, params)} {sortIcon(field)}
     </TableHead>
   );
 
@@ -171,7 +175,7 @@ export default memo(function AgentsTable(props: AgentsTableProps) {
             <TableHead className="text-right py-3 px-3 sm:py-3.5 sm:px-4 max-sm:hidden">{t("agents.col_jitter")}</TableHead>
             )}
             {visibleCols.status && sortableHead("status", "agents.col_status")}
-            {visibleCols.failures && sortableHead("failures", "agents.col_failures")}
+            {visibleCols.failures && sortableHead("failures", "agents.col_failures", { window: failureWindow })}
             <TableHead className="sticky-end text-right py-3 px-4 sm:py-3.5 sm:px-5">{t("agents.col_actions")}</TableHead>
           </TableRow>
         </TableHeader>

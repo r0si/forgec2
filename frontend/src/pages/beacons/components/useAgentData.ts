@@ -20,6 +20,8 @@ interface BeaconQueryParams {
   linked: string;
   sort_key: string;
   sort_dir: string;
+  /** The window the failure counts describe (24h / 7d / 30d). */
+  failures_window: string;
 }
 
 interface BeaconPage {
@@ -38,6 +40,7 @@ const DEFAULT_QUERY: BeaconQueryParams = {
   linked: "",
   sort_key: "last_seen",
   sort_dir: "desc",
+  failures_window: "24h",
 };
 
 export function useAgentData(t: (key: string) => string) {
@@ -68,10 +71,11 @@ export function useAgentData(t: (key: string) => string) {
       if (q.linked) p.set("linked", q.linked);
       p.set("sort_key", q.sort_key);
       p.set("sort_dir", q.sort_dir);
-      // The failed operations of the last 24 hours, per beacon: the column the
+      // The failed operations of the failure window, per beacon: the column the
       // fleet list sorts by. The server answers them with one bounded query
       // over the page's beacons.
       p.set("failures", "1");
+      p.set("failures_window", q.failures_window);
       const d = await api.get<{ agents?: Beacon[]; total?: number | string }>(
         paths.agents.list(p.toString()),
         { signal, unwrap: false },
@@ -99,8 +103,19 @@ export function useAgentData(t: (key: string) => string) {
   const taskCountMap = useMemo(() => data?.countMap ?? {}, [data]);
 
   const loadBeacons = useCallback(
-    (search = "", status = "", os = "", page = 1, pageSize = 20, tag_id = "", linked = "", sort_key = "last_seen", sort_dir = "desc") => {
-      queryRef.current = { search, status, os, page, pageSize, tag_id, linked, sort_key, sort_dir };
+    (
+      search = "",
+      status = "",
+      os = "",
+      page = 1,
+      pageSize = 20,
+      tag_id = "",
+      linked = "",
+      sort_key = "last_seen",
+      sort_dir = "desc",
+      failures_window = "24h",
+    ) => {
+      queryRef.current = { search, status, os, page, pageSize, tag_id, linked, sort_key, sort_dir, failures_window };
       void refreshList();
     },
     [refreshList],

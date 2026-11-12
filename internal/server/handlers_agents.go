@@ -680,10 +680,11 @@ func (s *Server) handleListAgents(c *gin.Context) {
 type agentListItem struct {
 	db.Implant
 	TaskStats *db.TaskStats `json:"taskStats,omitempty"`
-	// Failures24h is the number of failed operations on this beacon in the
-	// last 24 hours. It is the column the fleet list sorts by, so the number
-	// in the row is the number it was sorted by.
-	Failures24h int64 `json:"failures_24h,omitempty"`
+	// FailureCount is the number of failed operations on this beacon in the
+	// failure window (failures_window, 24h by default). It is the column the
+	// fleet list sorts by, so the number in the row is the number it was
+	// sorted by.
+	FailureCount int64 `json:"failure_count,omitempty"`
 	// ProtocolOutdated flags an agent that speaks a protocol version the
 	// server would refuse (or a version that is on its way out). The agent
 	// has to be rebuilt - the console shows the badge.
@@ -694,12 +695,24 @@ type agentListItem struct {
 }
 
 // agentSortFailures is the sort key for "recent failures": the beacons with
-// the most failed operations in the last 24 hours.
+// the most failed operations in the failure window.
 const agentSortFailures = "failures"
 
-// agentFailureWindow is the window the failure counts describe - the same 24
-// hours the dashboard's security strip counts.
-const agentFailureWindow = 24 * time.Hour
+// agentFailureWindowFromQuery returns the window the failure counts describe.
+//
+// The operator's choice (24h / 7d / 30d) or the 24h default. An unknown value
+// falls back instead of failing the list: the window is a display option, not
+// a filter, and a typo in it must not empty the fleet.
+func agentFailureWindowFromQuery(c *gin.Context) time.Duration {
+	switch strings.ToLower(strings.TrimSpace(c.Query("failures_window"))) {
+	case "7d":
+		return 7 * 24 * time.Hour
+	case "30d":
+		return 30 * 24 * time.Hour
+	default:
+		return 24 * time.Hour
+	}
+}
 
 // agentFailureCounts returns the number of failed operations per beacon over
 // the last 24 hours. With no ids it counts every beacon of the caller's
@@ -717,7 +730,7 @@ func (s *Server) agentFailureCounts(c *gin.Context, ids []string) map[string]int
 		Count   int64
 	}
 	var rows []row
-	since := comparableLocalTime(time.Now().Add(-agentFailureWindow))
+	since := comparableLocalTime(time.Now().Add(-agentFailureWindowFromQuery(c)))
 	q := s.auditTenantScope(s.db.Model(&db.AuditLog{}), c).
 		Select("agent_id, COUNT(*) AS count").
 		Where("success = ?", false).
@@ -737,13 +750,13 @@ func (s *Server) agentFailureCounts(c *gin.Context, ids []string) map[string]int
 	return counts
 }
 
-// agentFailureCountsQuery groups the failed operations of the last 24 hours by
-// beacon, for the JOIN that sorts the fleet by them.
+// agentFailureCountsQuery groups the failed operations of the failure window
+// by beacon, for the JOIN that sorts the fleet by them.
 func (s *Server) agentFailureCountsQuery(c *gin.Context) *gorm.DB {
 	return s.auditTenantScope(s.db.Model(&db.AuditLog{}), c).
 		Select("agent_id, COUNT(*) AS failures").
 		Where("success = ?", false).
-		Where("created_at >= ?", comparableLocalTime(time.Now().Add(-agentFailureWindow))).
+		Where("created_at >= ?", comparableLocalTime(time.Now().Add(-agentFailureWindowFromQuery(c)))).
 		Where("agent_id <> ''").
 		Group("agent_id")
 }
@@ -820,7 +833,7 @@ func (s *Server) writeAgentListJSON(c *gin.Context) {
 		resp[i] = agentListItem{
 			Implant:          a,
 			TaskStats:        stats[a.ID],
-			Failures24h:      failureCounts[a.ID],
+			FailureCount:     failureCounts[a.ID],
 			ProtocolOutdated: protocol.IsOutdated(a.ProtocolVersion),
 			ProtocolCurrent:  protocol.CurrentProtocolVersion,
 		}
