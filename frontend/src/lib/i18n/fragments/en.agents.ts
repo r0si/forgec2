@@ -34,6 +34,7 @@ export const enAgents: Record<string, string> = {
   "agents.col_os": "OS",
   "agents.col_sleep": "Sleep",
   "agents.col_status": "Status",
+  "agents.col_failures": "Failures (24h)",
   "agents.col_tasks": "Tasks",
   "agents.col_user": "User",
   "agents.col_version": "Version",

@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useDebounce } from "@/lib/hooks/useDebounce";
 import type { Beacon } from "./types";
 
-export type AgentSortKey = "hostname" | "username" | "os" | "ip" | "last_seen" | "status";
+export type AgentSortKey = "hostname" | "username" | "os" | "ip" | "last_seen" | "status" | "failures";
 type SortKey = AgentSortKey;
 type LinkedFilter = "" | "direct" | "chained";
 
@@ -23,7 +23,7 @@ export function useAgentFilters(beacons: Beacon[]) {
   const [visibleCols, setVisibleCols] = useState<Record<string, boolean>>({
     hostname: true, username: true, os: true, ip: true, last_seen: true,
     window: true, lock: true, tasks: true, status: true, version: true,
-    sleep: true, jitter: true,
+    sleep: true, jitter: true, failures: true,
   });
 
   useEffect(() => { setPage(1); }, [searchInput]);

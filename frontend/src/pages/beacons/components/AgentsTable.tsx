@@ -171,6 +171,7 @@ export default memo(function AgentsTable(props: AgentsTableProps) {
             <TableHead className="text-right py-3 px-3 sm:py-3.5 sm:px-4 max-sm:hidden">{t("agents.col_jitter")}</TableHead>
             )}
             {visibleCols.status && sortableHead("status", "agents.col_status")}
+            {visibleCols.failures && sortableHead("failures", "agents.col_failures")}
             <TableHead className="sticky-end text-right py-3 px-4 sm:py-3.5 sm:px-5">{t("agents.col_actions")}</TableHead>
           </TableRow>
         </TableHeader>

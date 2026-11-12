@@ -33,6 +33,7 @@ export const zhAgents: Record<string, string> = {
   "agents.col_os": "系统",
   "agents.col_sleep": "Sleep",
   "agents.col_status": "状态",
+  "agents.col_failures": "失败（24 小时）",
   "agents.col_tasks": "任务",
   "agents.col_user": "用户",
   "agents.col_version": "版本",

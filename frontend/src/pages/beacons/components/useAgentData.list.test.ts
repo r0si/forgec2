@@ -49,6 +49,18 @@ describe("useAgentData fleet list", () => {
     expect(result.current.total).toBe(1);
   });
 
+  it("asks for the failure counts the fleet list shows", async () => {
+    const { result } = renderHook(() => useAgentData(t));
+    await waitFor(() => expect(result.current.beacons.length).toBe(1));
+
+    const call = getMock.mock.calls.find(([path]) => String(path).startsWith("/api/agents"));
+    const query = String(call?.[0]);
+    // The counts come from the server with the page, not from a second
+    // request per row.
+    expect(query).toContain("failures=1");
+    expect(query).toContain("sort_key=last_seen");
+  });
+
   it("reads the per-agent tags out of the batch response", async () => {
     // The batch tag read answers a map keyed by agent id. Reading a "tags"
     // field out of it found nothing, so every agent looked untagged.

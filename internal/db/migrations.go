@@ -1256,6 +1256,21 @@ var indexMigrations = []*gormigrate.Migration{
 			return nil
 		},
 	},
+	{
+		// The fleet list counts the failed operations per beacon (the
+		// "recent failures" sort and its column). Without an index on
+		// (agent_id, created_at) that count is a window scan of the whole
+		// audit log on every list request.
+		ID: "2026-11-12-audit-agent-created-index",
+		Migrate: func(tx *gorm.DB) error {
+			execMigration(tx, "CREATE INDEX IF NOT EXISTS idx_audit_agent_created ON audit_logs(agent_id, created_at)", "idx_audit_agent_created")
+			return nil
+		},
+		Rollback: func(tx *gorm.DB) error {
+			execMigration(tx, "DROP INDEX IF EXISTS idx_audit_agent_created", "drop_idx_audit_agent_created")
+			return nil
+		},
+	},
 }
 
 // Migrations is the combined migration history, kept for tooling and tests.

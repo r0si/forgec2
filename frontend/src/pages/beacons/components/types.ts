@@ -11,6 +11,9 @@ interface TaskStats {
 export type Beacon = Partial<AgentBase> & {
   status?: AgentStatus;
   taskStats?: TaskStats;
+  /** Failed operations on this beacon in the last 24 hours (the fleet list's
+   *  "recent failures" column). */
+  failures_24h?: number;
   kill_date?: string;
   parent_agent_id?: string;
 };

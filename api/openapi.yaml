@@ -292,9 +292,11 @@ paths:
           in: query
           schema:
             type: string
-            enum: [hostname, username, os, ip, last_seen, version, status]
+            enum: [hostname, username, os, ip, last_seen, version, status, failures]
             default: last_seen
-          description: Sort by column (status orders by derived online/stale/offline)
+          description: >-
+            Sort by column (status orders by derived online/stale/offline;
+            failures orders by the failed operations of the last 24 hours)
         - name: sort_dir
           in: query
           schema:
@@ -302,6 +304,13 @@ paths:
             enum: [asc, desc]
             default: desc
           description: Sort direction
+        - name: failures
+          in: query
+          description: >-
+            Answer with the failed operations of the last 24 hours per beacon
+            (failures_24h); the count is bounded by the page's beacons
+          schema:
+            type: boolean
       responses:
         '200':
           description: Successful response

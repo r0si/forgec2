@@ -564,6 +564,9 @@ type implantHostBucket struct {
 	agents  []db.Implant
 	sortAt  time.Time
 	sortStr string
+	// failures is the number of failed operations across the bucket's
+	// beacons in the last 24 hours - the "recent failures" sort.
+	failures int64
 }
 
 func groupImplantsByHost(matched []db.Implant) []*implantHostBucket {
@@ -593,6 +596,16 @@ func sortHostBuckets(order []*implantHostBucket, sortKey, sortDir string) {
 	sort.SliceStable(order, func(i, j int) bool {
 		a, b := order[i], order[j]
 		switch sortKey {
+		case agentSortFailures:
+			// Most failures first by default: the beacons that need the
+			// operator's attention come first.
+			if a.failures == b.failures {
+				return a.sortAt.After(b.sortAt)
+			}
+			if desc {
+				return a.failures > b.failures
+			}
+			return a.failures < b.failures
 		case "hostname":
 			if a.sortStr == b.sortStr {
 				return a.sortAt.After(b.sortAt)
@@ -633,7 +646,7 @@ func paginateHostBuckets(order []*implantHostBucket, page, pageSize int) ([]db.I
 	return out, total
 }
 
-func (s *Server) listAgentsGroupedByHost(query *gorm.DB, page, pageSize int, sortKey, sortDir string) ([]db.Implant, int64, error) {
+func (s *Server) listAgentsGroupedByHost(query *gorm.DB, page, pageSize int, sortKey, sortDir string, failures map[string]int64) ([]db.Implant, int64, error) {
 	// Cap initial load to 5000 implants to avoid OOM on 10k+ fleets; grouping
 	// stays in-memory but bounded. A true DB-side DISTINCT pagination would
 	// require a host_key persisted column; this cap is the no-migration fix
@@ -643,6 +656,15 @@ func (s *Server) listAgentsGroupedByHost(query *gorm.DB, page, pageSize int, sor
 		return nil, 0, err
 	}
 	order := groupImplantsByHost(matched)
+	if len(failures) > 0 {
+		// A host is as unhealthy as its sessions: the bucket carries the sum
+		// of its beacons' failure counts.
+		for _, bucket := range order {
+			for _, a := range bucket.agents {
+				bucket.failures += failures[a.ID]
+			}
+		}
+	}
 	sortHostBuckets(order, sortKey, sortDir)
 	out, total := paginateHostBuckets(order, page, pageSize)
 	return out, total, nil
@@ -658,6 +680,10 @@ func (s *Server) handleListAgents(c *gin.Context) {
 type agentListItem struct {
 	db.Implant
 	TaskStats *db.TaskStats `json:"taskStats,omitempty"`
+	// Failures24h is the number of failed operations on this beacon in the
+	// last 24 hours. It is the column the fleet list sorts by, so the number
+	// in the row is the number it was sorted by.
+	Failures24h int64 `json:"failures_24h,omitempty"`
 	// ProtocolOutdated flags an agent that speaks a protocol version the
 	// server would refuse (or a version that is on its way out). The agent
 	// has to be rebuilt - the console shows the badge.
@@ -665,6 +691,61 @@ type agentListItem struct {
 	// ProtocolCurrent is the version the server speaks, so the console does
 	// not have to know it.
 	ProtocolCurrent uint `json:"protocol_current"`
+}
+
+// agentSortFailures is the sort key for "recent failures": the beacons with
+// the most failed operations in the last 24 hours.
+const agentSortFailures = "failures"
+
+// agentFailureWindow is the window the failure counts describe - the same 24
+// hours the dashboard's security strip counts.
+const agentFailureWindow = 24 * time.Hour
+
+// agentFailureCounts returns the number of failed operations per beacon over
+// the last 24 hours. With no ids it counts every beacon of the caller's
+// tenant; with ids it counts only those.
+//
+// One grouped query over a bounded window - the same shape the login rollup
+// uses. A per-row subquery would run once per row of the page, and a
+// correlated subquery in ORDER BY would run once per candidate beacon: the
+// "sort the index cannot serve" shape this repository has been bitten by
+// before.
+func (s *Server) agentFailureCounts(c *gin.Context, ids []string) map[string]int64 {
+	counts := map[string]int64{}
+	type row struct {
+		AgentID string
+		Count   int64
+	}
+	var rows []row
+	since := comparableLocalTime(time.Now().Add(-agentFailureWindow))
+	q := s.auditTenantScope(s.db.Model(&db.AuditLog{}), c).
+		Select("agent_id, COUNT(*) AS count").
+		Where("success = ?", false).
+		Where("created_at >= ?", since).
+		Where("agent_id <> ''")
+	if len(ids) > 0 {
+		q = q.Where("agent_id IN ?", ids)
+	}
+	if err := q.Group("agent_id").Scan(&rows).Error; err != nil {
+		// Advisory: the count is a convenience, the list must still load.
+		slog.Warn("Agent failure counts unavailable", "err", err)
+		return counts
+	}
+	for _, r := range rows {
+		counts[r.AgentID] = r.Count
+	}
+	return counts
+}
+
+// agentFailureCountsQuery groups the failed operations of the last 24 hours by
+// beacon, for the JOIN that sorts the fleet by them.
+func (s *Server) agentFailureCountsQuery(c *gin.Context) *gorm.DB {
+	return s.auditTenantScope(s.db.Model(&db.AuditLog{}), c).
+		Select("agent_id, COUNT(*) AS failures").
+		Where("success = ?", false).
+		Where("created_at >= ?", comparableLocalTime(time.Now().Add(-agentFailureWindow))).
+		Where("agent_id <> ''").
+		Group("agent_id")
 }
 
 func parseAgentListPage(c *gin.Context) (page, pageSize int) {
@@ -681,14 +762,40 @@ func (s *Server) writeAgentListJSON(c *gin.Context) {
 	}
 	page, pageSize := parseAgentListPage(c)
 	query := s.implantListQuery(c)
+	sortKey := c.Query("sort_key")
+	sortDir := c.Query("sort_dir")
 	var agents []db.Implant
 	var total int64
 	var err error
+	// failureCounts holds the failed operations of the last 24 hours per
+	// beacon. It is filled by the sort's JOIN, or by one bounded query when
+	// the console asks for the column.
+	failureCounts := map[string]int64{}
 	groupHost := c.Query("group") == "host"
 	if groupHost {
-		agents, total, err = s.listAgentsGroupedByHost(query, page, pageSize, c.Query("sort_key"), c.Query("sort_dir"))
+		var counts map[string]int64
+		if sortKey == agentSortFailures {
+			counts = s.agentFailureCounts(c, nil)
+			failureCounts = counts
+		}
+		agents, total, err = s.listAgentsGroupedByHost(query, page, pageSize, sortKey, sortDir, counts)
 	} else if err = query.Count(&total).Error; err == nil {
-		err = query.Order(agentSortOrder(c.Query("sort_key"), c.Query("sort_dir"))).
+		order := agentSortOrder(sortKey, sortDir)
+		if sortKey == agentSortFailures {
+			// The JOIN only carries the ORDER BY: the counts of the page are
+			// read by one bounded, index-backed query below. Selecting the
+			// count into the row as well would make GORM rebuild the SELECT
+			// from the destination schema and lose it.
+			query = query.Joins("LEFT JOIN (?) AS fail_counts ON fail_counts.agent_id = implants.id", s.agentFailureCountsQuery(c))
+			dir := "desc"
+			if sortDir == "asc" {
+				dir = "asc"
+			}
+			// The expression, not an output alias: SQLite resolves an ORDER
+			// BY name against the joined tables first.
+			order = "COALESCE(fail_counts.failures, 0) " + dir + ", last_seen desc"
+		}
+		err = query.Order(order).
 			Offset((page - 1) * pageSize).Limit(pageSize).Find(&agents).Error
 	}
 	if err != nil {
@@ -701,12 +808,19 @@ func (s *Server) writeAgentListJSON(c *gin.Context) {
 		ids[i] = agents[i].ID
 		agents[i].Status = s.agentStatus(agents[i]).Status
 	}
+	// The failure counts of the page: one bounded query over the page's
+	// beacons, served by the (agent_id, created_at) index. It runs when the
+	// console asks for the column or sorts by it.
+	if len(failureCounts) == 0 && !groupHost && (c.Query("failures") == "1" || sortKey == agentSortFailures) {
+		failureCounts = s.agentFailureCounts(c, ids)
+	}
 	stats := computeTaskStats(s.db, ids)
 	resp := make([]agentListItem, len(agents))
 	for i, a := range agents {
 		resp[i] = agentListItem{
 			Implant:          a,
 			TaskStats:        stats[a.ID],
+			Failures24h:      failureCounts[a.ID],
 			ProtocolOutdated: protocol.IsOutdated(a.ProtocolVersion),
 			ProtocolCurrent:  protocol.CurrentProtocolVersion,
 		}

@@ -68,6 +68,10 @@ export function useAgentData(t: (key: string) => string) {
       if (q.linked) p.set("linked", q.linked);
       p.set("sort_key", q.sort_key);
       p.set("sort_dir", q.sort_dir);
+      // The failed operations of the last 24 hours, per beacon: the column the
+      // fleet list sorts by. The server answers them with one bounded query
+      // over the page's beacons.
+      p.set("failures", "1");
       const d = await api.get<{ agents?: Beacon[]; total?: number | string }>(
         paths.agents.list(p.toString()),
         { signal, unwrap: false },

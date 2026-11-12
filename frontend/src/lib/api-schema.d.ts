@@ -12562,10 +12562,12 @@ export interface operations {
                 page?: number;
                 /** @description Items per page */
                 pageSize?: number;
-                /** @description Sort by column (status orders by derived online/stale/offline) */
-                sort_key?: "hostname" | "username" | "os" | "ip" | "last_seen" | "version" | "status";
+                /** @description Sort by column (status orders by derived online/stale/offline; failures orders by the failed operations of the last 24 hours) */
+                sort_key?: "hostname" | "username" | "os" | "ip" | "last_seen" | "version" | "status" | "failures";
                 /** @description Sort direction */
                 sort_dir?: "asc" | "desc";
+                /** @description Answer with the failed operations of the last 24 hours per beacon (failures_24h); the count is bounded by the page's beacons */
+                failures?: boolean;
             };
             header?: never;
             path?: never;
