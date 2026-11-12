@@ -5,6 +5,7 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -101,19 +102,21 @@ export default memo(function AgentsToolbar({
           <DropdownMenuCheckboxItem checked={showResults} onCheckedChange={() => onToggleResults()}>
             <History className="size-4" /> {t("agents.results")}
           </DropdownMenuCheckboxItem>
-          <DropdownMenuLabel>{t("agents.failures_window_24h")}</DropdownMenuLabel>
-          <DropdownMenuItem disabled={exporting} onClick={() => onExport("24h")}>
-            <Download className="size-4" /> {t("agents.export_24h")}
-            <span className="ml-auto text-micro text-muted-foreground">CSV</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem disabled={exporting} onClick={() => onExport("7d")}>
-            <Download className="size-4" /> {t("agents.export_7d")}
-            <span className="ml-auto text-micro text-muted-foreground">CSV</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem disabled={exporting} onClick={() => onExport("30d")}>
-            <Download className="size-4" /> {t("agents.export_30d")}
-            <span className="ml-auto text-micro text-muted-foreground">CSV</span>
-          </DropdownMenuItem>
+          <DropdownMenuGroup>
+            <DropdownMenuLabel>{t("agents.failures_window_24h")}</DropdownMenuLabel>
+            <DropdownMenuItem disabled={exporting} onClick={() => onExport("24h")}>
+              <Download className="size-4" /> {t("agents.export_24h")}
+              <span className="ml-auto text-micro text-muted-foreground">CSV</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled={exporting} onClick={() => onExport("7d")}>
+              <Download className="size-4" /> {t("agents.export_7d")}
+              <span className="ml-auto text-micro text-muted-foreground">CSV</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled={exporting} onClick={() => onExport("30d")}>
+              <Download className="size-4" /> {t("agents.export_30d")}
+              <span className="ml-auto text-micro text-muted-foreground">CSV</span>
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={onToggleView}>
             {effectiveViewMode === "table" ? <Grip className="size-4" /> : <ListOrdered className="size-4" />}
