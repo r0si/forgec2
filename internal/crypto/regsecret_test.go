@@ -87,8 +87,20 @@ func TestRegSecretStoreTamper(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Seal: %v", err)
 	}
-	// Flip a byte in the payload portion (after the FC2REG: marker).
-	tampered := sealed[:len(sealed)-1] + "X"
+	// Flip a character in the base64 payload (after the FC2REG: marker). Use a
+	// character that differs from the one already there: the old "replace the
+	// last byte with X" form was a no-op whenever the last character happened to
+	// be X, which made this test flaky in CI.
+	const marker = "FC2REG:"
+	at := len(marker) + (len(sealed)-len(marker))/2
+	replacement := byte('A')
+	if sealed[at] == replacement {
+		replacement = 'B'
+	}
+	tampered := sealed[:at] + string(replacement) + sealed[at+1:]
+	if tampered == sealed {
+		t.Fatal("tamper helper did not change the ciphertext")
+	}
 	if _, err := store.Unseal(tampered); err == nil {
 		t.Fatalf("tampered ciphertext must fail to unseal")
 	}
