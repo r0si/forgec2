@@ -167,7 +167,9 @@ func (s *Server) processTaskResults(agent db.Implant, results []taskResult, uuid
 		// whoever cancelled the task (cancel endpoint / kill-switch disarm) —
 		// decrementing here double-counted the release.
 		if task.Status == "cancelled" {
-			slog.Info("Result for cancelled task dropped", "agent_id", uuid, "task_id", r.TaskID, "type", r.Type)
+			// Keep the task cancelled, but preserve what the agent actually
+			// reported: the abort may have lost the race with the command.
+			s.captureLateResult(task, r, uuid, now)
 			continue
 		}
 		// Durable idempotency (P8): the agent reseeds results with the same rid

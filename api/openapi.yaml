@@ -15109,6 +15109,15 @@ components:
           type: string
         error:
           type: string
+        late_result:
+          type: boolean
+          description: A result arrived after the operator cancelled the task; status stays cancelled.
+        late_result_status:
+          type: string
+          enum: [completed, failed]
+        late_result_at:
+          type: string
+          format: date-time
         progress:
           type: integer
           description: 0-100 percentage

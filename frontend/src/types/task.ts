@@ -23,6 +23,9 @@ export interface Task {
   callback_url?: string;
   callback_method?: string;
   callback_sent?: boolean;
+  late_result?: boolean;
+  late_result_status?: string;
+  late_result_at?: string;
   created_at: string;
   updated_at: string;
 }

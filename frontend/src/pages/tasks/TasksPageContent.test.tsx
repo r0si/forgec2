@@ -108,6 +108,31 @@ describe("TasksPageContent error surfaces", () => {
     mockMountReads();
   });
 
+  it("marks a cancelled task whose result arrived later", async () => {
+    getMock.mockImplementation(async (path: unknown) => {
+      if (String(path).includes("pageSize=50")) {
+        return {
+          tasks: [{
+            ...TASK,
+            status: "cancelled",
+            late_result: true,
+            late_result_status: "completed",
+            late_result_at: "2026-10-01T10:05:00.000Z",
+          }],
+          total: 1,
+        };
+      }
+      return {};
+    });
+    render(
+      <MemoryRouter>
+        <TasksPageContent />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText("tasks.late_result_badge");
+  });
+
   it("maps a failed task load onto the shared status copy instead of the raw message", async () => {
     getMock.mockImplementation(async () => { throw serverError(); });
     render(

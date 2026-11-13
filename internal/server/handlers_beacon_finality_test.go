@@ -175,11 +175,13 @@ func TestDedupEvictsOldestFirst(t *testing.T) {
 	}
 }
 
-// TestCancelledTaskResultNotApplied pins the P6 finality guarantee: a result
-// that arrives for a task the operator already cancelled must not resurrect the
-// row (previously the status was unconditionally overwritten to completed).
+// TestCancelledTaskResultNotApplied pins the P6 finality guarantee with the
+// late-result contract: a result that arrives for a task the operator already
+// cancelled must not resurrect the row, but its output is preserved for the
+// audit under LateResult. The cancellation reason stays in Error.
 func TestCancelledTaskResultNotApplied(t *testing.T) {
 	s, database := newBeaconFinalityTestServer(t)
+	crypto.InitLootEncryption(testStorageKeyHex)
 
 	uuid := "dddd4444-5555-4333-8444-666666666666"
 	now := time.Now()
@@ -213,14 +215,17 @@ func TestCancelledTaskResultNotApplied(t *testing.T) {
 	if reloaded.Status != "cancelled" {
 		t.Errorf("cancelled task resurrected: status=%q", reloaded.Status)
 	}
-	if reloaded.Result != "" {
-		t.Errorf("cancelled task result overwritten: result=%q", reloaded.Result)
+	if reloaded.Result != "administrator" {
+		t.Errorf("late result not preserved: result=%q", reloaded.Result)
 	}
 	if reloaded.Error != "cancelled by operator" {
-		t.Errorf("cancelled task error overwritten: error=%q", reloaded.Error)
+		t.Errorf("cancellation reason overwritten: error=%q", reloaded.Error)
 	}
-	if reloaded.LastResultID != "" {
-		t.Errorf("cancelled task picked up last_result_id=%q", reloaded.LastResultID)
+	if !reloaded.LateResult || reloaded.LateResultStatus != "completed" || reloaded.LateResultAt == nil {
+		t.Errorf("late result metadata missing: %+v", reloaded)
+	}
+	if reloaded.LastResultID != "rid-late" {
+		t.Errorf("late result id not recorded: %q", reloaded.LastResultID)
 	}
 	// The cancelled task's pending slot is NOT released here: terminal-state
 	// transitions own the decrement (cancel endpoint / kill-switch disarm /

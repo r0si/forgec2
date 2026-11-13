@@ -322,6 +322,12 @@ type Task struct {
 	// It gives durable idempotency for results re-resent after a dropped frame
 	// (survives server restarts, unlike the in-memory dedup cache).
 	LastResultID string `gorm:"size:64;index" json:"last_result_id,omitempty"`
+	// LateResult records a result that arrived after an operator cancelled the
+	// task. The task stays cancelled; Result/Error preserve what the agent
+	// actually reported so "did it run before the abort landed?" is answerable.
+	LateResult       bool       `gorm:"default:false" json:"late_result,omitempty"`
+	LateResultStatus string     `gorm:"size:20;default:''" json:"late_result_status,omitempty"`
+	LateResultAt     *time.Time `json:"late_result_at,omitempty"`
 	// IdempotencyKey is an operator-supplied dedup key: creating a task with
 	// a key that already has a live (pending/pending_approval/running) task
 	// on the same agent returns the existing task instead of a duplicate.

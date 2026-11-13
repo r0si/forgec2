@@ -438,6 +438,17 @@ func (s *Server) broadcastTaskUpdate(agentID string, task db.Task) {
 	if task.Error != "" {
 		payload["error"] = task.Error
 	}
+	if task.LateResult {
+		payload["late_result"] = true
+		payload["late_result_status"] = task.LateResultStatus
+		if task.LateResultAt != nil {
+			payload["late_result_at"] = task.LateResultAt.UTC().Format(time.RFC3339)
+		}
+		if task.Result != "" {
+			payload["result"] = truncateString(task.Result, 200)
+			payload["result_complete"] = false
+		}
+	}
 	notification, err := json.Marshal(payload)
 	if err != nil {
 		slog.Error("Failed to marshal task update", "err", err)

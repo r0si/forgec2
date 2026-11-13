@@ -784,7 +784,7 @@ const TaskRow = memo(function TaskRow({ task, expanded, selected, onToggleSelect
           )}
         </TableCell>
         <TableCell className="max-sm:hidden py-3 px-4 text-xs text-muted-foreground font-mono">{calcDuration(task.created_at, task.updated_at)}</TableCell>
-        <TableCell className="py-3 px-4 text-center">{getStatusBadge(task.status)}</TableCell>
+        <TableCell className="py-3 px-4 text-center">{getStatusBadge(task.status)}{task.late_result && <Badge variant="warning" className="ml-1 px-1.5 py-0 text-micro-sm">{t("tasks.late_result_badge")}</Badge>}</TableCell>
         <TableCell className="py-3 px-4 text-center" onClick={(e) => e.stopPropagation()}>
           <TaskActions
             task={task}
@@ -858,6 +858,7 @@ const TaskCard = memo(function TaskCard({ task, expanded, selected, onToggleSele
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
             {getStatusBadge(task.status)}
+            {task.late_result && <Badge variant="warning" className="px-1.5 py-0 text-micro-sm">{t("tasks.late_result_badge")}</Badge>}
             {getTypeBadge(task.type)}
             <span className="font-medium text-sm text-foreground truncate min-w-0">
               {getAgentName(task.agent_id) || task.agent_id?.substring(0, 8)}
@@ -1027,6 +1028,13 @@ function TaskDetailModal({ task, onClose, getAgentName, getStatusBadge, getTypeB
             <h3 className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">{t("tasks.detail_command")}</h3>
             <code className="block bg-muted border border-border rounded-lg p-3 text-sm font-mono text-foreground">{task.command || "-"}</code>
           </div>
+          {task.late_result && (
+            <div className="mb-4 rounded-lg border border-warning/40 bg-warning/10 p-3" role="status">
+              <p className="text-sm font-medium text-warning-ink">{t("tasks.late_result_title")}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{t("tasks.late_result_body")}</p>
+              {task.late_result_at && <p className="mt-1 text-micro text-muted-foreground">{formatTime(task.late_result_at)}</p>}
+            </div>
+          )}
           {task.result && (
             <div>
               <div className="flex items-center justify-between mb-2">

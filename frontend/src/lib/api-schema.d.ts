@@ -11894,6 +11894,12 @@ export interface components {
             status?: "pending" | "running" | "completed" | "failed" | "cancelled" | "pending_approval";
             result?: string;
             error?: string;
+            /** @description A result arrived after the operator cancelled the task; status stays cancelled. */
+            late_result?: boolean;
+            /** @enum {string} */
+            late_result_status?: "completed" | "failed";
+            /** Format: date-time */
+            late_result_at?: string;
             /** @description 0-100 percentage */
             progress?: number;
             /** Format: int64 */
