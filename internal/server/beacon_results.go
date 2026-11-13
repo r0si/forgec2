@@ -213,13 +213,39 @@ func (s *Server) processTaskResults(agent db.Implant, results []taskResult, uuid
 			continue
 		}
 
+		// A file chunk is persisted before the terminal-state claim below, so
+		// reject results for rows that can no longer be claimed first. Without
+		// this guard a replayed chunk could be written again before the claim
+		// discovered the task was already terminal.
+		switch task.Status {
+		case "pending", "running", "sent":
+		default:
+			slog.Debug("Result for non-live task dropped", "agent_id", uuid, "task_id", r.TaskID, "status", task.Status)
+			continue
+		}
+
+		// File chunks are written before the terminal-state claim: a completed
+		// upload/download chunk must mean the bytes are on disk. The old order
+		// marked the task completed (and broadcast it) first, then recorded a
+		// local write failure only in the result text.
+		fileChunkHandled := false
+		var fileChunkErr error
+		switch {
+		case r.Type == "upload" && r.Output != "":
+			fileChunkHandled = true
+			task.Result, fileChunkErr = s.persistFileChunk(uuid, task, r, "upload", "File chunk saved")
+		case r.Type == "download" && r.Output != "" && (r.Offset > 0 || task.Offset > 0 || r.Size > 0):
+			fileChunkHandled = true
+			task.Result, fileChunkErr = s.persistFileChunk(uuid, task, r, "download", "Download chunk saved")
+		}
+
 		// Atomic first-final-wins claim: chunked transfers (upload/download)
 		// deliver many final-shaped results per task ID. Without this guard
 		// every chunk re-finalised the task and drained another pending-slot
 		// from agentPendingTasks, zeroing MaxPendingTasksPerAgent and letting
 		// that agent bypass the anti-flood gate entirely.
 		finalStatus := "completed"
-		if r.Error != "" {
+		if r.Error != "" || fileChunkErr != nil {
 			finalStatus = "failed"
 		}
 		claim := s.withBusyRetryDB("result", func() *gorm.DB {
@@ -239,6 +265,9 @@ func (s *Server) processTaskResults(agent db.Implant, results []taskResult, uuid
 		task.Status = finalStatus
 		if r.Error != "" {
 			task.Error = r.Error
+		} else if fileChunkErr != nil {
+			task.Error = fileChunkErr.Error()
+			task.Result = ""
 		}
 		task.UpdatedAt = now
 
@@ -288,7 +317,7 @@ func (s *Server) processTaskResults(agent db.Implant, results []taskResult, uuid
 			// opaque id in the task result; task rows must not become an
 			// alternate unbounded image store.
 			task.Result = s.storeFileThumbs(uuid, r.Output)
-		} else {
+		} else if !fileChunkHandled {
 			task.Result = decodeTaskResult(r.Type, r.Encoding, r.Output)
 		}
 
@@ -535,18 +564,6 @@ func (s *Server) processTaskResults(agent db.Implant, results []taskResult, uuid
 				details = details[:AuditLogDetailsMaxLen] + "..."
 			}
 			pendingAudit = append(pendingAudit, auditEntry{action: "command_result", resource: "agent", agentID: uuid, details: details, success: r.Error == ""})
-		}
-
-		if r.Type == "upload" && r.Output != "" {
-			if saveFileChunk(s, uuid, task, r, "upload", "File chunk saved") {
-				continue
-			}
-		}
-
-		if r.Type == "download" && r.Output != "" && (r.Offset > 0 || task.Offset > 0 || r.Size > 0) {
-			if saveFileChunk(s, uuid, task, r, "download", "Download chunk saved") {
-				continue
-			}
 		}
 	}
 }

@@ -3,7 +3,7 @@ import { api, getCsrfToken, handleUnauthorized, pollTask } from "@/lib/api";
 import { paths } from "@/lib/api-paths";
 import { TASK_HARD_TIMEOUT_MS } from "@/lib/task-poll";
 import { downloadBlob } from "@/lib/download";
-import { exfilBasename, fileTaskId, pullPlan, transferProgressAt, type TransferProgress } from "./file-task";
+import { exfilBasename, fileTaskId, fileTaskIds, pullPlan, transferProgressAt, type TransferProgress } from "./file-task";
 
 type TFn = (key: string, params?: Record<string, string | number>) => string;
 
@@ -123,12 +123,18 @@ export function pushLocalFile(opts: {
           }
           let ack: unknown = {};
           try { ack = JSON.parse(xhr.responseText || "{}"); } catch { /* non-json */ }
-          const taskId = fileTaskId(ack);
-          if (taskId) {
-            // Chunk tasks can legitimately take minutes on slow links: bound
-            // by the server sweep, not the old 180s false-timeout.
-            const st = await pollTask(opts.agentId, taskId, { timeoutMs: TASK_HARD_TIMEOUT_MS, signal: opts.signal });
-            if (st.status === "failed") throw new Error(st.error || opts.t("agents.files_push_failed"));
+          const taskIds = fileTaskIds(ack);
+          if (taskIds.length > 0) {
+            // Large pushes are split into one task per chunk. Wait for every
+            // chunk and fail the whole upload if any of them did not complete;
+            // polling only the first one reported success on a partial file.
+            const statuses = await Promise.all(
+              taskIds.map((taskId) =>
+                pollTask(opts.agentId, taskId, { timeoutMs: TASK_HARD_TIMEOUT_MS, signal: opts.signal }),
+              ),
+            );
+            const unfinished = statuses.find((st) => st.status !== "completed");
+            if (unfinished) throw new Error(unfinished.error || opts.t("agents.files_push_failed"));
           }
           resolve();
         } catch (err) {

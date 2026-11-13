@@ -1,13 +1,16 @@
 package server
 
 import (
+	"encoding/base64"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/forgec2/forgec2/internal/config"
-	forgecrypto "github.com/forgec2/forgec2/internal/crypto"
 	"github.com/forgec2/forgec2/internal/db"
+	"github.com/forgec2/forgec2/internal/testutil"
 )
 
 // TestUploadsRootRefusesEmptyDataDir pins the same defect class that produced hundreds of
@@ -31,32 +34,92 @@ func TestUploadsRootRefusesEmptyDataDir(t *testing.T) {
 	}
 }
 
-// TestSaveFileChunkRefusesWithoutDataDir proves the refusal reaches the operator: the task
-// is marked failed with a reason instead of the chunk being written into the cwd.
-func TestSaveFileChunkRefusesWithoutDataDir(t *testing.T) {
+// TestPersistFileChunkRefusesWithoutDataDir proves the refusal reaches the
+// caller: an empty server.data_dir is an error, not a write into the cwd.
+func TestPersistFileChunkRefusesWithoutDataDir(t *testing.T) {
 	s := mustTenantServer(t)
-	forgecrypto.InitLootEncryption(testStorageKeyHex) // the refusal is stored through the vault
-	s.cfg.Server.DataDir = ""                         // hand-built server, the shape tests and a bad config produce
+	s.cfg.Server.DataDir = "" // hand-built server, the shape tests and a bad config produce
 	task := &db.Task{AgentID: "a1", Type: "download", Status: "running"}
-	if err := s.db.Create(task).Error; err != nil {
-		t.Fatal(err)
-	}
 
-	handled := saveFileChunk(s, "agent-1", task, taskResult{Output: "aGk=", Filename: "x.txt"}, "log", "prefix")
-	if !handled {
-		t.Fatal("the refusal was not reported as handled")
-	}
-
-	var after db.Task
-	if err := s.db.First(&after, task.ID).Error; err != nil {
-		t.Fatal(err)
-	}
-	if after.Result == "" {
-		t.Fatal("the task carries no refusal reason")
+	if _, err := s.persistFileChunk("agent-1", task, taskResult{Output: "aGk=", Filename: "x.txt"}, "log", "prefix"); err == nil {
+		t.Fatal("an empty data_dir produced a chunk write")
 	}
 
 	// Nothing may appear in the package directory.
 	if _, err := os.Stat("uploads"); err == nil {
 		t.Fatal("a relative uploads directory was created in the working directory")
+	}
+}
+
+// TestPersistFileChunkWritesBytes covers the success path: the bytes land in
+// <data_dir>/uploads/<agent>/<filename> and the returned summary is what the
+// task row will carry.
+func TestPersistFileChunkWritesBytes(t *testing.T) {
+	s := newTestFileServer(t, testutil.SetupTestDB(t))
+	dataDir := t.TempDir()
+	s.cfg.Server.DataDir = dataDir
+	task := &db.Task{AgentID: "agent-1", Type: "upload"}
+	payload := []byte("hello chunk")
+	summary, err := s.persistFileChunk("agent-1", task, taskResult{
+		Output:   base64.StdEncoding.EncodeToString(payload),
+		Filename: "x.txt",
+		Size:     int64(len(payload)),
+	}, "upload", "File chunk saved")
+	if err != nil {
+		t.Fatalf("persist chunk: %v", err)
+	}
+	if !strings.Contains(summary, "x.txt") || !strings.Contains(summary, "offset 0") {
+		t.Fatalf("summary = %q", summary)
+	}
+	got, err := os.ReadFile(filepath.Join(dataDir, "uploads", "agent-1", "x.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != string(payload) {
+		t.Fatalf("file content = %q, want %q", got, payload)
+	}
+}
+
+// TestUploadChunkSaveFailureFailsTask is the operator-visible half of the
+// ordering rule: a chunk that could not be written must not leave its task
+// completed, because the UI would report a successful transfer with missing
+// bytes.
+func TestUploadChunkSaveFailureFailsTask(t *testing.T) {
+	s := mustTenantServer(t)
+	oldEncrypt := encryptTaskFieldsFn
+	encryptTaskFieldsFn = func(*db.Task) error { return nil }
+	t.Cleanup(func() { encryptTaskFieldsFn = oldEncrypt })
+	dataDir := t.TempDir()
+	s.cfg.Server.DataDir = dataDir
+	// A FILE named uploads makes MkdirAll fail, the same class of local
+	// storage failure as a full disk or a permission error.
+	if err := os.WriteFile(filepath.Join(dataDir, "uploads"), []byte("blocked"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	const agentID = "chunk-save-fail"
+	if err := s.db.Create(&db.Implant{ID: agentID, TenantID: 1, Hostname: "chunk", Status: "online"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	task := db.Task{AgentID: agentID, TenantID: 1, Type: "upload", Status: "running"}
+	if err := s.db.Create(&task).Error; err != nil {
+		t.Fatal(err)
+	}
+	s.processTaskResults(db.Implant{ID: agentID}, []taskResult{{
+		TaskID:   task.ID,
+		Type:     "upload",
+		Output:   "aGk=",
+		Filename: "x.txt",
+	}}, agentID, time.Now())
+
+	var got db.Task
+	if err := s.db.First(&got, task.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != "failed" {
+		t.Fatalf("status = %q, want failed when the chunk could not be written", got.Status)
+	}
+	if !strings.Contains(got.Error, "uploads") {
+		t.Fatalf("error = %q, want the uploads directory failure", got.Error)
 	}
 }

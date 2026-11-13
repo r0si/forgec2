@@ -330,6 +330,35 @@ describe("pushLocalFile", () => {
     expect(t).toHaveBeenCalledWith("agents.files_push_failed");
   });
 
+  it("waits for every chunk task before reporting a successful push", async () => {
+    mocks.pollTask.mockResolvedValue({ status: "completed" });
+    const p = pushLocalFile({ agentId: "a1", destPath: "C:\\drop", file: file(), t });
+    const xhr = lastXhr();
+    xhr.status = 200;
+    xhr.responseText = JSON.stringify({ success: true, task_id: 9, task_ids: [9, 10, 11] });
+    xhr.emit("load");
+
+    await expect(p).resolves.toBeUndefined();
+    expect(mocks.pollTask).toHaveBeenCalledTimes(3);
+    expect(mocks.pollTask.mock.calls.map((call) => call[1])).toEqual([9, 10, 11]);
+  });
+
+  it("fails the whole push when a later chunk failed", async () => {
+    mocks.pollTask.mockImplementation((_agentId: string, taskId: number) =>
+      Promise.resolve(taskId === 11
+        ? { status: "failed", error: "chunk 3 write failed" }
+        : { status: "completed" }),
+    );
+    const p = pushLocalFile({ agentId: "a1", destPath: "C:\\drop", file: file(), t });
+    const xhr = lastXhr();
+    xhr.status = 200;
+    xhr.responseText = JSON.stringify({ success: true, task_id: 9, task_ids: [9, 10, 11] });
+    xhr.emit("load");
+
+    await expect(p).rejects.toThrow("chunk 3 write failed");
+    expect(mocks.pollTask).toHaveBeenCalledTimes(3);
+  });
+
   it("routes a 401 through the central unauthorized flow and reports the status", async () => {
     const p = pushLocalFile({ agentId: "a1", destPath: "C:\\drop", file: file(), t });
     const xhr = lastXhr();

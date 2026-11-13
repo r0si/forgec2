@@ -15,6 +15,26 @@ export function fileTaskId(data: unknown): number | null {
   return Number.isFinite(id) && id > 0 ? id : null;
 }
 
+/**
+ * Every task a file push queued. Large files are split into one task per
+ * chunk, and a push is only successful when all of them finished: polling
+ * only the first chunk reported success while later chunks could still fail.
+ */
+export function fileTaskIds(data: unknown): number[] {
+  if (!data || typeof data !== "object") return [];
+  const o = data as Record<string, unknown>;
+  const ids: number[] = [];
+  const add = (value: unknown) => {
+    const id = Number(value);
+    if (Number.isFinite(id) && id > 0 && !ids.includes(id)) ids.push(id);
+  };
+  if (Array.isArray(o.task_ids)) {
+    for (const value of o.task_ids) add(value);
+  }
+  add(o.task_id);
+  return ids;
+}
+
 export function looksLikeFileTaskAckJson(text: string): boolean {
   try {
     return isFileTaskAck(JSON.parse(text));

@@ -7,6 +7,7 @@ import {
   exfilBasename,
   fileReadPreview,
   fileTaskId,
+  fileTaskIds,
   imageMimeForFilename,
   isFileTaskAck,
   looksLikeFileTaskAckJson,
@@ -24,6 +25,16 @@ describe("isFileTaskAck", () => {
     expect(isFileTaskAck({ content: "hello world", task_id: 1 })).toBe(false);
     expect(looksLikeFileTaskAckJson(JSON.stringify({ success: true, task_id: 3 }))).toBe(true);
     expect(looksLikeFileTaskAckJson("hello world")).toBe(false);
+  });
+});
+
+describe("fileTaskIds", () => {
+  it("returns every chunk task, deduplicated, with the single-task fallback", () => {
+    expect(fileTaskIds({ success: true, task_id: 9 })).toEqual([9]);
+    expect(fileTaskIds({ success: true, task_id: 9, task_ids: [9, 10, 11] })).toEqual([9, 10, 11]);
+    expect(fileTaskIds({ task_ids: [4, "5", 4, null, -1, "x"] })).toEqual([4, 5]);
+    expect(fileTaskIds(null)).toEqual([]);
+    expect(fileTaskIds({})).toEqual([]);
   });
 });
 

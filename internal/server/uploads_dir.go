@@ -2,10 +2,6 @@ package server
 
 import (
 	"path/filepath"
-
-	"github.com/forgec2/forgec2/internal/db"
-	"github.com/gin-gonic/gin"
-	"log/slog"
 )
 
 // uploadsRootDir resolves <data_dir>/uploads and refuses to guess.
@@ -21,20 +17,4 @@ func (s *Server) uploadsRootDir() (string, error) {
 		return "", errNoDataDir
 	}
 	return filepath.Join(dir, "uploads"), nil
-}
-
-// failUploadTask records an error on a chunk task and returns true (the caller's
-// "handled" convention), so a refused write is reported to the operator instead of
-// silently completing.
-func (s *Server) failUploadTask(c *gin.Context, task *db.Task, msg string) bool {
-	slog.Error("Refused to write a file chunk", "task_id", task.ID, "reason", msg)
-	task.Result = "ERROR: " + msg
-	_ = s.encryptTaskFieldsOrBlank(task)
-	if err := s.db.Model(&db.Task{}).Where("id = ?", task.ID).Updates(map[string]interface{}{
-		"result": task.Result,
-		"error":  task.Error,
-	}).Error; err != nil {
-		slog.Error("Failed to save chunk refusal", "task_id", task.ID, "error", err)
-	}
-	return true
 }
