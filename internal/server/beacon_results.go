@@ -277,7 +277,11 @@ func (s *Server) processTaskResults(agent db.Implant, results []taskResult, uuid
 		if s.metrics != nil {
 			s.metrics.TaskExecuteDuration.WithLabelValues(task.Type).Observe(now.Sub(task.CreatedAt).Seconds())
 		}
-		s.fileChains.reset(task.ID)
+		// Keep a failed chunk's poisoned chain state: resetting it here would
+		// let a replay of the rejected chunk pass the zero-prev check.
+		if fileChunkErr == nil {
+			s.fileChains.reset(task.ID)
+		}
 		if r.Type == "screen_stream_start" || r.Type == "screen_stream_stop" {
 			task.Result = "processed"
 			s.broadcastTaskUpdate(uuid, *task)
