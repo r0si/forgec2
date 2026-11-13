@@ -54,6 +54,16 @@ var exportFields = []exportField{
 	{name: "retry_count", header: "Retries", numeric: true, value: func(t db.Task, _, _ string) string {
 		return itoaTaskID(uint(t.RetryCount))
 	}},
+	// late_result is the outcome an operator most needs after cancelling: the
+	// status column still says cancelled, so the export must be able to say what
+	// the agent reported after the abort. Selectable and in the full preset,
+	// never added to the default CSV.
+	{name: "late_result", header: "Late result", value: func(t db.Task, _, _ string) string {
+		if !t.LateResult {
+			return ""
+		}
+		return t.LateResultStatus
+	}},
 }
 
 // exportMinimalFields is the "just the outcome" preset: identifiers plus what happened.
@@ -143,7 +153,7 @@ func fieldsByName(names []string) []exportField {
 func defaultExportFields(format string) []exportField {
 	out := make([]exportField, 0, len(exportFields))
 	for _, field := range exportFields {
-		if (field.name == "agent_id" || field.name == "retry_count") && format != "json" {
+		if (field.name == "agent_id" || field.name == "retry_count" || field.name == "late_result") && format != "json" {
 			continue
 		}
 		out = append(out, field)

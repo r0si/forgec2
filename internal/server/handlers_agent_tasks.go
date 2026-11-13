@@ -188,7 +188,7 @@ func (s *Server) handleExportTasks(c *gin.Context) {
 		Preload("Agent", func(db *gorm.DB) *gorm.DB {
 			return db.Select("id, hostname")
 		}).
-		Select("tasks.id, tasks.agent_id, tasks.type, tasks.command, tasks.result, tasks.error, tasks.status, tasks.created_at").
+		Select("tasks.id, tasks.agent_id, tasks.type, tasks.command, tasks.result, tasks.error, tasks.status, tasks.late_result, tasks.late_result_status, tasks.created_at").
 		Where("type NOT IN ?", []string{"screen_stream_start", "screen_stream_stop", "ls"})
 	query = s.tenantScope(query, c)
 	if hasSince {
