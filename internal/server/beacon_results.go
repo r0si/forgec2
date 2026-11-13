@@ -213,15 +213,45 @@ func (s *Server) processTaskResults(agent db.Implant, results []taskResult, uuid
 			continue
 		}
 
-		// A file chunk is persisted before the terminal-state claim below, so
-		// reject results for rows that can no longer be claimed first. Without
-		// this guard a replayed chunk could be written again before the claim
-		// discovered the task was already terminal.
+		// A result for a row that can no longer be claimed must not be staged or
+		// written: a replayed chunk would otherwise have side effects before the
+		// finality claim below discovered the task was already terminal.
 		switch task.Status {
 		case "pending", "running", "sent":
 		default:
 			slog.Debug("Result for non-live task dropped", "agent_id", uuid, "task_id", r.TaskID, "status", task.Status)
 			continue
+		}
+
+		// Chunked screenshots: stage each part under the capture task id and
+		// keep the task running. The server cannot render a capture that only
+		// exists as chunks, so completing on the first chunk was a lie.
+		if r.Type == "screenshot_chunk" && (task.Type == "screenshot" || task.Type == "screenshot_window") {
+			data, derr := base64.StdEncoding.DecodeString(r.Output)
+			if derr != nil {
+				slog.Warn("Screenshot chunk is not valid base64", "agent_id", uuid, "task_id", task.ID, "error", derr)
+				continue
+			}
+			if serr := s.stageScreenshotChunk(uuid, task.ID, int(r.Offset), int(r.Size), data); serr != nil {
+				slog.Warn("Rejected screenshot chunk", "agent_id", uuid, "task_id", task.ID, "error", serr)
+			}
+			continue
+		}
+
+		// The implant signals a multi-chunk capture with this marker. Only the
+		// assembled image may take the screenshot path; an incomplete set is a
+		// failed task, not a completed one with no image.
+		if (r.Type == "screenshot" || r.Type == "screenshot_window") && r.Output == "screenshot_chunked" {
+			image, ok := s.takeAssembledScreenshot(task.ID)
+			if !ok {
+				s.dropScreenshotChunks(task.ID)
+				r.Error = "screenshot chunks incomplete"
+				r.Output = ""
+			} else {
+				r.Output = base64.StdEncoding.EncodeToString(image)
+				r.Encoding = "base64"
+				r.Size = int64(len(image))
+			}
 		}
 
 		// File chunks are written before the terminal-state claim: a completed

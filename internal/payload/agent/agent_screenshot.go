@@ -121,6 +121,15 @@ func takeScreenshotJPEG(quality int) ([]byte, error) {
 	return jpegBuf.Bytes(), nil
 }
 
+// stampScreenshotTask attaches the capture task id to every chunk. Without it
+// the server cannot associate the chunks with the screenshot task (the old
+// results carried TaskID 0 and were silently discarded).
+func stampScreenshotTask(taskID uint, results []TaskResult) {
+	for i := range results {
+		results[i].TaskID = taskID
+	}
+}
+
 func takeScreenshotChunked(quality int) []TaskResult {
 	imgBytes, err := takeScreenshotJPEG(quality)
 	if err != nil {

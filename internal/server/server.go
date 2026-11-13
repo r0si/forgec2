@@ -78,6 +78,11 @@ type Server struct {
 	screenMonitorOps map[string]screenMonitorOp
 	screenFrames     map[string]cachedScreenFrame
 	screenFrameMu    sync.RWMutex
+	// Chunked screenshots arrive as several `screenshot_chunk` results carrying
+	// the capture task id; the server assembles them before the final result is
+	// allowed to complete the task. A bare test server lazily creates the map.
+	screenshotChunks  map[uint]*screenshotChunkBuffer
+	screenshotChunkMu sync.Mutex
 	// remoteInputLimiter throttles remote desktop input events per
 	// (operator, agent). Value type: zero value works on bare test servers.
 	remoteInputLimiter fixedWindowLimiter

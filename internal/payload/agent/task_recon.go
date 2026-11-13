@@ -35,6 +35,7 @@ func handleScreenshot(task Task, res *TaskResult) {
 	}
 	// Multi-chunk: append chunks to pendingResults. The beacon loop and the
 	// task worker both touch pendingResults through the bounded enqueue helper.
+	stampScreenshotTask(task.ID, results)
 	enqueueResults(results)
 	res.Output = "screenshot_chunked"
 	res.Size = int64(len(results))
@@ -185,6 +186,7 @@ func handleScreenshotWindow(task Task, res *TaskResult) {
 		res.Size = results[0].Size
 		return
 	}
+	stampScreenshotTask(task.ID, results)
 	enqueueResults(results)
 	res.Output = "screenshot_chunked"
 	res.Size = int64(len(results))
