@@ -42,6 +42,17 @@ docker pull ghcr.io/r0si/forgec2:edge
 pin the image digest or a published `sha-<commit>` tag. There is currently no `latest` tag.
 If the package is private, authenticate with `docker login ghcr.io` using an account
 with package access; never put a token directly in a command or configuration file.
+The published image is **linux/amd64**; arm64 hosts need the release binary or a source
+build (`make build-linux-arm64`) until a multi-arch manifest is published.
+
+### Build from source
+
+The Go toolchain is pinned to **Go 1.26.11** in `go.mod` (`go 1.26.0` is the language
+floor; the toolchain carries the standard-library security patches). The frontend needs
+**Node 24.15+**. `make build` now emits the right binary name for the host OS, and
+`make build-linux`, `make build-linux-arm64`, `make build-windows` and
+`make build-darwin` cross-compile explicitly. Full details are in
+[docs/DEPLOY.md](docs/DEPLOY.md).
 
 Before starting the image, prepare a writable `/data/config.yaml` based on
 [config.example.yaml](config.example.yaml), persist `/data` for the database and keys,

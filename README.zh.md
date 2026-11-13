@@ -36,6 +36,12 @@
 docker pull ghcr.io/r0si/forgec2:edge
 ```
 
+### 从源码构建
+
+Go 版本固定为 **Go 1.26.11**（`go.mod` 的 `go 1.26.0` 是语言版本下限，工具链包含标准库安全补丁），前端需要 **Node 24.15+**。`make build` 会按当前操作系统生成正确的二进制名；`make build-linux`、`make build-linux-arm64`、`make build-windows`、`make build-darwin` 可显式交叉编译。完整说明见 [docs/DEPLOY.md](docs/DEPLOY.md)。
+
+已发布镜像目前是 **linux/amd64**；arm64 主机可使用 release 二进制或源码构建，直到发布多架构 manifest。
+
 `edge` 是滚动开发标签，并非稳定发行版。需要可复现部署时，请固定镜像摘要或
 已发布的 `sha-<commit>` 标签，目前没有 `latest` 标签。
 如果包为私有，请使用有包访问权限的账号执行 `docker login ghcr.io`；

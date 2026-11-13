@@ -572,8 +572,10 @@ func (s *Server) apiHealth(c *gin.Context) {
 	// alert on depth before entries start being dropped.
 	if s != nil {
 		health["audit_queue_depth"] = s.auditQueueDepth()
+		health["audit_dropped"] = s.auditDropped.Load()
 	} else {
 		health["audit_queue_depth"] = 0
+		health["audit_dropped"] = int64(0)
 	}
 
 	respond(c, health)

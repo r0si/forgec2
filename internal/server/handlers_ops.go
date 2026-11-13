@@ -80,6 +80,13 @@ func (s *Server) handleReadyCheck(c *gin.Context) {
 			warnings = append(warnings, "audit chain integrity failure")
 			s.noteAuditChainTamper(verdict)
 		}
+		// A bounded async queue can drop under a burst. That is not silent:
+		// surface the process-lifetime count on the probe operators actually
+		// watch, so "some audit rows are missing" can page someone.
+		if dropped := s.auditDropped.Load(); dropped > 0 {
+			checks["audit_dropped"] = dropped
+			warnings = append(warnings, fmt.Sprintf("%d audit entr(ies) were dropped because the write queue was full", dropped))
+		}
 	}
 
 	// Delivery and action health are warnings, not readiness: a route nobody can reach does not make the process unready,

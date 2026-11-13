@@ -1,16 +1,18 @@
 .PHONY: build build-js build-embed build-all test vet lint run dev bundle clean
-.PHONY: build-cross build-linux build-windows build-darwin
+.PHONY: build-cross build-linux build-linux-arm64 build-windows build-darwin
 .PHONY: tidy deps i18n-check i18n-missing
 .PHONY: db-reset help
 
 BINARY   ?= forgec2-server
+GOOS     ?= $(shell go env GOOS)
+BIN_EXT  := $(if $(filter windows,$(GOOS)),.exe,)
 VERSION  ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 LDFLAGS  := -s -w -buildid= -X github.com/forgec2/forgec2/internal/server.ServerVersion=$(VERSION)
 
 # ---------- Core ----------
 
 build:
-	go build -ldflags="$(LDFLAGS)" -trimpath -buildvcs=false -o $(BINARY).exe ./cmd/server
+	go build -ldflags="$(LDFLAGS)" -trimpath -buildvcs=false -o $(BINARY)$(BIN_EXT) ./cmd/server
 
 # go vet includes the agent, which emits expected unsafe.Pointer warnings
 # (Windows syscall patterns). Filter those while still FAILING on real findings
@@ -53,6 +55,9 @@ build-embed: internal/webdist/dist build
 build-linux:
 	GOOS=linux GOARCH=amd64 go build -ldflags="$(LDFLAGS)" -trimpath -buildvcs=false -o $(BINARY)-linux-amd64 ./cmd/server
 
+build-linux-arm64:
+	GOOS=linux GOARCH=arm64 go build -ldflags="$(LDFLAGS)" -trimpath -buildvcs=false -o $(BINARY)-linux-arm64 ./cmd/server
+
 build-windows:
 	GOOS=windows GOARCH=amd64 go build -ldflags="$(LDFLAGS)" -trimpath -buildvcs=false -o $(BINARY)-windows-amd64.exe ./cmd/server
 
@@ -76,10 +81,12 @@ i18n-missing:
 # ---------- Run ----------
 
 run:
-	./$(BINARY).exe -config config.yaml
+	./$(BINARY)$(BIN_EXT) -config config.yaml
 
+# POSIX shells (Linux/macOS/Git Bash). Windows cmd.exe users can run
+# `set FORGEC2_DEV=1 && go run ./cmd/server -config config.yaml`.
 dev:
-	set FORGEC2_DEV=1&& go run ./cmd/server -config config.yaml
+	FORGEC2_DEV=1 go run ./cmd/server -config config.yaml
 
 # ---------- Database ----------
 
@@ -94,7 +101,7 @@ clean:
 	go clean
 	rm -rf internal/webdist/dist
 	rm -f $(BINARY) $(BINARY).exe
-	rm -f $(BINARY)-linux-amd64 $(BINARY)-windows-amd64.exe $(BINARY)-darwin-amd64
+	rm -f $(BINARY)-linux-amd64 $(BINARY)-linux-arm64 $(BINARY)-windows-amd64.exe $(BINARY)-darwin-amd64
 	# Stray root artifacts: editor/editor-backup binaries and generated agent
 	# payloads that accumulate at the repo root and risk accidental commit.
 	rm -f $(BINARY).exe~ agent agent.exe cbeacon.exe cbeacon-release.exe
@@ -104,7 +111,7 @@ clean:
 help:
 	@echo "ForgeC2 Makefile"
 	@echo ""
-	@echo "  make build          Build server (Windows .exe, requires existing internal/webdist/dist)"
+	@echo "  make build          Build server for the host OS (requires existing internal/webdist/dist)"
 	@echo "  make build-js       Build frontend JS"
 	@echo "  make build-embed    Build frontend + embed + Go binary (full pipeline)"
 	@echo "  make build-all      Alias for build-embed"
@@ -113,6 +120,7 @@ help:
 	@echo "  make tidy           Run go mod tidy"
 	@echo "  make build-cross    Build for Linux, Windows, macOS"
 	@echo "  make build-linux    Build for Linux amd64"
+	@echo "  make build-linux-arm64 Build for Linux arm64"
 	@echo "  make build-windows  Build for Windows amd64"
 	@echo "  make build-darwin   Build for macOS amd64"
 	@echo "  make dev            Run in dev mode"

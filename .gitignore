@@ -139,6 +139,13 @@ frontend/.next-build-output.txt
 /.gomodcache/
 /coverage
 /coverage-server
+/coverage-r*
 /i18n-zh-mine.patch
 /openapi-worktree.patch
 /nul
+# Profiling output, ad-hoc probes and the local Windows runner are not
+# source: keep them out of the tree (the CI Go bump patch is deliberately
+# tracked until the workflow scope is available to apply it).
+/$prof
+/probe
+/server_runner.cmd
