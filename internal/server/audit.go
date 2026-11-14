@@ -24,12 +24,17 @@ import (
 
 // Async audit pipeline tuning: request goroutines never touch the DB.
 // A single worker owns the hash chain (in-memory lastHash) and persists
-// batches. A full queue drops with a counter instead of blocking beacons.
+// batches. When the queue is full the writer waits briefly for the worker and
+// then persists synchronously, so a burst slows the writers down instead of
+// losing audit rows.
 const (
 	auditQueueCap      = 4096
 	auditBatchMax      = 100
 	auditFlushInterval = time.Second
 	auditWriteTimeout  = 5 * time.Second
+	// auditEnqueueWait is how long a writer waits for queue space before it
+	// falls back to a synchronous write.
+	auditEnqueueWait = 200 * time.Millisecond
 )
 
 // auditChainMu serializes the synchronous fallback path (used when the async
@@ -158,9 +163,16 @@ func (s *Server) flushAuditEntries(entries []db.AuditLog) {
 	}
 	select {
 	case s.auditQueue <- entries:
-	default:
-		s.auditNoteDropped(len(entries))
-		slog.Warn("Dropping audit entries: queue full", "count", len(entries), "cap", auditQueueCap)
+	case <-time.After(auditEnqueueWait):
+		// The queue is still full. The audit log is the compliance record, so a
+		// burst must not lose rows: park the batch on disk and let the worker
+		// write it on the next tick (or after a restart). The request path
+		// never waits on the database - a wedged database must not stall every
+		// beacon check-in.
+		if !s.spillAuditBatch(entries) {
+			s.auditNoteDropped(len(entries))
+			slog.Error("Dropping audit entries: queue full and no spill space", "count", len(entries), "cap", auditQueueCap)
+		}
 	}
 }
 
@@ -794,6 +806,12 @@ func (s *Server) auditWorkerLoop() {
 			}
 		case <-ticker.C:
 			flush()
+			// Batches that could not be written earlier are retried here. They
+			// are older than whatever is still queued, so they land first and
+			// the chain keeps its order.
+			if recovered := s.drainAuditSpill(); recovered > 0 {
+				slog.Info("Recovered spilled audit batches", "count", recovered)
+			}
 		}
 	}
 }
@@ -817,7 +835,14 @@ func (s *Server) writeAuditBatchWithRetry(batch []db.AuditLog) {
 			return
 		}
 	}
-	slog.Error("Dropping audit batch after retries", "count", len(batch), "err", err)
+	slog.Error("Audit batch could not be written after retries", "count", len(batch), "err", err)
+	// Park the batch on disk before calling it a drop: the database being
+	// unreachable is a transient condition, and the next tick (or the next
+	// restart) writes the rows with the chain intact. Only a batch that cannot
+	// even be parked is really lost.
+	if s.spillAuditBatch(batch) {
+		return
+	}
 	s.auditNoteDropped(len(batch))
 }
 

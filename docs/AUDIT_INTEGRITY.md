@@ -45,6 +45,22 @@ it — and it does not travel with a database backup.
 anchor file" from `/verify`, means the table and the anchor disagree. Treat it as
 an incident, not a bug report.
 
+## When the write path is unavailable
+
+Audit batches are written by a single worker. When its queue is full the writer
+waits briefly for room and then **parks the batch on disk** under
+`<data_dir>/audit-spill/`, so the request path never waits on the database and no
+row is lost. If the database itself cannot be written (unreachable, full disk),
+the batch is parked the same way and written on the next tick or after a restart;
+the file is removed only once the rows are in the database, so a crash costs a retry
+and not a row. The chain is intact either way: every write re-bases onto the
+database head inside its own transaction.
+
+`GET /ready` publishes `checks.audit_spill_pending` (batches waiting on disk) and
+`checks.audit_spilled` (entries parked since the process started), and warns while
+the backlog is non-empty. `checks.audit_dropped` counts the entries that could be
+neither written nor parked — the only true losses.
+
 ## A practical workflow
 
 1. **Before an engagement.** Export the chain (`/audit/export`) and record

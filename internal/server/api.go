@@ -573,9 +573,13 @@ func (s *Server) apiHealth(c *gin.Context) {
 	if s != nil {
 		health["audit_queue_depth"] = s.auditQueueDepth()
 		health["audit_dropped"] = s.auditDropped.Load()
+		health["audit_spilled"] = s.auditSpilled.Load()
+		health["audit_spill_pending"] = s.auditSpillPending()
 	} else {
 		health["audit_queue_depth"] = 0
 		health["audit_dropped"] = int64(0)
+		health["audit_spilled"] = int64(0)
+		health["audit_spill_pending"] = 0
 	}
 
 	respond(c, health)

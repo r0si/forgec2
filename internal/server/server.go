@@ -224,6 +224,10 @@ type Server struct {
 	auditQueue    chan []db.AuditLog
 	auditLastHash string
 	auditDropped  atomic.Int64
+	// auditSpilled counts entries that could not be written to the database and
+	// were parked on disk for a later attempt (see audit_spill.go). A spill is
+	// not a loss, but it is a backlog an operator should see.
+	auditSpilled atomic.Int64
 	// auditTamperID is the row id of the last reported chain-integrity failure,
 	// so /ready polls do not re-log the same finding every few seconds.
 	auditTamperMu sync.Mutex

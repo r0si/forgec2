@@ -87,6 +87,16 @@ func (s *Server) handleReadyCheck(c *gin.Context) {
 			checks["audit_dropped"] = dropped
 			warnings = append(warnings, fmt.Sprintf("%d audit entr(ies) were dropped because the write queue was full", dropped))
 		}
+		// Batches that could not be written are parked on disk instead of lost.
+		// A backlog there means the database was unreachable, so it is a
+		// warning; the recovered count is informational.
+		if pending := s.auditSpillPending(); pending > 0 {
+			checks["audit_spill_pending"] = pending
+			warnings = append(warnings, fmt.Sprintf("%d audit batch(es) are parked on disk waiting for the database", pending))
+		}
+		if spilled := s.auditSpilled.Load(); spilled > 0 {
+			checks["audit_spilled"] = spilled
+		}
 	}
 
 	// Delivery and action health are warnings, not readiness: a route nobody can reach does not make the process unready,
