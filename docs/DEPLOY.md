@@ -207,6 +207,25 @@ The outcome is audited (`hot_update_result`) and readable at
 `GET /api/update-progress` under `last_result`
 (`success` / `failed` / `rolled_back` / `interrupted`).
 
+#### The release asset contract
+
+The updater reads the GitHub releases API and installs exactly one asset. A
+release (including a fork's) must therefore publish, for the platform it
+targets:
+
+| Asset | Required | Purpose |
+|---|---|---|
+| `forgec2-server-<os>-<arch>[.exe]` | yes | the installable binary |
+| `forgec2-server-<os>-<arch>[.exe].sha256` | yes | checksum of **that** binary |
+| `forgec2-server-<os>-<arch>[.exe].sha256.sig` | when signing is on | detached Ed25519 signature |
+
+Anything else in the release — the one-click archives, the SBOM, `QUICKSTART.txt`,
+other platforms' binaries — is ignored by the picker, and a checksum that
+belongs to a different platform is **not** accepted for this one. A release
+that publishes no binary for the running platform, or two binaries that both
+match it, is refused instead of guessed. `internal/server/update_release_contract_test.go`
+pins this contract against a simulated multi-platform release.
+
 ### Manual upgrade (and the escape hatch)
 
 The hot update needs a working installation; to replace the binary by hand:
