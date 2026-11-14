@@ -18,7 +18,7 @@ database, one HTTP listener, and **no** beacon transport.
 
 | layer | detail |
 |---|---|
-| backend | container `forgec2-demo` from the published image — **canonical pin `sha256:40a2ff32…`** (the `edge` build of `f2fa0f5e1`, the one with the patched Go standard library). The mirror currently answers 502 for that digest, so the host runs the identical image loaded from GHCR under the local tag `hygiene`; `verify-image.sh` proves the two are the same content. `network_mode: host`, `read_only`, `working_dir: /data`, binds `127.0.0.1:18000` only |
+| backend | container `forgec2-demo` from the published image — **canonical pin `sha256:bda86050…`** (the `edge` build of `01b53b2b4`, the one with the patched Go standard library). The mirror currently answers 502 for that digest, so the host runs the identical image loaded from GHCR under the local tag `auditspill`; `verify-image.sh` proves the two are the same content. `network_mode: host`, `read_only`, `working_dir: /data`, binds `127.0.0.1:18000` only |
 | database | PostgreSQL 18 on the host (`127.0.0.1:5432`, role `forgec2`, db `forgec2`) |
 | edge | standalone nginx (`deploy/demo/nginx.conf`) listening on `0.0.0.0:8000`, proxying everything to the backend |
 | state | `/opt/forgec2-demo/container-data` (uid/gid 65532), config mounted read-only from `/opt/forgec2-demo/compose/config.yaml` |
@@ -75,7 +75,7 @@ Requirements specific to this host and documented rather than hidden:
 
 - **GHCR is not reachable directly.** The image is pulled through a read-only
   mirror serving the identical manifest (`ghcr.nju.edu.cn/r0si/forgec2`, pulled
-  by digest `sha256:40a2ff32…`). Set `FORGEC2_IMAGE` to the mirror, tag or
+  by digest `sha256:bda86050…`). Set `FORGEC2_IMAGE` to the mirror, tag or
   digest, in `.env`. When the mirror rejects a new digest with 502, pull it
   from GHCR on a reachable host, `docker load` the saved image, and point the
   demo at the local tag until the mirror catches up - the pin stays checkable
@@ -163,8 +163,8 @@ therefore be *proved* to be the canonical one:
 
 ```bash
 bash deploy/demo/verify-image.sh
-# OK: ghcr.nju.edu.cn/r0si/forgec2:hygiene is content-identical to the
-# canonical manifest sha256:40a2ff32877671ea232e4a4a5b15df18adbfa5276a41e89c4ec47f6cfef8be7e
+# OK: ghcr.nju.edu.cn/r0si/forgec2:auditspill is content-identical to the
+# canonical manifest sha256:bda86050ec090eb03eb479c84c773266dc9a05e7e12dff073418bc8d091df465
 ```
 
 A backup is only real once it has been restored somewhere. `restore-drill.sh`restores the newest dump into a scratch database on the same cluster and
