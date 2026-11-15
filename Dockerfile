@@ -15,7 +15,7 @@
 # without QEMU emulation - the alternative was ~34 minutes of emulated npm and
 # go build for one extra architecture. It needs BuildKit (the default since
 # Docker 23); the classic builder does not understand --platform in FROM.
-FROM --platform=$BUILDPLATFORM node:26.12-alpine@sha256:6f08a523443ddedf52941874c203475b0ad503e859ad70cb26ab8be9a517dbd5 AS frontend-builder
+FROM --platform=$BUILDPLATFORM node:26.13-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5 AS frontend-builder
 WORKDIR /build/frontend
 COPY frontend/package*.json ./
 RUN npm ci
@@ -23,7 +23,7 @@ COPY frontend/ .
 RUN npm run build
 
 # Stage 2: Build Go binary with embedded frontend
-FROM --platform=$BUILDPLATFORM golang:1.26.11-alpine@sha256:ae52b5bc6ed045a9ed26ab03dc19327a802a9cc9aa8b27ed57f5c6b60579b0bb AS backend-builder
+FROM --platform=$BUILDPLATFORM golang:1.27.0-alpine@sha256:4c9fe60190a2a3350ddc51de80d0224b8a6698d12bdfc999fee45ea9d6c46dbc AS backend-builder
 # TARGETOS/TARGETARCH are the platform the IMAGE is for; the build itself runs
 # on the builder platform, so the binary is cross-compiled rather than emulated.
 ARG TARGETOS
