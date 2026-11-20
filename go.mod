@@ -25,7 +25,7 @@ require (
 	github.com/prometheus/client_golang v1.25.0
 	github.com/quic-go/quic-go v0.65.0
 	github.com/refraction-networking/utls v1.8.2
-	github.com/slack-go/slack v0.35.0
+	github.com/slack-go/slack v0.36.0
 	github.com/tc-hib/winres v0.3.1
 	github.com/tetratelabs/wazero v1.12.0
 	github.com/vmihailenco/msgpack/v5 v5.4.1
